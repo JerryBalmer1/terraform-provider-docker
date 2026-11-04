@@ -1,0 +1,128 @@
+package provider
+
+import (
+	"context"
+
+	"github.com/docker/docker/api/types/network"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+var (
+	_ datasource.DataSource              = (*networkDataSource)(nil)
+	_ datasource.DataSourceWithConfigure = (*networkDataSource)(nil)
+)
+
+// NewNetworkDataSource is the data "docker_network" constructor.
+func NewNetworkDataSource() datasource.DataSource { return &networkDataSource{} }
+
+type networkDataSource struct {
+	pd *providerData
+}
+
+type networkDataSourceModel struct {
+	Name       types.String `tfsdk:"name"`
+	ID         types.String `tfsdk:"id"`
+	Driver     types.String `tfsdk:"driver"`
+	Scope      types.String `tfsdk:"scope"`
+	Internal   types.Bool   `tfsdk:"internal"`
+	Attachable types.Bool   `tfsdk:"attachable"`
+	Ingress    types.Bool   `tfsdk:"ingress"`
+	IPv6       types.Bool   `tfsdk:"ipv6"`
+	IPAMDriver types.String `tfsdk:"ipam_driver"`
+	IPAMConfig types.List   `tfsdk:"ipam_config"`
+	Options    types.Map    `tfsdk:"options"`
+	Labels     types.Map    `tfsdk:"labels"`
+}
+
+var networkDataIPAMAttrTypes = map[string]attr.Type{
+	"subnet":      types.StringType,
+	"ip_range":    types.StringType,
+	"gateway":     types.StringType,
+	"aux_address": types.MapType{ElemType: types.StringType},
+}
+
+func (d *networkDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_network"
+}
+
+func (d *networkDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Looks up an existing Docker network (e.g. `bridge`, `host`, or one created outside Terraform) by name or ID.",
+		Attributes: map[string]schema.Attribute{
+			"name":        schema.StringAttribute{Required: true, MarkdownDescription: "Network name, ID or unique ID prefix."},
+			"id":          schema.StringAttribute{Computed: true, MarkdownDescription: "Network ID."},
+			"driver":      schema.StringAttribute{Computed: true, MarkdownDescription: "Network driver."},
+			"scope":       schema.StringAttribute{Computed: true, MarkdownDescription: "`local` or `swarm`."},
+			"internal":    schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether external access is restricted."},
+			"attachable":  schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether standalone containers can attach (overlay)."},
+			"ingress":     schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether this is the Swarm ingress network."},
+			"ipv6":        schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether IPv6 is enabled."},
+			"ipam_driver": schema.StringAttribute{Computed: true, MarkdownDescription: "IPAM driver."},
+			"ipam_config": schema.ListNestedAttribute{
+				Computed: true, MarkdownDescription: "IPAM pools, including daemon-assigned ones.",
+				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+					"subnet":      schema.StringAttribute{Computed: true, MarkdownDescription: "Subnet (CIDR)."},
+					"ip_range":    schema.StringAttribute{Computed: true, MarkdownDescription: "Allocation range."},
+					"gateway":     schema.StringAttribute{Computed: true, MarkdownDescription: "Gateway address."},
+					"aux_address": schema.MapAttribute{ElementType: types.StringType, Computed: true, MarkdownDescription: "Auxiliary addresses."},
+				}},
+			},
+			"options": schema.MapAttribute{ElementType: types.StringType, Computed: true, MarkdownDescription: "Driver options."},
+			"labels":  schema.MapAttribute{ElementType: types.StringType, Computed: true, MarkdownDescription: "Network labels."},
+		},
+	}
+}
+
+func (d *networkDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	d.pd = providerDataFrom(req.ProviderData, &resp.Diagnostics)
+}
+
+// networkDataFromInspect fills the data source model from inspect output.
+func networkDataFromInspect(n network.Inspect, name types.String) networkDataSourceModel {
+	pools := make([]attr.Value, 0, len(n.IPAM.Config))
+	for _, c := range n.IPAM.Config {
+		pools = append(pools, types.ObjectValueMust(networkDataIPAMAttrTypes, map[string]attr.Value{
+			"subnet":      types.StringValue(c.Subnet),
+			"ip_range":    types.StringValue(c.IPRange),
+			"gateway":     types.StringValue(c.Gateway),
+			"aux_address": stringMapValue(c.AuxAddress, false),
+		}))
+	}
+	return networkDataSourceModel{
+		Name:       name,
+		ID:         types.StringValue(n.ID),
+		Driver:     types.StringValue(n.Driver),
+		Scope:      types.StringValue(n.Scope),
+		Internal:   types.BoolValue(n.Internal),
+		Attachable: types.BoolValue(n.Attachable),
+		Ingress:    types.BoolValue(n.Ingress),
+		IPv6:       types.BoolValue(n.EnableIPv6),
+		IPAMDriver: types.StringValue(n.IPAM.Driver),
+		IPAMConfig: types.ListValueMust(types.ObjectType{AttrTypes: networkDataIPAMAttrTypes}, pools),
+		Options:    stringMapValue(n.Options, false),
+		Labels:     stringMapValue(n.Labels, false),
+	}
+}
+
+func (d *networkDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var cfg networkDataSourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
+	if resp.Diagnostics.HasError() || d.pd == nil {
+		return
+	}
+	id, err := resolveNetworkID(ctx, d.pd.Client, cfg.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot find network", err.Error())
+		return
+	}
+	n, err := d.pd.Client.NetworkInspect(ctx, id, network.InspectOptions{})
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot inspect network", err.Error())
+		return
+	}
+	state := networkDataFromInspect(n, cfg.Name)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}

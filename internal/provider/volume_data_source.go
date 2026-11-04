@@ -1,0 +1,82 @@
+package provider
+
+import (
+	"context"
+
+	"github.com/docker/docker/api/types/volume"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+var (
+	_ datasource.DataSource              = (*volumeDataSource)(nil)
+	_ datasource.DataSourceWithConfigure = (*volumeDataSource)(nil)
+)
+
+// NewVolumeDataSource is the data "docker_volume" constructor.
+func NewVolumeDataSource() datasource.DataSource { return &volumeDataSource{} }
+
+type volumeDataSource struct {
+	pd *providerData
+}
+
+type volumeDataSourceModel struct {
+	Name       types.String `tfsdk:"name"`
+	ID         types.String `tfsdk:"id"`
+	Driver     types.String `tfsdk:"driver"`
+	DriverOpts types.Map    `tfsdk:"driver_opts"`
+	Labels     types.Map    `tfsdk:"labels"`
+	Mountpoint types.String `tfsdk:"mountpoint"`
+	Scope      types.String `tfsdk:"scope"`
+}
+
+func (d *volumeDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_volume"
+}
+
+func (d *volumeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Looks up an existing Docker volume by name.",
+		Attributes: map[string]schema.Attribute{
+			"name":        schema.StringAttribute{Required: true, MarkdownDescription: "Volume name."},
+			"id":          schema.StringAttribute{Computed: true, MarkdownDescription: "Volume name (volumes have no separate ID)."},
+			"driver":      schema.StringAttribute{Computed: true, MarkdownDescription: "Volume driver."},
+			"driver_opts": schema.MapAttribute{ElementType: types.StringType, Computed: true, MarkdownDescription: "Driver options."},
+			"labels":      schema.MapAttribute{ElementType: types.StringType, Computed: true, MarkdownDescription: "Volume labels."},
+			"mountpoint":  schema.StringAttribute{Computed: true, MarkdownDescription: "Host path of the volume data."},
+			"scope":       schema.StringAttribute{Computed: true, MarkdownDescription: "`local` or `global`."},
+		},
+	}
+}
+
+func (d *volumeDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	d.pd = providerDataFrom(req.ProviderData, &resp.Diagnostics)
+}
+
+func volumeDataFromInspect(v volume.Volume) volumeDataSourceModel {
+	return volumeDataSourceModel{
+		Name:       types.StringValue(v.Name),
+		ID:         types.StringValue(v.Name),
+		Driver:     types.StringValue(v.Driver),
+		DriverOpts: stringMapValue(v.Options, false),
+		Labels:     stringMapValue(v.Labels, false),
+		Mountpoint: types.StringValue(v.Mountpoint),
+		Scope:      types.StringValue(v.Scope),
+	}
+}
+
+func (d *volumeDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var cfg volumeDataSourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
+	if resp.Diagnostics.HasError() || d.pd == nil {
+		return
+	}
+	v, err := d.pd.Client.VolumeInspect(ctx, cfg.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot find volume", err.Error())
+		return
+	}
+	state := volumeDataFromInspect(v)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}

@@ -1,0 +1,49 @@
+{{- define "attrtable" -}}
+{{- if .Attributes }}
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+{{- range .Attributes }}
+| `{{ .Name }}` | {{ if .Type }}`{{ .Type }}`{{ end }} | {{ status . }}{{ if .Deprecated }}, deprecated{{ end }} | {{ yes .ForcesReplacement }} | {{ yes .Sensitive }} | {{ cell .Description }} |
+{{- end }}
+{{- end }}
+{{- if .Blocks }}
+
+Nested blocks: {{ range $i, $b := .Blocks }}{{ if $i }}, {{ end }}`{{ $b.Name }}` ({{ $b.Nesting }}{{ limits $b }}){{ end }}.
+{{- end }}
+{{- end -}}
+
+# {{ if eq .Doc.Kind "provider" }}provider "docker"{{ else }}{{ .Doc.Address }}{{ end }}
+
+{{ .Marker }}
+
+Kind: {{ .Doc.Kind }}.{{ if ne .Doc.Kind "provider" }} Back to [SKILL.md](../SKILL.md).{{ end }}
+
+{{ if .Doc.Description }}{{ .Doc.Description }}{{ else }}No description in the schema.{{ end }}
+
+## Arguments and attributes
+{{ template "attrtable" .Doc.Root }}
+{{- if not .Doc.Root.Attributes }}{{ if not .Doc.Root.Blocks }}
+
+This type has no attributes.
+{{- end }}{{ end }}
+{{ range .Blocks }}
+### `{{ .Path }}`
+
+{{ .Nesting }}{{ limits . }}.{{ if .Description }} {{ .Description }}{{ end }}
+{{ template "attrtable" . }}
+{{ end }}
+{{- if .Doc.Example }}
+## Example
+
+```terraform
+{{ .Doc.Example }}
+```
+{{- end }}
+{{- if .Doc.Import }}
+
+## Import
+
+```shell
+{{ .Doc.Import }}
+```
+{{- end }}

@@ -1,0 +1,63 @@
+# Test harness ONLY: a three-node Docker-in-Docker swarm (one manager, two
+# workers) used by `make e2e` / TestAccE2EImageToService. This is the only
+# compose file in the repository; the provider itself never uses compose or
+# the docker CLI.
+#
+# SECURITY: every daemon listens on plain TCP 2375 WITHOUT TLS. That is
+# acceptable only because this is a throwaway local harness and the ports are
+# published on 127.0.0.1 exclusively. Never copy this setup anywhere else.
+name: tfdocker-e2e
+
+x-dind: &dind
+  image: docker:28-dind
+  privileged: true
+  environment:
+    # Empty cert dir disables dind's auto-generated TLS (harness-only).
+    DOCKER_TLS_CERTDIR: ""
+  command:
+    - --host=tcp://0.0.0.0:2375
+    - --host=unix:///var/run/docker.sock
+  networks:
+    - swarmnet
+  healthcheck:
+    test: ["CMD", "docker", "info"]
+    interval: 3s
+    timeout: 5s
+    retries: 40
+    start_period: 5s
+  restart: "no"
+
+services:
+  manager:
+    <<: *dind
+    hostname: manager
+    ports:
+      - "127.0.0.1:12375:2375"
+    volumes:
+      - manager-data:/var/lib/docker
+
+  worker1:
+    <<: *dind
+    hostname: worker1
+    ports:
+      - "127.0.0.1:12376:2375"
+    volumes:
+      - worker1-data:/var/lib/docker
+
+  worker2:
+    <<: *dind
+    hostname: worker2
+    ports:
+      - "127.0.0.1:12377:2375"
+    volumes:
+      - worker2-data:/var/lib/docker
+
+networks:
+  # Workers reach the manager's swarm port at manager:2377 over this network.
+  swarmnet:
+    driver: bridge
+
+volumes:
+  manager-data:
+  worker1-data:
+  worker2-data:

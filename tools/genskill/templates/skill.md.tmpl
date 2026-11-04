@@ -1,0 +1,320 @@
+---
+name: terraform-provider-docker
+description: Use when writing, reviewing or debugging Terraform for Docker with the JerryBalmer1/docker provider - images (pull, build, push), networks, volumes, containers, Swarm clusters (init, joining worker and manager nodes), Swarm secrets, configs, services and stacks. Use it instead of docker compose YAML or docker CLI scripts; it explains the four-layer model, dependency order, which attributes force replacement, and how to translate a compose service into docker_service or docker_container.
+---
+
+{{ .Marker }}
+
+# terraform-provider-docker
+
+The `JerryBalmer1/docker` provider drives the Docker Engine API directly. It
+owns the whole chain from image to Swarm workload. **No compose YAML anywhere**:
+there is no compose file to point at, the provider never shells out to the
+`docker` CLI, and you must not generate `docker-compose.yml`, `docker stack
+deploy` calls or `local-exec` provisioners that run `docker`. Express every
+compose concept as a resource (see "Translating compose" below).
+
+This build registers {{ .Resources }} resources and {{ .DataSources }} data sources.
+Per-type argument tables are in [reference/](reference/) and are generated from
+the provider schema, so they are authoritative over anything written here.
+
+```terraform
+terraform {
+  required_providers {
+    docker = {
+      source = "JerryBalmer1/docker"
+    }
+  }
+}
+
+provider "docker" {
+  host = "tcp://10.0.0.10:2376" # or DOCKER_HOST; default unix:///var/run/docker.sock
+}
+```
+
+The provider block points at ONE daemon. For Swarm that daemon must be the
+manager: services, secrets, configs, overlay networks and node updates all go
+through it. Worker hosts are reached only by `docker_swarm_node.host`, which is
+used to make that host join.
+
+## 1. The four-layer model
+
+Build configurations bottom up. Each layer only consumes outputs of the layers
+below it.
+{{ range .Layers }}
+### {{ .Title }}
+
+{{ .Blurb }}
+
+- Resources: {{ if .Resources }}{{ range $i, $r := .Resources }}{{ if $i }}, {{ end }}[`{{ $r.Name }}`]({{ $r.File }}){{ end }}{{ else }}none registered in this build{{ end }}
+- Data sources: {{ if .DataSources }}{{ range $i, $d := .DataSources }}{{ if $i }}, {{ end }}[`{{ $d.Name }}`]({{ $d.File }}){{ end }}{{ else }}none registered in this build{{ end }}
+{{ end }}
+Layer 2 primitives also work inside a Swarm: `docker_network` with
+`driver = "overlay"` is the network type services attach to, and volumes are
+created per node (a service mount of `type = "volume"` creates the volume on
+whichever node runs the task).
+
+## 2. Dependency order
+
+Terraform orders by references. Prefer references (`docker_x.y.id`) over
+`depends_on`; add `depends_on` only where the dependency is real but no
+attribute carries it.
+
+1. `docker_image` before anything that runs it. `docker_registry_image` after
+   `docker_image` (it pushes the local tag, so reference
+   `docker_image.x.name` or add `depends_on`). Swarm workers pull images
+   themselves, so a locally built image must be pushed to a registry the
+   workers can reach before a `docker_service` uses it.
+2. `docker_swarm_init` before every Swarm object. Overlay networks, secrets,
+   configs and services fail with "This node is not a swarm manager" when
+   created first. A plain `docker_network` with `driver = "overlay"` has no
+   attribute pointing at the swarm, so give it
+   `depends_on = [docker_swarm_init.this]`; do the same for `docker_secret`
+   and `docker_config` when nothing else orders them.
+3. `docker_swarm_node` after `docker_swarm_init`, using its tokens:
+   `join_token = docker_swarm_init.this.worker_join_token` (or
+   `manager_join_token` with `role = "manager"`) and
+   `manager_address = "<manager ip>:2377"`. The token reference already orders
+   the join after init.
+4. `docker_secret` and `docker_config` before the `docker_service` that mounts
+   them; reference `docker_secret.x.id` in the service's `secrets` block and the
+   order follows.
+5. `docker_service` after the networks it attaches to (reference
+   `docker_network.x.id` in `networks`) and, when placement constraints need
+   workers, `depends_on = [docker_swarm_node.a, docker_swarm_node.b]`; otherwise
+   tasks sit pending until workers join and `converge_config` times out.
+6. Destroy runs in reverse: services, then secrets/configs/networks, then
+   nodes leave, then the manager leaves the swarm. Do not break the reverse
+   chain with `-target` on a lower layer while upper layers still exist.
+
+## 3. Changes that force replacement
+
+The protocol schema does not carry plan modifiers, so this table lists every
+attribute whose description says it forces a new resource. Changing any of
+these destroys and recreates the object.
+{{ if .Replacements }}
+| Resource | Attribute | Description |
+|---|---|---|
+{{- range .Replacements }}
+| `{{ .Address }}` | `{{ .Path }}` | {{ summary .Description }} |
+{{- end }}
+{{ else }}
+No registered resource attribute says it forces replacement in this build.
+{{ end }}
+Gotchas to plan around:
+
+- **Secrets and configs are immutable** in Swarm. Changing `data` or `name`
+  replaces them, and a secret in use by a service cannot be removed. Rotate by
+  putting a version suffix in `name` (`db_password_v2`) together with
+  `lifecycle { create_before_destroy = true }`, so the new secret exists, the
+  service updates to it, and only then the old one is deleted.
+- **Networks are immutable**: driver, IPAM, `internal`, `attachable`, options
+  cannot change in place. A replaced network detaches running containers and
+  service tasks; expect a service update.
+- **Image triggers**: `docker_image` and `docker_registry_image` re-pull,
+  rebuild or re-push only when an attribute or a `triggers` map value changes.
+  Put a content hash in `triggers` (for example
+  `sha1(join("", [for f in fileset(path.module, "app/**") : filesha1("${path.module}/${f}")]))`)
+  to rebuild when the build context changes. Pin services to
+  `docker_image.x.repo_digest` so a new pull of the same tag rolls the service.
+- **`docker_swarm_init` destroy = leave the swarm.** Destroying or replacing it
+  makes the manager leave and tears down every Swarm object with it. Changing
+  `advertise_addr` or `listen_addr` therefore rebuilds the whole cluster; guard
+  it with `lifecycle { prevent_destroy = true }` in long-lived environments.
+- **`docker_swarm_node` replacement = leave and rejoin.** Changing the joining
+  `host`, `join_token` or `manager_address` makes the node leave and join again
+  with a new node ID; `availability`, `role` and `labels` update in place.
+- Containers are replaced on most changes; use services for rolling updates.
+
+## 4. Worked example: cold start to three replicas on two workers
+
+One manager (the provider's daemon) and two worker hosts, all reachable over
+TCP with TLS. The example pulls an image, initialises the swarm, joins both
+workers, creates an overlay network and a secret, and runs three replicas that
+only land on workers.
+{{ if .ExampleGaps }}
+> Schema drift: this example does not match the provider build it was
+> generated from:
+{{- range .ExampleGaps }}
+> - {{ . }}
+{{- end }}
+{{ end }}
+```terraform
+terraform {
+  required_providers {
+    docker = {
+      source = "JerryBalmer1/docker"
+    }
+  }
+}
+
+variable "manager_ip" { default = "10.0.0.10" }
+variable "worker1_ip" { default = "10.0.0.11" }
+variable "worker2_ip" { default = "10.0.0.12" }
+variable "db_password" {
+  type      = string
+  sensitive = true
+}
+
+# The provider talks to the manager. Everything except the join goes here.
+provider "docker" {
+  host = "tcp://${var.manager_ip}:2376"
+
+  tls {
+    ca   = file("certs/manager/ca.pem")
+    cert = file("certs/manager/cert.pem")
+    key  = file("certs/manager/key.pem")
+  }
+}
+
+# Layer 1: image. Pulled on the manager to resolve the digest; workers pull
+# the same digest when their tasks start.
+resource "docker_image" "web" {
+  name         = "nginx:1.27-alpine"
+  keep_locally = true
+}
+
+# Layer 3: swarm topology.
+resource "docker_swarm_init" "this" {
+  advertise_addr = var.manager_ip
+}
+
+resource "docker_swarm_node" "worker1" {
+  host            = "tcp://${var.worker1_ip}:2376"
+  join_token      = docker_swarm_init.this.worker_join_token
+  manager_address = "${var.manager_ip}:2377"
+  role            = "worker"
+  labels          = { zone = "a" }
+
+  tls {
+    ca   = file("certs/worker1/ca.pem")
+    cert = file("certs/worker1/cert.pem")
+    key  = file("certs/worker1/key.pem")
+  }
+}
+
+resource "docker_swarm_node" "worker2" {
+  host            = "tcp://${var.worker2_ip}:2376"
+  join_token      = docker_swarm_init.this.worker_join_token
+  manager_address = "${var.manager_ip}:2377"
+  role            = "worker"
+  labels          = { zone = "b" }
+
+  tls {
+    ca   = file("certs/worker2/ca.pem")
+    cert = file("certs/worker2/cert.pem")
+    key  = file("certs/worker2/key.pem")
+  }
+}
+
+# Layer 2 primitive used by the swarm: overlay networks need an initialised
+# swarm, and no attribute says so, hence depends_on.
+resource "docker_network" "app" {
+  name       = "app"
+  driver     = "overlay"
+  attachable = true
+
+  depends_on = [docker_swarm_init.this]
+}
+
+# Layer 4: workload. Secret data is base64. Rotate by bumping the suffix.
+resource "docker_secret" "db_password" {
+  name = "db_password_v1"
+  data = base64encode(var.db_password)
+
+  depends_on = [docker_swarm_init.this]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "docker_service" "web" {
+  name     = "web"
+  image    = docker_image.web.repo_digest
+  mode     = "replicated"
+  replicas = 3
+
+  networks = [docker_network.app.id]
+
+  placement {
+    constraints = ["node.role==worker"]
+    preferences = ["spread=node.labels.zone"]
+  }
+
+  secrets {
+    secret_id   = docker_secret.db_password.id
+    secret_name = docker_secret.db_password.name
+    file_name   = "db_password" # mounted at /run/secrets/db_password
+  }
+
+  endpoint_spec {
+    ports {
+      target_port    = 80
+      published_port = 8080
+    }
+  }
+
+  update_config {
+    parallelism    = 1
+    delay          = "10s"
+    order          = "start-first"
+    failure_action = "rollback"
+  }
+
+  # Apply waits until all replicas are running (or fails after timeout).
+  converge_config {
+    timeout = "3m"
+    delay   = "5s"
+  }
+
+  # The constraint only matches once workers have joined.
+  depends_on = [docker_swarm_node.worker1, docker_swarm_node.worker2]
+}
+```
+
+`terraform apply` creates, in order: image and swarm init (parallel), the two
+joins, network and secret, then the service, and returns once three tasks run
+on the workers. `terraform destroy` removes the service, secret and network,
+makes both workers leave, and finally makes the manager leave the swarm.
+
+## 5. Reference files
+
+Generated from the schema of this build. Read the one for each type you write
+before choosing argument names.
+{{ range .References }}
+- [`{{ if eq .Kind "provider" }}provider "docker"{{ else }}{{ .Address }}{{ end }}`]({{ .File }}){{ if .Description }}: {{ summary .Description }}{{ end }}
+{{- end }}
+
+## 6. Translating compose
+
+No compose YAML anywhere: not as input, not as output, not embedded in a
+heredoc. Map each compose key to resources:
+
+| Compose | Swarm (`docker_service`) | Single host (`docker_container`) |
+|---|---|---|
+| `services.<name>` | one `docker_service` | one `docker_container` |
+| `image` | `image` | `image` |
+| `build` | `docker_image` with a `build` block, then `docker_registry_image` so workers can pull | `docker_image` with a `build` block; `image = docker_image.x.image_id` |
+| `command` / `entrypoint` | `args` / `command` | `command` / `entrypoint` |
+| `environment` | `env` map | `env` map |
+| `ports: ["8080:80"]` | `endpoint_spec { ports { target_port = 80, published_port = 8080 } }` | `ports { internal = 80, external = 8080 }` |
+| `volumes` (named) | `docker_volume` + `mounts { type = "volume", source, target }` | `docker_volume` + `mounts { type = "volume", source, target }` |
+| `volumes` (bind) | `mounts { type = "bind", source, target }` | `mounts { type = "bind", source, target }` |
+| `networks` | `docker_network` (`driver = "overlay"`) + `networks = [id]` | `docker_network` + `networks_advanced { name }` |
+| `secrets` / `configs` | `docker_secret` / `docker_config` + `secrets {}` / `configs {}` blocks | not supported by the Engine for plain containers; use a bind or tmpfs mount |
+| `deploy.replicas` / `deploy.mode` | `replicas` / `mode` | n/a |
+| `deploy.placement` | `placement { constraints, preferences }` | n/a |
+| `deploy.resources` (`cpus: "0.5"`, `memory: 512M`) | `resources { limits { nano_cpus = 500000000, memory_bytes = 536870912 } }` | `nano_cpus`, `memory` (bytes) |
+| `deploy.update_config` / `rollback_config` | `update_config {}` / `rollback_config {}` | n/a |
+| `deploy.restart_policy` / `restart` | `restart_policy {}` | `restart = "unless-stopped"` |
+| `deploy.labels` / `labels` | `labels` / `container_labels` | `labels` |
+| `healthcheck` | `healthcheck {}` | `healthcheck {}` |
+| `logging` | `logging { driver, options }` | `log_driver`, `log_opts` |
+| `depends_on` | Terraform references or `depends_on` (orders creation only, not readiness) | same |
+| whole file / `docker stack deploy` | `docker_stack` with `service`, `network`, `volume`, `secret`, `config` blocks, or separate resources | separate resources |
+
+Durations are Go duration strings (`"30s"`, `"5m"`). CPU is in nano CPUs and
+memory in bytes. Prefer separate resources over `docker_stack` when objects
+need their own lifecycle settings (for example `create_before_destroy` on a
+rotated secret).

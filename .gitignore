@@ -1,0 +1,22 @@
+# Build output
+/terraform-provider-docker
+/terraform-provider-docker.exe
+/dist/
+*.test
+
+# Terraform working files
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+
+# Editors
+.idea/
+.vscode/
+
+# Test harness runtime state
+/test/harness/.env
+
+__Prompt.md
