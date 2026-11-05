@@ -1,0 +1,5 @@
+# Go sources stay LF on every checkout (core.autocrlf=true on Windows otherwise makes gofmt -l flag every file).
+*.go text eol=lf
+
+# Pinned Engine API spec copies stay byte-identical to the download (sha256 in tools/apiwatch/pinned.json).
+tools/apiwatch/spec/*.yaml -text

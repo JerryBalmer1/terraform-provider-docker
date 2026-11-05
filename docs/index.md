@@ -81,7 +81,7 @@ credentials live only in a helper gives an error that names the setting.
 
 A generated agent skill with dependency rules, the attributes that force
 replacement and a worked cold-start example lives in
-`skills/terraform-provider-docker/SKILL.md` in the provider repository.
+`.claude/skills/terraform-provider-docker/SKILL.md` in the provider repository (Claude Code loads it from there).
 
 ## Example Usage
 

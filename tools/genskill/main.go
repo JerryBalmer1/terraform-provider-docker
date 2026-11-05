@@ -58,10 +58,12 @@ var templateFS embed.FS
 
 func main() {
 	var o options
-	flag.StringVar(&o.Out, "out", filepath.Join("skills", "terraform-provider-docker"), "output directory of the skill")
+	flag.StringVar(&o.Out, "out", filepath.Join(".claude", "skills", "terraform-provider-docker"), "output directory of the skill")
 	flag.StringVar(&o.Examples, "examples", "examples", "examples directory (tfplugindocs layout: resources/<type>/resource.tf, import.sh, data-sources/<type>/data-source.tf, actions/<type>/action.tf, ephemeral-resources/<type>/ephemeral-resource.tf, list-resources/<type>/list-resource.tfquery.hcl, functions/<name>/function.tf)")
 	flag.StringVar(&o.Readme, "readme", "README_resources.md", "path of the generated type index; empty disables it")
 	flag.StringVar(&o.Docs, "docs", "docs", "tfplugindocs output directory the type index links to")
+	flag.StringVar(&o.CLIMap, "climap", filepath.Join("tools", "climap", "commands.json"), "hand-maintained CLI command list for the docker-cli-map skill; empty disables it")
+	flag.StringVar(&o.CLIMapOut, "climap-out", filepath.Join(".claude", "skills", "docker-cli-map", "SKILL.md"), "output file of the docker-cli-map skill")
 	flag.BoolVar(&o.Check, "check", false, "render in memory and exit non-zero if files on disk differ")
 	flag.BoolVar(&o.Strict, "strict", false, "exit non-zero if an attribute or block with a RequiresReplace plan modifier has no replacement sentence in its description, or an action, ephemeral resource, list resource or function lacks a description on the type or any attribute / parameter (does not write files)")
 	flag.Parse()
@@ -78,6 +80,9 @@ type options struct {
 	Docs     string
 	Check    bool
 	Strict   bool
+	// CLIMap is tools/climap/commands.json; empty skips the docker-cli-map skill.
+	CLIMap    string
+	CLIMapOut string
 	// Provider builds the provider to document; nil means provider.New("dev").
 	Provider func() fwprovider.Provider
 }
@@ -135,6 +140,25 @@ func run(ctx context.Context, o options, stdout, stderr io.Writer) error {
 	for _, w := range warnings {
 		fmt.Fprintln(stderr, "genskill: warning:", w)
 	}
+	var cliMap []byte
+	if o.CLIMap != "" {
+		cm, err := loadCLIMap(o.CLIMap)
+		if err != nil {
+			return err
+		}
+		// Tool paths in commands.json are relative to the repository root, two
+		// levels above tools/climap/commands.json.
+		if errs := validateCLIMap(resp, cm, filepath.Join(filepath.Dir(o.CLIMap), "..", "..")); len(errs) > 0 {
+			for _, e := range errs {
+				fmt.Fprintln(stderr, "genskill: climap:", e)
+			}
+			return fmt.Errorf("%s: %d error(s); every type and argument it names must exist in the provider schema", o.CLIMap, len(errs))
+		}
+		for _, w := range cliMapWarnings(resp) {
+			fmt.Fprintln(stderr, "genskill: warning: climap:", w)
+		}
+		cliMap = renderCLIMap(cm, relLink(o.CLIMapOut, o.Out))
+	}
 	if o.Check {
 		diffs, err := checkFiles(o.Out, files)
 		if err != nil {
@@ -142,6 +166,15 @@ func run(ctx context.Context, o options, stdout, stderr io.Writer) error {
 		}
 		if o.Readme != "" {
 			d, err := checkFile(o.Readme, readme)
+			if err != nil {
+				return err
+			}
+			if d != "" {
+				diffs = append(diffs, d)
+			}
+		}
+		if cliMap != nil {
+			d, err := checkFile(o.CLIMapOut, cliMap)
 			if err != nil {
 				return err
 			}
@@ -175,6 +208,15 @@ func run(ctx context.Context, o options, stdout, stderr io.Writer) error {
 			return err
 		}
 		fmt.Fprintf(stdout, "genskill: wrote %s\n", o.Readme)
+	}
+	if cliMap != nil {
+		if err := os.MkdirAll(filepath.Dir(o.CLIMapOut), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(o.CLIMapOut, cliMap, 0o644); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "genskill: wrote %s\n", o.CLIMapOut)
 	}
 	return nil
 }

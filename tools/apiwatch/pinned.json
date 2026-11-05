@@ -1,0 +1,10 @@
+{
+  "_comment": "Engine API spec this provider was last reviewed against. Run go run ./tools/apiwatch at the start of every pass (see .claude/skills/engine-api-watch/SKILL.md); -update rewrites this file after the TODOs are filed.",
+  "api_version": "1.56",
+  "url": "https://docs.docker.com/reference/api/engine/version/v1.56.yaml",
+  "sha256": "00ccd7d2e6e0b7a943ac0067007d181d723b2513ef1f6af3b6b54145314a6fa7",
+  "spec": "spec/engine-api-v1.56.yaml",
+  "url_template": "https://docs.docker.com/reference/api/engine/version/v{version}.yaml",
+  "client_api_version": "1.51",
+  "reviewed": "2026-11-05"
+}

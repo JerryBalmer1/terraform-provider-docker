@@ -58,7 +58,7 @@ jobs:
       - name: make test
         run: make test
 
-      # gofmt, vet, genskill -check (skill + README_resources.md), genskill -strict,
+      # gofmt, vet, genskill -check (.claude/skills, docker-cli-map, README_resources.md), genskill -strict,
       # tfplugindocs validate.
       - name: make check
         run: make check
@@ -67,6 +67,12 @@ jobs:
       # tools/parity/parity.go has no [BLOCKED] line naming it in BUILD_REPORT.md.
       - name: parity
         run: go run ./tools/parity -check BUILD_REPORT.md
+
+      # Docker Engine API drift: fails when the newest published spec (docs.docker.com,
+      # probed upward from the pinned version) differs from tools/apiwatch/pinned.json.
+      # Fix: go run ./tools/apiwatch -todo, file the lines in BUILD_REPORT.md, then -update.
+      - name: apiwatch
+        run: go run ./tools/apiwatch -check
 
   e2e:
     runs-on: ubuntu-latest

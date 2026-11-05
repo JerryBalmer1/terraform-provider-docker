@@ -676,3 +676,76 @@ docker -H "$DOCKER_HOST" swarm init --advertise-addr "$E2E_ADVERTISE_ADDR"
 TF_ACC=1 go test ./internal/provider/ -run 'TestAcc(Service|Stack|Secret|DockerConfig|SwarmTokens|Node_|Nodes_|SwarmNode|ComposeSwarm|ListSecret|P3SwarmList|Action(SwarmRotateTokens|NodeDrainActivate|ServiceScaleForceUpdateRollback))' -count=1 -v -timeout 120m
 bash test/harness/scripts/harness-down.sh
 ```
+
+## Pass 4 Lane 0
+
+Goal: make the repo self-describing for Claude Code before more feature work: CLAUDE.md, skills under .claude/skills/, an Engine API drift watcher and a docker CLI map. Nothing is committed.
+
+### Log
+
+[P4-0] [BUILD] CLAUDE.md at the repo root covers, in order: the provider (four layers + six Terraform kinds); the repo map (internal/provider, tools/genskill, tools/compose2stack, tools/parity, tools/apiwatch, tools/climap, test/harness, .claude/); the standing rules (never commit/push/tag; one worktree per lane under C:\__Code\tpd-wt\lane<X>, lanes never share files, merge by copying owned files back; acceptance only through test/harness/Invoke-E2E.ps1; BUILD_REPORT.md append-only with the tag vocabulary and "a blocked item never stops a lane"; nothing shells out except the gated credential-helper exception; every new type ships with unit test, cleanly-skipping acceptance test, example, genskill-readable description, a parity row and, if it replaces a CLI command, a climap entry; run engine-api-watch at the start of every pass); build commands for PowerShell and bash; a pointer to .claude/skills/.
+[P4-0] [BUILD] The generated skill moved from skills/terraform-provider-docker/ to .claude/skills/terraform-provider-docker/ (SKILL.md + 59 reference files; genskill -out default changed). skills/ now holds only a one-line README pointing at .claude/skills/. Updated README.md, build.ps1 (skill task help, check step name), GNUmakefile (skill comment), ci.yml (check step comment; it runs `make check`, which runs genskill -check on the new default path), templates/index.md.tmpl (tfplugindocs index link) and README_resources.md (regenerated links).
+[P4-0] [BUILD] tools/parity's static lists moved to an importable package tools/parity/paritydata (Kreuzwerker, Extras, Kind, Status). tools/parity keeps its code through type aliases. parity_test.go literals are keyed (go vet's composites check flags unkeyed literals of another package's struct).
+[P4-0] [BUILD] docker-cli-map skill: tools/climap/commands.json is hand-maintained, with 76 commands in three groups: docker, docker compose, and docker swarm/node/service/stack/secret/config. Each command maps to kinds resource / data / action / ephemeral / list / function / provider / tool with attribute paths, or `none` with a reason (BLOCKED: prefix when the Engine API or framework can't do it). genskill (new tools/genskill/climap.go, flags -climap / -climap-out) renders .claude/skills/docker-cli-map/SKILL.md: one table per group, linking into the main skill's reference files, plus a coverage table of every tools/parity/paritydata type with its kreuzwerker status and the commands it replaces. Generation and -check fail on any type, attribute path, function parameter or tool path the provider/repo doesn't have, and on bad groups or duplicates. They warn on a provider type missing from paritydata; there are none today.
+[P4-0] [TEST] tools/genskill: TestValidateCLIMap (valid map incl. nested attribute / block paths, function params, provider, tool; 8 error classes), TestRenderCLIMap (links, escaping, no-equivalent rows, parity coverage rows), TestCLIMapRealProvider (renders the repo's commands.json against the real provider with no errors or warnings; -check passes, then fails with errDrift after the output is edited).
+[P4-0] [FIXED] The first wiring of the climap -check comparison didn't land (a PowerShell replace missed on indentation); TestCLIMapRealProvider caught it ("check after editing the map: got <nil>"). The check is now in run()'s -check branch.
+[P4-0] [BUILD] tools/apiwatch, new:
+  - spec.go: parses swagger 2.0 YAML with gopkg.in/yaml.v3, now a direct dependency (go.mod: one line). It collects endpoints with params, body ref and deprecation, and definitions with top-level properties incl. allOf.
+  - Diff: NEW/CHANGED/REMOVED endpoints; FIELD+/FIELD-/DEF+/DEF- definitions.
+  - mapping.go: ordered rules mapping each path or definition to resource / data / action / ephemeral / function / list / provider / skip-with-reason / unmapped.
+  - main.go: the default compares the pinned copy with the newest published version (probes v<n+1>.yaml upward on docs.docker.com until 404). Flags: -from/-to; -todo -tag (BUILD_REPORT lines grouped by provider type; skip groups become ASSUMED); -check (exit 1 when the newest published spec's sha256 differs from pinned.json, i.e. a newer version or a re-published one); -update (re-pin, rewrite spec copy + pinned.json).
+  - tools/apiwatch/pinned.json pins api_version, url, sha256, spec, url_template, client_api_version (1.51 = github.com/docker/docker v28.5.2) and the reviewed date.
+  - .gitattributes keeps tools/apiwatch/spec/*.yaml byte-exact (-text).
+[P4-0] [TEST] tools/apiwatch: TestParseAndDiff (all 8 change kinds incl. allOf properties and a body-ref change), TestParseRejectsNonSpec, TestMapping, TestRunCheckAndUpdate (httptest docs server: -check fails on a newer version, default table, -todo grouping, -update re-pins and removes the old copy, -check then passes, -todo with nothing new prints a VERIFIED line), TestCheckRepublished.
+[P4-0] [BUILD] build.ps1 -Task apiwatch and `make apiwatch` run `go run ./tools/apiwatch`. ci.yml gained an `apiwatch` step (`go run ./tools/apiwatch -check`) after the parity step.
+[P4-0] [BUILD] .claude/skills/engine-api-watch/SKILL.md (hand-written): when to run (start of every pass; whenever a Docker Engine/Desktop/moby/API version is mentioned, go.mod bumps docker/moby, or CI's apiwatch step fails), how to run each mode, how to read the table (ops, the `-> kind type` targets, why FIELD-/REMOVED matter), how to file it (-todo lines into BUILD_REPORT.md, add mapping rules for unmapped groups, only then -update and log the pin), and gotchas (re-published specs, byte-exact copy, pinned ahead of the client library).
+[P4-0] [VERIFIED] Live: docs.docker.com publishes per-version specs v1.51 ... v1.56; v1.57 returns 404. Docker Desktop here is Engine 29.5.3 / API 1.54. First pinned v1.51 (the client library's version; sha256 f51b797750a7...), ran apiwatch v1.51 -> v1.56 (1 new, 6 changed, 0 removed endpoints; 31 new, 4 removed definitions; 6 added, 27 removed fields), refined the definition rules until nothing was unmapped (disk-usage/stats/NRI -> skip, NetworkSettings and Storage -> docker_container, signature/identity/attestation -> docker_image, EndpointResource/SubnetStatus -> docker_network, AuthResponse -> registry_auth), filed the lines below, then `-update`: pinned v1.56 (sha256 00ccd7d2e6e0...). `go run ./tools/apiwatch -check` failed before the re-pin (exit 1, "v1.56 is published, pinned is v1.51") and passes after.
+[P4-0] [VERIFIED] Static: no non-test provider code reads any field v1.56 removed (NetworkSettings.IPAddress/Gateway/MacAddress/IPPrefixLen/GlobalIPv6Address/Bridge/EndpointID, ContainerConfig.MacAddress, Resources.KernelMemoryTCP, Network.Containers). Newer daemons dropping them can't cause drift. The docker_container TODO below is about exposing the new fields, not repairing reads.
+[P4-0] [TODO] apiwatch Engine API v1.51 -> v1.56, list docker_image: review and cover or log as skipped: CHANGED GET /images/json [+query:identity]
+[P4-0] [TODO] apiwatch Engine API v1.51 -> v1.56, resource docker_image: review and cover or log as skipped: NEW GET /images/{name}/attestations; DEF+ AttestationStatement; DEF+ BuildIdentity; FIELD- BuildInfo.error; FIELD- BuildInfo.progress; DEF+ Identity; FIELD+ ImageInspect.Identity; FIELD- ImageInspect.DockerVersion; FIELD- ImageInspect.Parent; DEF+ KnownSignerIdentity; DEF+ PullIdentity; DEF+ SignatureIdentity; DEF+ SignatureTimestamp; DEF+ SignatureTimestampType; DEF+ SignatureType; DEF+ SignerIdentity
+[P4-0] [ASSUMED] apiwatch Engine API v1.51 -> v1.56, no provider change (diagnostics or the provider's connection handshake): CHANGED GET /system/df [+query:verbose]
+[P4-0] [TODO] apiwatch Engine API v1.51 -> v1.56, action docker_system_prune: review and cover or log as skipped: CHANGED POST /build/prune [-query:keep-storage]
+[P4-0] [TODO] apiwatch Engine API v1.51 -> v1.56, resource docker_network: review and cover or log as skipped: CHANGED POST /networks/{id}/connect [body object -> #/definitions/NetworkConnectRequest]; CHANGED POST /networks/{id}/disconnect [body object -> #/definitions/NetworkDisconnectRequest]; DEF+ EndpointResource; DEF+ IPAMStatus; FIELD- Network.Containers; DEF+ NetworkConnectRequest; DEF+ NetworkDisconnectRequest; DEF+ NetworkInspect; DEF+ NetworkStatus; DEF+ NetworkSummary; DEF+ NetworkTaskInfo; DEF+ SubnetStatus; DEF- NetworkContainer
+[P4-0] [TODO] apiwatch Engine API v1.51 -> v1.56, resource docker_volume: review and cover or log as skipped: CHANGED POST /volumes/create [body #/definitions/VolumeCreateOptions -> #/definitions/VolumeCreateRequest]; DEF+ VolumeCreateRequest; DEF- VolumeCreateOptions
+[P4-0] [TODO] apiwatch Engine API v1.51 -> v1.56, provider registry_auth: review and cover or log as skipped: FIELD- AuthConfig.email; DEF+ AuthResponse
+[P4-0] [ASSUMED] apiwatch Engine API v1.51 -> v1.56, no provider change (daemon diagnostics (system df, stats, NRI), not managed state): DEF+ BuildCacheDiskUsage; FIELD+ ContainerStatsResponse.os_type; DEF+ ContainersDiskUsage; DEF+ ImagesDiskUsage; DEF+ NRIInfo; DEF+ VolumesDiskUsage
+[P4-0] [TODO] apiwatch Engine API v1.51 -> v1.56, resource docker_container: review and cover or log as skipped: FIELD- ContainerConfig.MacAddress; FIELD+ ContainerInspectResponse.Storage; FIELD+ ContainerSummary.Health; FIELD+ HostConfig.Umask; FIELD- NetworkSettings.Bridge; FIELD- NetworkSettings.EndpointID; FIELD- NetworkSettings.Gateway; FIELD- NetworkSettings.GlobalIPv6Address; FIELD- NetworkSettings.GlobalIPv6PrefixLen; FIELD- NetworkSettings.HairpinMode; FIELD- NetworkSettings.IPAddress; FIELD- NetworkSettings.IPPrefixLen; FIELD- NetworkSettings.IPv6Gateway; FIELD- NetworkSettings.LinkLocalIPv6Address; FIELD- NetworkSettings.LinkLocalIPv6PrefixLen; FIELD- NetworkSettings.MacAddress; FIELD- NetworkSettings.SecondaryIPAddresses; FIELD- NetworkSettings.SecondaryIPv6Addresses; DEF+ PortSummary; FIELD- Resources.KernelMemoryTCP; DEF+ RootFSStorage; DEF+ RootFSStorageSnapshot; DEF+ Storage; DEF- Port
+[P4-0] [ASSUMED] apiwatch Engine API v1.51 -> v1.56, no provider change (protocol plumbing): FIELD- CreateImageInfo.error; FIELD- CreateImageInfo.progress; FIELD- PushImageInfo.error; FIELD- PushImageInfo.progress
+[P4-0] [TODO] apiwatch Engine API v1.51 -> v1.56, resource docker_service: review and cover or log as skipped: DEF+ ServiceInfo
+[P4-0] [ASSUMED] apiwatch Engine API v1.51 -> v1.56, no provider change (daemon diagnostics, not managed state): FIELD+ SystemInfo.NRI; FIELD- SystemInfo.KernelMemoryTCP
+[P4-0] [TODO] apiwatch Engine API v1.51 -> v1.56, resource docker_plugin: review and cover or log as skipped: DEF- PluginInterfaceType
+[P4-0] [FIXED] `build.ps1 -Task check` reported gofmt on 128 files. Cause: the user's commit of Pass 3 (dfbd8f4) and a main <-> develop checkout at 20:21 rewrote the working tree with CRLF (core.autocrlf=true), which gofmt -l flags. Git content was unchanged (after `git update-index --refresh` only the 3 intended Go edits show in git diff). Added `*.go text eol=lf` to .gitattributes so future Windows checkouts stay LF, and converted the working copies with gofmt -w (no content change).
+[P4-0] [TEST] go mod tidy; go build ./...; go vet ./... clean. go test ./... -count=1 PASS (internal/provider 177.0s, tools/apiwatch, tools/compose2stack, tools/genskill, tools/parity). go run ./tools/genskill: 60 files to .claude/skills/terraform-provider-docker, README_resources.md, .claude/skills/docker-cli-map/SKILL.md. tfplugindocs generate --provider-name docker exit 0 (docs/index.md now points at .claude/skills/). `pwsh -File build.ps1 -Task check`: all steps passed. `pwsh -File build.ps1 -Task apiwatch`: v1.56 -> v1.56, no changes. `go run ./tools/parity -check BUILD_REPORT.md` exit 0. `go run ./tools/apiwatch -check` exit 0.
+[P4-0] [ASSUMED] The CI apiwatch step depends on docs.docker.com being reachable and keeping the /reference/api/engine/version/v<X>.yaml layout. A network failure exits 2 (an error, not a finding). If the URL layout changes, update url_template in pinned.json.
+[P4-0] [TODO] The CLI map doesn't cover `docker buildx bake/imagetools`, `docker scout`, `docker trust`, `docker checkpoint` or `docker init`. Add them to tools/climap/commands.json (most will be `none`) when an agent reaches for one.
+
+### Pass 4 Lane 0 summary
+
+| Item | Status |
+|---|---|
+| 1. CLAUDE.md | done |
+| 2. Skill moved to .claude/skills/terraform-provider-docker/; skills/ replaced by a pointer README; README.md, ci.yml, build.ps1, GNUmakefile, genskill (-out default and -check), tfplugindocs index link updated | done; genskill -check passes on the new path |
+| 3. engine-api-watch skill + tools/apiwatch (pinned.json with version + sha256, endpoint/field diff mapped to provider types, -todo, -check, -update); build.ps1 -Task apiwatch, make apiwatch, ci.yml apiwatch step | done; pinned Engine API v1.56 after filing the v1.51 -> v1.56 delta |
+| 4. docker-cli-map skill generated from tools/climap/commands.json (76 commands) + tools/parity/paritydata, covered by genskill -check | done |
+| 5. genskill, tfplugindocs generate, build.ps1 -Task check, git add -A | done; all pass |
+
+Counts (this section): VERIFIED 2, FIXED 2, ASSUMED 5 (4 from apiwatch skip groups), BLOCKED 0, TODO 10 (9 apiwatch review items + 1 CLI-map gap).
+
+apiwatch v1.51 -> v1.56 TODOs, for the next pass's lane plan:
+- docker_container: HostConfig.Umask, ContainerSummary.Health, ContainerInspectResponse.Storage / RootFSStorage, PortSummary.
+- docker_image: image identity, signatures and attestations (ImageInspect.Identity, GET /images/{name}/attestations). Image list `identity` query.
+- docker_network: NetworkInspect / IPAMStatus / SubnetStatus status data, typed connect/disconnect bodies.
+- docker_volume: VolumeCreateRequest replaces VolumeCreateOptions (same fields).
+- docker_system_prune: /build/prune lost `keep-storage`.
+- registry_auth: AuthConfig.email removed.
+- docker_service: ServiceInfo.
+- docker_plugin: PluginInterfaceType removed.
+- Most of these need github.com/docker/docker bumped past v28.5.2 (client API 1.51) before the provider can set them.
+
+Commands:
+```
+pwsh -File build.ps1 -Task check
+pwsh -File build.ps1 -Task apiwatch
+go run ./tools/apiwatch -check
+go run ./tools/genskill -check
+```

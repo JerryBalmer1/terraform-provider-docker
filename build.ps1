@@ -11,7 +11,7 @@
       build    go build ./...; go build -o . .          (provider binary in the repo root)
       vet      go vet ./...
       test     go test ./... -count=1 -timeout 10m       (unit tests; TestAcc* skip themselves)
-      skill    go run ./tools/genskill                    (skills/terraform-provider-docker + README_resources.md)
+      skill    go run ./tools/genskill                    (.claude/skills/terraform-provider-docker, .claude/skills/docker-cli-map, README_resources.md)
       docs     skill, then tfplugindocs generate + validate
       check    gofmt -l, go vet, genskill -check, genskill -strict, tfplugindocs validate
                (runs every step, then fails listing the steps that failed)
@@ -22,6 +22,7 @@
       compose2stack  go run ./tools/compose2stack -in <In> -out <Out> -mode <Mode>
                (convert a compose file to HCL once; -In/-Out are relative to the caller's directory)
       parity   go run ./tools/parity                      (kreuzwerker/docker v4.6.0 types vs ours: have / partial / missing)
+      apiwatch go run ./tools/apiwatch                    (pinned Engine API spec vs the newest published: new/changed/removed endpoints and fields per provider type)
 
 .PARAMETER In
     compose2stack: compose file to read (default docker-compose.yml).
@@ -38,15 +39,16 @@
     pwsh -NoProfile -File build.ps1 -Task check
     ./build.ps1 -Task compose2stack -In docker-compose.yml -Out stack.tf -Mode swarm
     ./build.ps1 -Task parity
+    ./build.ps1 -Task apiwatch
 #>
 [CmdletBinding()]
 param(
     # The same set as a ValidateSet, but checked per comma-separated item: `pwsh -File build.ps1
     # -Task build,vet` passes the single string "build,vet" (only -Command parses it as an array),
     # which a plain ValidateSet rejects.
-    [ArgumentCompletions('build', 'vet', 'test', 'docs', 'skill', 'check', 'testacc', 'e2e', 'fmt', 'install', 'compose2stack', 'parity')]
+    [ArgumentCompletions('build', 'vet', 'test', 'docs', 'skill', 'check', 'testacc', 'e2e', 'fmt', 'install', 'compose2stack', 'parity', 'apiwatch')]
     [ValidateScript({
-            $valid = 'build', 'vet', 'test', 'docs', 'skill', 'check', 'testacc', 'e2e', 'fmt', 'install', 'compose2stack', 'parity'
+            $valid = 'build', 'vet', 'test', 'docs', 'skill', 'check', 'testacc', 'e2e', 'fmt', 'install', 'compose2stack', 'parity', 'apiwatch'
             foreach ($t in ($_ -split ',')) {
                 if ($t.Trim() -notin $valid) { throw "Unknown task '$t'. Valid tasks: $($valid -join ', ')." }
             }
@@ -129,6 +131,7 @@ function Invoke-Task {
         'install' { Invoke-Native $Go install . }
         'compose2stack' { Invoke-Native $Go run ./tools/compose2stack -in $InPath -out $OutPath -mode $Mode }
         'parity' { Invoke-Native $Go run ./tools/parity }
+        'apiwatch' { Invoke-Native $Go run ./tools/apiwatch }
         default { throw "unknown task '$Name'" }
     }
 }
@@ -150,7 +153,7 @@ function Invoke-Check {
 
     $steps = @(
         @{ Name = 'go vet'; Args = @('vet', './...') }
-        @{ Name = 'genskill -check (skill and README_resources.md up to date)'; Args = @('run', './tools/genskill', '-check')
+        @{ Name = 'genskill -check (.claude/skills, docker-cli-map and README_resources.md up to date)'; Args = @('run', './tools/genskill', '-check')
             Hint = 'run ./build.ps1 -Task skill and commit the result'
         }
         @{ Name = 'genskill -strict (RequiresReplace attributes say "Forces replacement.")'; Args = @('run', './tools/genskill', '-strict')

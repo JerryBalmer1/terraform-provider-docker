@@ -24,15 +24,15 @@ func TestStaticListValid(t *testing.T) {
 
 func TestValidateCatchesMistakes(t *testing.T) {
 	bad := []Entry{
-		{Resource, "docker_b", Have, ""},
-		{Resource, "docker_a", Have, ""},
-		{Resource, "docker_a", Have, ""},
-		{Resource, "widget", Have, ""},
-		{DataSource, "docker_x", "maybe", ""},
-		{Action, "docker_p", Partial, ""},
-		{"thing", "docker_q", Have, ""},
+		{Kind: Resource, Name: "docker_b", Status: Have, Note: ""},
+		{Kind: Resource, Name: "docker_a", Status: Have, Note: ""},
+		{Kind: Resource, Name: "docker_a", Status: Have, Note: ""},
+		{Kind: Resource, Name: "widget", Status: Have, Note: ""},
+		{Kind: DataSource, Name: "docker_x", Status: "maybe", Note: ""},
+		{Kind: Action, Name: "docker_p", Status: Partial, Note: ""},
+		{Kind: "thing", Name: "docker_q", Status: Have, Note: ""},
 	}
-	got := strings.Join(Validate(bad, []Extra{{Resource, "docker_b", ""}, {"nope", "docker_z", ""}}), "\n")
+	got := strings.Join(Validate(bad, []Extra{{Kind: Resource, Name: "docker_b", Note: ""}, {Kind: "nope", Name: "docker_z", Note: ""}}), "\n")
 	for _, want := range []string{
 		"resource docker_a: duplicate",
 		"resource widget: name lacks docker_ prefix",
@@ -51,11 +51,11 @@ func TestValidateCatchesMistakes(t *testing.T) {
 
 func TestUnblocked(t *testing.T) {
 	entries := []Entry{
-		{Action, "docker_image", Missing, ""},
-		{Action, "docker_image_save", Missing, ""},
-		{Action, "docker_exec", Have, ""},
-		{Resource, "docker_tag", Missing, ""},
-		{Resource, "docker_plugin", Partial, "x"},
+		{Kind: Action, Name: "docker_image", Status: Missing, Note: ""},
+		{Kind: Action, Name: "docker_image_save", Status: Missing, Note: ""},
+		{Kind: Action, Name: "docker_exec", Status: Have, Note: ""},
+		{Kind: Resource, Name: "docker_tag", Status: Missing, Note: ""},
+		{Kind: Resource, Name: "docker_plugin", Status: Partial, Note: "x"},
 	}
 	report := strings.Join([]string{
 		"[P3-D] [BLOCKED] D docker_image_save needs a tar sink, tried X",
@@ -78,7 +78,7 @@ func TestUnblocked(t *testing.T) {
 
 func TestPrint(t *testing.T) {
 	var b bytes.Buffer
-	if err := Print(&b, []Entry{{Resource, "docker_a", Have, ""}, {Action, "docker_b", Missing, "later"}}, []Extra{{Resource, "docker_c", "ours"}}); err != nil {
+	if err := Print(&b, []Entry{{Kind: Resource, Name: "docker_a", Status: Have, Note: ""}, {Kind: Action, Name: "docker_b", Status: Missing, Note: "later"}}, []Extra{{Kind: Resource, Name: "docker_c", Note: "ours"}}); err != nil {
 		t.Fatal(err)
 	}
 	out := b.String()

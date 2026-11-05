@@ -18,7 +18,8 @@ provider schema, so it always matches the build.
 ## Agent skill
 
 A Claude skill generated from the provider schema lives in
-[skills/terraform-provider-docker/SKILL.md](skills/terraform-provider-docker/SKILL.md).
+[.claude/skills/terraform-provider-docker/SKILL.md](.claude/skills/terraform-provider-docker/SKILL.md)
+(Claude Code loads skills from `.claude/skills/` automatically).
 It covers the four layers, their dependency order, the attributes that
 force replacement (read from the resources' `RequiresReplace` plan
 modifiers), write-only `*_wo` arguments, when to use actions, ephemeral

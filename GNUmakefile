@@ -13,7 +13,7 @@ IN ?= docker-compose.yml
 OUT ?= stack.tf
 MODE ?= swarm
 
-.PHONY: build install vet test testacc e2e harness-up harness-down skill docs check lint fmt compose2stack parity
+.PHONY: build install vet test testacc e2e harness-up harness-down skill docs check lint fmt compose2stack parity apiwatch
 
 # Build the provider binary into the repo root.
 build:
@@ -46,7 +46,7 @@ harness-up:
 harness-down:
 	bash test/harness/scripts/harness-down.sh
 
-# Render skills/terraform-provider-docker/ and README_resources.md from the provider schema.
+# Render .claude/skills/terraform-provider-docker/, .claude/skills/docker-cli-map/SKILL.md and README_resources.md from the provider schema.
 skill:
 	$(GO) run ./tools/genskill
 
@@ -82,3 +82,10 @@ compose2stack:
 # type has no [BLOCKED] line in BUILD_REPORT.md.
 parity:
 	$(GO) run ./tools/parity
+
+# Pinned Engine API spec (tools/apiwatch/pinned.json) vs the newest published one:
+# new / changed / removed endpoints and fields mapped to provider types. CI runs
+# `go run ./tools/apiwatch -check`, which fails when a newer spec is published.
+# See .claude/skills/engine-api-watch/SKILL.md.
+apiwatch:
+	$(GO) run ./tools/apiwatch
