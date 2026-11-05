@@ -33,3 +33,33 @@ resource "docker_image" "app" {
     pull = true
   }
 }
+
+# Build with BuildKit: secrets are mounted with RUN --mount=type=secret and
+# are read by the provider at build time (never stored in state).
+#   # syntax=docker/dockerfile:1
+#   RUN --mount=type=secret,id=npm_token NPM_TOKEN=$(cat /run/secrets/npm_token) npm ci
+resource "docker_image" "web" {
+  name = "registry.example.com/team/web:1.0"
+
+  build {
+    context = "${path.module}/web"
+    builder = "buildkit"
+
+    # Reuse layers from a previously pushed image built with inline cache.
+    cache_from = ["registry.example.com/team/web:cache"]
+    args = {
+      BUILDKIT_INLINE_CACHE = "1"
+    }
+
+    platforms = ["linux/arm64"]
+
+    secrets {
+      id  = "npm_token"
+      env = "NPM_TOKEN"
+    }
+    secrets {
+      id  = "netrc"
+      src = "${path.module}/secrets/netrc"
+    }
+  }
+}

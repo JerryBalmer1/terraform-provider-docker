@@ -8,7 +8,7 @@
 {{- end }}
 {{- if .Blocks }}
 
-Nested blocks: {{ range $i, $b := .Blocks }}{{ if $i }}, {{ end }}`{{ $b.Name }}` ({{ $b.Nesting }}{{ limits $b }}){{ end }}.
+Nested blocks: {{ range $i, $b := .Blocks }}{{ if $i }}, {{ end }}`{{ $b.Name }}` ({{ $b.Nesting }}{{ limits $b }}{{ if $b.ForcesReplacement }}, forces replacement{{ end }}){{ end }}.
 {{- end }}
 {{- end -}}
 

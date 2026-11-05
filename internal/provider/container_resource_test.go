@@ -229,6 +229,20 @@ resource "docker_container" "c" {
     soft = 1
     hard = 2
   }
+  devices {
+    host_path = "/dev/fuse"
+  }
+  hostname     = "plan"
+  dns          = ["1.1.1.1"]
+  extra_hosts  = ["db:10.0.0.5"]
+  tty          = true
+  stdin_open   = true
+  stop_signal  = "SIGQUIT"
+  stop_timeout = 20
+  sysctls      = { "net.core.somaxconn" = "1024" }
+  security_opt = ["no-new-privileges:true"]
+  read_only    = true
+  gpus         = "all"
 }
 `,
 		}},

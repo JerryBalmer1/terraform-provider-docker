@@ -12,6 +12,10 @@ import (
 	_ "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	_ "github.com/hashicorp/terraform-plugin-log/tflog"
 	_ "github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	_ "github.com/moby/buildkit/client"
+	_ "github.com/moby/buildkit/session"
+	_ "github.com/moby/buildkit/session/filesync"
+	_ "github.com/moby/buildkit/session/secrets/secretsprovider"
 	_ "github.com/moby/patternmatcher"
 	_ "github.com/moby/patternmatcher/ignorefile"
 )

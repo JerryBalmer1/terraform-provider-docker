@@ -42,8 +42,8 @@ func (r *serviceResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A Swarm service: a desired number of tasks (containers) of one image scheduled across the Swarm. " +
 			"Requires the provider to point at a Swarm manager. Almost every change is a rolling update in place " +
-			"(`ServiceUpdate`, governed by `update_config`); only `name` and switching `mode` between replicated and global " +
-			"replace the service. Destroy removes the service and waits until its tasks are gone, so the networks, secrets " +
+			"(`ServiceUpdate`, governed by `update_config`); only `name` and changing `mode` (replicated, global, replicated_job, " +
+			"global_job) replace the service. Destroy removes the service and waits until its tasks are gone, so the networks, secrets " +
 			"and configs it used can be removed next. Add `converge_config {}` to make apply wait for the tasks to run.",
 		Attributes: attrs,
 		Blocks:     blocks,
@@ -151,7 +151,7 @@ func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := svcUpdate(ctx, r.pd, state.ID.ValueString(), spec); err != nil {
+	if err := svcUpdateKeepForce(ctx, r.pd, state.ID.ValueString(), spec, !containerKnown(plan.ForceUpdate)); err != nil {
 		resp.Diagnostics.AddError("Cannot update service", err.Error())
 		return
 	}
@@ -163,8 +163,15 @@ func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-// svcUpdate applies spec to an existing service at its current version.
+// svcUpdate applies spec to an existing service at its current version. A
+// zero TaskTemplate.ForceUpdate keeps the daemon's counter.
 func svcUpdate(ctx context.Context, pd *providerData, id string, spec swarm.ServiceSpec) error {
+	return svcUpdateKeepForce(ctx, pd, id, spec, spec.TaskTemplate.ForceUpdate == 0)
+}
+
+// svcUpdateKeepForce is svcUpdate; keepForce copies the daemon's ForceUpdate
+// counter into spec (force_update unset) so no forced rollout is replayed.
+func svcUpdateKeepForce(ctx context.Context, pd *providerData, id string, spec swarm.ServiceSpec, keepForce bool) error {
 	cur, _, err := pd.Client.ServiceInspectWithRaw(ctx, id, swarm.ServiceInspectOptions{})
 	if err != nil {
 		return err
@@ -173,8 +180,9 @@ func svcUpdate(ctx context.Context, pd *providerData, id string, spec swarm.Serv
 	if err != nil {
 		return err
 	}
-	// Keep ForceUpdate so an earlier forced rollout is not replayed.
-	spec.TaskTemplate.ForceUpdate = cur.Spec.TaskTemplate.ForceUpdate
+	if keepForce {
+		spec.TaskTemplate.ForceUpdate = cur.Spec.TaskTemplate.ForceUpdate
+	}
 	_, err = pd.Client.ServiceUpdate(ctx, id, cur.Version, spec, swarm.ServiceUpdateOptions{EncodedRegistryAuth: auth, QueryRegistry: true})
 	return err
 }

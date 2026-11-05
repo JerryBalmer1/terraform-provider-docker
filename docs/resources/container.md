@@ -69,6 +69,19 @@ resource "docker_container" "web" {
     hard = 65536
   }
 
+  # Create-time settings (changing any of these replaces the container).
+  hostname     = "web"
+  dns          = ["1.1.1.1", "8.8.8.8"]
+  extra_hosts  = ["db.internal:10.0.0.5", "host.docker.internal:host-gateway"]
+  stop_signal  = "SIGQUIT"
+  stop_timeout = 30
+  sysctls      = { "net.core.somaxconn" = "1024" }
+  security_opt = ["no-new-privileges:true"]
+
+  devices {
+    host_path = "/dev/fuse"
+  }
+
   log_driver = "json-file"
   log_opts   = { max-size = "10m", max-file = "3" }
 
@@ -94,9 +107,15 @@ resource "docker_container" "web" {
 - `capabilities` (Block, Optional) Linux capabilities to add or drop. Changing it forces a new resource. (see [below for nested schema](#nestedblock--capabilities))
 - `command` (List of String) Command (`CMD`) override. Unset uses the image's. Changing this forces a new resource.
 - `cpu_shares` (Number) Relative CPU weight (default 1024 in the daemon). Updated in place; removing it forces a new resource.
+- `devices` (Block List) Host devices mapped into the container (`HostConfig.Devices`, like `docker run --device`). Forces replacement. (see [below for nested schema](#nestedblock--devices))
+- `dns` (List of String) DNS server IPs for the container's resolver (`HostConfig.Dns`). Unset uses the daemon/network default. Forces replacement.
+- `dns_search` (List of String) DNS search domains (`HostConfig.DnsSearch`). Forces replacement.
 - `entrypoint` (List of String) Entrypoint override. Unset uses the image's; setting it also drops the image's `CMD` unless `command` is set. Changing this forces a new resource.
 - `env` (Map of String) Environment variables, merged over the image's. Image-provided variables are not reported in state. Changing this forces a new resource.
+- `extra_hosts` (List of String) Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` exactly like `docker run --add-host` (e.g. `"db.local:10.0.0.5"`, or `"host.docker.internal:host-gateway"` for the host's gateway IP). Forces replacement.
+- `gpus` (String) GPUs to expose, like `docker run --gpus`: `"all"`, a count such as `"2"`, or `"device=0,1"` (indexes or UUIDs). Sent as a `HostConfig.DeviceRequests` entry with driver `nvidia` and capabilities `[["gpu"]]`; the host needs the NVIDIA container toolkit. Forces replacement.
 - `healthcheck` (Block, Optional) Healthcheck override. Without this block the image's healthcheck (if any) applies. Changing it forces a new resource. (see [below for nested schema](#nestedblock--healthcheck))
+- `hostname` (String) Container hostname (`Config.Hostname`). Unset: the daemon uses the first 12 characters of the container ID, which is not reported in state. Forces replacement.
 - `labels` (Map of String) Container labels. Image labels are not reported in state. Docker cannot change labels of an existing container, so changing this forces a new resource.
 - `log_driver` (String) Logging driver, e.g. `json-file`, `local`, `syslog`. Unset uses the daemon default (reported after create). Changing this forces a new resource.
 - `log_opts` (Map of String) Logging driver options, e.g. `{ max-size = "10m" }`. Unset uses the daemon defaults. Changing this forces a new resource.
@@ -109,7 +128,14 @@ resource "docker_container" "web" {
 - `networks_advanced` (Block List) Networks to attach. The first is used at create (`NetworkMode`), the rest are connected before start. Without this block the container joins the daemon's default `bridge`. Changing networks forces a new resource. (see [below for nested schema](#nestedblock--networks_advanced))
 - `ports` (Block List) Published ports (`HostConfig.PortBindings`). Changing ports forces a new resource. (see [below for nested schema](#nestedblock--ports))
 - `privileged` (Boolean) Run the container privileged. Changing this forces a new resource.
+- `read_only` (Boolean) Mount the container's root filesystem read-only (`docker run --read-only`); use `mounts` (e.g. tmpfs) for writable paths. Default `false`. Forces replacement.
 - `restart` (String) Restart policy: `no` (default), `always`, `unless-stopped` or `on-failure`. Updated in place.
+- `security_opt` (Set of String) Security options (`HostConfig.SecurityOpt`), e.g. `no-new-privileges:true`, `apparmor=unconfined`, `seccomp=unconfined`, `label=disable`. Forces replacement.
+- `stdin_open` (Boolean) Keep stdin open (`docker run -i`); with `tty` this keeps shells such as `sh` from exiting immediately. Default `false`. Forces replacement.
+- `stop_signal` (String) Signal sent to stop the container, e.g. `SIGTERM` or `SIGQUIT`. Unset uses the image's `STOPSIGNAL` (else `SIGTERM`); the image value is not reported in state. Forces replacement.
+- `stop_timeout` (Number) Seconds to wait after the stop signal before killing the container. Unset uses the daemon default (10s). Forces replacement.
+- `sysctls` (Map of String) Namespaced kernel parameters, e.g. `{ "net.core.somaxconn" = "1024" }`. Only keys you set are reported (except on import). Forces replacement.
+- `tty` (Boolean) Allocate a pseudo-TTY (`docker run -t`). Default `false`. Forces replacement.
 - `ulimits` (Block List) Resource ulimits. Changing them forces a new resource. (see [below for nested schema](#nestedblock--ulimits))
 - `user` (String) User (and optionally `:group`) to run as. Unset uses the image's. Changing this forces a new resource.
 - `wait` (Boolean) Wait after start until the container's healthcheck reports `healthy` (or, without a healthcheck, until it is running). Fails if the container exits or `wait_timeout` elapses.
@@ -129,6 +155,19 @@ Optional:
 
 - `add` (Set of String) Capabilities to add, e.g. `NET_ADMIN`.
 - `drop` (Set of String) Capabilities to drop, e.g. `ALL`.
+
+
+<a id="nestedblock--devices"></a>
+### Nested Schema for `devices`
+
+Required:
+
+- `host_path` (String) Device path on the host, e.g. `/dev/fuse`.
+
+Optional:
+
+- `container_path` (String) Path inside the container. Unset uses `host_path`.
+- `permissions` (String) Cgroup permissions, a combination of `r` (read), `w` (write) and `m` (mknod). Default `rwm`.
 
 
 <a id="nestedblock--healthcheck"></a>
@@ -169,6 +208,7 @@ Optional:
 
 - `aliases` (Set of String) DNS aliases on this network.
 - `ipv4_address` (String) Static IPv4 address (needs a user-defined subnet).
+- `ipv6_address` (String) Static IPv6 address (needs an IPv6-enabled network with a user-defined IPv6 subnet).
 
 
 <a id="nestedblock--ports"></a>

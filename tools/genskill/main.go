@@ -1,11 +1,15 @@
 // Command genskill renders the terraform-provider-docker agent skill
 // (skills/terraform-provider-docker/SKILL.md and reference/*.md) from the
-// provider's live schema. It serves the provider in-process, asks it for
-// GetProviderSchema, walks every resource and data source, and renders the
-// embedded templates. Run it from the repository root:
+// provider's live schema, plus README_resources.md (an index of every
+// resource and data source). It serves the provider in-process, asks it for
+// GetProviderSchema, walks every resource and data source, reads each
+// resource's framework schema for RequiresReplace plan modifiers, and renders
+// the embedded templates. Run it from the repository root:
 //
-//	go run ./tools/genskill          # write the skill
-//	go run ./tools/genskill -check   # exit 1 if the files on disk are stale
+//	go run ./tools/genskill           # write the skill and README_resources.md
+//	go run ./tools/genskill -check    # exit 1 if the files on disk are stale
+//	go run ./tools/genskill -strict   # exit 1 if a RequiresReplace attribute's
+//	                                  # description lacks a replacement sentence
 package main
 
 import (
@@ -46,7 +50,10 @@ func main() {
 	var o options
 	flag.StringVar(&o.Out, "out", filepath.Join("skills", "terraform-provider-docker"), "output directory of the skill")
 	flag.StringVar(&o.Examples, "examples", "examples", "examples directory (examples/resources/<type>/resource.tf, import.sh, examples/data-sources/<type>/data-source.tf)")
+	flag.StringVar(&o.Readme, "readme", "README_resources.md", "path of the generated resource index; empty disables it")
+	flag.StringVar(&o.Docs, "docs", "docs", "tfplugindocs output directory the resource index links to")
 	flag.BoolVar(&o.Check, "check", false, "render in memory and exit non-zero if files on disk differ")
+	flag.BoolVar(&o.Strict, "strict", false, "exit non-zero if an attribute or block with a RequiresReplace plan modifier has no replacement sentence in its description (does not write files)")
 	flag.Parse()
 	if err := run(context.Background(), o, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, "genskill:", err)
@@ -57,17 +64,50 @@ func main() {
 type options struct {
 	Out      string
 	Examples string
+	Readme   string
+	Docs     string
 	Check    bool
+	Strict   bool
 }
 
-var errDrift = errors.New("skill is out of date; run `go run ./tools/genskill`")
+var (
+	errDrift  = errors.New("skill is out of date; run `go run ./tools/genskill`")
+	errStrict = errors.New(`RequiresReplace attributes without a replacement sentence (add "Forces replacement." to their MarkdownDescription)`)
+)
 
 func run(ctx context.Context, o options, stdout, stderr io.Writer) error {
 	resp, err := loadSchema(ctx)
 	if err != nil {
 		return err
 	}
-	files, warnings, err := render(resp, o.Examples)
+	fw, err := frameworkResources(ctx, provider.New("dev")())
+	if err != nil {
+		return err
+	}
+	repl, violations := frameworkReplacements(fw)
+
+	var errs []error
+	if o.Strict {
+		for _, v := range violations {
+			fmt.Fprintln(stderr, "genskill: strict:", v)
+		}
+		if len(violations) > 0 {
+			fmt.Fprintf(stderr, "genskill: strict: %d violation(s)\n", len(violations))
+			errs = append(errs, errStrict)
+		} else {
+			fmt.Fprintf(stdout, "genskill: strict: every RequiresReplace attribute says it forces replacement (%d resources)\n", len(fw))
+		}
+		if !o.Check {
+			return errors.Join(errs...)
+		}
+	}
+
+	ro := renderOpts{Examples: o.Examples, Replace: repl}
+	if o.Readme != "" {
+		ro.ReadmeSkillDir = relLink(o.Readme, o.Out)
+		ro.ReadmeDocsDir = relLink(o.Readme, o.Docs)
+	}
+	files, readme, warnings, err := render(resp, ro)
 	if err != nil {
 		return err
 	}
@@ -79,14 +119,27 @@ func run(ctx context.Context, o options, stdout, stderr io.Writer) error {
 		if err != nil {
 			return err
 		}
+		if o.Readme != "" {
+			d, err := checkFile(o.Readme, readme)
+			if err != nil {
+				return err
+			}
+			if d != "" {
+				diffs = append(diffs, d)
+			}
+		}
 		for _, d := range diffs {
 			fmt.Fprintln(stderr, "genskill: drift:", d)
 		}
 		if len(diffs) > 0 {
-			return errDrift
+			errs = append(errs, errDrift)
+		} else {
+			fmt.Fprintf(stdout, "genskill: %s is up to date (%d files)\n", o.Out, len(files))
+			if o.Readme != "" {
+				fmt.Fprintf(stdout, "genskill: %s is up to date\n", o.Readme)
+			}
 		}
-		fmt.Fprintf(stdout, "genskill: %s is up to date (%d files)\n", o.Out, len(files))
-		return nil
+		return errors.Join(errs...)
 	}
 	removed, err := writeFiles(o.Out, files)
 	if err != nil {
@@ -96,7 +149,26 @@ func run(ctx context.Context, o options, stdout, stderr io.Writer) error {
 		fmt.Fprintln(stdout, "genskill: removed stale", r)
 	}
 	fmt.Fprintf(stdout, "genskill: wrote %d files to %s\n", len(files), o.Out)
+	if o.Readme != "" {
+		if err := os.WriteFile(o.Readme, readme, 0o644); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "genskill: wrote %s\n", o.Readme)
+	}
 	return nil
+}
+
+// relLink returns target relative to the directory of file, slash separated,
+// for markdown links written into file.
+func relLink(file, target string) string {
+	fa, err1 := filepath.Abs(filepath.Dir(file))
+	ta, err2 := filepath.Abs(target)
+	if err1 == nil && err2 == nil {
+		if rel, err := filepath.Rel(fa, ta); err == nil {
+			return filepath.ToSlash(rel)
+		}
+	}
+	return filepath.ToSlash(target)
 }
 
 // loadSchema serves the provider in-process and returns its protocol schema.
@@ -144,8 +216,11 @@ type blockInfo struct {
 	MinItems    int64
 	MaxItems    int64
 	Description string
-	Attributes  []attrInfo
-	Blocks      []blockInfo
+	// ForcesReplacement: the block carries a RequiresReplace plan modifier
+	// or its description says it forces replacement.
+	ForcesReplacement bool
+	Attributes        []attrInfo
+	Blocks            []blockInfo
 }
 
 type typeDoc struct {
@@ -176,12 +251,25 @@ func (t typeDoc) File() string {
 	return "reference/" + t.Name + ".md"
 }
 
-// forcesReplacement reports whether an attribute description follows the
-// lane convention of stating that changing it forces a new resource. The
-// protocol schema carries no plan modifiers, so the text is the signal.
+// DocPage is the tfplugindocs page relative to the docs directory.
+func (t typeDoc) DocPage() string {
+	short := strings.TrimPrefix(t.Name, "docker_")
+	switch t.Kind {
+	case kindDataSource:
+		return "data-sources/" + short + ".md"
+	case kindProvider:
+		return "index.md"
+	}
+	return "resources/" + short + ".md"
+}
+
+// forcesReplacement reports whether a description states that changing the
+// value forces replacement ("Forces replacement." or "Changing this forces a
+// new resource."). It is the fallback signal where no framework plan modifier
+// is visible, and the sentence -strict requires on RequiresReplace attributes.
 func forcesReplacement(desc string) bool {
 	d := strings.ToLower(desc)
-	for _, p := range []string{"forces a new resource", "forces replacement", "forces a replacement", "force a new resource"} {
+	for _, p := range []string{"forces a new ", "force a new ", "forces replacement", "forces a replacement"} {
 		if strings.Contains(d, p) {
 			return true
 		}
@@ -305,6 +393,7 @@ func walkBlock(name, path, nesting string, b *tfprotov6.SchemaBlock) blockInfo {
 		return bi
 	}
 	bi.Description = strings.TrimSpace(b.Description)
+	bi.ForcesReplacement = path != "" && forcesReplacement(b.Description)
 	bi.Attributes = walkAttributes(path, b.Attributes)
 	for _, nb := range b.BlockTypes {
 		if nb == nil {
@@ -345,18 +434,54 @@ func subBlocks(b blockInfo) []blockInfo {
 	return out
 }
 
-// replacementAttrs lists every attribute under b that forces replacement.
-func replacementAttrs(b blockInfo) []attrInfo {
-	var out []attrInfo
+// markReplacements sets ForcesReplacement on every attribute and block of b
+// whose path the framework walk flagged as RequiresReplace. The description
+// text flag set by the protocol walk stays as the fallback.
+func markReplacements(b *blockInfo, typeName string, set replaceSet) {
+	if set == nil {
+		return
+	}
+	for i := range b.Attributes {
+		a := &b.Attributes[i]
+		if set.has(typeName, a.Path) {
+			a.ForcesReplacement = true
+		}
+		if a.Nested != nil {
+			markReplacements(a.Nested, typeName, set)
+		}
+	}
+	for i := range b.Blocks {
+		c := &b.Blocks[i]
+		if set.has(typeName, c.Path) {
+			c.ForcesReplacement = true
+		}
+		markReplacements(c, typeName, set)
+	}
+}
+
+// replNode is an attribute or block that forces replacement.
+type replNode struct {
+	Path        string
+	Description string
+	Block       bool
+}
+
+// replacementAttrs lists every attribute and block under b that forces
+// replacement, in document order.
+func replacementAttrs(b blockInfo) []replNode {
+	var out []replNode
 	for _, a := range b.Attributes {
 		if a.ForcesReplacement {
-			out = append(out, a)
+			out = append(out, replNode{Path: a.Path, Description: a.Description})
 		}
 		if a.Nested != nil {
 			out = append(out, replacementAttrs(*a.Nested)...)
 		}
 	}
 	for _, c := range b.Blocks {
+		if c.ForcesReplacement {
+			out = append(out, replNode{Path: c.Path, Description: c.Description, Block: true})
+		}
 		out = append(out, replacementAttrs(c)...)
 	}
 	return out
@@ -458,6 +583,7 @@ type replRow struct {
 	Address     string
 	Path        string
 	Description string
+	Block       bool
 }
 
 type skillData struct {
@@ -469,6 +595,16 @@ type skillData struct {
 	ExampleGaps  []string
 	Resources    int
 	DataSources  int
+}
+
+type readmeData struct {
+	Marker      string
+	Layers      []layerView
+	Provider    typeDoc
+	SkillDir    string // link prefix from the README to the skill directory
+	DocsDir     string // link prefix from the README to docs/
+	Resources   int
+	DataSources int
 }
 
 type refData struct {
@@ -561,10 +697,12 @@ func readExample(path string) string {
 	return strings.TrimRight(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n")
 }
 
-// collect turns the protocol response into sorted type docs.
-func collect(resp *tfprotov6.GetProviderSchemaResponse, examplesDir string) (res, ds []typeDoc, prov typeDoc) {
+// collect turns the protocol response into sorted type docs. repl (may be
+// nil) adds framework-derived RequiresReplace flags to resources.
+func collect(resp *tfprotov6.GetProviderSchemaResponse, examplesDir string, repl replaceSet) (res, ds []typeDoc, prov typeDoc) {
 	for name, s := range resp.ResourceSchemas {
 		td := walkSchema(name, kindResource, s)
+		markReplacements(&td.Root, name, repl)
 		if examplesDir != "" {
 			td.Example = readExample(filepath.Join(examplesDir, "resources", name, "resource.tf"))
 			td.Import = readExample(filepath.Join(examplesDir, "resources", name, "import.sh"))
@@ -587,14 +725,23 @@ func collect(resp *tfprotov6.GetProviderSchemaResponse, examplesDir string) (res
 	return res, ds, prov
 }
 
+// renderOpts controls render.
+type renderOpts struct {
+	Examples       string     // examples directory; "" skips examples
+	Replace        replaceSet // framework RequiresReplace flags; nil uses description text only
+	ReadmeSkillDir string     // link prefix from README_resources.md to the skill dir; "" skips the README
+	ReadmeDocsDir  string     // link prefix from README_resources.md to docs/
+}
+
 // render produces every skill file keyed by slash path relative to the skill
-// directory, plus warnings about example drift.
-func render(resp *tfprotov6.GetProviderSchemaResponse, examplesDir string) (map[string][]byte, []string, error) {
+// directory, the README_resources.md content (nil when disabled), and
+// warnings about example drift.
+func render(resp *tfprotov6.GetProviderSchemaResponse, ro renderOpts) (map[string][]byte, []byte, []string, error) {
 	tmpl, err := parseTemplates()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	res, ds, prov := collect(resp, examplesDir)
+	res, ds, prov := collect(resp, ro.Examples, ro.Replace)
 
 	sd := skillData{Marker: generatedMarker, Provider: prov, Resources: len(res), DataSources: len(ds)}
 	for _, l := range layerDefs {
@@ -618,7 +765,7 @@ func render(resp *tfprotov6.GetProviderSchemaResponse, examplesDir string) (map[
 	for _, r := range res {
 		byName[r.Name] = r
 		for _, a := range replacementAttrs(r.Root) {
-			sd.Replacements = append(sd.Replacements, replRow{Address: r.Name, Path: a.Path, Description: a.Description})
+			sd.Replacements = append(sd.Replacements, replRow{Address: r.Name, Path: a.Path, Description: a.Description, Block: a.Block})
 		}
 	}
 	sd.References = append(sd.References, prov)
@@ -650,17 +797,33 @@ func render(resp *tfprotov6.GetProviderSchemaResponse, examplesDir string) (map[
 	files := map[string][]byte{}
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, "skill.md.tmpl", sd); err != nil {
-		return nil, nil, fmt.Errorf("rendering SKILL.md: %w", err)
+		return nil, nil, nil, fmt.Errorf("rendering SKILL.md: %w", err)
 	}
 	files["SKILL.md"] = normalize(buf.Bytes())
 	for _, td := range sd.References {
 		buf.Reset()
 		if err := tmpl.ExecuteTemplate(&buf, "reference.md.tmpl", refData{Marker: generatedMarker, Doc: td, Blocks: subBlocks(td.Root)}); err != nil {
-			return nil, nil, fmt.Errorf("rendering %s: %w", td.File(), err)
+			return nil, nil, nil, fmt.Errorf("rendering %s: %w", td.File(), err)
 		}
 		files[td.File()] = normalize(buf.Bytes())
 	}
-	return files, warnings, nil
+	var readme []byte
+	if ro.ReadmeSkillDir != "" {
+		buf.Reset()
+		rd := readmeData{
+			Marker: generatedMarker, Layers: sd.Layers, Provider: prov,
+			SkillDir: ro.ReadmeSkillDir, DocsDir: ro.ReadmeDocsDir,
+			Resources: len(res), DataSources: len(ds),
+		}
+		if rd.DocsDir == "" {
+			rd.DocsDir = "docs"
+		}
+		if err := tmpl.ExecuteTemplate(&buf, "readme.md.tmpl", rd); err != nil {
+			return nil, nil, nil, fmt.Errorf("rendering README_resources.md: %w", err)
+		}
+		readme = normalize(buf.Bytes())
+	}
+	return files, readme, warnings, nil
 }
 
 // normalize forces LF endings, strips trailing spaces, collapses runs of
@@ -749,6 +912,22 @@ func writeFiles(outDir string, files map[string][]byte) ([]string, error) {
 		}
 	}
 	return stale, nil
+}
+
+// checkFile compares one rendered file with disk and returns a drift message,
+// or "" when it matches. CRLF on disk is not drift.
+func checkFile(path string, want []byte) (string, error) {
+	b, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return filepath.ToSlash(path) + " is missing", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if !bytes.Equal(bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n")), want) {
+		return filepath.ToSlash(path) + " differs", nil
+	}
+	return "", nil
 }
 
 // checkFiles compares rendered files with disk. CRLF on disk (a Windows

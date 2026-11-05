@@ -13,12 +13,39 @@ resource "docker_service" "web" {
   image    = "nginx:1.27-alpine"
   replicas = 3
 
-  # Overlay networks by name or ID.
-  networks = ["frontend"]
+  # Overlay networks by name or ID, with extra DNS aliases per network.
+  # (Use the plain `networks = ["frontend"]` set when no aliases are needed;
+  # the two cannot be combined.)
+  networks_advanced {
+    name    = "frontend"
+    aliases = ["www"]
+  }
 
   env = {
     TZ = "UTC"
   }
+
+  # Task container settings; all of these update in place (rolling update).
+  hostname          = "web-{{.Task.Slot}}"
+  user              = "nginx"
+  hosts             = ["db.internal:10.0.0.5"]
+  cap_drop          = ["NET_RAW"]
+  sysctls           = { "net.core.somaxconn" = "1024" }
+  stop_grace_period = "30s"
+
+  dns {
+    nameservers = ["10.0.0.2"]
+    options     = ["ndots:2"]
+  }
+
+  ulimits {
+    name = "nofile"
+    soft = 65536
+    hard = 65536
+  }
+
+  # Bump to force a rolling restart without other changes.
+  force_update = 1
 
   labels = {
     app = "shop"
@@ -89,5 +116,25 @@ resource "docker_service" "web" {
   converge_config {
     timeout = "3m"
     delay   = "5s"
+  }
+}
+
+# A one-off job: runs 6 tasks to completion, 2 at a time. With
+# converge_config, apply waits until total_completions tasks completed.
+# Changing mode (e.g. to "replicated") replaces the service.
+resource "docker_service" "migrate" {
+  name              = "db-migrate"
+  image             = "busybox:1.36"
+  args              = ["sh", "-c", "echo migrating; sleep 5"]
+  mode              = "replicated_job"
+  max_concurrent    = 2
+  total_completions = 6
+
+  restart_policy {
+    condition = "on-failure"
+  }
+
+  converge_config {
+    timeout = "5m"
   }
 }

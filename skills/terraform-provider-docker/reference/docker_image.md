@@ -4,7 +4,7 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A Docker image on the provider's daemon. Without a `build` block the image `name` is pulled from its registry (credentials from the provider's `registry_auth`); with a `build` block the image is built from a local context directory through the Engine API (classic builder, the context is tarred by the provider honouring `.dockerignore`) and tagged `name`. On destroy the tag is removed (and the image deleted when no other tag references it) unless `keep_locally` is true. Edits to files in the build context change `context_digest` at plan time and force a rebuild.
+A Docker image on the provider's daemon. Without a `build` block the image `name` is pulled from its registry (credentials from the provider's `registry_auth`); with a `build` block the image is built from a local context directory through the Engine API (classic builder by default, or BuildKit with `build.builder = "buildkit"`; the context is tarred by the provider honouring `.dockerignore`) and tagged `name`. On destroy the tag is removed (and the image deleted when no other tag references it) unless `keep_locally` is true. Edits to files in the build context change `context_digest` at plan time and force a rebuild.
 
 ## Arguments and attributes
 
@@ -20,7 +20,7 @@ A Docker image on the provider's daemon. Without a `build` block the image `name
 | `repo_digest` | `string` | computed |  |  | Repository digest (`repo@sha256:...`) of the image for `name`'s repository, when the daemon knows one (pulled images, or built images after a push). Null for a built image that was never pushed. |
 | `triggers` | `map(string)` | optional | yes |  | Arbitrary string map; any change re-pulls or rebuilds the image. Use it to force a refresh of a moving tag (e.g. a timestamp) or to tie the image to other resources. Changing this forces a new resource. |
 
-Nested blocks: `build` (single block).
+Nested blocks: `build` (single block, forces replacement).
 
 ### `build`
 
@@ -29,13 +29,28 @@ single block. Build the image from a local directory instead of pulling it. Chan
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `args` | `map(string)` | optional |  |  | Build arguments (`--build-arg`). |
+| `builder` | `string` | optional | yes |  | Builder backend: `classic` (default; the legacy builder, `DOCKER_BUILDKIT=0`) or `buildkit`. With `buildkit` the provider opens a BuildKit session to the daemon (serving `secrets` and `registry_auth` credentials) so Dockerfile features such as `RUN --mount=type=secret` and heredocs work. Requires a daemon with BuildKit enabled (default since Docker 23). Forces replacement. |
+| `cache_from` | `list(string)` | optional | yes |  | BuildKit only. Image references to use as cache sources (`--cache-from`); the images must carry inline cache metadata (built with build arg `BUILDKIT_INLINE_CACHE=1`). Exporting cache (`--cache-to`) is not possible through the Engine API and needs buildx. Forces replacement. |
 | `context` | `string` | optional |  |  | **Required inside `build`.** Path of the build context directory, relative to the directory Terraform runs in (use `${path.module}/...`). Files matched by its `.dockerignore` are not sent; the Dockerfile and `.dockerignore` always are. |
 | `dockerfile` | `string` | optional |  |  | Dockerfile path relative to `context` (or absolute). Default `Dockerfile`. A Dockerfile outside the context is sent under a generated name, like the docker CLI does. |
 | `labels` | `map(string)` | optional |  |  | Labels set on the built image. The provider also adds `io.terraform.provider=JerryBalmer1/docker`. |
 | `no_cache` | `bool` | optional |  |  | Do not use the build cache (`--no-cache`). |
 | `platform` | `string` | optional |  |  | Build platform, e.g. `linux/arm64`. Default: the top-level `platform`, else the daemon's. |
+| `platforms` | `list(string)` | optional | yes |  | BuildKit only. Target platform list; exactly one element is supported (sent as the build platform, like `platform`). Multi-platform builds are rejected: the Engine API `/build` endpoint takes a single platform, use one `docker_image` per platform. Conflicts with `build.platform`. Forces replacement. |
 | `pull` | `bool` | optional |  |  | Always attempt to pull newer versions of base images (`--pull`). |
 | `target` | `string` | optional |  |  | Multi-stage target to build (`--target`). |
+
+Nested blocks: `secrets` (list of blocks, forces replacement).
+
+### `build.secrets`
+
+list of blocks. BuildKit only. Build secrets exposed to `RUN --mount=type=secret,id=<id>`. Values are read by the provider at build time from a file or an environment variable of the provider process and are never stored in state. Forces replacement (but changing a secret's value does not trigger a rebuild; use `triggers`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `env` | `string` | optional | yes |  | Name of an environment variable of the provider process holding the secret. Exactly one of `src` or `env`. Forces replacement. |
+| `id` | `string` | required | yes |  | Secret ID referenced by `RUN --mount=type=secret,id=...`. Forces replacement. |
+| `src` | `string` | optional | yes |  | Path of a file holding the secret (max 500 KiB). Exactly one of `src` or `env`. Forces replacement. |
 
 ## Example
 
@@ -73,6 +88,36 @@ resource "docker_image" "app" {
       "org.opencontainers.image.source" = "https://github.com/example/app"
     }
     pull = true
+  }
+}
+
+# Build with BuildKit: secrets are mounted with RUN --mount=type=secret and
+# are read by the provider at build time (never stored in state).
+#   # syntax=docker/dockerfile:1
+#   RUN --mount=type=secret,id=npm_token NPM_TOKEN=$(cat /run/secrets/npm_token) npm ci
+resource "docker_image" "web" {
+  name = "registry.example.com/team/web:1.0"
+
+  build {
+    context = "${path.module}/web"
+    builder = "buildkit"
+
+    # Reuse layers from a previously pushed image built with inline cache.
+    cache_from = ["registry.example.com/team/web:cache"]
+    args = {
+      BUILDKIT_INLINE_CACHE = "1"
+    }
+
+    platforms = ["linux/arm64"]
+
+    secrets {
+      id  = "npm_token"
+      env = "NPM_TOKEN"
+    }
+    secrets {
+      id  = "netrc"
+      src = "${path.module}/secrets/netrc"
+    }
   }
 }
 ```

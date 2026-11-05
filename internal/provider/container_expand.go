@@ -52,6 +52,7 @@ type containerNetworkModel struct {
 	Name        types.String `tfsdk:"name"`
 	Aliases     types.Set    `tfsdk:"aliases"`
 	IPv4Address types.String `tfsdk:"ipv4_address"`
+	IPv6Address types.String `tfsdk:"ipv6_address"`
 }
 
 type containerHealthcheckModel struct {
@@ -516,10 +517,10 @@ func containerFlattenCapabilities(add, drop, priorAdd, priorDrop []string, prior
 
 // containerEndpointSettings builds the endpoint config for one
 // networks_advanced entry.
-func containerEndpointSettings(aliases []string, ipv4 string) *network.EndpointSettings {
+func containerEndpointSettings(aliases []string, ipv4, ipv6 string) *network.EndpointSettings {
 	ep := &network.EndpointSettings{Aliases: aliases}
-	if ipv4 != "" {
-		ep.IPAMConfig = &network.EndpointIPAMConfig{IPv4Address: ipv4}
+	if ipv4 != "" || ipv6 != "" {
+		ep.IPAMConfig = &network.EndpointIPAMConfig{IPv4Address: ipv4, IPv6Address: ipv6}
 	}
 	return ep
 }
@@ -559,11 +560,11 @@ func containerFlattenNetworks(eps map[string]*network.EndpointSettings, networkM
 			}
 			aliases = append(aliases, a)
 		}
-		ipv4 := ""
+		ipv4, ipv6 := "", ""
 		if ep.IPAMConfig != nil {
-			ipv4 = ep.IPAMConfig.IPv4Address
+			ipv4, ipv6 = ep.IPAMConfig.IPv4Address, ep.IPAMConfig.IPv6Address
 		}
-		return containerNetworkModel{Name: name, Aliases: containerSetValue(priorAliases, aliases), IPv4Address: stringOrNull(ipv4)}
+		return containerNetworkModel{Name: name, Aliases: containerSetValue(priorAliases, aliases), IPv4Address: stringOrNull(ipv4), IPv6Address: stringOrNull(ipv6)}
 	}
 
 	for _, p := range prior {

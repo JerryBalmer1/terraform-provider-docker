@@ -228,18 +228,22 @@ type stackSvcPlan struct {
 	Update []string
 }
 
-// stackPlanServices plans services. desiredGlobal maps each desired short
-// name to whether it is global; existing maps short names to their specs;
+// stackPlanServices plans services. desiredMode maps each desired short
+// name to its mode attribute value; existing maps short names to their specs;
 // replaced holds the IDs of objects about to be replaced.
-func stackPlanServices(desiredGlobal map[string]bool, existing map[string]swarm.ServiceSpec, replaced map[string]bool) stackSvcPlan {
+func stackPlanServices(desiredMode map[string]string, existing map[string]swarm.ServiceSpec, replaced map[string]bool) stackSvcPlan {
 	var p stackSvcPlan
 	for name, spec := range existing {
-		global, want := desiredGlobal[name]
+		mode, want := desiredMode[name]
 		if !want {
 			p.Remove = append(p.Remove, name)
 			continue
 		}
-		recreate := (spec.Mode.Global != nil) != global
+		if mode == "" {
+			mode = "replicated"
+		}
+		// The Engine rejects any change of mode type in ServiceUpdate.
+		recreate := svcModeOf(spec) != mode
 		for id := range stackServiceRefs(spec) {
 			if replaced[id] {
 				recreate = true
@@ -252,7 +256,7 @@ func stackPlanServices(desiredGlobal map[string]bool, existing map[string]swarm.
 			p.Update = append(p.Update, name)
 		}
 	}
-	for name := range desiredGlobal {
+	for name := range desiredMode {
 		if _, ok := existing[name]; !ok {
 			p.Create = append(p.Create, name)
 		}
@@ -501,10 +505,10 @@ func (r *stackResource) apply(ctx context.Context, plan, prior *stackResourceMod
 	}
 
 	var names []string
-	desiredGlobal := map[string]bool{}
+	desiredMode := map[string]string{}
 	for _, s := range plan.Services {
 		names = append(names, s.Name.ValueString())
-		desiredGlobal[s.Name.ValueString()] = s.Mode.ValueString() == "global"
+		desiredMode[s.Name.ValueString()] = s.Mode.ValueString()
 	}
 	stackDuplicates("service", names, &diags)
 	for kind, list := range map[string][]string{"network": stackNames(plan.Networks), "secret": stackBlobNames(plan.Secrets), "config": stackBlobNames(plan.Configs), "volume": stackVolumeNames(plan.Volumes)} {
@@ -551,7 +555,7 @@ func (r *stackResource) apply(ctx context.Context, plan, prior *stackResourceMod
 	for k, s := range ex.services {
 		exSpecs[k] = s.Spec
 	}
-	svcPlan := stackPlanServices(desiredGlobal, exSpecs, replaced)
+	svcPlan := stackPlanServices(desiredMode, exSpecs, replaced)
 
 	// 1. Remove orphan and to-be-recreated services.
 	var rmIDs []string

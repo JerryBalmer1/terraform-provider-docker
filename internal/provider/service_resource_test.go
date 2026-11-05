@@ -299,10 +299,33 @@ func svcFakeNormalize(spec *swarm.ServiceSpec) {
 			rp.Condition = swarm.RestartPolicyConditionAny
 		}
 	}
-	if spec.Mode.Replicated == nil && spec.Mode.Global == nil {
+	if j := spec.Mode.ReplicatedJob; j != nil {
+		if j.MaxConcurrent == nil {
+			one := uint64(1)
+			j.MaxConcurrent = &one
+		}
+		if j.TotalCompletions == nil {
+			tc := *j.MaxConcurrent
+			j.TotalCompletions = &tc
+		}
+	}
+	if spec.Mode.Replicated == nil && spec.Mode.Global == nil && spec.Mode.ReplicatedJob == nil && spec.Mode.GlobalJob == nil {
 		one := uint64(1)
 		spec.Mode.Replicated = &swarm.ReplicatedService{Replicas: &one}
 	}
+}
+
+// svcFakeJobStatus bumps the job iteration of a job-mode service (each
+// create/update starts a new run).
+func svcFakeJobStatus(s *swarm.Service) {
+	if s.Spec.Mode.ReplicatedJob == nil && s.Spec.Mode.GlobalJob == nil {
+		s.JobStatus = nil
+		return
+	}
+	if s.JobStatus == nil {
+		s.JobStatus = &swarm.JobStatus{}
+	}
+	s.JobStatus.JobIteration.Index = s.Version.Index
 }
 
 func (f *svcFakeDaemon) findService(ref string) *swarm.Service {
@@ -338,6 +361,7 @@ func (f *svcFakeDaemon) handleServices(w http.ResponseWriter, r *http.Request, p
 		id := f.id("svc")
 		s := &swarm.Service{ID: id, Spec: spec}
 		s.Version.Index = 1
+		svcFakeJobStatus(s)
 		f.services[id] = s
 		f.creates[spec.Name]++
 		svcFakeJSON(w, 201, swarm.ServiceCreateResponse{ID: id})
@@ -360,13 +384,14 @@ func (f *svcFakeDaemon) handleServices(w http.ResponseWriter, r *http.Request, p
 		}
 		var spec swarm.ServiceSpec
 		_ = json.NewDecoder(r.Body).Decode(&spec)
-		if (spec.Mode.Global != nil) != (s.Spec.Mode.Global != nil) {
+		if svcModeOf(spec) != svcModeOf(s.Spec) {
 			svcFakeErr(w, 400, "service mode change is not allowed")
 			return
 		}
 		svcFakeNormalize(&spec)
 		s.Spec = spec
 		s.Version.Index++
+		svcFakeJobStatus(s)
 		svcFakeJSON(w, 200, swarm.ServiceUpdateResponse{})
 	case len(parts) == 2 && r.Method == http.MethodDelete:
 		s := f.findService(parts[1])
@@ -393,6 +418,18 @@ func (f *svcFakeDaemon) handleTasks(w http.ResponseWriter, r *http.Request) {
 	out := []swarm.Task{}
 	for _, s := range f.services {
 		if only != nil && s != only {
+			continue
+		}
+		if j := s.Spec.Mode.ReplicatedJob; j != nil || s.Spec.Mode.GlobalJob != nil {
+			// Job tasks of the current run, all completed.
+			n := 1
+			if j != nil {
+				n = int(*j.TotalCompletions)
+			}
+			for i := 0; i < n; i++ {
+				out = append(out, swarm.Task{ID: fmt.Sprintf("%s-j%d", s.ID, i), ServiceID: s.ID, DesiredState: swarm.TaskStateComplete,
+					Status: swarm.TaskStatus{State: swarm.TaskStateComplete}, JobIteration: &swarm.Version{Index: s.JobStatus.JobIteration.Index}})
+			}
 			continue
 		}
 		n := 1
@@ -588,6 +625,7 @@ resource "docker_service" "agent" {
 
 func TestAccServiceBasic(t *testing.T) {
 	testAccPreCheck(t)
+	_ = swarmAccManagerAddr(t) // skips unless DOCKER_HOST is a swarm manager
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

@@ -158,25 +158,39 @@ Required:
 Optional:
 
 - `args` (List of String) Arguments passed to the command (overrides the image `CMD`).
+- `cap_add` (Set of String) Linux capabilities to add to the task containers, e.g. `NET_ADMIN` (case and `CAP_` prefix are ignored when comparing). Updated in place.
+- `cap_drop` (Set of String) Linux capabilities to drop, e.g. `ALL`. Updated in place.
 - `command` (List of String) Command to run (overrides the image `ENTRYPOINT`).
 - `configs` (Block List) Swarm configs mounted as files in the task containers (default path `/run/secrets/<file_name>` for secrets, `/<file_name>` for configs). (see [below for nested schema](#nestedblock--service--configs))
 - `container_labels` (Map of String) Labels on the task containers.
-- `converge_config` (Block, Optional) When present, create and update wait until the service has converged: the wanted number of tasks running (every desired task for `global`) and no update paused or rolling back. On timeout the apply fails with the task errors. Not sent to the daemon. (see [below for nested schema](#nestedblock--service--converge_config))
+- `converge_config` (Block, Optional) When present, create and update wait until the service has converged: the wanted number of tasks running (every desired task for `global`) and no update paused or rolling back; for `replicated_job`, `total_completions` tasks completed; for `global_job`, every task of the current run finished with at least one completed. On timeout the apply fails with the task errors. Not sent to the daemon. (see [below for nested schema](#nestedblock--service--converge_config))
+- `dir` (String) Working directory of the task process. Unset uses the image's. Updated in place.
+- `dns` (Block, Optional) Resolver configuration of the task containers (`ContainerSpec.DNSConfig`). Updated in place. (see [below for nested schema](#nestedblock--service--dns))
 - `endpoint_spec` (Block, Optional) How the service is reached: resolution mode and published ports. (see [below for nested schema](#nestedblock--service--endpoint_spec))
 - `env` (Map of String) Environment variables of the task containers.
+- `force_update` (Number) Counter (`TaskTemplate.ForceUpdate`): change it (e.g. increment) to force a rolling restart of every task even when nothing else changed, like `docker service update --force`. Unset leaves the daemon's counter alone and ignores it on refresh. Updated in place.
 - `healthcheck` (Block, Optional) Container healthcheck; Swarm only counts healthy tasks as running. (see [below for nested schema](#nestedblock--service--healthcheck))
+- `hostname` (String) Hostname of the task containers (`ContainerSpec.Hostname`; Go templates such as `{{.Task.Name}}` work). Unset: the container ID prefix. Updated in place (rolling update).
+- `hosts` (List of String) Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` like `docker service create --host`. The provider sends them in the daemon's `"<ip> <hostname>"` (hosts(5)) format; an entry that already contains a space is sent as is. Updated in place.
 - `labels` (Map of String) Labels on the service object.
 - `logging` (Block, Optional) Log driver of the task containers. (see [below for nested schema](#nestedblock--service--logging))
-- `mode` (String) `replicated` (default) or `global`. Changing it recreates this service.
+- `max_concurrent` (Number) `replicated_job` only: tasks run at the same time (daemon default 1). Updated in place (re-runs the job).
+- `mode` (String) `replicated` (default), `global`, `replicated_job` or `global_job` (see `docker_service`). Changing it recreates this service.
 - `mounts` (Block List) Mounts in the task containers. (see [below for nested schema](#nestedblock--service--mounts))
-- `networks` (Set of String) Networks to attach the tasks to, by ID or name (resolved to IDs; overlay networks). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`.
+- `networks` (Set of String) Networks to attach the tasks to, by ID or name (resolved to IDs; overlay networks). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. Use `networks_advanced` instead for per-network aliases; the two cannot be combined. Updated in place.
+- `networks_advanced` (Block List) Networks to attach, with per-network DNS aliases (`TaskTemplate.Networks[].Aliases`). An alternative to `networks`: setting both is an error. Updated in place. (see [below for nested schema](#nestedblock--service--networks_advanced))
 - `placement` (Block, Optional) Where tasks may run. (see [below for nested schema](#nestedblock--service--placement))
-- `replicas` (Number) Number of tasks for `replicated` mode (default 1); ignored for `global`. Updated in place.
+- `replicas` (Number) Number of tasks for `replicated` mode (default 1); ignored by the other modes. Updated in place.
 - `resources` (Block, Optional) CPU and memory limits and reservations per task. (see [below for nested schema](#nestedblock--service--resources))
 - `restart_policy` (Block, Optional) When Swarm restarts tasks that exit. (see [below for nested schema](#nestedblock--service--restart_policy))
 - `rollback_config` (Block, Optional) How a failed update rolls back. (see [below for nested schema](#nestedblock--service--rollback_config))
 - `secrets` (Block List) Swarm secrets mounted as files in the task containers (default path `/run/secrets/<file_name>` for secrets, `/<file_name>` for configs). (see [below for nested schema](#nestedblock--service--secrets))
+- `stop_grace_period` (String) Time to wait after the stop signal before killing a task (Go duration, e.g. `30s`; daemon default 10s). Updated in place.
+- `sysctls` (Map of String) Namespaced kernel parameters for the task containers, e.g. `{ "net.core.somaxconn" = "1024" }`. Updated in place.
+- `total_completions` (Number) `replicated_job` only: tasks that must complete successfully (daemon default: `max_concurrent`). Updated in place (re-runs the job).
+- `ulimits` (Block List) Resource ulimits of the task containers. Updated in place. (see [below for nested schema](#nestedblock--service--ulimits))
 - `update_config` (Block, Optional) How a changed service rolls out to its tasks. (see [below for nested schema](#nestedblock--service--update_config))
+- `user` (String) User (`uid`, `name`, optionally `:group`) the task process runs as. Unset uses the image's. Updated in place.
 
 <a id="nestedblock--service--configs"></a>
 ### Nested Schema for `service.configs`
@@ -201,6 +215,16 @@ Optional:
 
 - `delay` (String) Poll interval (Go duration, default `5s`).
 - `timeout` (String) Maximum wait (Go duration, default `3m`).
+
+
+<a id="nestedblock--service--dns"></a>
+### Nested Schema for `service.dns`
+
+Optional:
+
+- `nameservers` (List of String) DNS server IPs.
+- `options` (List of String) resolv.conf options, e.g. `ndots:2`.
+- `search` (List of String) DNS search domains.
 
 
 <a id="nestedblock--service--endpoint_spec"></a>
@@ -263,6 +287,18 @@ Optional:
 - `volume_driver` (String) Volume driver used when the volume does not exist yet on the node.
 - `volume_driver_opts` (Map of String) Driver options for a volume created on first use.
 - `volume_labels` (Map of String) Labels for a volume created on first use.
+
+
+<a id="nestedblock--service--networks_advanced"></a>
+### Nested Schema for `service.networks_advanced`
+
+Required:
+
+- `name` (String) Network ID or name (resolved to its ID). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`.
+
+Optional:
+
+- `aliases` (Set of String) Extra DNS names the service gets on this network (the service name always resolves).
 
 
 <a id="nestedblock--service--placement"></a>
@@ -340,6 +376,16 @@ Optional:
 - `mode` (Number) File mode as a decimal number (default `292`, i.e. `0444`).
 - `secret_name` (String) Name of the secret; looked up from the ID when unset.
 - `uid` (String) File owner UID (default `0`).
+
+
+<a id="nestedblock--service--ulimits"></a>
+### Nested Schema for `service.ulimits`
+
+Required:
+
+- `hard` (Number) Hard limit.
+- `name` (String) Ulimit name, e.g. `nofile`.
+- `soft` (Number) Soft limit.
 
 
 <a id="nestedblock--service--update_config"></a>

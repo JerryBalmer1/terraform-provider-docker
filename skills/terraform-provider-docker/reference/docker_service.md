@@ -4,25 +4,36 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A Swarm service: a desired number of tasks (containers) of one image scheduled across the Swarm. Requires the provider to point at a Swarm manager. Almost every change is a rolling update in place (`ServiceUpdate`, governed by `update_config`); only `name` and switching `mode` between replicated and global replace the service. Destroy removes the service and waits until its tasks are gone, so the networks, secrets and configs it used can be removed next. Add `converge_config {}` to make apply wait for the tasks to run.
+A Swarm service: a desired number of tasks (containers) of one image scheduled across the Swarm. Requires the provider to point at a Swarm manager. Almost every change is a rolling update in place (`ServiceUpdate`, governed by `update_config`); only `name` and changing `mode` (replicated, global, replicated_job, global_job) replace the service. Destroy removes the service and waits until its tasks are gone, so the networks, secrets and configs it used can be removed next. Add `converge_config {}` to make apply wait for the tasks to run.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `args` | `list(string)` | optional |  |  | Arguments passed to the command (overrides the image `CMD`). |
+| `cap_add` | `set(string)` | optional |  |  | Linux capabilities to add to the task containers, e.g. `NET_ADMIN` (case and `CAP_` prefix are ignored when comparing). Updated in place. |
+| `cap_drop` | `set(string)` | optional |  |  | Linux capabilities to drop, e.g. `ALL`. Updated in place. |
 | `command` | `list(string)` | optional |  |  | Command to run (overrides the image `ENTRYPOINT`). |
 | `container_labels` | `map(string)` | optional |  |  | Labels on the task containers. |
+| `dir` | `string` | optional |  |  | Working directory of the task process. Unset uses the image's. Updated in place. |
 | `env` | `map(string)` | optional |  |  | Environment variables of the task containers. |
+| `force_update` | `number` | optional |  |  | Counter (`TaskTemplate.ForceUpdate`): change it (e.g. increment) to force a rolling restart of every task even when nothing else changed, like `docker service update --force`. Unset leaves the daemon's counter alone and ignores it on refresh. Updated in place. |
+| `hostname` | `string` | optional |  |  | Hostname of the task containers (`ContainerSpec.Hostname`; Go templates such as `{{.Task.Name}}` work). Unset: the container ID prefix. Updated in place (rolling update). |
+| `hosts` | `list(string)` | optional |  |  | Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` like `docker service create --host`. The provider sends them in the daemon's `"<ip> <hostname>"` (hosts(5)) format; an entry that already contains a space is sent as is. Updated in place. |
 | `id` | `string` | computed |  |  | The Swarm service ID. |
 | `image` | `string` | required |  |  | Image reference the tasks run. The provider asks the registry for the digest and the daemon pins tasks to it (`@sha256:...`); that pin is ignored on refresh when this value has no digest. Credentials come from the provider's `registry_auth`. Updated in place (rolling update). |
 | `labels` | `map(string)` | optional |  |  | Labels on the service object. |
-| `mode` | `string` | optional, computed | yes |  | `replicated` (default; runs `replicas` tasks) or `global` (one task per eligible node). Changing this forces a new resource. |
+| `max_concurrent` | `number` | optional |  |  | `replicated_job` only: tasks run at the same time (daemon default 1). Updated in place (re-runs the job). |
+| `mode` | `string` | optional, computed | yes |  | `replicated` (default; runs `replicas` tasks), `global` (one task per eligible node), `replicated_job` (runs `total_completions` tasks to completion, `max_concurrent` at a time) or `global_job` (one run-to-completion task per eligible node). The Engine API cannot change a service's mode type, so changing this forces replacement. |
 | `name` | `string` | required | yes |  | Service name. Changing this forces a new resource. |
-| `networks` | `set(string)` | optional |  |  | Networks to attach the tasks to, by ID or name (resolved to IDs; overlay networks). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. |
-| `replicas` | `number` | optional, computed |  |  | Number of tasks for `replicated` mode (default 1); ignored for `global`. Updated in place. |
+| `networks` | `set(string)` | optional |  |  | Networks to attach the tasks to, by ID or name (resolved to IDs; overlay networks). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. Use `networks_advanced` instead for per-network aliases; the two cannot be combined. Updated in place. |
+| `replicas` | `number` | optional, computed |  |  | Number of tasks for `replicated` mode (default 1); ignored by the other modes. Updated in place. |
+| `stop_grace_period` | `string` | optional |  |  | Time to wait after the stop signal before killing a task (Go duration, e.g. `30s`; daemon default 10s). Updated in place. |
+| `sysctls` | `map(string)` | optional |  |  | Namespaced kernel parameters for the task containers, e.g. `{ "net.core.somaxconn" = "1024" }`. Updated in place. |
+| `total_completions` | `number` | optional |  |  | `replicated_job` only: tasks that must complete successfully (daemon default: `max_concurrent`). Updated in place (re-runs the job). |
+| `user` | `string` | optional |  |  | User (`uid`, `name`, optionally `:group`) the task process runs as. Unset uses the image's. Updated in place. |
 
-Nested blocks: `configs` (list of blocks), `converge_config` (single block), `endpoint_spec` (single block), `healthcheck` (single block), `logging` (single block), `mounts` (list of blocks), `placement` (single block), `resources` (single block), `restart_policy` (single block), `rollback_config` (single block), `secrets` (list of blocks), `update_config` (single block).
+Nested blocks: `configs` (list of blocks), `converge_config` (single block), `dns` (single block), `endpoint_spec` (single block), `healthcheck` (single block), `logging` (single block), `mounts` (list of blocks), `networks_advanced` (list of blocks), `placement` (single block), `resources` (single block), `restart_policy` (single block), `rollback_config` (single block), `secrets` (list of blocks), `ulimits` (list of blocks), `update_config` (single block).
 
 ### `configs`
 
@@ -39,12 +50,22 @@ list of blocks. Swarm configs mounted as files in the task containers (default p
 
 ### `converge_config`
 
-single block. When present, create and update wait until the service has converged: the wanted number of tasks running (every desired task for `global`) and no update paused or rolling back. On timeout the apply fails with the task errors. Not sent to the daemon.
+single block. When present, create and update wait until the service has converged: the wanted number of tasks running (every desired task for `global`) and no update paused or rolling back; for `replicated_job`, `total_completions` tasks completed; for `global_job`, every task of the current run finished with at least one completed. On timeout the apply fails with the task errors. Not sent to the daemon.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `delay` | `string` | optional, computed |  |  | Poll interval (Go duration, default `5s`). |
 | `timeout` | `string` | optional, computed |  |  | Maximum wait (Go duration, default `3m`). |
+
+### `dns`
+
+single block. Resolver configuration of the task containers (`ContainerSpec.DNSConfig`). Updated in place.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `nameservers` | `list(string)` | optional |  |  | DNS server IPs. |
+| `options` | `list(string)` | optional |  |  | resolv.conf options, e.g. `ndots:2`. |
+| `search` | `list(string)` | optional |  |  | DNS search domains. |
 
 ### `endpoint_spec`
 
@@ -102,6 +123,15 @@ list of blocks. Mounts in the task containers.
 | `volume_driver` | `string` | optional |  |  | Volume driver used when the volume does not exist yet on the node. |
 | `volume_driver_opts` | `map(string)` | optional |  |  | Driver options for a volume created on first use. |
 | `volume_labels` | `map(string)` | optional |  |  | Labels for a volume created on first use. |
+
+### `networks_advanced`
+
+list of blocks. Networks to attach, with per-network DNS aliases (`TaskTemplate.Networks[].Aliases`). An alternative to `networks`: setting both is an error. Updated in place.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `set(string)` | optional |  |  | Extra DNS names the service gets on this network (the service name always resolves). |
+| `name` | `string` | required |  |  | Network ID or name (resolved to its ID). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. |
 
 ### `placement`
 
@@ -174,6 +204,16 @@ list of blocks. Swarm secrets mounted as files in the task containers (default p
 | `secret_name` | `string` | optional |  |  | Name of the secret; looked up from the ID when unset. |
 | `uid` | `string` | optional, computed |  |  | File owner UID (default `0`). |
 
+### `ulimits`
+
+list of blocks. Resource ulimits of the task containers. Updated in place.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `hard` | `number` | required |  |  | Hard limit. |
+| `name` | `string` | required |  |  | Ulimit name, e.g. `nofile`. |
+| `soft` | `number` | required |  |  | Soft limit. |
+
 ### `update_config`
 
 single block. How a changed service rolls out to its tasks.
@@ -205,12 +245,39 @@ resource "docker_service" "web" {
   image    = "nginx:1.27-alpine"
   replicas = 3
 
-  # Overlay networks by name or ID.
-  networks = ["frontend"]
+  # Overlay networks by name or ID, with extra DNS aliases per network.
+  # (Use the plain `networks = ["frontend"]` set when no aliases are needed;
+  # the two cannot be combined.)
+  networks_advanced {
+    name    = "frontend"
+    aliases = ["www"]
+  }
 
   env = {
     TZ = "UTC"
   }
+
+  # Task container settings; all of these update in place (rolling update).
+  hostname          = "web-{{.Task.Slot}}"
+  user              = "nginx"
+  hosts             = ["db.internal:10.0.0.5"]
+  cap_drop          = ["NET_RAW"]
+  sysctls           = { "net.core.somaxconn" = "1024" }
+  stop_grace_period = "30s"
+
+  dns {
+    nameservers = ["10.0.0.2"]
+    options     = ["ndots:2"]
+  }
+
+  ulimits {
+    name = "nofile"
+    soft = 65536
+    hard = 65536
+  }
+
+  # Bump to force a rolling restart without other changes.
+  force_update = 1
 
   labels = {
     app = "shop"
@@ -281,6 +348,26 @@ resource "docker_service" "web" {
   converge_config {
     timeout = "3m"
     delay   = "5s"
+  }
+}
+
+# A one-off job: runs 6 tasks to completion, 2 at a time. With
+# converge_config, apply waits until total_completions tasks completed.
+# Changing mode (e.g. to "replicated") replaces the service.
+resource "docker_service" "migrate" {
+  name              = "db-migrate"
+  image             = "busybox:1.36"
+  args              = ["sh", "-c", "echo migrating; sleep 5"]
+  mode              = "replicated_job"
+  max_concurrent    = 2
+  total_completions = 6
+
+  restart_policy {
+    condition = "on-failure"
+  }
+
+  converge_config {
+    timeout = "5m"
   }
 }
 ```

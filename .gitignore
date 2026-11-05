@@ -20,3 +20,6 @@ crash.log
 /test/harness/.env
 
 __Prompt.md
+
+# Harness run logs (Invoke-E2E.ps1)
+/test/harness/last-*.log

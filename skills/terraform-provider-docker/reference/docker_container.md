@@ -12,8 +12,13 @@ A single-host Docker container, created with `ContainerCreate`, attached to its 
 |---|---|---|---|---|---|
 | `command` | `list(string)` | optional | yes |  | Command (`CMD`) override. Unset uses the image's. Changing this forces a new resource. |
 | `cpu_shares` | `number` | optional | yes |  | Relative CPU weight (default 1024 in the daemon). Updated in place; removing it forces a new resource. |
+| `dns` | `list(string)` | optional | yes |  | DNS server IPs for the container's resolver (`HostConfig.Dns`). Unset uses the daemon/network default. Forces replacement. |
+| `dns_search` | `list(string)` | optional | yes |  | DNS search domains (`HostConfig.DnsSearch`). Forces replacement. |
 | `entrypoint` | `list(string)` | optional | yes |  | Entrypoint override. Unset uses the image's; setting it also drops the image's `CMD` unless `command` is set. Changing this forces a new resource. |
 | `env` | `map(string)` | optional | yes |  | Environment variables, merged over the image's. Image-provided variables are not reported in state. Changing this forces a new resource. |
+| `extra_hosts` | `list(string)` | optional | yes |  | Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` exactly like `docker run --add-host` (e.g. `"db.local:10.0.0.5"`, or `"host.docker.internal:host-gateway"` for the host's gateway IP). Forces replacement. |
+| `gpus` | `string` | optional | yes |  | GPUs to expose, like `docker run --gpus`: `"all"`, a count such as `"2"`, or `"device=0,1"` (indexes or UUIDs). Sent as a `HostConfig.DeviceRequests` entry with driver `nvidia` and capabilities `[["gpu"]]`; the host needs the NVIDIA container toolkit. Forces replacement. |
+| `hostname` | `string` | optional | yes |  | Container hostname (`Config.Hostname`). Unset: the daemon uses the first 12 characters of the container ID, which is not reported in state. Forces replacement. |
 | `id` | `string` | computed |  |  | Full container ID. |
 | `image` | `string` | required | yes |  | Image reference to run, e.g. `nginx:1.27` or a `docker_image` resource's `name`. Pulled (with matching `registry_auth`) when not present locally. Changing this forces a new resource. |
 | `image_id` | `string` | computed |  |  | ID (`sha256:...`) of the image the container runs. |
@@ -27,14 +32,21 @@ A single-host Docker container, created with `ContainerCreate`, attached to its 
 | `name` | `string` | required |  |  | Container name. Changing it renames the container in place. |
 | `nano_cpus` | `number` | optional | yes |  | CPU quota in units of 1e-9 CPUs (`1500000000` = 1.5 CPUs). Updated in place; removing it forces a new resource. |
 | `privileged` | `bool` | optional, computed | yes |  | Run the container privileged. Changing this forces a new resource. |
+| `read_only` | `bool` | optional, computed | yes |  | Mount the container's root filesystem read-only (`docker run --read-only`); use `mounts` (e.g. tmpfs) for writable paths. Default `false`. Forces replacement. |
 | `restart` | `string` | optional, computed |  |  | Restart policy: `no` (default), `always`, `unless-stopped` or `on-failure`. Updated in place. |
 | `running` | `bool` | computed |  |  | Whether the container was running at the last refresh. Planned `true` when `must_run` is set. |
+| `security_opt` | `set(string)` | optional | yes |  | Security options (`HostConfig.SecurityOpt`), e.g. `no-new-privileges:true`, `apparmor=unconfined`, `seccomp=unconfined`, `label=disable`. Forces replacement. |
+| `stdin_open` | `bool` | optional, computed | yes |  | Keep stdin open (`docker run -i`); with `tty` this keeps shells such as `sh` from exiting immediately. Default `false`. Forces replacement. |
+| `stop_signal` | `string` | optional | yes |  | Signal sent to stop the container, e.g. `SIGTERM` or `SIGQUIT`. Unset uses the image's `STOPSIGNAL` (else `SIGTERM`); the image value is not reported in state. Forces replacement. |
+| `stop_timeout` | `number` | optional | yes |  | Seconds to wait after the stop signal before killing the container. Unset uses the daemon default (10s). Forces replacement. |
+| `sysctls` | `map(string)` | optional | yes |  | Namespaced kernel parameters, e.g. `{ "net.core.somaxconn" = "1024" }`. Only keys you set are reported (except on import). Forces replacement. |
+| `tty` | `bool` | optional, computed | yes |  | Allocate a pseudo-TTY (`docker run -t`). Default `false`. Forces replacement. |
 | `user` | `string` | optional | yes |  | User (and optionally `:group`) to run as. Unset uses the image's. Changing this forces a new resource. |
 | `wait` | `bool` | optional, computed |  |  | Wait after start until the container's healthcheck reports `healthy` (or, without a healthcheck, until it is running). Fails if the container exits or `wait_timeout` elapses. |
 | `wait_timeout` | `string` | optional, computed |  |  | How long `wait` waits, as a Go duration. Default `60s`. |
 | `working_dir` | `string` | optional | yes |  | Working directory. Unset uses the image's. Changing this forces a new resource. |
 
-Nested blocks: `capabilities` (single block), `healthcheck` (single block), `mounts` (list of blocks), `networks_advanced` (list of blocks), `ports` (list of blocks), `ulimits` (list of blocks).
+Nested blocks: `capabilities` (single block, forces replacement), `devices` (list of blocks, forces replacement), `healthcheck` (single block, forces replacement), `mounts` (list of blocks, forces replacement), `networks_advanced` (list of blocks, forces replacement), `ports` (list of blocks, forces replacement), `ulimits` (list of blocks, forces replacement).
 
 ### `capabilities`
 
@@ -44,6 +56,16 @@ single block. Linux capabilities to add or drop. Changing it forces a new resour
 |---|---|---|---|---|---|
 | `add` | `set(string)` | optional |  |  | Capabilities to add, e.g. `NET_ADMIN`. |
 | `drop` | `set(string)` | optional |  |  | Capabilities to drop, e.g. `ALL`. |
+
+### `devices`
+
+list of blocks. Host devices mapped into the container (`HostConfig.Devices`, like `docker run --device`). Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `container_path` | `string` | optional |  |  | Path inside the container. Unset uses `host_path`. |
+| `host_path` | `string` | required |  |  | Device path on the host, e.g. `/dev/fuse`. |
+| `permissions` | `string` | optional, computed |  |  | Cgroup permissions, a combination of `r` (read), `w` (write) and `m` (mknod). Default `rwm`. |
 
 ### `healthcheck`
 
@@ -77,6 +99,7 @@ list of blocks. Networks to attach. The first is used at create (`NetworkMode`),
 |---|---|---|---|---|---|
 | `aliases` | `set(string)` | optional |  |  | DNS aliases on this network. |
 | `ipv4_address` | `string` | optional |  |  | Static IPv4 address (needs a user-defined subnet). |
+| `ipv6_address` | `string` | optional |  |  | Static IPv6 address (needs an IPv6-enabled network with a user-defined IPv6 subnet). |
 | `name` | `string` | required |  |  | Network name or ID (e.g. a `docker_network`'s `name`). |
 
 ### `ports`
@@ -157,6 +180,19 @@ resource "docker_container" "web" {
     name = "nofile"
     soft = 65536
     hard = 65536
+  }
+
+  # Create-time settings (changing any of these replaces the container).
+  hostname     = "web"
+  dns          = ["1.1.1.1", "8.8.8.8"]
+  extra_hosts  = ["db.internal:10.0.0.5", "host.docker.internal:host-gateway"]
+  stop_signal  = "SIGQUIT"
+  stop_timeout = 30
+  sysctls      = { "net.core.somaxconn" = "1024" }
+  security_opt = ["no-new-privileges:true"]
+
+  devices {
+    host_path = "/dev/fuse"
   }
 
   log_driver = "json-file"

@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/distribution/reference"
 	"github.com/docker/docker/pkg/jsonmessage"
@@ -189,7 +190,13 @@ func imgTarHeader(f imgContextFile) (*tar.Header, error) {
 		h.Name += "/"
 	}
 	h.Uid, h.Gid, h.Uname, h.Gname = 0, 0, "", ""
+	// Like moby's archive.FileInfoHeader: PAX format, but whole-second mtime and
+	// no atime/ctime, so ordinary entries need no PAX records. BuildKit sniffs the
+	// first tar block to tell a context archive from a bare Dockerfile; a leading
+	// PAX record made it read the whole upload as the Dockerfile.
 	h.Format = tar.FormatPAX
+	h.ModTime = h.ModTime.Truncate(time.Second)
+	h.AccessTime, h.ChangeTime = time.Time{}, time.Time{}
 	if runtime.GOOS == "windows" {
 		// Windows has no exec bit; mirror the CLI's chmodTarEntry.
 		perm := h.Mode & 0o755

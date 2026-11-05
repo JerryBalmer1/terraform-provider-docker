@@ -130,7 +130,7 @@ func TestRenderSynthetic(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "resource.tf"), []byte("resource \"docker_secret\" \"x\" {\r\n  name = \"x\"\r\n}\r\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "import.sh"), []byte("terraform import docker_secret.x abc\n"), 0o644)
 
-	files, warnings, err := render(syntheticResponse(), ex)
+	files, readme, warnings, err := render(syntheticResponse(), renderOpts{Examples: ex, ReadmeSkillDir: "skills/x", ReadmeDocsDir: "docs"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,8 +190,22 @@ func TestRenderSynthetic(t *testing.T) {
 		}
 	}
 
+	rd := string(readme)
+	for _, s := range []string{
+		generatedMarker,
+		"## 4. Swarm workload",
+		"| `docker_secret` | resource | Manages a Swarm secret. | [reference/docker_secret.md](skills/x/reference/docker_secret.md) | [resources/secret.md](docs/resources/secret.md) |",
+		"| `data.docker_secret` | data source | Manages a Swarm secret. | [reference/data.docker_secret.md](skills/x/reference/data.docker_secret.md) | [data-sources/secret.md](docs/data-sources/secret.md) |",
+		"## Other",
+		"[docs](docs/index.md)",
+	} {
+		if !strings.Contains(rd, s) {
+			t.Errorf("README_resources.md lacks %q\n%s", s, rd)
+		}
+	}
+
 	// Determinism.
-	again, _, err := render(syntheticResponse(), ex)
+	again, _, _, err := render(syntheticResponse(), renderOpts{Examples: ex})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +218,7 @@ func TestRenderSynthetic(t *testing.T) {
 
 func TestWriteCheckAndStale(t *testing.T) {
 	out := t.TempDir()
-	files, _, err := render(syntheticResponse(), "")
+	files, _, _, err := render(syntheticResponse(), renderOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,19 +284,31 @@ func TestNormalize(t *testing.T) {
 func TestGenerateRealProvider(t *testing.T) {
 	out := t.TempDir()
 	var stdout, stderr bytes.Buffer
-	o := options{Out: out, Examples: filepath.Join("..", "..", "examples")}
+	o := options{
+		Out:      filepath.Join(out, "skills", "terraform-provider-docker"),
+		Examples: filepath.Join("..", "..", "examples"),
+		Readme:   filepath.Join(out, "README_resources.md"),
+		Docs:     filepath.Join(out, "docs"),
+	}
 	if err := run(context.Background(), o, &stdout, &stderr); err != nil {
 		t.Fatalf("run: %v\n%s", err, stderr.String())
 	}
-	b, err := os.ReadFile(filepath.Join(out, "SKILL.md"))
+	b, err := os.ReadFile(filepath.Join(o.Out, "SKILL.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.HasPrefix(b, []byte("---\nname: terraform-provider-docker\ndescription: ")) {
 		t.Errorf("SKILL.md frontmatter missing: %.120q", b)
 	}
-	if _, err := os.Stat(filepath.Join(out, "reference", "provider.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(o.Out, "reference", "provider.md")); err != nil {
 		t.Errorf("reference/provider.md: %v", err)
+	}
+	rd, err := os.ReadFile(o.Readme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(rd, []byte("](skills/terraform-provider-docker/reference/docker_service.md)")) || !bytes.Contains(rd, []byte("](docs/resources/service.md)")) {
+		t.Errorf("README_resources.md links wrong:\n%s", rd)
 	}
 	o.Check = true
 	if err := run(context.Background(), o, &stdout, &stderr); err != nil {

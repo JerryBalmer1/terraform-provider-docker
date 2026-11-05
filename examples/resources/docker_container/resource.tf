@@ -54,6 +54,19 @@ resource "docker_container" "web" {
     hard = 65536
   }
 
+  # Create-time settings (changing any of these replaces the container).
+  hostname     = "web"
+  dns          = ["1.1.1.1", "8.8.8.8"]
+  extra_hosts  = ["db.internal:10.0.0.5", "host.docker.internal:host-gateway"]
+  stop_signal  = "SIGQUIT"
+  stop_timeout = 30
+  sysctls      = { "net.core.somaxconn" = "1024" }
+  security_opt = ["no-new-privileges:true"]
+
+  devices {
+    host_path = "/dev/fuse"
+  }
+
   log_driver = "json-file"
   log_opts   = { max-size = "10m", max-file = "3" }
 

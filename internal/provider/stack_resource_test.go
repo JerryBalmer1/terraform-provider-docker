@@ -53,12 +53,13 @@ func TestStackPlanServices(t *testing.T) {
 		"web":    withNet,    // untouched -> update
 		"agent":  withNet,    // switches to global -> recreate
 		"legacy": withNet,    // not desired -> remove
+		"batch":  withNet,    // switches to replicated_job -> recreate
 	}
-	desired := map[string]bool{"api": false, "web": false, "agent": true, "worker": false}
+	desired := map[string]string{"api": "replicated", "web": "", "agent": "global", "worker": "replicated", "batch": "replicated_job"}
 	got := stackPlanServices(desired, existing, map[string]bool{"sec-old": true})
 	want := stackSvcPlan{
-		Remove: []string{"agent", "api", "legacy"},
-		Create: []string{"agent", "api", "worker"},
+		Remove: []string{"agent", "api", "batch", "legacy"},
+		Create: []string{"agent", "api", "batch", "worker"},
 		Update: []string{"web"},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -347,6 +348,7 @@ func TestStackFakeDaemonLifecycle(t *testing.T) {
 
 func TestAccStackBasic(t *testing.T) {
 	testAccPreCheck(t)
+	_ = swarmAccManagerAddr(t) // skips unless DOCKER_HOST is a swarm manager
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{

@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -301,5 +302,88 @@ func e2eCheckDestroy(t *testing.T, serviceID, secretID *string) resource.TestChe
 			}
 		}
 		return nil
+	}
+}
+
+// TestE2EConfigMatchesSchema checks, without a daemon, that every attribute
+// and nested block e2eConfig sets exists in the provider's registered schema
+// and is settable (not computed-only), so a schema rename in any lane fails
+// here instead of only on a live harness run.
+func TestE2EConfigMatchesSchema(t *testing.T) {
+	srv, err := testAccProtoV6ProviderFactories["docker"]()
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := srv.GetProviderSchema(context.Background(), &tfprotov6.GetProviderSchemaRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := e2eConfig(e2eParams{
+		Suffix:        "abc123",
+		AdvertiseAddr: "eth0",
+		ManagerAddr:   "manager:2377",
+		Worker1Host:   "tcp://127.0.0.1:12376",
+		Worker2Host:   "tcp://127.0.0.1:12377",
+	})
+	f, diags := hclsyntax.ParseConfig([]byte(cfg), "e2e.tf", hcl.InitialPos)
+	if diags.HasErrors() {
+		t.Fatalf("HCL parse: %s", diags.Error())
+	}
+	for _, b := range f.Body.(*hclsyntax.Body).Blocks {
+		if b.Type != "resource" || len(b.Labels) != 2 {
+			continue
+		}
+		s, ok := resp.ResourceSchemas[b.Labels[0]]
+		if !ok || s == nil || s.Block == nil {
+			t.Errorf("resource type %s is not registered", b.Labels[0])
+			continue
+		}
+		e2eCheckBodyAgainstSchema(t, b.Labels[0]+"."+b.Labels[1], b.Body, s.Block, true)
+	}
+}
+
+// e2eCheckBodyAgainstSchema walks one HCL body against a protocol schema
+// block. top marks a resource body, where Terraform meta-arguments are legal.
+func e2eCheckBodyAgainstSchema(t *testing.T, path string, body *hclsyntax.Body, blk *tfprotov6.SchemaBlock, top bool) {
+	t.Helper()
+	meta := map[string]bool{"depends_on": true, "count": true, "for_each": true, "provider": true}
+	attrs := map[string]*tfprotov6.SchemaAttribute{}
+	for _, a := range blk.Attributes {
+		attrs[a.Name] = a
+	}
+	blocks := map[string]*tfprotov6.SchemaNestedBlock{}
+	for _, nb := range blk.BlockTypes {
+		blocks[nb.TypeName] = nb
+	}
+	for name := range body.Attributes {
+		if top && meta[name] {
+			continue
+		}
+		a, ok := attrs[name]
+		switch {
+		case !ok:
+			if _, isBlock := blocks[name]; isBlock {
+				t.Errorf("%s: %q is a block in the schema but set as an attribute", path, name)
+			} else {
+				t.Errorf("%s: attribute %q does not exist in the schema", path, name)
+			}
+		case !a.Optional && !a.Required:
+			t.Errorf("%s: attribute %q is computed-only and cannot be set", path, name)
+		}
+	}
+	for _, nb := range body.Blocks {
+		if top && nb.Type == "lifecycle" {
+			continue
+		}
+		sb, ok := blocks[nb.Type]
+		if !ok {
+			if _, isAttr := attrs[nb.Type]; isAttr {
+				t.Errorf("%s: %q is an attribute in the schema but written as a block", path, nb.Type)
+			} else {
+				t.Errorf("%s: block %q does not exist in the schema", path, nb.Type)
+			}
+			continue
+		}
+		e2eCheckBodyAgainstSchema(t, path+"."+nb.Type, nb.Body, sb.Block, false)
 	}
 }

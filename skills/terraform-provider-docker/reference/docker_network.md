@@ -22,7 +22,7 @@ A Docker network (`NetworkCreate`): a local `bridge`/`macvlan`/`ipvlan` network,
 | `options` | `map(string)` | optional | yes |  | Driver options, e.g. `{ "com.docker.network.bridge.name" = "br-app" }`. Options the driver adds itself are not reported. Changing this forces a new resource. |
 | `scope` | `string` | computed |  |  | `local` or `swarm`, as reported by the daemon. |
 
-Nested blocks: `ipam_config` (list of blocks).
+Nested blocks: `ipam_config` (list of blocks, forces replacement).
 
 ### `ipam_config`
 

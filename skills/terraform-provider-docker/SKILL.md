@@ -110,9 +110,10 @@ attribute carries it.
 
 ## 3. Changes that force replacement
 
-The protocol schema does not carry plan modifiers, so this table lists every
-attribute whose description says it forces a new resource. Changing any of
-these destroys and recreates the object.
+This table lists every attribute and block that carries a `RequiresReplace`
+plan modifier in the provider's framework schema, plus any whose description
+says it forces replacement. Changing any of these destroys and recreates the
+object (some are conditional; the description says when).
 
 | Resource | Attribute | Description |
 |---|---|---|
@@ -121,8 +122,13 @@ these destroys and recreates the object.
 | `docker_config` | `name` | Config name, unique in the Swarm. |
 | `docker_container` | `command` | Command (`CMD`) override. |
 | `docker_container` | `cpu_shares` | Relative CPU weight (default 1024 in the daemon). |
+| `docker_container` | `dns` | DNS server IPs for the container's resolver (`HostConfig.Dns`). |
+| `docker_container` | `dns_search` | DNS search domains (`HostConfig.DnsSearch`). |
 | `docker_container` | `entrypoint` | Entrypoint override. |
 | `docker_container` | `env` | Environment variables, merged over the image's. |
+| `docker_container` | `extra_hosts` | Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` exactly like `docker run --add-host` (e.g. `"db.local:10.0.0.5"`, or `"host.docker.internal:host-gateway"` for the host's gateway IP). |
+| `docker_container` | `gpus` | GPUs to expose, like `docker run --gpus`: `"all"`, a count such as `"2"`, or `"device=0,1"` (indexes or UUIDs). |
+| `docker_container` | `hostname` | Container hostname (`Config.Hostname`). |
 | `docker_container` | `image` | Image reference to run, e.g. `nginx:1.27` or a `docker_image` resource's `name`. |
 | `docker_container` | `labels` | Container labels. |
 | `docker_container` | `log_driver` | Logging driver, e.g. `json-file`, `local`, `syslog`. |
@@ -130,11 +136,33 @@ these destroys and recreates the object.
 | `docker_container` | `memory` | Memory limit in bytes. |
 | `docker_container` | `nano_cpus` | CPU quota in units of 1e-9 CPUs (`1500000000` = 1.5 CPUs). |
 | `docker_container` | `privileged` | Run the container privileged. |
+| `docker_container` | `read_only` | Mount the container's root filesystem read-only (`docker run --read-only`); use `mounts` (e.g. tmpfs) for writable paths. |
+| `docker_container` | `security_opt` | Security options (`HostConfig.SecurityOpt`), e.g. `no-new-privileges:true`, `apparmor=unconfined`, `seccomp=unconfined`, `label=disable`. |
+| `docker_container` | `stdin_open` | Keep stdin open (`docker run -i`); with `tty` this keeps shells such as `sh` from exiting immediately. |
+| `docker_container` | `stop_signal` | Signal sent to stop the container, e.g. `SIGTERM` or `SIGQUIT`. |
+| `docker_container` | `stop_timeout` | Seconds to wait after the stop signal before killing the container. |
+| `docker_container` | `sysctls` | Namespaced kernel parameters, e.g. `{ "net.core.somaxconn" = "1024" }`. |
+| `docker_container` | `tty` | Allocate a pseudo-TTY (`docker run -t`). |
 | `docker_container` | `user` | User (and optionally `:group`) to run as. |
 | `docker_container` | `working_dir` | Working directory. |
+| `docker_container` | `capabilities` (block) | Linux capabilities to add or drop. |
+| `docker_container` | `devices` (block) | Host devices mapped into the container (`HostConfig.Devices`, like `docker run --device`). |
+| `docker_container` | `healthcheck` (block) | Healthcheck override. |
+| `docker_container` | `mounts` (block) | Mounts (`HostConfig.Mounts`). |
+| `docker_container` | `networks_advanced` (block) | Networks to attach. |
+| `docker_container` | `ports` (block) | Published ports (`HostConfig.PortBindings`). |
+| `docker_container` | `ulimits` (block) | Resource ulimits. |
 | `docker_image` | `name` | Image reference. |
 | `docker_image` | `platform` | Platform to pull or build, `os[/arch[/variant]]` such as `linux/amd64`. |
 | `docker_image` | `triggers` | Arbitrary string map; any change re-pulls or rebuilds the image. |
+| `docker_image` | `build` (block) | Build the image from a local directory instead of pulling it. |
+| `docker_image` | `build.builder` | Builder backend: `classic` (default; the legacy builder, `DOCKER_BUILDKIT=0`) or `buildkit`. |
+| `docker_image` | `build.cache_from` | BuildKit only. |
+| `docker_image` | `build.platforms` | BuildKit only. |
+| `docker_image` | `build.secrets` (block) | BuildKit only. |
+| `docker_image` | `build.secrets.env` | Name of an environment variable of the provider process holding the secret. |
+| `docker_image` | `build.secrets.id` | Secret ID referenced by `RUN --mount=type=secret,id=...`. |
+| `docker_image` | `build.secrets.src` | Path of a file holding the secret (max 500 KiB). |
 | `docker_network` | `attachable` | Let standalone containers attach to an `overlay` network. |
 | `docker_network` | `driver` | Network driver: `bridge` (default), `overlay` (Swarm manager only), `macvlan`, `ipvlan`, or a plugin. |
 | `docker_network` | `ingress` | Create the Swarm routing-mesh (ingress) network. |
@@ -144,12 +172,13 @@ these destroys and recreates the object.
 | `docker_network` | `labels` | Network labels. |
 | `docker_network` | `name` | Network name. |
 | `docker_network` | `options` | Driver options, e.g. `{ "com.docker.network.bridge.name" = "br-app" }`. |
+| `docker_network` | `ipam_config` (block) | Static IPAM pools. |
 | `docker_registry_image` | `name` | Local image reference to push, including registry host and tag (e.g. `registry.example.com/team/app:1.2`; no tag means `latest`). |
 | `docker_registry_image` | `triggers` | Arbitrary string map; any change pushes the image again. |
 | `docker_secret` | `data` | Secret content, base64-encoded (use `base64encode()`); it must decode. |
 | `docker_secret` | `labels` | User labels on the secret. |
 | `docker_secret` | `name` | Secret name, unique in the Swarm. |
-| `docker_service` | `mode` | `replicated` (default; runs `replicas` tasks) or `global` (one task per eligible node). |
+| `docker_service` | `mode` | `replicated` (default; runs `replicas` tasks), `global` (one task per eligible node), `replicated_job` (runs `total_completions` tasks to completion, `max_concurrent` at a time) or `global_job` (one run-to-completion task per eligible node). |
 | `docker_service` | `name` | Service name. |
 | `docker_stack` | `name` | Stack namespace. |
 | `docker_swarm_init` | `advertise_addr` | Address advertised to other nodes, as `<ip\|interface>[:port]`, e.g. `10.0.0.5` or `eth0:2377`. |

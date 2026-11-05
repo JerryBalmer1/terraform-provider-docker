@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -81,6 +82,19 @@ type containerResourceModel struct {
 	Wait             types.Bool                  `tfsdk:"wait"`
 	WaitTimeout      types.String                `tfsdk:"wait_timeout"`
 	Running          types.Bool                  `tfsdk:"running"`
+	Hostname         types.String                `tfsdk:"hostname"`
+	DNS              types.List                  `tfsdk:"dns"`
+	DNSSearch        types.List                  `tfsdk:"dns_search"`
+	ExtraHosts       types.List                  `tfsdk:"extra_hosts"`
+	Devices          []containerDeviceModel      `tfsdk:"devices"`
+	Tty              types.Bool                  `tfsdk:"tty"`
+	StdinOpen        types.Bool                  `tfsdk:"stdin_open"`
+	StopSignal       types.String                `tfsdk:"stop_signal"`
+	StopTimeout      types.Int64                 `tfsdk:"stop_timeout"`
+	Sysctls          types.Map                   `tfsdk:"sysctls"`
+	SecurityOpt      types.Set                   `tfsdk:"security_opt"`
+	ReadOnly         types.Bool                  `tfsdk:"read_only"`
+	GPUs             types.String                `tfsdk:"gpus"`
 }
 
 func (r *containerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -220,6 +234,74 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed:            true,
 				MarkdownDescription: "Whether the container was running at the last refresh. Planned `true` when `must_run` is set.",
 			},
+			"hostname": schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "Container hostname (`Config.Hostname`). Unset: the daemon uses the first 12 characters of the container ID, " +
+					"which is not reported in state. Forces replacement.",
+				PlanModifiers: rrStr,
+			},
+			"dns": schema.ListAttribute{
+				ElementType: types.StringType, Optional: true,
+				MarkdownDescription: "DNS server IPs for the container's resolver (`HostConfig.Dns`). Unset uses the daemon/network default. Forces replacement.",
+				PlanModifiers:       rrList,
+			},
+			"dns_search": schema.ListAttribute{
+				ElementType: types.StringType, Optional: true,
+				MarkdownDescription: "DNS search domains (`HostConfig.DnsSearch`). Forces replacement.",
+				PlanModifiers:       rrList,
+			},
+			"extra_hosts": schema.ListAttribute{
+				ElementType: types.StringType, Optional: true,
+				MarkdownDescription: "Extra `/etc/hosts` entries, each `\"<hostname>:<ip>\"` exactly like `docker run --add-host` " +
+					"(e.g. `\"db.local:10.0.0.5\"`, or `\"host.docker.internal:host-gateway\"` for the host's gateway IP). Forces replacement.",
+				PlanModifiers: rrList,
+			},
+			"tty": schema.BoolAttribute{
+				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
+				MarkdownDescription: "Allocate a pseudo-TTY (`docker run -t`). Default `false`. Forces replacement.",
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.RequiresReplace()},
+			},
+			"stdin_open": schema.BoolAttribute{
+				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
+				MarkdownDescription: "Keep stdin open (`docker run -i`); with `tty` this keeps shells such as `sh` from exiting immediately. Default `false`. Forces replacement.",
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.RequiresReplace()},
+			},
+			"stop_signal": schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "Signal sent to stop the container, e.g. `SIGTERM` or `SIGQUIT`. Unset uses the image's `STOPSIGNAL` " +
+					"(else `SIGTERM`); the image value is not reported in state. Forces replacement.",
+				PlanModifiers: rrStr,
+			},
+			"stop_timeout": schema.Int64Attribute{
+				Optional:            true,
+				MarkdownDescription: "Seconds to wait after the stop signal before killing the container. Unset uses the daemon default (10s). Forces replacement.",
+				PlanModifiers:       []planmodifier.Int64{int64planmodifier.RequiresReplace()},
+			},
+			"sysctls": schema.MapAttribute{
+				ElementType: types.StringType, Optional: true,
+				MarkdownDescription: "Namespaced kernel parameters, e.g. `{ \"net.core.somaxconn\" = \"1024\" }`. Only keys you set are " +
+					"reported (except on import). Forces replacement.",
+				PlanModifiers: rrMap,
+			},
+			"security_opt": schema.SetAttribute{
+				ElementType: types.StringType, Optional: true,
+				MarkdownDescription: "Security options (`HostConfig.SecurityOpt`), e.g. `no-new-privileges:true`, `apparmor=unconfined`, " +
+					"`seccomp=unconfined`, `label=disable`. Forces replacement.",
+				PlanModifiers: []planmodifier.Set{setplanmodifier.RequiresReplace()},
+			},
+			"read_only": schema.BoolAttribute{
+				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
+				MarkdownDescription: "Mount the container's root filesystem read-only (`docker run --read-only`); use `mounts` (e.g. tmpfs) for " +
+					"writable paths. Default `false`. Forces replacement.",
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.RequiresReplace()},
+			},
+			"gpus": schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "GPUs to expose, like `docker run --gpus`: `\"all\"`, a count such as `\"2\"`, or `\"device=0,1\"` " +
+					"(indexes or UUIDs). Sent as a `HostConfig.DeviceRequests` entry with driver `nvidia` and capabilities `[[\"gpu\"]]`; " +
+					"the host needs the NVIDIA container toolkit. Forces replacement.",
+				PlanModifiers: rrStr,
+			},
 		},
 		Blocks: map[string]schema.Block{
 			"ports": schema.ListNestedBlock{
@@ -261,6 +343,7 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					"name":         schema.StringAttribute{Required: true, MarkdownDescription: "Network name or ID (e.g. a `docker_network`'s `name`)."},
 					"aliases":      schema.SetAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: "DNS aliases on this network."},
 					"ipv4_address": schema.StringAttribute{Optional: true, MarkdownDescription: "Static IPv4 address (needs a user-defined subnet)."},
+					"ipv6_address": schema.StringAttribute{Optional: true, MarkdownDescription: "Static IPv6 address (needs an IPv6-enabled network with a user-defined IPv6 subnet)."},
 				}},
 			},
 			"healthcheck": schema.SingleNestedBlock{
@@ -284,6 +367,19 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					"add":  schema.SetAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: "Capabilities to add, e.g. `NET_ADMIN`."},
 					"drop": schema.SetAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: "Capabilities to drop, e.g. `ALL`."},
 				},
+			},
+			"devices": schema.ListNestedBlock{
+				MarkdownDescription: "Host devices mapped into the container (`HostConfig.Devices`, like `docker run --device`). Forces replacement.",
+				PlanModifiers:       []planmodifier.List{listplanmodifier.RequiresReplace()},
+				NestedObject: schema.NestedBlockObject{Attributes: map[string]schema.Attribute{
+					"host_path": schema.StringAttribute{Required: true, MarkdownDescription: "Device path on the host, e.g. `/dev/fuse`."},
+					"container_path": schema.StringAttribute{Optional: true,
+						MarkdownDescription: "Path inside the container. Unset uses `host_path`."},
+					"permissions": schema.StringAttribute{
+						Optional: true, Computed: true, Default: stringdefault.StaticString(containerDefaultDevicePerms),
+						MarkdownDescription: "Cgroup permissions, a combination of `r` (read), `w` (write) and `m` (mknod). Default `rwm`.",
+					},
+				}},
 			},
 			"ulimits": schema.ListNestedBlock{
 				MarkdownDescription: "Resource ulimits. Changing them forces a new resource.",
@@ -337,10 +433,31 @@ func containerBuildCreate(ctx context.Context, m containerResourceModel, diags *
 		Labels:     mergeLabels(stringMapFrom(ctx, m.Labels, diags), map[string]string{labelManagedBy: labelManagedByValue}),
 		User:       m.User.ValueString(),
 		WorkingDir: m.WorkingDir.ValueString(),
+		Hostname:   m.Hostname.ValueString(),
+		Tty:        m.Tty.ValueBool(),
+		OpenStdin:  m.StdinOpen.ValueBool(),
+		StopSignal: m.StopSignal.ValueString(),
+	}
+	if v, ok := knownInt64(m.StopTimeout); ok {
+		n := int(v)
+		cfg.StopTimeout = &n
 	}
 	hc := &container.HostConfig{
-		Privileged:    m.Privileged.ValueBool(),
-		RestartPolicy: containerRestartPolicy(m.Restart.ValueString(), m.MaxRetryCount.ValueInt64()),
+		Privileged:     m.Privileged.ValueBool(),
+		RestartPolicy:  containerRestartPolicy(m.Restart.ValueString(), m.MaxRetryCount.ValueInt64()),
+		DNS:            stringListFrom(ctx, m.DNS, diags),
+		DNSSearch:      stringListFrom(ctx, m.DNSSearch, diags),
+		ExtraHosts:     stringListFrom(ctx, m.ExtraHosts, diags),
+		SecurityOpt:    stringSetFrom(ctx, m.SecurityOpt, diags),
+		ReadonlyRootfs: m.ReadOnly.ValueBool(),
+	}
+	if sc := stringMapFrom(ctx, m.Sysctls, diags); len(sc) > 0 {
+		hc.Sysctls = sc
+	}
+	for i, h := range hc.ExtraHosts {
+		if name, ip, ok := strings.Cut(h, ":"); !ok || name == "" || ip == "" {
+			diags.AddAttributeError(path.Root("extra_hosts").AtListIndex(i), "Invalid extra_hosts entry", fmt.Sprintf("%q: want \"<hostname>:<ip>\"", h))
+		}
 	}
 	hc.Memory = m.Memory.ValueInt64()
 	if v, ok := knownInt64(m.MemorySwap); ok {
@@ -361,6 +478,14 @@ func containerBuildCreate(ctx context.Context, m containerResourceModel, diags *
 		diags.AddAttributeError(path.Root("mounts"), "Invalid mounts", err.Error())
 	}
 	hc.Ulimits = containerExpandUlimits(m.Ulimits)
+	if hc.Devices, err = containerExpandDevices(m.Devices); err != nil {
+		diags.AddAttributeError(path.Root("devices"), "Invalid devices", err.Error())
+	}
+	if gpu, err := containerExpandGPUs(m.GPUs.ValueString()); err != nil {
+		diags.AddAttributeError(path.Root("gpus"), "Invalid gpus", err.Error())
+	} else if gpu != nil {
+		hc.DeviceRequests = []container.DeviceRequest{*gpu}
+	}
 	if m.Healthcheck != nil {
 		test := stringListFrom(ctx, m.Healthcheck.Test, diags)
 		if len(test) == 0 {
@@ -382,7 +507,7 @@ func containerBuildCreate(ctx context.Context, m containerResourceModel, diags *
 		name := first.Name.ValueString()
 		hc.NetworkMode = container.NetworkMode(name)
 		netCfg = &network.NetworkingConfig{EndpointsConfig: map[string]*network.EndpointSettings{
-			name: containerEndpointSettings(stringSetFrom(ctx, first.Aliases, diags), first.IPv4Address.ValueString()),
+			name: containerEndpointSettings(stringSetFrom(ctx, first.Aliases, diags), first.IPv4Address.ValueString(), first.IPv6Address.ValueString()),
 		}}
 		extra = m.NetworksAdvanced[1:]
 	}
@@ -492,7 +617,7 @@ func (r *containerResource) Create(ctx context.Context, req resource.CreateReque
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), plan.ID)...)
 
 	for _, n := range extra {
-		ep := containerEndpointSettings(stringSetFrom(ctx, n.Aliases, &resp.Diagnostics), n.IPv4Address.ValueString())
+		ep := containerEndpointSettings(stringSetFrom(ctx, n.Aliases, &resp.Diagnostics), n.IPv4Address.ValueString(), n.IPv6Address.ValueString())
 		if err := r.pd.Client.NetworkConnect(ctx, n.Name.ValueString(), created.ID, ep); err != nil {
 			resp.Diagnostics.AddError("Cannot connect container to network", fmt.Sprintf("%s: %v", n.Name.ValueString(), err))
 			return
@@ -547,7 +672,7 @@ func (r *containerResource) refresh(ctx context.Context, prior containerResource
 		ic := img.Config
 		imgCfg = &container.Config{
 			User: ic.User, Env: ic.Env, Cmd: ic.Cmd, Entrypoint: ic.Entrypoint, WorkingDir: ic.WorkingDir,
-			Labels: ic.Labels, Healthcheck: ic.Healthcheck,
+			Labels: ic.Labels, Healthcheck: ic.Healthcheck, StopSignal: ic.StopSignal,
 		}
 	}
 	return containerFromInspect(insp, imgCfg, prior), true
@@ -637,6 +762,20 @@ func containerFromInspect(insp container.InspectResponse, imgCfg *container.Conf
 	out.MemorySwap = types.Int64Value(hc.MemorySwap)
 	out.CPUShares = containerInt64Read(prior.CPUShares, hc.CPUShares)
 	out.NanoCPUs = containerInt64Read(prior.NanoCPUs, hc.NanoCPUs)
+
+	out.Hostname = containerHostnameRead(prior.Hostname, cfg.Hostname, out.ID.ValueString())
+	out.DNS = containerListRead(prior.DNS, hc.DNS, nil)
+	out.DNSSearch = containerListRead(prior.DNSSearch, hc.DNSSearch, nil)
+	out.ExtraHosts = containerListRead(prior.ExtraHosts, hc.ExtraHosts, nil)
+	out.Devices = containerFlattenDevices(hc.Devices, prior.Devices)
+	out.Tty = types.BoolValue(cfg.Tty)
+	out.StdinOpen = types.BoolValue(cfg.OpenStdin)
+	out.StopSignal = containerStringRead(prior.StopSignal, cfg.StopSignal, img.StopSignal)
+	out.StopTimeout = containerStopTimeoutRead(cfg.StopTimeout)
+	out.Sysctls = containerSysctlsRead(prior.Sysctls, hc.Sysctls, importing)
+	out.SecurityOpt = containerSecurityOptRead(prior.SecurityOpt, hc.SecurityOpt)
+	out.ReadOnly = types.BoolValue(hc.ReadonlyRootfs)
+	out.GPUs = containerFlattenGPUs(hc.DeviceRequests, prior.GPUs)
 
 	if !containerKnown(out.MustRun) {
 		out.MustRun = types.BoolValue(true)

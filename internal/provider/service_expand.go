@@ -159,18 +159,7 @@ func svcExpand(ctx context.Context, m *svcSpecModel, lk *svcLookup, o svcExpandO
 	}
 
 	// Mode
-	if m.Mode.ValueString() == "global" {
-		spec.Mode.Global = &swarm.GlobalService{}
-	} else {
-		n := uint64(1)
-		if v, ok := knownInt64(m.Replicas); ok {
-			if v < 0 {
-				diags.AddError("Invalid replicas", "replicas must be >= 0")
-			}
-			n = uint64(v)
-		}
-		spec.Mode.Replicated = &swarm.ReplicatedService{Replicas: &n}
-	}
+	svcExpandMode(m, &spec, &diags)
 
 	// Networks
 	for _, ref := range stringSetFrom(ctx, m.Networks, &diags) {
@@ -185,6 +174,8 @@ func svcExpand(ctx context.Context, m *svcSpecModel, lk *svcLookup, o svcExpandO
 		}
 		spec.TaskTemplate.Networks = append(spec.TaskTemplate.Networks, nac)
 	}
+	svcExpandNetworksAdvanced(ctx, m, lk, o, &spec, &diags)
+	svcExpandP2(ctx, m, &spec, &diags)
 
 	// Mounts
 	for _, mm := range m.Mounts {
@@ -432,21 +423,7 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 	}
 	m.Labels = svcMapValue(prior.Labels, userLabels(spec.Labels, o.StripStack))
 
-	switch {
-	case spec.Mode.Global != nil:
-		m.Mode = types.StringValue("global")
-		m.Replicas = prior.Replicas
-		if m.Replicas.IsNull() || m.Replicas.IsUnknown() {
-			m.Replicas = types.Int64Value(1)
-		}
-	default:
-		m.Mode = types.StringValue("replicated")
-		n := int64(1)
-		if spec.Mode.Replicated != nil && spec.Mode.Replicated.Replicas != nil {
-			n = int64(*spec.Mode.Replicated.Replicas)
-		}
-		m.Replicas = types.Int64Value(n)
-	}
+	svcFlattenMode(spec, prior, &m)
 
 	cs := spec.TaskTemplate.ContainerSpec
 	if cs == nil {
@@ -458,24 +435,8 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 	m.Env = svcMapValue(prior.Env, svcEnvMap(cs.Env))
 	m.ContainerLabels = svcMapValue(prior.ContainerLabels, userLabels(cs.Labels, o.StripStack))
 
-	// Networks: keep the prior reference that denotes each attached ID.
-	var priorNets []string
-	if !prior.Networks.IsNull() && !prior.Networks.IsUnknown() {
-		var d diag.Diagnostics
-		priorNets = stringSetFrom(context.Background(), prior.Networks, &d)
-	}
-	var nets []string
-	for _, n := range spec.TaskTemplate.Networks {
-		ref := lk.displayRef("network", n.Target)
-		for _, p := range priorNets {
-			if p == n.Target || (lk != nil && lk.matches("network", p, n.Target)) {
-				ref = p
-				break
-			}
-		}
-		nets = append(nets, ref)
-	}
-	m.Networks = svcSetValue(prior.Networks, nets)
+	svcFlattenNetworks(spec, prior, lk, o, &m)
+	svcFlattenP2(spec, cs, prior, &m)
 
 	// Mounts (positional against prior).
 	for i, mt := range cs.Mounts {

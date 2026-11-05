@@ -55,17 +55,28 @@ list of blocks. A service of the stack, created as `<stack>_<name>` with the sam
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `args` | `list(string)` | optional |  |  | Arguments passed to the command (overrides the image `CMD`). |
+| `cap_add` | `set(string)` | optional |  |  | Linux capabilities to add to the task containers, e.g. `NET_ADMIN` (case and `CAP_` prefix are ignored when comparing). Updated in place. |
+| `cap_drop` | `set(string)` | optional |  |  | Linux capabilities to drop, e.g. `ALL`. Updated in place. |
 | `command` | `list(string)` | optional |  |  | Command to run (overrides the image `ENTRYPOINT`). |
 | `container_labels` | `map(string)` | optional |  |  | Labels on the task containers. |
+| `dir` | `string` | optional |  |  | Working directory of the task process. Unset uses the image's. Updated in place. |
 | `env` | `map(string)` | optional |  |  | Environment variables of the task containers. |
+| `force_update` | `number` | optional |  |  | Counter (`TaskTemplate.ForceUpdate`): change it (e.g. increment) to force a rolling restart of every task even when nothing else changed, like `docker service update --force`. Unset leaves the daemon's counter alone and ignores it on refresh. Updated in place. |
+| `hostname` | `string` | optional |  |  | Hostname of the task containers (`ContainerSpec.Hostname`; Go templates such as `{{.Task.Name}}` work). Unset: the container ID prefix. Updated in place (rolling update). |
+| `hosts` | `list(string)` | optional |  |  | Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` like `docker service create --host`. The provider sends them in the daemon's `"<ip> <hostname>"` (hosts(5)) format; an entry that already contains a space is sent as is. Updated in place. |
 | `image` | `string` | required |  |  | Image reference the tasks run. The provider asks the registry for the digest and the daemon pins tasks to it (`@sha256:...`); that pin is ignored on refresh when this value has no digest. Credentials come from the provider's `registry_auth`. Updated in place (rolling update). |
 | `labels` | `map(string)` | optional |  |  | Labels on the service object. |
-| `mode` | `string` | optional, computed |  |  | `replicated` (default) or `global`. Changing it recreates this service. |
+| `max_concurrent` | `number` | optional |  |  | `replicated_job` only: tasks run at the same time (daemon default 1). Updated in place (re-runs the job). |
+| `mode` | `string` | optional, computed |  |  | `replicated` (default), `global`, `replicated_job` or `global_job` (see `docker_service`). Changing it recreates this service. |
 | `name` | `string` | required |  |  | Short service name inside the stack; the Swarm service is named `<stack>_<name>`. Renaming removes the old service and creates a new one. |
-| `networks` | `set(string)` | optional |  |  | Networks to attach the tasks to, by ID or name (resolved to IDs; overlay networks). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. |
-| `replicas` | `number` | optional, computed |  |  | Number of tasks for `replicated` mode (default 1); ignored for `global`. Updated in place. |
+| `networks` | `set(string)` | optional |  |  | Networks to attach the tasks to, by ID or name (resolved to IDs; overlay networks). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. Use `networks_advanced` instead for per-network aliases; the two cannot be combined. Updated in place. |
+| `replicas` | `number` | optional, computed |  |  | Number of tasks for `replicated` mode (default 1); ignored by the other modes. Updated in place. |
+| `stop_grace_period` | `string` | optional |  |  | Time to wait after the stop signal before killing a task (Go duration, e.g. `30s`; daemon default 10s). Updated in place. |
+| `sysctls` | `map(string)` | optional |  |  | Namespaced kernel parameters for the task containers, e.g. `{ "net.core.somaxconn" = "1024" }`. Updated in place. |
+| `total_completions` | `number` | optional |  |  | `replicated_job` only: tasks that must complete successfully (daemon default: `max_concurrent`). Updated in place (re-runs the job). |
+| `user` | `string` | optional |  |  | User (`uid`, `name`, optionally `:group`) the task process runs as. Unset uses the image's. Updated in place. |
 
-Nested blocks: `configs` (list of blocks), `converge_config` (single block), `endpoint_spec` (single block), `healthcheck` (single block), `logging` (single block), `mounts` (list of blocks), `placement` (single block), `resources` (single block), `restart_policy` (single block), `rollback_config` (single block), `secrets` (list of blocks), `update_config` (single block).
+Nested blocks: `configs` (list of blocks), `converge_config` (single block), `dns` (single block), `endpoint_spec` (single block), `healthcheck` (single block), `logging` (single block), `mounts` (list of blocks), `networks_advanced` (list of blocks), `placement` (single block), `resources` (single block), `restart_policy` (single block), `rollback_config` (single block), `secrets` (list of blocks), `ulimits` (list of blocks), `update_config` (single block).
 
 ### `service.configs`
 
@@ -82,12 +93,22 @@ list of blocks. Swarm configs mounted as files in the task containers (default p
 
 ### `service.converge_config`
 
-single block. When present, create and update wait until the service has converged: the wanted number of tasks running (every desired task for `global`) and no update paused or rolling back. On timeout the apply fails with the task errors. Not sent to the daemon.
+single block. When present, create and update wait until the service has converged: the wanted number of tasks running (every desired task for `global`) and no update paused or rolling back; for `replicated_job`, `total_completions` tasks completed; for `global_job`, every task of the current run finished with at least one completed. On timeout the apply fails with the task errors. Not sent to the daemon.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `delay` | `string` | optional, computed |  |  | Poll interval (Go duration, default `5s`). |
 | `timeout` | `string` | optional, computed |  |  | Maximum wait (Go duration, default `3m`). |
+
+### `service.dns`
+
+single block. Resolver configuration of the task containers (`ContainerSpec.DNSConfig`). Updated in place.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `nameservers` | `list(string)` | optional |  |  | DNS server IPs. |
+| `options` | `list(string)` | optional |  |  | resolv.conf options, e.g. `ndots:2`. |
+| `search` | `list(string)` | optional |  |  | DNS search domains. |
 
 ### `service.endpoint_spec`
 
@@ -145,6 +166,15 @@ list of blocks. Mounts in the task containers.
 | `volume_driver` | `string` | optional |  |  | Volume driver used when the volume does not exist yet on the node. |
 | `volume_driver_opts` | `map(string)` | optional |  |  | Driver options for a volume created on first use. |
 | `volume_labels` | `map(string)` | optional |  |  | Labels for a volume created on first use. |
+
+### `service.networks_advanced`
+
+list of blocks. Networks to attach, with per-network DNS aliases (`TaskTemplate.Networks[].Aliases`). An alternative to `networks`: setting both is an error. Updated in place.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `set(string)` | optional |  |  | Extra DNS names the service gets on this network (the service name always resolves). |
+| `name` | `string` | required |  |  | Network ID or name (resolved to its ID). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. |
 
 ### `service.placement`
 
@@ -216,6 +246,16 @@ list of blocks. Swarm secrets mounted as files in the task containers (default p
 | `secret_id` | `string` | required |  |  | ID or name of the secret (resolved to its ID). In a stack, the short name of a stack `secret` block resolves to `<stack>_<name>`. |
 | `secret_name` | `string` | optional |  |  | Name of the secret; looked up from the ID when unset. |
 | `uid` | `string` | optional, computed |  |  | File owner UID (default `0`). |
+
+### `service.ulimits`
+
+list of blocks. Resource ulimits of the task containers. Updated in place.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `hard` | `number` | required |  |  | Hard limit. |
+| `name` | `string` | required |  |  | Ulimit name, e.g. `nofile`. |
+| `soft` | `number` | required |  |  | Soft limit. |
 
 ### `service.update_config`
 

@@ -26,6 +26,8 @@ type svcConvergeState struct {
 	Fatal error
 	// TaskErrors are the distinct Status.Err of failed/rejected tasks.
 	TaskErrors []string
+	// Job is set for job modes: Running then counts completed tasks.
+	Job bool
 }
 
 // svcConvergeCheck decides from the service's tasks whether it converged.
@@ -81,6 +83,64 @@ func svcConvergeCheck(tasks []swarm.Task, replicas int, us *swarm.UpdateStatus, 
 	return st
 }
 
+// svcJobConvergeCheck decides whether a job-mode service finished its
+// current run (tasks of svc.JobStatus.JobIteration; all tasks when the
+// daemon reports no JobStatus). A replicated job is done when
+// TotalCompletions tasks completed (default MaxConcurrent, default 1); a
+// global job when every task is in a terminal state and at least one
+// completed. Failed tasks are not fatal (the restart policy may retry them)
+// but their errors are reported on timeout.
+func svcJobConvergeCheck(tasks []swarm.Task, svc swarm.Service) svcConvergeState {
+	st := svcConvergeState{Job: true}
+	var iter *uint64
+	if svc.JobStatus != nil {
+		i := svc.JobStatus.JobIteration.Index
+		iter = &i
+	}
+	errs := map[string]bool{}
+	current, pending := 0, 0
+	for _, t := range tasks {
+		if iter != nil && (t.JobIteration == nil || t.JobIteration.Index != *iter) {
+			continue
+		}
+		current++
+		switch t.Status.State {
+		case swarm.TaskStateComplete:
+			st.Running++
+		case swarm.TaskStateFailed, swarm.TaskStateRejected:
+			msg := t.Status.Err
+			if msg == "" {
+				msg = t.Status.Message
+			}
+			if msg != "" {
+				errs[fmt.Sprintf("task %s (%s): %s", svcShortID(t.ID), t.Status.State, msg)] = true
+			}
+		case swarm.TaskStateShutdown, swarm.TaskStateOrphaned, swarm.TaskStateRemove:
+		default:
+			pending++
+		}
+	}
+	for e := range errs {
+		st.TaskErrors = append(st.TaskErrors, e)
+	}
+	sort.Strings(st.TaskErrors)
+	if j := svc.Spec.Mode.ReplicatedJob; j != nil {
+		want := uint64(1)
+		if j.MaxConcurrent != nil {
+			want = *j.MaxConcurrent
+		}
+		if j.TotalCompletions != nil {
+			want = *j.TotalCompletions
+		}
+		st.Want = int(want)
+		st.Done = st.Running >= st.Want
+		return st
+	}
+	st.Want = current
+	st.Done = current > 0 && pending == 0 && st.Running > 0
+	return st
+}
+
 func svcShortID(id string) string {
 	if len(id) > 12 {
 		return id[:12]
@@ -107,6 +167,14 @@ func svcWaitConverged(ctx context.Context, c *client.Client, id string, cfg *svc
 		if err != nil {
 			return false, err
 		}
+		if svc.Spec.Mode.ReplicatedJob != nil || svc.Spec.Mode.GlobalJob != nil {
+			tasks, err := c.TaskList(ctx, swarm.TaskListOptions{Filters: filters.NewArgs(filters.Arg("service", id))})
+			if err != nil {
+				return false, err
+			}
+			last = svcJobConvergeCheck(tasks, svc)
+			return last.Done, nil
+		}
 		replicas := -1
 		if svc.Spec.Mode.Replicated != nil {
 			replicas = 1
@@ -128,7 +196,11 @@ func svcWaitConverged(ctx context.Context, c *client.Client, id string, cfg *svc
 		return nil
 	}
 	if errors.Is(werr, context.DeadlineExceeded) {
-		return svcConvergeError(fmt.Errorf("service %s did not converge: %d/%d tasks running: %w", id, last.Running, last.Want, werr), last)
+		what := "running"
+		if last.Job {
+			what = "completed"
+		}
+		return svcConvergeError(fmt.Errorf("service %s did not converge: %d/%d tasks %s: %w", id, last.Running, last.Want, what, werr), last)
 	}
 	return werr
 }

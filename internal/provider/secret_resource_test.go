@@ -40,6 +40,7 @@ resource "docker_secret" "bad" {
 
 func TestAccSecretBasic(t *testing.T) {
 	testAccPreCheck(t)
+	_ = swarmAccManagerAddr(t) // skips unless DOCKER_HOST is a swarm manager
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

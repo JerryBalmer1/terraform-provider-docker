@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -19,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -60,6 +62,11 @@ type imageBuildModel struct {
 	Labels     types.Map    `tfsdk:"labels"`
 	NoCache    types.Bool   `tfsdk:"no_cache"`
 	Pull       types.Bool   `tfsdk:"pull"`
+	// BuildKit (image_build_buildkit.go).
+	Builder   types.String            `tfsdk:"builder"`
+	CacheFrom types.List              `tfsdk:"cache_from"`
+	Platforms types.List              `tfsdk:"platforms"`
+	Secrets   []imageBuildSecretModel `tfsdk:"secrets"`
 }
 
 func (r *imageResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -72,7 +79,8 @@ func (r *imageResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A Docker image on the provider's daemon. Without a `build` block the image `name` is pulled from its registry " +
 			"(credentials from the provider's `registry_auth`); with a `build` block the image is built from a local context directory " +
-			"through the Engine API (classic builder, the context is tarred by the provider honouring `.dockerignore`) and tagged `name`. " +
+			"through the Engine API (classic builder by default, or BuildKit with `build.builder = \"buildkit\"`; the context is tarred by the " +
+			"provider honouring `.dockerignore`) and tagged `name`. " +
 			"On destroy the tag is removed (and the image deleted when no other tag references it) unless `keep_locally` is true. " +
 			"Edits to files in the build context change `context_digest` at plan time and force a rebuild.",
 		Attributes: map[string]schema.Attribute{
@@ -170,6 +178,51 @@ func (r *imageResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 						Optional:            true,
 						MarkdownDescription: "Always attempt to pull newer versions of base images (`--pull`).",
 					},
+					"builder": schema.StringAttribute{
+						Optional: true,
+						MarkdownDescription: "Builder backend: `classic` (default; the legacy builder, `DOCKER_BUILDKIT=0`) or `buildkit`. With `buildkit` " +
+							"the provider opens a BuildKit session to the daemon (serving `secrets` and `registry_auth` credentials) so Dockerfile " +
+							"features such as `RUN --mount=type=secret` and heredocs work. Requires a daemon with BuildKit enabled (default since Docker 23). " +
+							"Forces replacement.",
+						Validators: []validator.String{stringvalidator.OneOf(imgBuilderClassic, imgBuilderBuildKit)},
+					},
+					"cache_from": schema.ListAttribute{
+						Optional:    true,
+						ElementType: types.StringType,
+						MarkdownDescription: "BuildKit only. Image references to use as cache sources (`--cache-from`); the images must carry " +
+							"inline cache metadata (built with build arg `BUILDKIT_INLINE_CACHE=1`). Exporting cache (`--cache-to`) is not possible " +
+							"through the Engine API and needs buildx. Forces replacement.",
+					},
+					"platforms": schema.ListAttribute{
+						Optional:    true,
+						ElementType: types.StringType,
+						MarkdownDescription: "BuildKit only. Target platform list; exactly one element is supported (sent as the build platform, " +
+							"like `platform`). Multi-platform builds are rejected: the Engine API `/build` endpoint takes a single platform, use " +
+							"one `docker_image` per platform. Conflicts with `build.platform`. Forces replacement.",
+					},
+				},
+				Blocks: map[string]schema.Block{
+					"secrets": schema.ListNestedBlock{
+						MarkdownDescription: "BuildKit only. Build secrets exposed to `RUN --mount=type=secret,id=<id>`. Values are read by the " +
+							"provider at build time from a file or an environment variable of the provider process and are never stored in state. " +
+							"Forces replacement (but changing a secret's value does not trigger a rebuild; use `triggers`).",
+						NestedObject: schema.NestedBlockObject{
+							Attributes: map[string]schema.Attribute{
+								"id": schema.StringAttribute{
+									Required:            true,
+									MarkdownDescription: "Secret ID referenced by `RUN --mount=type=secret,id=...`. Forces replacement.",
+								},
+								"src": schema.StringAttribute{
+									Optional:            true,
+									MarkdownDescription: "Path of a file holding the secret (max 500 KiB). Exactly one of `src` or `env`. Forces replacement.",
+								},
+								"env": schema.StringAttribute{
+									Optional:            true,
+									MarkdownDescription: "Name of an environment variable of the provider process holding the secret. Exactly one of `src` or `env`. Forces replacement.",
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -190,6 +243,7 @@ func (r *imageResource) ValidateConfig(ctx context.Context, req resource.Validat
 		resp.Diagnostics.AddAttributeError(path.Root("build").AtName("context"), "Missing build context",
 			"build.context is required when a build block is present.")
 	}
+	resp.Diagnostics.Append(imgValidateBuildKit(ctx, m.Build)...)
 }
 
 // ModifyPlan computes context_digest so file edits in the build context
@@ -319,6 +373,14 @@ func (r *imageResource) build(ctx context.Context, plan *imageResourceModel) (st
 	opts.AuthConfigs = imgAuthConfigs(r.pd.RegistryAuth)
 	if diags.HasError() {
 		return "", "", diags
+	}
+	if imgIsBuildKit(b) {
+		id, bkDiags := imgBuildKitBuild(ctx, r.pd.Client, r.pd.RegistryAuth, b, bc, opts)
+		diags.Append(bkDiags...)
+		if diags.HasError() {
+			return "", "", diags
+		}
+		return id, digest, diags
 	}
 	tflog.Info(ctx, "building image", map[string]any{"name": plan.Name.ValueString(), "context": b.Context.ValueString(), "files": len(bc.Files)})
 	tarStream := imgTarReader(bc)

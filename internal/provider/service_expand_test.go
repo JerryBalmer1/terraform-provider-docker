@@ -70,7 +70,32 @@ func svcTestModel() svcSpecModel {
 			Interval: str("30s"), Timeout: str("5s"), StartPeriod: types.StringNull(), Retries: i64(3)},
 		Logging:        &svcLoggingModel{Driver: str("json-file"), Options: stringMapValue(map[string]string{"max-size": "10m"}, false)},
 		ConvergeConfig: &svcConvergeModel{Timeout: str("3m"), Delay: str("5s")},
+
+		MaxConcurrent:    types.Int64Null(),
+		TotalCompletions: types.Int64Null(),
+		Hostname:         str("{{.Task.Name}}"),
+		User:             str("101:101"),
+		Dir:              str("/srv"),
+		Hosts:            stringListValue([]string{"db.local:10.0.0.5", "v6.local:fd00::1"}, false),
+		DNS: &svcDNSModel{Nameservers: stringListValue([]string{"10.0.0.2"}, false), Search: types.ListNull(types.StringType),
+			Options: stringListValue([]string{"ndots:2"}, false)},
+		CapAdd:          stringSetValue([]string{"NET_ADMIN"}, false),
+		CapDrop:         types.SetNull(types.StringType),
+		Sysctls:         stringMapValue(map[string]string{"net.core.somaxconn": "1024"}, false),
+		Ulimits:         []svcUlimitModel{{Name: str("nofile"), Soft: i64(1024), Hard: i64(2048)}},
+		StopGracePeriod: str("30s"),
+		ForceUpdate:     i64(2),
 	}
+}
+
+// svcP2Nulls sets every Pass 2 attribute of m to its typed null.
+func svcP2Nulls(m *svcSpecModel) {
+	m.MaxConcurrent, m.TotalCompletions, m.ForceUpdate = types.Int64Null(), types.Int64Null(), types.Int64Null()
+	m.Hostname, m.User, m.Dir, m.StopGracePeriod = types.StringNull(), types.StringNull(), types.StringNull(), types.StringNull()
+	m.Hosts = types.ListNull(types.StringType)
+	m.CapAdd, m.CapDrop = types.SetNull(types.StringType), types.SetNull(types.StringType)
+	m.Sysctls = types.MapNull(types.StringType)
+	m.DNS, m.Ulimits, m.NetworksAdvanced = nil, nil, nil
 }
 
 // svcSimulateDaemon mimics what the daemon and client do to a submitted
@@ -163,6 +188,7 @@ func TestServiceFlattenMinimalNoSpuriousBlocks(t *testing.T) {
 		Env: types.MapNull(types.StringType), Args: types.ListNull(types.StringType), Command: types.ListNull(types.StringType),
 		Networks: types.SetNull(types.StringType), Labels: types.MapValueMust(types.StringType, map[string]attr.Value{}), ContainerLabels: types.MapNull(types.StringType),
 	}
+	svcP2Nulls(&m)
 	spec, diags := svcExpand(ctx, &m, svcTestLookup(), svcExpandOpts{})
 	if diags.HasError() {
 		t.Fatal(diags)

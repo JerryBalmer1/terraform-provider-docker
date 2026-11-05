@@ -89,14 +89,15 @@ attribute carries it.
 
 ## 3. Changes that force replacement
 
-The protocol schema does not carry plan modifiers, so this table lists every
-attribute whose description says it forces a new resource. Changing any of
-these destroys and recreates the object.
+This table lists every attribute and block that carries a `RequiresReplace`
+plan modifier in the provider's framework schema, plus any whose description
+says it forces replacement. Changing any of these destroys and recreates the
+object (some are conditional; the description says when).
 {{ if .Replacements }}
 | Resource | Attribute | Description |
 |---|---|---|
 {{- range .Replacements }}
-| `{{ .Address }}` | `{{ .Path }}` | {{ summary .Description }} |
+| `{{ .Address }}` | `{{ .Path }}`{{ if .Block }} (block){{ end }} | {{ summary .Description }} |
 {{- end }}
 {{ else }}
 No registered resource attribute says it forces replacement in this build.

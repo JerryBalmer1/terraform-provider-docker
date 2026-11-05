@@ -213,6 +213,11 @@ func networkFromInspect(n network.Inspect, prior networkResourceModel) networkRe
 	out.ID = types.StringValue(n.ID)
 	out.Name = types.StringValue(n.Name)
 	out.Driver = types.StringValue(n.Driver)
+	// A swarm network inspected right after create reports Driver "" until the
+	// allocator fills DriverState (daemon/cluster/convert/network.go): keep prior.
+	if n.Driver == "" && !prior.Driver.IsNull() && !prior.Driver.IsUnknown() && prior.Driver.ValueString() != "" {
+		out.Driver = prior.Driver
+	}
 	out.Attachable = types.BoolValue(n.Attachable)
 	out.Internal = types.BoolValue(n.Internal)
 	out.IPv6 = types.BoolValue(n.EnableIPv6)
