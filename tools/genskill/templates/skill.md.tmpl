@@ -1,6 +1,6 @@
 ---
 name: terraform-provider-docker
-description: Use when writing, reviewing or debugging Terraform for Docker with the JerryBalmer1/docker provider - images (pull, build, push), networks, volumes, containers, Swarm clusters (init, joining worker and manager nodes), Swarm secrets, configs, services and stacks. Use it instead of docker compose YAML or docker CLI scripts; it explains the four-layer model, dependency order, which attributes force replacement, and how to translate a compose service into docker_service or docker_container.
+description: Use when writing, reviewing or debugging Terraform for Docker with the JerryBalmer1/docker provider - images (pull, build, push), networks, volumes, containers, Swarm clusters (init, joining worker and manager nodes), Swarm secrets, configs, services and stacks, plus Terraform 1.10-1.14 features (actions such as docker_exec and docker_service_scale with action_trigger and -invoke, write-only *_wo arguments, ephemeral resources, provider functions, list resources with terraform query). Use it instead of docker compose YAML or docker CLI scripts; it explains the four-layer model, dependency order, which attributes force replacement, how to translate a compose service into docker_service or docker_container, and how to convert an existing compose file once with tools/compose2stack.
 ---
 
 {{ .Marker }}
@@ -8,15 +8,19 @@ description: Use when writing, reviewing or debugging Terraform for Docker with 
 # terraform-provider-docker
 
 The `JerryBalmer1/docker` provider drives the Docker Engine API directly. It
-owns the whole chain from image to Swarm workload. **No compose YAML anywhere**:
-there is no compose file to point at, the provider never shells out to the
-`docker` CLI, and you must not generate `docker-compose.yml`, `docker stack
-deploy` calls or `local-exec` provisioners that run `docker`. Express every
-compose concept as a resource (see "Translating compose" below).
+owns the whole chain from image to Swarm workload. **No compose YAML at
+runtime**: the provider never shells out to the `docker` CLI, and you must not
+generate `docker-compose.yml`, `docker stack deploy` calls or `local-exec`
+provisioners that run `docker`. Express every compose concept as a resource
+(see "Translating compose" below). An existing compose file is converted once
+into HCL with `go run ./tools/compose2stack` (worked example 2); after that the
+generated `.tf` is the source of truth.
 
-This build registers {{ .Resources }} resources and {{ .DataSources }} data sources.
-Per-type argument tables are in [reference/](reference/) and are generated from
-the provider schema, so they are authoritative over anything written here.
+This build registers {{ .Resources }} resources, {{ .DataSources }} data sources,
+{{ len .Actions }} actions, {{ len .Ephemeral }} ephemeral resources, {{ len .Lists }} list resources
+and {{ len .Functions }} provider functions. Per-type argument tables are in
+[reference/](reference/) and are generated from the provider schema, so they are
+authoritative over anything written here.
 
 ```terraform
 terraform {
@@ -48,6 +52,18 @@ below it.
 
 - Resources: {{ if .Resources }}{{ range $i, $r := .Resources }}{{ if $i }}, {{ end }}[`{{ $r.Name }}`]({{ $r.File }}){{ end }}{{ else }}none registered in this build{{ end }}
 - Data sources: {{ if .DataSources }}{{ range $i, $d := .DataSources }}{{ if $i }}, {{ end }}[`{{ $d.Name }}`]({{ $d.File }}){{ end }}{{ else }}none registered in this build{{ end }}
+{{- if .Actions }}
+- Actions: {{ range $i, $d := .Actions }}{{ if $i }}, {{ end }}[`{{ $d.Name }}`]({{ $d.File }}){{ end }}
+{{- end }}
+{{- if .Ephemeral }}
+- Ephemeral resources: {{ range $i, $d := .Ephemeral }}{{ if $i }}, {{ end }}[`{{ $d.Name }}`]({{ $d.File }}){{ end }}
+{{- end }}
+{{- if .Lists }}
+- List resources: {{ range $i, $d := .Lists }}{{ if $i }}, {{ end }}[`{{ $d.Name }}`]({{ $d.File }}){{ end }}
+{{- end }}
+{{- if .Functions }}
+- Functions: {{ range $i, $d := .Functions }}{{ if $i }}, {{ end }}[`{{ $d.Address }}`]({{ $d.File }}){{ end }}
+{{- end }}
 {{ end }}
 Layer 2 primitives also work inside a Swarm: `docker_network` with
 `driver = "overlay"` is the network type services attach to, and volumes are
@@ -127,7 +143,146 @@ Gotchas to plan around:
   with a new node ID; `availability`, `role` and `labels` update in place.
 - Containers are replaced on most changes; use services for rolling updates.
 
-## 4. Worked example: cold start to three replicas on two workers
+## 4. Write-only arguments (`*_wo`)
+
+Terraform >= 1.11. A write-only argument is sent to the provider on create and
+update but its value is **never stored in state or shown in plan** (it reads
+back as null). Use one for every secret you would otherwise put in a normal
+argument (registry passwords, secret data). They come in pairs:
+
+- `<name>_wo`: the write-only value. It may be an ephemeral value (an
+  `ephemeral` resource attribute or an `ephemeral = true` variable), which a
+  normal argument cannot accept.
+- `<name>_wo_version`: a normal (stored) number or string. Terraform cannot
+  diff a value it never stores, so the provider only re-sends `<name>_wo` when
+  this changes. Bump it to rotate the value; changing only `<name>_wo` does
+  nothing.
+
+Set either `<name>` or `<name>_wo`, never both. Older
+Terraform (< 1.11) rejects write-only arguments outright, so pin
+`required_version = ">= 1.11"` when you use them.
+{{ if .WriteOnly }}
+| Resource | Write-only argument | Description |
+|---|---|---|
+{{- range .WriteOnly }}
+| `{{ .Address }}` | `{{ .Path }}` | {{ summary .Description }} |
+{{- end }}
+{{ else }}
+No resource in this build has a write-only argument yet; check the reference
+file of the type before using `*_wo`.
+{{ end }}
+## 5. Actions
+
+Terraform >= 1.14. An action is an imperative operation (run a command in a
+container, scale a service, prune, export) that Terraform runs but does not
+track in state. Use one when the effect is a one-off step around a resource's
+lifecycle, not an object whose existence Terraform should manage: seeding a
+database after it is created, a migration after an image update, scaling a
+service for a load test without changing the configured `replicas`. If you
+want Terraform to keep converging a value, use a resource argument instead
+(an action that sets replicas is overwritten by the next apply of a
+`docker_service` that manages `replicas`).
+{{ if .Actions }}
+Registered in this build:
+{{ range .Actions }}
+- [`{{ .Address }}`]({{ .File }}){{ if .Description }}: {{ summary .Description }}{{ end }}
+{{- end }}
+{{ else }}
+No action is registered in this build.
+{{ end }}
+Declare an action with its arguments in a `config` block, then either trigger
+it from a resource's lifecycle or invoke it by hand:
+
+```terraform
+action "docker_exec" "migrate" {
+  config {
+    # arguments from reference/action.docker_exec.md
+  }
+}
+
+resource "docker_service" "api" {
+  # ...
+
+  lifecycle {
+    action_trigger {
+      events  = [after_create, after_update] # before_create, after_create, before_update, after_update
+      actions = [action.docker_exec.migrate]
+      # condition = <bool expression> # optional
+    }
+  }
+}
+```
+
+```shell
+terraform apply -invoke=action.docker_exec.migrate   # run just this action now, nothing else changes
+terraform plan  -invoke=action.docker_exec.migrate   # preview it
+```
+
+Actions that fail fail the apply. They run against the daemon of the provider
+configuration they use (alias with `provider = docker.<alias>` inside the
+`action` block).
+
+## 6. Ephemeral resources
+
+Terraform >= 1.10. An `ephemeral "<type>" "<name>"` block is opened on every
+plan and apply and its values are **never persisted** in plan or state. Its
+attributes may only be referenced from ephemeral contexts: write-only
+arguments (`*_wo`), `provider` blocks, other ephemeral resources, and
+variables, locals and outputs marked `ephemeral = true`. Referencing one from a
+normal resource argument is an error. Typical use: fetch a credential and feed
+it to a `*_wo` argument or to a provider block, so it never lands in state.
+{{ if .Ephemeral }}
+Registered in this build:
+{{ range .Ephemeral }}
+- [`{{ .Address }}`]({{ .File }}){{ if .Description }}: {{ summary .Description }}{{ end }}
+{{- end }}
+{{ else }}
+No ephemeral resource is registered in this build.
+{{ end }}
+## 7. Provider functions
+
+Terraform >= 1.8. Pure functions called as `provider::docker::<name>(...)`;
+the module must declare the provider in `required_providers`. They run at plan
+time without touching the daemon, so use them for parsing and formatting (for
+example image references), never for lookups.
+{{ if .Functions }}
+| Function | Signature | Summary |
+|---|---|---|
+{{- range .Functions }}
+| [`{{ .Name }}`]({{ .File }}) | `{{ cell .Usage }}` | {{ summary .Description }} |
+{{- end }}
+{{ else }}
+No provider function is registered in this build.
+{{ end }}
+## 8. List resources and `terraform query`
+
+Terraform >= 1.14. A list resource enumerates existing objects of a managed
+resource type on the daemon. Put `list` blocks in a `*.tfquery.hcl` file next
+to the configuration and run `terraform query`; add
+`-generate-config-out=imported.tf` to write `import` blocks plus resource
+configuration for the results, which is the way to adopt unmanaged
+containers, networks or services in bulk.
+
+```terraform
+# discover.tfquery.hcl
+list "docker_container" "all" {
+  provider = docker
+  # include_resource = true # return full resource objects, not just identities
+  # limit            = 100
+  config {
+    # filters from reference/list.docker_container.md
+  }
+}
+```
+{{ if .Lists }}
+Registered in this build:
+{{ range .Lists }}
+- [`{{ .Address }}`]({{ .File }}){{ if .Description }}: {{ summary .Description }}{{ end }}
+{{- end }}
+{{ else }}
+No list resource is registered in this build.
+{{ end }}
+## 9. Worked example: cold start to three replicas on two workers
 
 One manager (the provider's daemon) and two worker hosts, all reachable over
 TCP with TLS. The example pulls an image, initialises the swarm, joins both
@@ -279,7 +434,172 @@ joins, network and secret, then the service, and returns once three tasks run
 on the workers. `terraform destroy` removes the service, secret and network,
 makes both workers leave, and finally makes the manager leave the swarm.
 
-## 5. Reference files
+## 10. Worked example 2: compose file to stack, seeded and scaled with actions
+
+Migrating an existing `docker-compose.yml`. The compose file is input to a
+one-off converter, never to the provider: after conversion you edit and commit
+the generated `.tf`, and delete or archive the YAML. Needs Terraform >= 1.14
+for the actions.
+{{ if .Example2Gaps }}
+> Schema drift: this example does not match the provider build it was
+> generated from:
+{{- range .Example2Gaps }}
+> - {{ . }}
+{{- end }}
+{{ end }}
+Step 1, the input (`docker-compose.yml`):
+
+```yaml
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: shop
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    networks: [backend]
+    deploy:
+      placement:
+        constraints: ["node.role==manager"]
+  web:
+    image: nginx:1.27-alpine
+    ports: ["8080:80"]
+    networks: [backend]
+    deploy:
+      replicas: 2
+networks:
+  backend: {}
+secrets:
+  db_password:
+    file: ./db_password.txt
+```
+
+Step 2, convert it (from the provider repository; `make compose2stack
+IN=docker-compose.yml OUT=stack.tf MODE=swarm` and `./build.ps1 -Task
+compose2stack -In docker-compose.yml -Out stack.tf -Mode swarm` run the same):
+
+```shell
+go run ./tools/compose2stack -in docker-compose.yml -out stack.tf -mode swarm
+```
+
+`-mode swarm` targets a Swarm `docker_stack`. Review the result for compose
+keys that have no stack equivalent (build contexts, `depends_on` conditions,
+host-only options) and fix those by hand. The generated file is
+authoritative; it looks roughly like this:
+
+```terraform
+resource "docker_stack" "shop" {
+  name = "shop" # objects are created as shop_<name>
+
+  network {
+    name = "backend"
+  }
+
+  secret {
+    name = "db_password"
+    data = filebase64("${path.module}/db_password.txt")
+  }
+
+  service {
+    name     = "db"
+    image    = "postgres:16-alpine"
+    replicas = 1
+    env = {
+      POSTGRES_DB            = "shop"
+      POSTGRES_PASSWORD_FILE = "/run/secrets/db_password"
+    }
+    networks = ["backend"]
+
+    secrets {
+      secret_id = "db_password"
+      file_name = "db_password"
+    }
+
+    # On the manager, so docker_exec (which talks to the provider's daemon)
+    # finds the task container.
+    placement {
+      constraints = ["node.role==manager"]
+    }
+  }
+
+  service {
+    name     = "web"
+    image    = "nginx:1.27-alpine"
+    replicas = 2
+    networks = ["backend"]
+
+    endpoint_spec {
+      ports {
+        target_port    = 80
+        published_port = 8080
+      }
+    }
+  }
+
+  # Step 4: seed the database once, right after the stack is first created.
+  lifecycle {
+    action_trigger {
+      events  = [after_create]
+      actions = [action.docker_exec.seed_db]
+    }
+  }
+}
+```
+
+Step 3, add the swarm and the actions next to it (`main.tf`):
+
+```terraform
+terraform {
+  required_version = ">= 1.14"
+  required_providers {
+    docker = {
+      source = "JerryBalmer1/docker"
+    }
+  }
+}
+
+provider "docker" {} # the swarm manager (DOCKER_HOST)
+
+resource "docker_swarm_init" "this" {
+  advertise_addr = "eth0"
+}
+
+# Runs inside a running task of shop_db on the provider's daemon.
+action "docker_exec" "seed_db" {
+  config {
+    service = "shop_db"
+    command = ["sh", "-c", "until pg_isready -U postgres; do sleep 1; done; psql -U postgres -d shop -c 'CREATE TABLE IF NOT EXISTS items (id serial PRIMARY KEY, name text)'"]
+  }
+}
+
+# Not triggered by any resource: run it on demand.
+action "docker_service_scale" "web_peak" {
+  config {
+    service  = "shop_web"
+    replicas = 6
+  }
+}
+```
+
+Add `depends_on = [docker_swarm_init.this]` to the generated `docker_stack`
+(nothing else orders it after the swarm exists).
+
+Step 4, apply and operate:
+
+```shell
+terraform init
+terraform apply                                          # swarm, then the stack; after_create runs action.docker_exec.seed_db
+terraform apply -invoke=action.docker_service_scale.web_peak   # scale web to 6 now; nothing else changes
+```
+
+The scale action does not change configuration: the stack still says
+`replicas = 2`, and the next plain `terraform apply` that updates the `web`
+service puts it back to 2. To make a new size permanent, change `replicas` in
+`stack.tf` instead. Re-running the seed later is
+`terraform apply -invoke=action.docker_exec.seed_db`, which is why the SQL is
+idempotent.
+
+## 11. Reference files
 
 Generated from the schema of this build. Read the one for each type you write
 before choosing argument names.
@@ -287,10 +607,12 @@ before choosing argument names.
 - [`{{ if eq .Kind "provider" }}provider "docker"{{ else }}{{ .Address }}{{ end }}`]({{ .File }}){{ if .Description }}: {{ summary .Description }}{{ end }}
 {{- end }}
 
-## 6. Translating compose
+## 12. Translating compose
 
-No compose YAML anywhere: not as input, not as output, not embedded in a
-heredoc. Map each compose key to resources:
+No compose YAML in the configuration: not as provider input, not as output,
+not embedded in a heredoc. For a whole existing file use `tools/compose2stack`
+once (worked example 2); when writing by hand, map each compose key to
+resources:
 
 | Compose | Swarm (`docker_service`) | Single host (`docker_container`) |
 |---|---|---|

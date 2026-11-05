@@ -1,7 +1,7 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-  Tear down the dind swarm harness, its volumes, and test/harness/.env.
+  Tear down the dind harness, its volumes, test/harness/.env and test/harness/tls/.
 
 .DESCRIPTION
   PowerShell equivalent of harness-down.sh. Also clears the harness variables
@@ -15,7 +15,10 @@ $ErrorActionPreference = 'Stop'
 $HarnessDir  = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $ComposeFile = Join-Path $HarnessDir 'docker-compose.yml'
 $EnvFile     = Join-Path $HarnessDir '.env'
-$HarnessVars = 'DOCKER_HOST', 'DOCKER_WORKER1_HOST', 'DOCKER_WORKER2_HOST', 'E2E_MANAGER_ADDR', 'E2E_ADVERTISE_ADDR'
+$HarnessVars = 'DOCKER_HOST', 'DOCKER_WORKER1_HOST', 'DOCKER_WORKER2_HOST', 'DOCKER_WORKER3_HOST', 'E2E_MANAGER_ADDR', 'E2E_ADVERTISE_ADDR',
+    'TF_ACC_REGISTRY', 'TF_ACC_REGISTRY_NODES', 'TF_ACC_TLS_HOST', 'TF_ACC_TLS_CA', 'TF_ACC_TLS_CERT', 'TF_ACC_TLS_KEY',
+    'TF_ACC_TLS_CERT_PATH', 'TF_ACC_GPU_NODE_LABEL', 'TF_ACC_HARNESS_COMPOSE', 'TF_ACC_TERRAFORM_VERSION', 'TF_ACC_TERRAFORM_PATH'
+$TlsDir      = Join-Path $HarnessDir 'tls'
 
 # compose must talk to the HOST daemon, not the harness manager.
 if ($env:DOCKER_HOST -eq 'tcp://127.0.0.1:12375') { $env:DOCKER_HOST = $null }
@@ -29,12 +32,13 @@ try {
     $composeExit = 1
 } finally {
     Remove-Item -LiteralPath $EnvFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $TlsDir -Recurse -Force -ErrorAction SilentlyContinue
     foreach ($v in $HarnessVars) {
         Remove-Item -Path "Env:$v" -ErrorAction SilentlyContinue
     }
 }
 
 if ($composeExit -ne 0) {
-    throw "harness-down: 'docker compose down' failed (exit $composeExit); .env removed and harness variables cleared anyway."
+    throw "harness-down: 'docker compose down' failed (exit $composeExit); .env and tls/ removed and harness variables cleared anyway."
 }
 Write-Host 'Harness removed.'

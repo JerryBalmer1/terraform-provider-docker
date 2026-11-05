@@ -4,7 +4,7 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A single-host Docker container, created with `ContainerCreate`, attached to its networks and started. Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `max_retry_count`, `memory`, `memory_swap`, `cpu_shares` and `nano_cpus` update in place (`ContainerRename`/`ContainerUpdate`); every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
+A single-host Docker container, created with `ContainerCreate`, attached to its networks and started. Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `max_retry_count`, `memory`, `memory_swap`, `cpu_shares` and `nano_cpus` update in place (`ContainerRename`/`ContainerUpdate`); `upload` blocks are copied in with `CopyToContainer` before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
 
 ## Arguments and attributes
 
@@ -46,7 +46,7 @@ A single-host Docker container, created with `ContainerCreate`, attached to its 
 | `wait_timeout` | `string` | optional, computed |  |  | How long `wait` waits, as a Go duration. Default `60s`. |
 | `working_dir` | `string` | optional | yes |  | Working directory. Unset uses the image's. Changing this forces a new resource. |
 
-Nested blocks: `capabilities` (single block, forces replacement), `devices` (list of blocks, forces replacement), `healthcheck` (single block, forces replacement), `mounts` (list of blocks, forces replacement), `networks_advanced` (list of blocks, forces replacement), `ports` (list of blocks, forces replacement), `ulimits` (list of blocks, forces replacement).
+Nested blocks: `capabilities` (single block, forces replacement), `devices` (list of blocks, forces replacement), `healthcheck` (single block, forces replacement), `mounts` (list of blocks, forces replacement), `networks_advanced` (list of blocks, forces replacement), `ports` (list of blocks, forces replacement), `ulimits` (list of blocks, forces replacement), `upload` (list of blocks, forces replacement).
 
 ### `capabilities`
 
@@ -86,6 +86,7 @@ list of blocks. Mounts (`HostConfig.Mounts`). Changing mounts forces a new resou
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `read_only` | `bool` | optional, computed |  |  | Mount read-only. Default `false`. |
+| `selinux_relabel` | `string` | optional | yes |  | SELinux relabel for a `bind` or named `volume` mount: `z` (shared label) or `Z` (private label), like the `docker run -v src:dst:z` suffix. The entry is then sent as a `HostConfig.Binds` string, because the `Mounts` API has no relabel option. Forces replacement like any mounts change. |
 | `source` | `string` | optional |  |  | Host path (bind) or volume name (volume; unset = anonymous volume). Not allowed for tmpfs. |
 | `target` | `string` | required |  |  | Path inside the container. |
 | `tmpfs_size` | `number` | optional |  |  | tmpfs size in bytes (tmpfs only). |
@@ -123,6 +124,22 @@ list of blocks. Resource ulimits. Changing them forces a new resource.
 | `name` | `string` | required |  |  | Ulimit name, e.g. `nofile`. |
 | `soft` | `number` | required |  |  | Soft limit. |
 
+### `upload`
+
+list of blocks. Files written into the container with `CopyToContainer` after create and before start (like `docker cp`). Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `file` must already exist in the image. Uploads are not read back from the daemon. Changing an upload forces a new container, unless the container is stopped (`must_run = false` and not running), in which case the files are copied in place.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `content` | `string` | optional |  |  | Literal file content (UTF-8 text). |
+| `content_base64` | `string` | optional |  |  | File content, base64-encoded (use `filebase64()` for binary files). |
+| `executable` | `bool` | optional, computed |  |  | Upload with mode `0744` instead of `0644`. Default `false`. Conflicts with `permissions`. |
+| `file` | `string` | required |  |  | Absolute path of the file inside the container, e.g. `/etc/app/config.json`. |
+| `group` | `number` | optional |  |  | Numeric group ID that owns the file. Default `0`. |
+| `owner` | `number` | optional |  |  | Numeric user ID that owns the file. Default `0`. |
+| `permissions` | `string` | optional |  |  | File mode as an octal string, e.g. `"0640"` or `"755"`. Default `0644`. Conflicts with `executable`. |
+| `source` | `string` | optional |  |  | Path of a local file (on the machine running Terraform) whose content is uploaded. It is read at apply; set `source_hash` (e.g. `filesha256(...)`) so content changes are planned. |
+| `source_hash` | `string` | optional |  |  | Any string that changes when the `source` file changes, e.g. `filesha256("app.conf")`. Only used to trigger a re-upload. |
+
 ## Example
 
 ```terraform
@@ -157,6 +174,32 @@ resource "docker_container" "web" {
     type       = "tmpfs"
     target     = "/var/cache/nginx"
     tmpfs_size = 67108864
+  }
+
+  # SELinux hosts: relabel the bind source for this container (`-v src:dst:z`).
+  mounts {
+    type            = "bind"
+    source          = "/srv/web/conf.d"
+    target          = "/etc/nginx/conf.d"
+    read_only       = true
+    selinux_relabel = "z"
+  }
+
+  # Files copied in after create and before start.
+  upload {
+    file        = "/etc/nginx/snippets/headers.conf"
+    content     = "add_header X-Served-By terraform;\n"
+    permissions = "0640"
+    owner       = 0
+    group       = 101 # nginx
+  }
+
+  # For a local file use `source = "${path.module}/banner.sh"` together with
+  # `source_hash = filesha256("${path.module}/banner.sh")`.
+  upload {
+    file           = "/docker-entrypoint.d/99-banner.sh"
+    content_base64 = base64encode("#!/bin/sh\necho web starting\n")
+    executable     = true
   }
 
   networks_advanced {

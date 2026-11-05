@@ -1,0 +1,100 @@
+name: webapp
+
+services:
+  web:
+    image: nginx:1.27-alpine
+    build: ./web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./html:/usr/share/nginx/html:ro
+    configs:
+      - source: nginx_conf
+        target: /etc/nginx/conf.d/default.conf
+      - source: banner
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+    networks: [front, back]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      replicas: 3
+      placement:
+        constraints: ["node.role==worker"]
+        preferences:
+          - spread: node.labels.zone
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      resources:
+        limits: {cpus: "0.5", memory: 128M}
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: shop
+    secrets:
+      - db_password
+      - source: api_key
+        target: api.key
+        mode: 0400
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [back]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      start_period: 30s
+    deploy:
+      placement:
+        constraints: ["node.labels.db==true"]
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  cache:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    networks: [back]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+    ulimits:
+      nofile: {soft: 1024, hard: 2048}
+    deploy:
+      replicas: 2
+
+  debug:
+    image: busybox:1.36
+    command: ["sleep", "infinity"]
+    profiles: [debug]
+    network_mode: host
+
+networks:
+  front: {}
+  back:
+    internal: true
+
+volumes:
+  pgdata:
+    labels:
+      backup: daily
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  api_key:
+    environment: API_KEY
+
+configs:
+  nginx_conf:
+    file: ./nginx.conf
+  banner:
+    content: "welcome"

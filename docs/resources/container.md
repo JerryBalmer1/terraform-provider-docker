@@ -3,12 +3,12 @@
 page_title: "docker_container Resource - docker"
 subcategory: ""
 description: |-
-  A single-host Docker container, created with ContainerCreate, attached to its networks and started. Refresh diffs against ContainerInspect: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. name, restart, max_retry_count, memory, memory_swap, cpu_shares and nano_cpus update in place (ContainerRename/ContainerUpdate); every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
+  A single-host Docker container, created with ContainerCreate, attached to its networks and started. Refresh diffs against ContainerInspect: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. name, restart, max_retry_count, memory, memory_swap, cpu_shares and nano_cpus update in place (ContainerRename/ContainerUpdate); upload blocks are copied in with CopyToContainer before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
 ---
 
 # docker_container (Resource)
 
-A single-host Docker container, created with `ContainerCreate`, attached to its networks and started. Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `max_retry_count`, `memory`, `memory_swap`, `cpu_shares` and `nano_cpus` update in place (`ContainerRename`/`ContainerUpdate`); every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
+A single-host Docker container, created with `ContainerCreate`, attached to its networks and started. Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `max_retry_count`, `memory`, `memory_swap`, `cpu_shares` and `nano_cpus` update in place (`ContainerRename`/`ContainerUpdate`); `upload` blocks are copied in with `CopyToContainer` before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
 
 ## Example Usage
 
@@ -44,6 +44,32 @@ resource "docker_container" "web" {
     type       = "tmpfs"
     target     = "/var/cache/nginx"
     tmpfs_size = 67108864
+  }
+
+  # SELinux hosts: relabel the bind source for this container (`-v src:dst:z`).
+  mounts {
+    type            = "bind"
+    source          = "/srv/web/conf.d"
+    target          = "/etc/nginx/conf.d"
+    read_only       = true
+    selinux_relabel = "z"
+  }
+
+  # Files copied in after create and before start.
+  upload {
+    file        = "/etc/nginx/snippets/headers.conf"
+    content     = "add_header X-Served-By terraform;\n"
+    permissions = "0640"
+    owner       = 0
+    group       = 101 # nginx
+  }
+
+  # For a local file use `source = "${path.module}/banner.sh"` together with
+  # `source_hash = filesha256("${path.module}/banner.sh")`.
+  upload {
+    file           = "/docker-entrypoint.d/99-banner.sh"
+    content_base64 = base64encode("#!/bin/sh\necho web starting\n")
+    executable     = true
   }
 
   networks_advanced {
@@ -137,6 +163,7 @@ resource "docker_container" "web" {
 - `sysctls` (Map of String) Namespaced kernel parameters, e.g. `{ "net.core.somaxconn" = "1024" }`. Only keys you set are reported (except on import). Forces replacement.
 - `tty` (Boolean) Allocate a pseudo-TTY (`docker run -t`). Default `false`. Forces replacement.
 - `ulimits` (Block List) Resource ulimits. Changing them forces a new resource. (see [below for nested schema](#nestedblock--ulimits))
+- `upload` (Block List) Files written into the container with `CopyToContainer` after create and before start (like `docker cp`). Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `file` must already exist in the image. Uploads are not read back from the daemon. Changing an upload forces a new container, unless the container is stopped (`must_run = false` and not running), in which case the files are copied in place. (see [below for nested schema](#nestedblock--upload))
 - `user` (String) User (and optionally `:group`) to run as. Unset uses the image's. Changing this forces a new resource.
 - `wait` (Boolean) Wait after start until the container's healthcheck reports `healthy` (or, without a healthcheck, until it is running). Fails if the container exits or `wait_timeout` elapses.
 - `wait_timeout` (String) How long `wait` waits, as a Go duration. Default `60s`.
@@ -193,6 +220,7 @@ Required:
 Optional:
 
 - `read_only` (Boolean) Mount read-only. Default `false`.
+- `selinux_relabel` (String) SELinux relabel for a `bind` or named `volume` mount: `z` (shared label) or `Z` (private label), like the `docker run -v src:dst:z` suffix. The entry is then sent as a `HostConfig.Binds` string, because the `Mounts` API has no relabel option. Forces replacement like any mounts change.
 - `source` (String) Host path (bind) or volume name (volume; unset = anonymous volume). Not allowed for tmpfs.
 - `tmpfs_size` (Number) tmpfs size in bytes (tmpfs only).
 
@@ -233,6 +261,25 @@ Required:
 - `hard` (Number) Hard limit.
 - `name` (String) Ulimit name, e.g. `nofile`.
 - `soft` (Number) Soft limit.
+
+
+<a id="nestedblock--upload"></a>
+### Nested Schema for `upload`
+
+Required:
+
+- `file` (String) Absolute path of the file inside the container, e.g. `/etc/app/config.json`.
+
+Optional:
+
+- `content` (String) Literal file content (UTF-8 text).
+- `content_base64` (String) File content, base64-encoded (use `filebase64()` for binary files).
+- `executable` (Boolean) Upload with mode `0744` instead of `0644`. Default `false`. Conflicts with `permissions`.
+- `group` (Number) Numeric group ID that owns the file. Default `0`.
+- `owner` (Number) Numeric user ID that owns the file. Default `0`.
+- `permissions` (String) File mode as an octal string, e.g. `"0640"` or `"755"`. Default `0644`. Conflicts with `executable`.
+- `source` (String) Path of a local file (on the machine running Terraform) whose content is uploaded. It is read at apply; set `source_hash` (e.g. `filesha256(...)`) so content changes are planned.
+- `source_hash` (String) Any string that changes when the `source` file changes, e.g. `filesha256("app.conf")`. Only used to trigger a re-upload.
 
 ## Import
 

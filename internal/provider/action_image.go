@@ -1,0 +1,294 @@
+package provider
+
+// docker_image_import, docker_image_load and docker_image_save.
+
+import (
+	"context"
+	"io"
+	"os"
+	"strings"
+
+	"github.com/distribution/reference"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/hashicorp/terraform-plugin-framework/action"
+	"github.com/hashicorp/terraform-plugin-framework/action/schema"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+)
+
+var (
+	_ action.ActionWithConfigure      = (*imageImportAction)(nil)
+	_ action.ActionWithValidateConfig = (*imageImportAction)(nil)
+	_ action.ActionWithConfigure      = (*imageLoadAction)(nil)
+	_ action.ActionWithConfigure      = (*imageSaveAction)(nil)
+	_ action.ActionWithValidateConfig = (*imageSaveAction)(nil)
+)
+
+// actIsURL reports whether an import source is a URL the daemon fetches.
+func actIsURL(s string) bool {
+	l := strings.ToLower(s)
+	return strings.HasPrefix(l, "http://") || strings.HasPrefix(l, "https://")
+}
+
+// actStreamProgress forwards each human line of a JSON message stream.
+func actStreamProgress(ctx context.Context, resp *action.InvokeResponse) func(jsonmessage.JSONMessage) {
+	return func(m jsonmessage.JSONMessage) {
+		line := strings.TrimRight(m.Stream, "\r\n")
+		if line == "" && m.Status != "" && m.Progress == nil {
+			line = strings.TrimSpace(m.ID + " " + m.Status)
+		}
+		if line != "" {
+			actProgress(ctx, resp, "%s", line)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// docker_image_import
+
+// NewImageImportAction returns the docker_image_import action.
+func NewImageImportAction() action.Action { return &imageImportAction{} }
+
+type imageImportAction struct{ actBase }
+
+type imageImportActionModel struct {
+	Source     types.String `tfsdk:"source"`
+	Repository types.String `tfsdk:"repository"`
+	Tag        types.String `tfsdk:"tag"`
+	Changes    types.List   `tfsdk:"changes"`
+	Message    types.String `tfsdk:"message"`
+	Platform   types.String `tfsdk:"platform"`
+}
+
+func (a *imageImportAction) Metadata(_ context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_image_import"
+}
+
+func (a *imageImportAction) Schema(_ context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Creates an image from a filesystem tarball, like `docker import`. " +
+			"The source is a local tar file (streamed by the provider) or an `http(s)://` URL (fetched by the daemon). " +
+			"The image is not tracked in state; manage its lifetime yourself.",
+		Attributes: map[string]schema.Attribute{
+			"source": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "Local path of a tar archive (optionally gzip/bzip2/xz compressed) or an `http://` / `https://` URL the daemon downloads.",
+			},
+			"repository": schema.StringAttribute{Optional: true, MarkdownDescription: "Repository to tag the image with, e.g. `example/rootfs`. Without it the image is untagged."},
+			"tag":        schema.StringAttribute{Optional: true, MarkdownDescription: "Tag for `repository`. Default `latest`. Requires `repository`."},
+			"changes": schema.ListAttribute{
+				Optional: true, ElementType: types.StringType,
+				MarkdownDescription: "Dockerfile instructions applied to the image config, e.g. `[\"CMD [\\\"/bin/sh\\\"]\", \"ENV A=b\"]` (`docker import --change`).",
+			},
+			"message":  schema.StringAttribute{Optional: true, MarkdownDescription: "Commit message recorded in the image history."},
+			"platform": schema.StringAttribute{Optional: true, MarkdownDescription: "Platform of the imported image, `os[/arch[/variant]]`, e.g. `linux/amd64`. Default: the daemon's."},
+		},
+	}
+}
+
+func (a *imageImportAction) ValidateConfig(ctx context.Context, req action.ValidateConfigRequest, resp *action.ValidateConfigResponse) {
+	var m imageImportActionModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !m.Tag.IsNull() && m.Repository.IsNull() {
+		resp.Diagnostics.AddAttributeError(path.Root("tag"), "tag needs repository", "Set repository when setting tag.")
+	}
+	if r, ok := knownString(m.Repository); ok && r != "" {
+		if _, err := reference.ParseNormalizedNamed(r); err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root("repository"), "Invalid repository", err.Error())
+		}
+	}
+}
+
+func (a *imageImportAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	var m imageImportActionModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	c := a.client(&resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	changes := stringListFrom(ctx, m.Changes, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	src := m.Source.ValueString()
+	is := image.ImportSource{SourceName: src}
+	if !actIsURL(src) {
+		f, err := os.Open(expandHome(src))
+		if err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root("source"), "docker_image_import: cannot open source", err.Error())
+			return
+		}
+		defer f.Close()
+		is = image.ImportSource{Source: f, SourceName: "-"}
+	}
+	ref := m.Repository.ValueString()
+	tag := m.Tag.ValueString()
+	actProgress(ctx, resp, "importing %s", src)
+	rc, err := c.ImageImport(ctx, is, ref, image.ImportOptions{
+		Tag:      tag,
+		Message:  m.Message.ValueString(),
+		Changes:  changes,
+		Platform: m.Platform.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("docker_image_import failed", err.Error())
+		return
+	}
+	defer rc.Close()
+	id := ""
+	_, err = imgDecodeStream(rc, func(msg jsonmessage.JSONMessage) {
+		if strings.HasPrefix(msg.Status, "sha256:") {
+			id = strings.TrimSpace(msg.Status)
+			return
+		}
+		actStreamProgress(ctx, resp)(msg)
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("docker_image_import failed", err.Error())
+		return
+	}
+	name := id
+	if ref != "" {
+		if tag == "" {
+			tag = "latest"
+		}
+		name = ref + ":" + tag + " (" + id + ")"
+	}
+	actProgress(ctx, resp, "imported image %s", name)
+}
+
+// ---------------------------------------------------------------------------
+// docker_image_load
+
+// NewImageLoadAction returns the docker_image_load action.
+func NewImageLoadAction() action.Action { return &imageLoadAction{} }
+
+type imageLoadAction struct{ actBase }
+
+type imageLoadActionModel struct {
+	Path types.String `tfsdk:"path"`
+}
+
+func (a *imageLoadAction) Metadata(_ context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_image_load"
+}
+
+func (a *imageLoadAction) Schema(_ context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Loads images from a local tar archive into the daemon, like `docker load`. " +
+			"The archive is what `docker save` or the `docker_image_save` action writes; the loaded image names are reported as progress. " +
+			"The images are not tracked in state.",
+		Attributes: map[string]schema.Attribute{
+			"path": schema.StringAttribute{Required: true, MarkdownDescription: "Local path of the image archive (optionally gzip/bzip2/xz compressed). `~` expands to the home directory."},
+		},
+	}
+}
+
+func (a *imageLoadAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	var m imageLoadActionModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	c := a.client(&resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	p := m.Path.ValueString()
+	f, err := os.Open(expandHome(p))
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("path"), "docker_image_load: cannot open archive", err.Error())
+		return
+	}
+	defer f.Close()
+	actProgress(ctx, resp, "loading images from %s", p)
+	lr, err := c.ImageLoad(ctx, f, client.ImageLoadWithQuiet(true))
+	if err != nil {
+		resp.Diagnostics.AddError("docker_image_load failed", err.Error())
+		return
+	}
+	defer lr.Body.Close()
+	if !lr.JSON {
+		b, _ := io.ReadAll(lr.Body)
+		for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+			if l != "" {
+				actProgress(ctx, resp, "%s", l)
+			}
+		}
+		return
+	}
+	if _, err := imgDecodeStream(lr.Body, actStreamProgress(ctx, resp)); err != nil {
+		resp.Diagnostics.AddError("docker_image_load failed", err.Error())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// docker_image_save
+
+// NewImageSaveAction returns the docker_image_save action.
+func NewImageSaveAction() action.Action { return &imageSaveAction{} }
+
+type imageSaveAction struct{ actBase }
+
+type imageSaveActionModel struct {
+	Images types.List   `tfsdk:"images"`
+	Path   types.String `tfsdk:"path"`
+}
+
+func (a *imageSaveAction) Metadata(_ context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_image_save"
+}
+
+func (a *imageSaveAction) Schema(_ context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Writes one or more images to a local tar archive, like `docker save`. " +
+			"The archive keeps every tag and can be loaded with `docker load` or the `docker_image_load` action; it is written to a temporary name and renamed into place.",
+		Attributes: map[string]schema.Attribute{
+			"images": schema.ListAttribute{
+				Required: true, ElementType: types.StringType,
+				MarkdownDescription: "Image names, tags or IDs to save, e.g. `[docker_image.app.name]`. All must exist on the daemon.",
+			},
+			"path": schema.StringAttribute{Required: true, MarkdownDescription: "Local tar file to write. Parent directories are created; an existing file is replaced."},
+		},
+	}
+}
+
+func (a *imageSaveAction) ValidateConfig(ctx context.Context, req action.ValidateConfigRequest, resp *action.ValidateConfigResponse) {
+	var m imageSaveActionModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !m.Images.IsUnknown() && !m.Images.IsNull() && len(m.Images.Elements()) == 0 {
+		resp.Diagnostics.AddAttributeError(path.Root("images"), "No images", "images needs at least one image.")
+	}
+}
+
+func (a *imageSaveAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
+	var m imageSaveActionModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	c := a.client(&resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	imgs := stringListFrom(ctx, m.Images, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	p := m.Path.ValueString()
+	actProgress(ctx, resp, "saving %s to %s", strings.Join(imgs, ", "), p)
+	rc, err := c.ImageSave(ctx, imgs)
+	if err != nil {
+		resp.Diagnostics.AddError("docker_image_save failed", err.Error())
+		return
+	}
+	defer rc.Close()
+	n, err := actWriteFile(p, rc, func(w int64) { actProgress(ctx, resp, "saved %s", actHumanSize(uint64(w))) })
+	if err != nil {
+		resp.Diagnostics.AddError("docker_image_save failed", err.Error())
+		return
+	}
+	actProgress(ctx, resp, "saved %d image(s): %s written to %s", len(imgs), actHumanSize(uint64(n)), p)
+}

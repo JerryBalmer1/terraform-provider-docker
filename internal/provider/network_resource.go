@@ -23,6 +23,7 @@ var (
 	_ resource.Resource                = (*networkResource)(nil)
 	_ resource.ResourceWithConfigure   = (*networkResource)(nil)
 	_ resource.ResourceWithImportState = (*networkResource)(nil)
+	_ resource.ResourceWithIdentity    = (*networkResource)(nil)
 )
 
 // NewNetworkResource is the docker_network constructor.
@@ -238,6 +239,10 @@ func networkFromInspect(n network.Inspect, prior networkResourceModel) networkRe
 	return out
 }
 
+func (r *networkResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = listIDIdentitySchema()
+}
+
 func (r *networkResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan networkResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -272,11 +277,13 @@ func (r *networkResource) Create(ctx context.Context, req resource.CreateRequest
 	n, err := r.pd.Client.NetworkInspect(ctx, created.ID, network.InspectOptions{})
 	if err != nil {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), plan.ID)...)
+		resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, created.ID)...)
 		resp.Diagnostics.AddError("Cannot inspect network", err.Error())
 		return
 	}
 	state := networkFromInspect(n, plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
 func (r *networkResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -296,6 +303,7 @@ func (r *networkResource) Read(ctx context.Context, req resource.ReadRequest, re
 	}
 	state := networkFromInspect(n, prior)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
 // Update is only reached for no-op plans: every argument forces replacement.
@@ -306,6 +314,7 @@ func (r *networkResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
 
 func (r *networkResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -324,10 +333,15 @@ func (r *networkResource) ImportState(ctx context.Context, req resource.ImportSt
 		resp.Diagnostics.AddError("Provider not configured", "Cannot import before the provider is configured.")
 		return
 	}
-	id, err := resolveNetworkID(ctx, r.pd.Client, req.ID)
+	ref := listIDFromImport(ctx, req, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	id, err := resolveNetworkID(ctx, r.pd.Client, ref)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot find network", err.Error())
 		return
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), id)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, id)...)
 }

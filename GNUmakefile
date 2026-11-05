@@ -5,9 +5,15 @@ SHELL := /bin/bash
 TFPLUGINDOCS := $(GO) run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
 
 # Windows without make: ./build.ps1 -Task <target> runs the same commands
-# (build, vet, test, docs, skill, check, testacc, e2e, fmt, install).
+# (build, vet, test, docs, skill, check, testacc, e2e, fmt, install,
+# compose2stack -In/-Out/-Mode, parity).
 
-.PHONY: build install vet test testacc e2e harness-up harness-down skill docs check lint fmt
+# compose2stack: make compose2stack IN=docker-compose.yml OUT=stack.tf MODE=swarm
+IN ?= docker-compose.yml
+OUT ?= stack.tf
+MODE ?= swarm
+
+.PHONY: build install vet test testacc e2e harness-up harness-down skill docs check lint fmt compose2stack parity
 
 # Build the provider binary into the repo root.
 build:
@@ -66,3 +72,13 @@ lint:
 
 fmt:
 	gofmt -w .
+
+# Convert a compose file to HCL once (tools/compose2stack); the .tf is the source of truth after.
+compose2stack:
+	$(GO) run ./tools/compose2stack -in $(IN) -out $(OUT) -mode $(MODE)
+
+# kreuzwerker/docker v4.6.0 types vs ours (have / partial / missing). CI runs
+# `go run ./tools/parity -check BUILD_REPORT.md`, which also fails when a missing
+# type has no [BLOCKED] line in BUILD_REPORT.md.
+parity:
+	$(GO) run ./tools/parity

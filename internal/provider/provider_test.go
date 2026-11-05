@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"net"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/docker/docker/client"
@@ -63,7 +65,8 @@ func TestProviderSchema(t *testing.T) {
 }
 
 func TestResolveEndpoint(t *testing.T) {
-	env := map[string]string{}
+	// An empty DOCKER_CONFIG dir keeps the real currentContext out of the test.
+	env := map[string]string{"DOCKER_CONFIG": t.TempDir()}
 	getenv := func(k string) string { return env[k] }
 	var diags diag.Diagnostics
 
@@ -148,5 +151,61 @@ func TestLabelHelpers(t *testing.T) {
 	}
 	if got := labelFilter(map[string]string{"b": "2", "a": "1"}).Get("label"); len(got) != 2 {
 		t.Errorf("labelFilter: %v", got)
+	}
+}
+
+func TestValidateProviderModelCertPath(t *testing.T) {
+	var diags diag.Diagnostics
+	m := providerModel{CertPath: types.StringValue("/certs"), TLS: &tlsModel{CA: types.StringValue("ca.pem")}}
+	validateProviderModel(m, &diags)
+	if !diags.HasError() {
+		t.Fatal("cert_path with a tls block should fail validation")
+	}
+	diags = nil
+	validateProviderModel(providerModel{CertPath: types.StringValue("/certs")}, &diags)
+	validateProviderModel(providerModel{TLS: &tlsModel{}}, &diags)
+	if diags.HasError() {
+		t.Fatalf("either alone is fine: %v", diags)
+	}
+	validateProviderModel(providerModel{SSH: &sshModel{ConnectTimeout: types.StringValue("later")}}, &diags)
+	validateProviderModel(providerModel{SSH: &sshModel{ProxyJump: types.StringValue("u@:1")}}, &diags)
+	if len(diags) != 2 {
+		t.Errorf("want 2 ssh validation errors, got %v", diags)
+	}
+
+	// cert_path maps onto the three files.
+	diags = nil
+	ep := resolveEndpoint(providerModel{Host: types.StringValue("tcp://h:2376"), CertPath: types.StringValue("certs")},
+		func(k string) string { return map[string]string{"DOCKER_CONFIG": t.TempDir()}[k] }, &diags)
+	if ep.CA != filepath.Join("certs", "ca.pem") || ep.Cert != filepath.Join("certs", "cert.pem") || ep.Key != filepath.Join("certs", "key.pem") {
+		t.Errorf("cert_path: %+v", ep)
+	}
+}
+
+func TestCheckDockerDaemon(t *testing.T) {
+	eng := fakeEngine(t)
+	c, err := newDockerClient(endpointConfig{Host: "tcp://" + eng.Listener.Addr().String(), APIVersion: "1.47"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var diags diag.Diagnostics
+	checkDockerDaemon(context.Background(), c, endpointConfig{Host: "fake"}, &diags)
+	if len(diags) != 0 {
+		t.Fatalf("reachable daemon: %v", diags)
+	}
+	// Unreachable: a warning, never an error.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close()
+	c2, err := newDockerClient(endpointConfig{Host: "tcp://" + addr, APIVersion: "1.47"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkDockerDaemon(context.Background(), c2, endpointConfig{Host: "tcp://" + addr}, &diags)
+	if diags.HasError() || diags.WarningsCount() != 1 {
+		t.Fatalf("unreachable daemon should warn only: %v", diags)
 	}
 }

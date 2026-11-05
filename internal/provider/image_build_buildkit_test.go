@@ -314,11 +314,13 @@ func TestImageBuildKitAuthCredentials(t *testing.T) {
 	a := &imgBuildKitAuth{creds: []registryCredential{
 		{Address: "https://index.docker.io/v1/", Username: "hub", Password: "p"},
 		{Address: "ghcr.io", Auth: base64.StdEncoding.EncodeToString([]byte("gh:tok"))},
+		{Address: "myacr.azurecr.io", Username: "00000000-0000-0000-0000-000000000000", IdentityToken: "refresh-tok"},
 	}}
 	for host, want := range map[string][2]string{
 		"registry-1.docker.io": {"hub", "p"},
 		"docker.io":            {"hub", "p"},
 		"ghcr.io":              {"gh", "tok"},
+		"myacr.azurecr.io":     {"", "refresh-tok"}, // identity token wins, no username
 		"quay.io":              {"", ""},
 	} {
 		r, err := a.Credentials(ctx, &auth.CredentialsRequest{Host: host})

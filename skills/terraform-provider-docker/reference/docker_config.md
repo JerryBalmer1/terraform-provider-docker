@@ -10,7 +10,9 @@ A Swarm config: an immutable, non-secret blob mounted into service tasks as a fi
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `data` | `string` | required | yes |  | Config content, base64-encoded (use `base64encode()`); it must decode. Kept from state on refresh and ignored on import. Changing this forces a new resource. |
+| `data` | `string` | optional | yes |  | Config content, base64-encoded (use `base64encode()`); it must decode. Kept from state on refresh and filled from the daemon on import. Changing this forces a new resource. Exactly one of `data` and `data_wo` is required. |
+| `data_wo` | `string` | optional, write-only |  | yes | Config content as a write-only argument (Terraform 1.11+), base64-encoded (use `base64encode()`); it is never stored in plan or state, so it can come from an ephemeral value. Requires `data_wo_version`; bump the version to replace the config with new content. Conflicts with `data`. |
+| `data_wo_version` | `number` | optional | yes |  | Version of `data_wo`. Terraform cannot see changes to a write-only value, so change this number whenever `data_wo` changes; changing it forces a new resource (swarm secrets and configs are immutable). |
 | `id` | `string` | computed |  |  | The Swarm config ID. |
 | `labels` | `map(string)` | optional | yes |  | User labels on the config. Changing this forces a new resource. |
 | `name` | `string` | required | yes |  | Config name, unique in the Swarm. Changing this forces a new resource. |
@@ -27,6 +29,14 @@ resource "docker_config" "nginx" {
     }
   CONF
   )
+}
+
+# Terraform 1.11+: write-only content, kept out of plan and state. Bump
+# data_wo_version whenever the content changes.
+resource "docker_config" "app" {
+  name            = "app.ini"
+  data_wo         = base64encode("debug = false\n")
+  data_wo_version = 1
 }
 ```
 

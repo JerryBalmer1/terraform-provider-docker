@@ -31,6 +31,32 @@ resource "docker_container" "web" {
     tmpfs_size = 67108864
   }
 
+  # SELinux hosts: relabel the bind source for this container (`-v src:dst:z`).
+  mounts {
+    type            = "bind"
+    source          = "/srv/web/conf.d"
+    target          = "/etc/nginx/conf.d"
+    read_only       = true
+    selinux_relabel = "z"
+  }
+
+  # Files copied in after create and before start.
+  upload {
+    file        = "/etc/nginx/snippets/headers.conf"
+    content     = "add_header X-Served-By terraform;\n"
+    permissions = "0640"
+    owner       = 0
+    group       = 101 # nginx
+  }
+
+  # For a local file use `source = "${path.module}/banner.sh"` together with
+  # `source_hash = filesha256("${path.module}/banner.sh")`.
+  upload {
+    file           = "/docker-entrypoint.d/99-banner.sh"
+    content_base64 = base64encode("#!/bin/sh\necho web starting\n")
+    executable     = true
+  }
+
   networks_advanced {
     name    = docker_network.app.name
     aliases = ["www"]

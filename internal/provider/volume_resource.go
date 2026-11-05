@@ -19,6 +19,7 @@ var (
 	_ resource.Resource                = (*volumeResource)(nil)
 	_ resource.ResourceWithConfigure   = (*volumeResource)(nil)
 	_ resource.ResourceWithImportState = (*volumeResource)(nil)
+	_ resource.ResourceWithIdentity    = (*volumeResource)(nil)
 )
 
 // NewVolumeResource is the docker_volume constructor.
@@ -95,6 +96,10 @@ func volumeFromInspect(v volume.Volume, prior volumeResourceModel) volumeResourc
 	return out
 }
 
+func (r *volumeResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = listIDIdentitySchema()
+}
+
 func (r *volumeResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan volumeResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -132,6 +137,7 @@ func (r *volumeResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 	state := volumeFromInspect(v, plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
 func (r *volumeResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -151,6 +157,7 @@ func (r *volumeResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 	state := volumeFromInspect(v, prior)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
 // Update is only reached for no-op plans: every argument forces replacement.
@@ -161,6 +168,7 @@ func (r *volumeResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
 
 func (r *volumeResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -179,10 +187,15 @@ func (r *volumeResource) ImportState(ctx context.Context, req resource.ImportSta
 		resp.Diagnostics.AddError("Provider not configured", "Cannot import before the provider is configured.")
 		return
 	}
-	name, err := resolveVolumeName(ctx, r.pd.Client, req.ID)
+	ref := listIDFromImport(ctx, req, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	name, err := resolveVolumeName(ctx, r.pd.Client, ref)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot find volume", err.Error())
 		return
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), name)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, name)...)
 }

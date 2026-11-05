@@ -4,24 +4,30 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
+	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 var (
-	_ resource.Resource                = (*secretResource)(nil)
-	_ resource.ResourceWithConfigure   = (*secretResource)(nil)
-	_ resource.ResourceWithImportState = (*secretResource)(nil)
+	_ resource.Resource                     = (*secretResource)(nil)
+	_ resource.ResourceWithConfigure        = (*secretResource)(nil)
+	_ resource.ResourceWithImportState      = (*secretResource)(nil)
+	_ resource.ResourceWithIdentity         = (*secretResource)(nil)
+	_ resource.ResourceWithConfigValidators = (*secretResource)(nil)
 )
 
 // NewSecretResource returns the docker_secret resource.
@@ -32,10 +38,12 @@ type secretResource struct {
 }
 
 type secretResourceModel struct {
-	ID     types.String `tfsdk:"id"`
-	Name   types.String `tfsdk:"name"`
-	Data   types.String `tfsdk:"data"`
-	Labels types.Map    `tfsdk:"labels"`
+	ID            types.String `tfsdk:"id"`
+	Name          types.String `tfsdk:"name"`
+	Data          types.String `tfsdk:"data"`
+	DataWO        types.String `tfsdk:"data_wo"`
+	DataWOVersion types.Int64  `tfsdk:"data_wo_version"`
+	Labels        types.Map    `tfsdk:"labels"`
 }
 
 func (r *secretResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -60,13 +68,16 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"data": schema.StringAttribute{
-				Required:  true,
+				Optional:  true,
 				Sensitive: true,
 				MarkdownDescription: "Secret content, base64-encoded (use `base64encode()`); it must decode. The daemon never " +
-					"returns secret data, so it is kept from state on refresh and ignored on import. Changing this forces a new resource.",
+					"returns secret data, so it is kept from state on refresh and ignored on import. Changing this forces a new resource. " +
+					"Exactly one of `data` and `data_wo` is required.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Validators:    []validator.String{secretBase64Validator{}},
 			},
+			"data_wo":         secretDataWOAttribute("Secret"),
+			"data_wo_version": secretDataWOVersionAttribute(),
 			"labels": schema.MapAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
@@ -81,15 +92,22 @@ func (r *secretResource) Configure(_ context.Context, req resource.ConfigureRequ
 	r.pd = providerDataFrom(req.ProviderData, &resp.Diagnostics)
 }
 
+func (r *secretResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = listIDIdentitySchema()
+}
+
+func (r *secretResource) ConfigValidators(context.Context) []resource.ConfigValidator {
+	return secretDataConfigValidators()
+}
+
 func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan secretResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	data, err := base64.StdEncoding.DecodeString(plan.Data.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddAttributeError(path.Root("data"), "Invalid base64", err.Error())
+	data, ok := secretPayload(ctx, req.Config, plan.Data, &resp.Diagnostics)
+	if !ok {
 		return
 	}
 	spec := swarm.SecretSpec{
@@ -105,7 +123,9 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 	plan.ID = types.StringValue(out.ID)
+	plan.DataWO = types.StringNull() // write-only: never persisted
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, out.ID)...)
 	r.read(ctx, &plan, &resp.Diagnostics, nil)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -144,6 +164,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
 // Update is never called with a real change: every attribute forces
@@ -154,7 +175,9 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	plan.DataWO = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
 
 func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -169,12 +192,74 @@ func (r *secretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 }
 
 func (r *secretResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	id, err := resolveSecretID(ctx, r.pd.Client, req.ID)
+	ref := listIDFromImport(ctx, req, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	id, err := resolveSecretID(ctx, r.pd.Client, ref)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot import secret", err.Error())
 		return
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), id)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, id)...)
+}
+
+// secretDataWOAttribute is the write-only twin of `data`, shared by
+// docker_secret and docker_config. Terraform never stores it; data_wo_version
+// is the stored signal that it changed.
+func secretDataWOAttribute(kind string) schema.StringAttribute {
+	return schema.StringAttribute{
+		Optional:  true,
+		WriteOnly: true,
+		Sensitive: true,
+		MarkdownDescription: kind + " content as a write-only argument (Terraform 1.11+), base64-encoded (use `base64encode()`); it is never " +
+			"stored in plan or state, so it can come from an ephemeral value. Requires `data_wo_version`; bump the version to " +
+			"replace the " + strings.ToLower(kind) + " with new content. Conflicts with `data`.",
+		Validators: []validator.String{secretBase64Validator{}},
+	}
+}
+
+func secretDataWOVersionAttribute() schema.Int64Attribute {
+	return schema.Int64Attribute{
+		Optional: true,
+		MarkdownDescription: "Version of `data_wo`. Terraform cannot see changes to a write-only value, so change this number " +
+			"whenever `data_wo` changes; changing it forces a new resource (swarm secrets and configs are immutable).",
+		PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()},
+	}
+}
+
+// secretDataConfigValidators: exactly one of data / data_wo; data_wo and
+// data_wo_version go together.
+func secretDataConfigValidators() []resource.ConfigValidator {
+	return []resource.ConfigValidator{
+		resourcevalidator.ExactlyOneOf(path.MatchRoot("data"), path.MatchRoot("data_wo")),
+		resourcevalidator.RequiredTogether(path.MatchRoot("data_wo"), path.MatchRoot("data_wo_version")),
+	}
+}
+
+// secretPayload returns the decoded content: data from the plan, or data_wo
+// from the config (write-only values are always null in the plan).
+func secretPayload(ctx context.Context, cfg tfsdk.Config, data types.String, diags *diag.Diagnostics) ([]byte, bool) {
+	attr, raw := "data", data
+	if raw.IsNull() {
+		var wo types.String
+		diags.Append(cfg.GetAttribute(ctx, path.Root("data_wo"), &wo)...)
+		if diags.HasError() {
+			return nil, false
+		}
+		attr, raw = "data_wo", wo
+	}
+	if raw.IsNull() || raw.IsUnknown() {
+		diags.AddError("Missing content", "Set exactly one of data and data_wo.")
+		return nil, false
+	}
+	b, err := base64.StdEncoding.DecodeString(raw.ValueString())
+	if err != nil {
+		diags.AddAttributeError(path.Root(attr), "Invalid base64", err.Error())
+		return nil, false
+	}
+	return b, true
 }
 
 // secretRemoveWhenFree removes a secret (or config when isConfig), retrying

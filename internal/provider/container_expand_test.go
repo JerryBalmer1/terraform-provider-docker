@@ -73,7 +73,7 @@ func TestContainerExpandMounts(t *testing.T) {
 	if out[0].Type != mount.TypeBind || !out[0].ReadOnly || out[2].TmpfsOptions == nil || out[2].TmpfsOptions.SizeBytes != 1<<20 {
 		t.Errorf("expand: %+v", out)
 	}
-	back := containerFlattenMounts(out, in)
+	back := containerFlattenMounts(out, nil, in)
 	for i := range in {
 		if !back[i].Type.Equal(in[i].Type) || !back[i].Source.Equal(in[i].Source) || !back[i].Target.Equal(in[i].Target) ||
 			!back[i].ReadOnly.Equal(in[i].ReadOnly) || !back[i].TmpfsSize.Equal(in[i].TmpfsSize) {

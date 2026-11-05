@@ -46,6 +46,9 @@ type containerMountModel struct {
 	Target    types.String `tfsdk:"target"`
 	ReadOnly  types.Bool   `tfsdk:"read_only"`
 	TmpfsSize types.Int64  `tfsdk:"tmpfs_size"`
+	// SelinuxRelabel ("z" or "Z") sends the entry as a HostConfig.Binds
+	// string instead of a mount.Mount (container_upload.go).
+	SelinuxRelabel types.String `tfsdk:"selinux_relabel"`
 }
 
 type containerNetworkModel struct {
@@ -305,12 +308,22 @@ func containerFlattenPorts(pm nat.PortMap, prior []containerPortModel) []contain
 // ---------------------------------------------------------------------------
 // Mounts
 
-// containerExpandMounts builds HostConfig.Mounts.
+// containerExpandMounts builds HostConfig.Mounts. Entries with
+// selinux_relabel are validated but left out; containerExpandMountsBinds
+// returns them as HostConfig.Binds.
 func containerExpandMounts(in []containerMountModel) ([]mount.Mount, error) {
+	out, _, err := containerExpandMountsBinds(in)
+	return out, err
+}
+
+// containerExpandMountsBinds builds HostConfig.Mounts and, for entries with
+// selinux_relabel, HostConfig.Binds.
+func containerExpandMountsBinds(in []containerMountModel) ([]mount.Mount, []string, error) {
 	if len(in) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	out := make([]mount.Mount, 0, len(in))
+	var binds []string
 	for i, m := range in {
 		t := m.Type.ValueString()
 		mm := mount.Mount{
@@ -320,39 +333,48 @@ func containerExpandMounts(in []containerMountModel) ([]mount.Mount, error) {
 			ReadOnly: m.ReadOnly.ValueBool(),
 		}
 		if mm.Target == "" {
-			return nil, fmt.Errorf("mounts[%d].target is required", i)
+			return nil, nil, fmt.Errorf("mounts[%d].target is required", i)
 		}
 		switch mm.Type {
 		case mount.TypeBind:
 			if mm.Source == "" {
-				return nil, fmt.Errorf("mounts[%d]: a bind mount needs source (host path)", i)
+				return nil, nil, fmt.Errorf("mounts[%d]: a bind mount needs source (host path)", i)
 			}
 		case mount.TypeVolume:
 		case mount.TypeTmpfs:
 			if mm.Source != "" {
-				return nil, fmt.Errorf("mounts[%d]: a tmpfs mount takes no source", i)
+				return nil, nil, fmt.Errorf("mounts[%d]: a tmpfs mount takes no source", i)
 			}
 			if sz, ok := knownInt64(m.TmpfsSize); ok && sz > 0 {
 				mm.TmpfsOptions = &mount.TmpfsOptions{SizeBytes: sz}
 			}
 		default:
-			return nil, fmt.Errorf("mounts[%d].type %q: must be bind, volume or tmpfs", i, t)
+			return nil, nil, fmt.Errorf("mounts[%d].type %q: must be bind, volume or tmpfs", i, t)
 		}
 		if mm.Type != mount.TypeTmpfs && containerKnown(m.TmpfsSize) && m.TmpfsSize.ValueInt64() != 0 {
-			return nil, fmt.Errorf("mounts[%d].tmpfs_size only applies to type tmpfs", i)
+			return nil, nil, fmt.Errorf("mounts[%d].tmpfs_size only applies to type tmpfs", i)
+		}
+		if rl, ok := knownString(m.SelinuxRelabel); ok && rl != "" {
+			spec, err := containerBindSpec(i, m, rl)
+			if err != nil {
+				return nil, nil, err
+			}
+			binds = append(binds, spec)
+			continue
 		}
 		out = append(out, mm)
 	}
-	return out, nil
+	return out, binds, nil
 }
 
 func containerMountKey(m containerMountModel) string {
 	return m.Target.ValueString() + "|" + m.Type.ValueString() + "|" + m.Source.ValueString()
 }
 
-// containerFlattenMounts maps HostConfig.Mounts back to blocks.
-func containerFlattenMounts(in []mount.Mount, prior []containerMountModel) []containerMountModel {
-	got := make([]containerMountModel, 0, len(in))
+// containerFlattenMounts maps HostConfig.Mounts and HostConfig.Binds back to
+// blocks.
+func containerFlattenMounts(in []mount.Mount, binds []string, prior []containerMountModel) []containerMountModel {
+	got := make([]containerMountModel, 0, len(in)+len(binds))
 	for _, m := range in {
 		mm := containerMountModel{
 			Type:      types.StringValue(string(m.Type)),
@@ -360,12 +382,15 @@ func containerFlattenMounts(in []mount.Mount, prior []containerMountModel) []con
 			Target:    types.StringValue(m.Target),
 			ReadOnly:  types.BoolValue(m.ReadOnly),
 			TmpfsSize: types.Int64Null(),
+
+			SelinuxRelabel: types.StringNull(),
 		}
 		if m.TmpfsOptions != nil && m.TmpfsOptions.SizeBytes > 0 {
 			mm.TmpfsSize = types.Int64Value(m.TmpfsOptions.SizeBytes)
 		}
 		got = append(got, mm)
 	}
+	got = append(got, containerFlattenBinds(binds)...)
 	return containerOrderByPrior(prior, got, containerMountKey)
 }
 

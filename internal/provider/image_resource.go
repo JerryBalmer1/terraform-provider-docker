@@ -31,6 +31,7 @@ var (
 	_ resource.ResourceWithImportState    = (*imageResource)(nil)
 	_ resource.ResourceWithModifyPlan     = (*imageResource)(nil)
 	_ resource.ResourceWithValidateConfig = (*imageResource)(nil)
+	_ resource.ResourceWithIdentity       = (*imageResource)(nil)
 )
 
 // NewImageResource returns the docker_image resource.
@@ -294,6 +295,10 @@ func imgPlanContextDigest(b *imageBuildModel) types.String {
 	return types.StringValue(d)
 }
 
+func (r *imageResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = listIDIdentitySchema()
+}
+
 func (r *imageResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.pd == nil {
 		resp.Diagnostics.AddError("Provider not configured", "The docker provider was not configured.")
@@ -330,6 +335,7 @@ func (r *imageResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 	imgApplyInspect(&plan, insp)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
 
 // pull pulls name and drains the progress stream.
@@ -431,7 +437,7 @@ func imgBuildOptions(ctx context.Context, plan *imageResourceModel, dockerfile s
 func imgAuthConfigs(creds []registryCredential) map[string]registry.AuthConfig {
 	out := map[string]registry.AuthConfig{}
 	for _, c := range creds {
-		ac := registry.AuthConfig{Username: c.Username, Password: c.Password, ServerAddress: c.Address}
+		ac := registry.AuthConfig{Username: c.Username, Password: c.Password, IdentityToken: c.IdentityToken, ServerAddress: c.Address}
 		out[c.Address] = ac
 		host := normalizeRegistry(c.Address)
 		out[host] = ac
@@ -502,6 +508,7 @@ func (r *imageResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	}
 	imgApplyInspect(&st, insp)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &st)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, st.ID.ValueString())...)
 }
 
 // Update only handles keep_locally / force_remove; everything else replaces.
@@ -517,6 +524,7 @@ func (r *imageResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		plan.ContextDigest = st.ContextDigest
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
 
 func (r *imageResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -553,8 +561,15 @@ func imgRemove(ctx context.Context, c *client.Client, name, imageID string, forc
 	return nil
 }
 
+// ImportState accepts an image name or ID; Read resolves it to the image ID
+// and rewrites both the id attribute and the identity.
 func (r *imageResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	ref := listIDFromImport(ctx, req, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), ref)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, ref)...)
 }
 
 // imgDockerHubIndexServer is the legacy key Docker Hub credentials are

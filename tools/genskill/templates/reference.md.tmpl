@@ -19,6 +19,49 @@ Nested blocks: {{ range $i, $b := .Blocks }}{{ if $i }}, {{ end }}`{{ $b.Name }}
 Kind: {{ .Doc.Kind }}.{{ if ne .Doc.Kind "provider" }} Back to [SKILL.md](../SKILL.md).{{ end }}
 
 {{ if .Doc.Description }}{{ .Doc.Description }}{{ else }}No description in the schema.{{ end }}
+{{- if eq .Doc.Kind "action" }}
+
+Actions need Terraform >= 1.14. They keep no state: they run when a
+resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
+`terraform apply -invoke=action.{{ .Doc.Name }}.<name>`. Arguments go inside
+the action's `config` block.
+{{- else if eq .Doc.Kind "ephemeral-resource" }}
+
+Ephemeral resources need Terraform >= 1.10. Their values are never written to
+plan or state; reference them only from ephemeral contexts (write-only
+arguments, provider blocks, ephemeral variables, outputs and locals, other
+ephemeral resources).
+{{- else if eq .Doc.Kind "list-resource" }}
+
+List resources need Terraform >= 1.14 and live in `*.tfquery.hcl` files run
+with `terraform query`. Arguments go inside the list block's `config` block.
+{{- end }}
+{{- with .Doc.Usage }}
+
+## Usage
+
+```terraform
+{{ . }}
+```
+{{- end }}
+{{- if .Doc.Func }}
+{{- if .Doc.Func.Deprecation }}
+
+Deprecated: {{ .Doc.Func.Deprecation }}
+{{- end }}
+
+## Parameters
+{{ if .Doc.Func.Params }}
+| Position | Name | Type | Null allowed | Description |
+|---|---|---|---|---|
+{{- range $i, $p := .Doc.Func.Params }}
+| {{ if $p.Variadic }}variadic{{ else }}{{ inc $i }}{{ end }} | `{{ $p.Name }}` | `{{ $p.Type }}` | {{ yes $p.AllowNull }} | {{ cell $p.Description }} |
+{{- end }}
+{{ else }}
+This function takes no parameters.
+{{ end }}
+Returns `{{ if .Doc.Func.Return }}{{ .Doc.Func.Return }}{{ else }}dynamic{{ end }}`. Provider functions need Terraform >= 1.8.
+{{- else }}
 
 ## Arguments and attributes
 {{ template "attrtable" .Doc.Root }}
@@ -32,7 +75,9 @@ This type has no attributes.
 {{ .Nesting }}{{ limits . }}.{{ if .Description }} {{ .Description }}{{ end }}
 {{ template "attrtable" . }}
 {{ end }}
+{{- end }}
 {{- if .Doc.Example }}
+
 ## Example
 
 ```terraform

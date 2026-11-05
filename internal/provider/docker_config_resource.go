@@ -20,6 +20,9 @@ var (
 	_ resource.Resource                = (*dockerConfigResource)(nil)
 	_ resource.ResourceWithConfigure   = (*dockerConfigResource)(nil)
 	_ resource.ResourceWithImportState = (*dockerConfigResource)(nil)
+	_ resource.ResourceWithIdentity    = (*dockerConfigResource)(nil)
+
+	_ resource.ResourceWithConfigValidators = (*dockerConfigResource)(nil)
 )
 
 // NewDockerConfigResource returns the docker_config resource.
@@ -30,10 +33,12 @@ type dockerConfigResource struct {
 }
 
 type dockerConfigResourceModel struct {
-	ID     types.String `tfsdk:"id"`
-	Name   types.String `tfsdk:"name"`
-	Data   types.String `tfsdk:"data"`
-	Labels types.Map    `tfsdk:"labels"`
+	ID            types.String `tfsdk:"id"`
+	Name          types.String `tfsdk:"name"`
+	Data          types.String `tfsdk:"data"`
+	DataWO        types.String `tfsdk:"data_wo"`
+	DataWOVersion types.Int64  `tfsdk:"data_wo_version"`
+	Labels        types.Map    `tfsdk:"labels"`
 }
 
 func (r *dockerConfigResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -58,12 +63,15 @@ func (r *dockerConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"data": schema.StringAttribute{
-				Required: true,
+				Optional: true,
 				MarkdownDescription: "Config content, base64-encoded (use `base64encode()`); it must decode. Kept from state on " +
-					"refresh and ignored on import. Changing this forces a new resource.",
+					"refresh and filled from the daemon on import. Changing this forces a new resource. " +
+					"Exactly one of `data` and `data_wo` is required.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Validators:    []validator.String{secretBase64Validator{}},
 			},
+			"data_wo":         secretDataWOAttribute("Config"),
+			"data_wo_version": secretDataWOVersionAttribute(),
 			"labels": schema.MapAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
@@ -78,15 +86,22 @@ func (r *dockerConfigResource) Configure(_ context.Context, req resource.Configu
 	r.pd = providerDataFrom(req.ProviderData, &resp.Diagnostics)
 }
 
+func (r *dockerConfigResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = listIDIdentitySchema()
+}
+
+func (r *dockerConfigResource) ConfigValidators(context.Context) []resource.ConfigValidator {
+	return secretDataConfigValidators()
+}
+
 func (r *dockerConfigResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan dockerConfigResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	data, err := base64.StdEncoding.DecodeString(plan.Data.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddAttributeError(path.Root("data"), "Invalid base64", err.Error())
+	data, ok := secretPayload(ctx, req.Config, plan.Data, &resp.Diagnostics)
+	if !ok {
 		return
 	}
 	spec := swarm.ConfigSpec{
@@ -102,7 +117,9 @@ func (r *dockerConfigResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 	plan.ID = types.StringValue(out.ID)
+	plan.DataWO = types.StringNull() // write-only: never persisted
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, out.ID)...)
 	r.read(ctx, &plan, &resp.Diagnostics, nil)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -122,8 +139,9 @@ func (r *dockerConfigResource) read(ctx context.Context, m *dockerConfigResource
 	m.Labels = svcMapValue(m.Labels, userLabels(s.Spec.Labels, false))
 	// The daemon does return config data, but import keeps the contract of
 	// docker_secret: data stays whatever state holds. Fill it when state has
-	// none (import) so plans after import are clean.
-	if m.Data.IsNull() || m.Data.IsUnknown() {
+	// none (import) so plans after import are clean. A config created from
+	// data_wo has data_wo_version set and keeps data null.
+	if (m.Data.IsNull() || m.Data.IsUnknown()) && m.DataWOVersion.IsNull() {
 		m.Data = types.StringValue(base64.StdEncoding.EncodeToString(s.Spec.Data))
 	}
 }
@@ -144,6 +162,7 @@ func (r *dockerConfigResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
 // Update only persists the plan: every attribute forces replacement.
@@ -153,7 +172,9 @@ func (r *dockerConfigResource) Update(ctx context.Context, req resource.UpdateRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	plan.DataWO = types.StringNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
 
 func (r *dockerConfigResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -168,10 +189,15 @@ func (r *dockerConfigResource) Delete(ctx context.Context, req resource.DeleteRe
 }
 
 func (r *dockerConfigResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	id, err := resolveConfigID(ctx, r.pd.Client, req.ID)
+	ref := listIDFromImport(ctx, req, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	id, err := resolveConfigID(ctx, r.pd.Client, ref)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot import config", err.Error())
 		return
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), id)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, id)...)
 }

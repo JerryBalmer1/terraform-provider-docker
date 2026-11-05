@@ -86,7 +86,11 @@ func TestImageAuthConfigs(t *testing.T) {
 	m := imgAuthConfigs([]registryCredential{
 		{Address: "registry-1.docker.io", Username: "hub", Password: "p"},
 		{Address: "https://ghcr.io", Username: "gh", Password: "q"},
+		{Address: "myacr.azurecr.io", IdentityToken: "refresh-tok"},
 	})
+	if m["myacr.azurecr.io"].IdentityToken != "refresh-tok" {
+		t.Errorf("identity token not passed through: %+v", m["myacr.azurecr.io"])
+	}
 	if m[imgDockerHubIndexServer].Username != "hub" || m["docker.io"].Username != "hub" {
 		t.Errorf("hub keys: %v", m)
 	}

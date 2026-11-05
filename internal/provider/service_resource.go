@@ -16,6 +16,7 @@ var (
 	_ resource.Resource                = (*serviceResource)(nil)
 	_ resource.ResourceWithConfigure   = (*serviceResource)(nil)
 	_ resource.ResourceWithImportState = (*serviceResource)(nil)
+	_ resource.ResourceWithIdentity    = (*serviceResource)(nil)
 )
 
 // NewServiceResource returns the docker_service resource.
@@ -54,6 +55,10 @@ func (r *serviceResource) Configure(_ context.Context, req resource.ConfigureReq
 	r.pd = providerDataFrom(req.ProviderData, &resp.Diagnostics)
 }
 
+func (r *serviceResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = listIDIdentitySchema()
+}
+
 func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan serviceResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -87,12 +92,14 @@ func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest
 	// Save the ID first so a failed convergence still leaves a tracked
 	// (tainted) resource rather than an orphan.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, out.ID)...)
 	if err := svcWaitConverged(ctx, r.pd.Client, out.ID, plan.ConvergeConfig); err != nil {
 		resp.Diagnostics.AddError("Service did not converge", err.Error())
 		return
 	}
 	r.refresh(ctx, &plan, lk, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
 
 // refresh replaces m with the daemon's view, keeping m's spellings. It
@@ -131,6 +138,7 @@ func (r *serviceResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
 func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -161,6 +169,7 @@ func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 	r.refresh(ctx, &plan, lk, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
 
 // svcUpdate applies spec to an existing service at its current version. A
@@ -199,10 +208,15 @@ func (r *serviceResource) Delete(ctx context.Context, req resource.DeleteRequest
 }
 
 func (r *serviceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	id, err := resolveServiceID(ctx, r.pd.Client, req.ID)
+	ref := listIDFromImport(ctx, req, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	id, err := resolveServiceID(ctx, r.pd.Client, ref)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot import service", err.Error())
 		return
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), id)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, id)...)
 }

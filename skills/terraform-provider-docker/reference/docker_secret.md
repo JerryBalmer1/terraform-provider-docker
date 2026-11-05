@@ -10,7 +10,9 @@ A Swarm secret: an immutable blob the Swarm managers store encrypted and mount i
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `data` | `string` | required | yes | yes | Secret content, base64-encoded (use `base64encode()`); it must decode. The daemon never returns secret data, so it is kept from state on refresh and ignored on import. Changing this forces a new resource. |
+| `data` | `string` | optional | yes | yes | Secret content, base64-encoded (use `base64encode()`); it must decode. The daemon never returns secret data, so it is kept from state on refresh and ignored on import. Changing this forces a new resource. Exactly one of `data` and `data_wo` is required. |
+| `data_wo` | `string` | optional, write-only |  | yes | Secret content as a write-only argument (Terraform 1.11+), base64-encoded (use `base64encode()`); it is never stored in plan or state, so it can come from an ephemeral value. Requires `data_wo_version`; bump the version to replace the secret with new content. Conflicts with `data`. |
+| `data_wo_version` | `number` | optional | yes |  | Version of `data_wo`. Terraform cannot see changes to a write-only value, so change this number whenever `data_wo` changes; changing it forces a new resource (swarm secrets and configs are immutable). |
 | `id` | `string` | computed |  |  | The Swarm secret ID. |
 | `labels` | `map(string)` | optional | yes |  | User labels on the secret. Changing this forces a new resource. |
 | `name` | `string` | required | yes |  | Secret name, unique in the Swarm. Changing this forces a new resource. |
@@ -26,6 +28,16 @@ resource "docker_secret" "db_password" {
     app = "shop"
   }
 }
+
+# Terraform 1.11+: a write-only secret. The content never reaches plan or
+# state, so it can come from an ephemeral value (an `ephemeral = true`
+# variable, ephemeral.docker_exec_output, ...); bump data_wo_version to rotate
+# it (the secret is replaced, swarm secrets are immutable).
+resource "docker_secret" "api_key" {
+  name            = "api_key_v1"
+  data_wo         = base64encode("replace-with-an-ephemeral-value")
+  data_wo_version = 1
+}
 ```
 
 ## Import
@@ -34,4 +46,9 @@ resource "docker_secret" "db_password" {
 # Import by secret name or ID. The daemon never returns secret data, so
 # the next plan replaces the secret unless data is ignored or recreated.
 terraform import docker_secret.db_password db_password
+# Terraform 1.12+ can import by identity instead:
+#   import {
+#     to       = docker_secret.db_password
+#     identity = { id = "<secret ID>" }
+#   }
 ```

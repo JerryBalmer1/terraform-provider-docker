@@ -1,0 +1,37 @@
+# converted from testdata/minimal/compose.yml
+# by tools/compose2stack -mode local (project "minimal")
+
+resource "docker_container" "app" {
+  name  = "minimal-app-1"
+  image = "ghcr.io/example/app:1.0"
+  env = {
+    LOG_LEVEL = "info"
+  }
+  labels = {
+    "com.docker.compose.container-number" = "1"
+    "com.docker.compose.project"          = "minimal"
+    "com.docker.compose.service"          = "app"
+  }
+  restart = "unless-stopped"
+  mounts {
+    type   = "tmpfs"
+    target = "/tmp"
+  }
+  networks_advanced {
+    name    = "traefik_public"
+    aliases = ["app"]
+  }
+  ports {
+    internal = 3000
+    external = 3000
+    ip       = "127.0.0.1"
+  }
+  ports {
+    internal = 9000
+    external = 9000
+  }
+  ports {
+    internal = 9001
+    external = 9001
+  }
+}

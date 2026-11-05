@@ -19,26 +19,44 @@
       e2e      test/harness/Invoke-E2E.ps1               (dind manager + 2 workers, TestAccE2E)
       fmt      gofmt -w .
       install  go install .                               (into GOBIN / GOPATH\bin, the dev_overrides path)
+      compose2stack  go run ./tools/compose2stack -in <In> -out <Out> -mode <Mode>
+               (convert a compose file to HCL once; -In/-Out are relative to the caller's directory)
+      parity   go run ./tools/parity                      (kreuzwerker/docker v4.6.0 types vs ours: have / partial / missing)
+
+.PARAMETER In
+    compose2stack: compose file to read (default docker-compose.yml).
+
+.PARAMETER Out
+    compose2stack: .tf file to write (default stack.tf).
+
+.PARAMETER Mode
+    compose2stack: conversion mode passed to -mode (default swarm).
 
 .EXAMPLE
     ./build.ps1                       # build
     ./build.ps1 -Task build,vet,skill
     pwsh -NoProfile -File build.ps1 -Task check
+    ./build.ps1 -Task compose2stack -In docker-compose.yml -Out stack.tf -Mode swarm
+    ./build.ps1 -Task parity
 #>
 [CmdletBinding()]
 param(
     # The same set as a ValidateSet, but checked per comma-separated item: `pwsh -File build.ps1
     # -Task build,vet` passes the single string "build,vet" (only -Command parses it as an array),
     # which a plain ValidateSet rejects.
-    [ArgumentCompletions('build', 'vet', 'test', 'docs', 'skill', 'check', 'testacc', 'e2e', 'fmt', 'install')]
+    [ArgumentCompletions('build', 'vet', 'test', 'docs', 'skill', 'check', 'testacc', 'e2e', 'fmt', 'install', 'compose2stack', 'parity')]
     [ValidateScript({
-            $valid = 'build', 'vet', 'test', 'docs', 'skill', 'check', 'testacc', 'e2e', 'fmt', 'install'
+            $valid = 'build', 'vet', 'test', 'docs', 'skill', 'check', 'testacc', 'e2e', 'fmt', 'install', 'compose2stack', 'parity'
             foreach ($t in ($_ -split ',')) {
                 if ($t.Trim() -notin $valid) { throw "Unknown task '$t'. Valid tasks: $($valid -join ', ')." }
             }
             $true
         })]
-    [string[]]$Task = 'build'
+    [string[]]$Task = 'build',
+
+    [string]$In = 'docker-compose.yml',
+    [string]$Out = 'stack.tf',
+    [string]$Mode = 'swarm'
 )
 
 Set-StrictMode -Version Latest
@@ -47,6 +65,11 @@ $ErrorActionPreference = 'Stop'
 $Task = @($Task | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 
 $Go = if ($env:GO) { $env:GO } else { 'go' }
+
+# compose2stack paths are given relative to where the caller ran build.ps1, but the tasks run
+# from the repository root; resolve them before Push-Location.
+$InPath = [System.IO.Path]::GetFullPath($In, (Get-Location).Path)
+$OutPath = [System.IO.Path]::GetFullPath($Out, (Get-Location).Path)
 $TfPluginDocs = 'github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs'
 
 # Run a native command; throw if it exits non-zero.
@@ -86,12 +109,16 @@ function Invoke-Task {
         'testacc' {
             $global:LASTEXITCODE = 0
             # Pass 1: plain manager (image, network, volume, container, swarm_init, e2e).
-            & "$PSScriptRoot/test/harness/Invoke-E2E.ps1" -Run TestAcc -Timeout 60m -Log test/harness/last-acc.log
-            if ($LASTEXITCODE) { throw "testacc failed with exit code $LASTEXITCODE" }
+            # Both passes always run; the task fails afterwards if either did.
+            $plain = 0
+            try { & "$PSScriptRoot/test/harness/Invoke-E2E.ps1" -Run TestAcc -Timeout 120m -Log test/harness/last-acc.log; $plain = $LASTEXITCODE }
+            catch { Write-Warning "testacc plain pass: $_"; $plain = 1 }
             # Pass 2: harness manager swarm-initialised, for tests that skip unless DOCKER_HOST is a swarm manager.
             $global:LASTEXITCODE = 0
-            & "$PSScriptRoot/test/harness/Invoke-E2E.ps1" -SwarmInit -Run 'TestAcc(Service|Stack|Secret|DockerConfig|SwarmTokens|Node_|Nodes_|SwarmNode)' -Timeout 60m -Log test/harness/last-acc-swarm.log
-            if ($LASTEXITCODE) { throw "testacc (swarm) failed with exit code $LASTEXITCODE" }
+            $swarmPass = 0
+            try { & "$PSScriptRoot/test/harness/Invoke-E2E.ps1" -SwarmInit -Run 'TestAcc(Service|Stack|Secret|DockerConfig|SwarmTokens|Node_|Nodes_|SwarmNode|ComposeSwarm|ListSecret|P3SwarmList|Action(SwarmRotateTokens|NodeDrainActivate|ServiceScaleForceUpdateRollback))' -Timeout 120m -Log test/harness/last-acc-swarm.log; $swarmPass = $LASTEXITCODE }
+            catch { Write-Warning "testacc swarm pass: $_"; $swarmPass = 1 }
+            if ($plain -or $swarmPass) { throw "testacc failed (plain pass exit $plain, swarm pass exit $swarmPass)" }
         }
         'e2e' {
             $global:LASTEXITCODE = 0
@@ -100,6 +127,8 @@ function Invoke-Task {
         }
         'fmt' { Invoke-Native gofmt -w . }
         'install' { Invoke-Native $Go install . }
+        'compose2stack' { Invoke-Native $Go run ./tools/compose2stack -in $InPath -out $OutPath -mode $Mode }
+        'parity' { Invoke-Native $Go run ./tools/parity }
         default { throw "unknown task '$Name'" }
     }
 }

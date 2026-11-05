@@ -1,0 +1,13 @@
+services:
+  app:
+    image: ghcr.io/example/app:1.0
+    restart: unless-stopped
+    ports: ["127.0.0.1:3000:3000", "9000-9001:9000-9001"]
+    environment:
+      LOG_LEVEL: info
+    tmpfs: [/tmp]
+    networks: [proxy]
+networks:
+  proxy:
+    external: true
+    name: traefik_public

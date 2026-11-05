@@ -3,13 +3,13 @@
 page_title: "docker_swarm_node Resource - docker"
 subcategory: ""
 description: |-
-  Joins a Docker host to an existing swarm. The join is sent to the joining node's OWN daemon (host, optionally with a tls block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
+  Joins a Docker host to an existing swarm. The join is sent to the joining node's OWN daemon (host, optionally with a tls block, or over SSH with an ssh:// host and an ssh block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
   Import with the node ID; host, join_token and manager_address must then be set in configuration (the next apply records them without replacing the node).
 ---
 
 # docker_swarm_node (Resource)
 
-Joins a Docker host to an existing swarm. The join is sent to the joining node's OWN daemon (`host`, optionally with a `tls` block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
+Joins a Docker host to an existing swarm. The join is sent to the joining node's OWN daemon (`host`, optionally with a `tls` block, or over SSH with an `ssh://` host and an `ssh` block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
 
 Import with the node ID; `host`, `join_token` and `manager_address` must then be set in configuration (the next apply records them without replacing the node).
 
@@ -47,17 +47,20 @@ resource "docker_swarm_node" "worker1" {
 
 ### Required
 
-- `host` (String) Docker endpoint of the JOINING node, e.g. `tcp://10.0.0.6:2376`. Changing this forces a new resource.
+- `host` (String) Docker endpoint of the JOINING node, e.g. `tcp://10.0.0.6:2376` or `ssh://admin@10.0.0.6` (with an optional `ssh` block for credentials). Changing this forces a new resource.
 - `join_token` (String, Sensitive) Worker or manager join token, e.g. `docker_swarm_init.this.worker_join_token`. Changing this forces a new resource.
 - `manager_address` (String) Address of an existing manager as seen from the joining node, e.g. `10.0.0.5:2377`. Changing this forces a new resource.
 
 ### Optional
+
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
 
 - `advertise_addr` (String) Address the node advertises, `<ip|interface>[:port]`. Changing this forces a new resource.
 - `availability` (String) Scheduling availability: `active`, `pause` or `drain`. Default `active`. Updated in place through the manager.
 - `labels` (Map of String) Node labels (`node.labels.*` in placement constraints). Updated in place; labels set outside Terraform are removed.
 - `listen_addr` (String) Listen address for swarm traffic on the node. Default `0.0.0.0:2377`. Changing this forces a new resource.
 - `role` (String) Node role: `worker` or `manager`. Default `worker`. Updated in place (promote/demote) through the manager, whichever token was used to join.
+- `ssh` (Block, Optional) Reach the JOINING node's daemon over SSH in pure Go (same shape as the provider's `ssh` block). Set `host` to `ssh://user@node[:port]`; this block adds credentials and may override user, host or port. Only used to reach that daemon; changing it does not replace the node. (see [below for nested schema](#nestedblock--ssh))
 - `tls` (Block, Optional) TLS client material for the joining node's `tcp://` `host`. Each value is PEM content or a path to a PEM file. Only used to reach that daemon; changing it does not replace the node. (see [below for nested schema](#nestedblock--tls))
 
 ### Read-Only
@@ -65,6 +68,27 @@ resource "docker_swarm_node" "worker1" {
 - `hostname` (String) Hostname the node reports to the swarm.
 - `id` (String) Swarm node ID (same as `node_id`).
 - `node_id` (String) Swarm node ID, read from the joining daemon after the join.
+
+<a id="nestedblock--ssh"></a>
+### Nested Schema for `ssh`
+
+Optional:
+
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
+- `connect_timeout` (String) Timeout for the TCP connection plus SSH handshake of each hop, as a Go duration (`10s`, `1m`). Default `10s`.
+- `host` (String) SSH server host name or IP. Default: the host of an `ssh://` Docker host (from `host`, the Docker context or `DOCKER_HOST`).
+- `identity_agent` (Boolean) Also offer the keys held by the running SSH agent: `SSH_AUTH_SOCK` on Linux/macOS, the Windows OpenSSH agent named pipe `\\.\pipe\openssh-ssh-agent` on Windows (or `SSH_AUTH_SOCK` when it names a pipe). Default `false`.
+- `identity_file` (String, Sensitive) Private key used for public-key authentication: PEM/OpenSSH content or a path (`~` expands). Passphrase-protected keys are not supported; load them into an agent and use `identity_agent`. When unset, `~/.ssh/id_ed25519`, `~/.ssh/id_ecdsa` and `~/.ssh/id_rsa` are offered if they exist and are unencrypted.
+- `known_hosts_file` (String) OpenSSH `known_hosts` file used to verify the server's host key (and every `proxy_jump` hop). Default `~/.ssh/known_hosts`.
+- `password` (String, Sensitive) SSH password (password and keyboard-interactive authentication). Conflicts with `password_wo`.
+- `password_wo` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) SSH password, write-only variant of `password`. Conflicts with `password`. Write-only: never stored in plan or state (needs Terraform >= 1.11). Because it is not in state, destroy cannot use it; give destroy another way in (`identity_file`, `identity_agent` or `password`).
+- `port` (Number) SSH server port. Default `22` (or the port in an `ssh://` Docker host).
+- `proxy_jump` (String) Jump host(s) to reach the server through, OpenSSH `ProxyJump` style: `user@host:port`, or several hops separated by commas (`user@bastion:22,user@inner:2222`), dialled in order. User defaults to `user`, port to `22`. Each hop is authenticated with the same credentials and checked against the same `known_hosts_file`.
+- `remote_socket` (String) Path of the Docker daemon's unix socket on the remote host. Default `/var/run/docker.sock`.
+- `strict_host_key_checking` (Boolean) Reject servers whose host key is missing from, or does not match, `known_hosts_file`. Default `true`. `false` accepts any host key (insecure; for throwaway hosts only).
+- `user` (String) SSH user. Default: the user in an `ssh://user@host` Docker host, else `USER`/`USERNAME` from the environment.
+
 
 <a id="nestedblock--tls"></a>
 ### Nested Schema for `tls`

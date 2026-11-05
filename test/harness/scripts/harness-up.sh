@@ -1,43 +1,175 @@
 #!/usr/bin/env bash
-# Bring up the dind swarm harness (manager + 2 workers) and write
-# test/harness/.env for `make e2e`. The docker CLI is used here, in the test
-# harness only; the provider never shells out to it.
+# Bring up the dind harness (manager + 3 workers, registry:2, TLS daemon) and
+# write test/harness/.env for `make e2e`. The docker CLI is used here, in the
+# test harness only; the provider never shells out to it.
+#
+# Mirrors harness-up.ps1: generates throwaway TLS material for tlsnode into
+# test/harness/tls/ (openssl), installs Terraform ${HARNESS_TF_VERSION:-1.14.9}
+# into test/harness/.bin/ once (SHA256-checked) and exports
+# TF_ACC_TERRAFORM_VERSION (+ TF_ACC_TERRAFORM_PATH when the install worked).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HARNESS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="${HARNESS_DIR}/docker-compose.yml"
 ENV_FILE="${HARNESS_DIR}/.env"
+TLS_DIR="${HARNESS_DIR}/tls"
+BIN_DIR="${HARNESS_DIR}/.bin"
+TF_VERSION="${HARNESS_TF_VERSION:-1.14.9}"
+
+# compose must talk to the HOST daemon, not a stale harness manager value.
+if [ "${DOCKER_HOST:-}" = "tcp://127.0.0.1:12375" ]; then unset DOCKER_HOST; fi
+
+# Paths handed to Go: on Git Bash/MSYS convert /c/x to C:/x (Go on Windows
+# does not understand MSYS paths); elsewhere unchanged.
+native_path() {
+  if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s\n' "$1"; fi
+}
+
+# ---------------------------------------------------------------------------
+# TLS material: CA, server cert (SAN tlsnode, localhost, 127.0.0.1), client
+# cert. Same file names as harness-up.ps1.
+gen_tls() {
+  command -v openssl >/dev/null 2>&1 || { echo "ERROR: openssl not on PATH (needed for the tlsnode certificates)" >&2; return 1; }
+  mkdir -p "${TLS_DIR}"
+  local d="${TLS_DIR}" tmp
+  tmp="$(mktemp -d)"
+  # Git Bash/MSYS would rewrite "/CN=..." into a Windows path; exclude only
+  # those arguments (file paths still need the conversion for a native openssl).
+  export MSYS2_ARG_CONV_EXCL="/CN"
+  openssl genrsa -out "${d}/ca-key.pem" 2048 2>/dev/null
+  # Self-sign through x509 -req -signkey so only these extensions are set
+  # (req -x509 would add the config file's basicConstraints a second time).
+  openssl req -new -key "${d}/ca-key.pem" -subj "/CN=tfdocker-e2e harness CA" -out "${tmp}/ca.csr"
+  printf 'basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign\nsubjectKeyIdentifier=hash\n' > "${tmp}/ca.ext"
+  openssl x509 -req -in "${tmp}/ca.csr" -signkey "${d}/ca-key.pem" -days 30 -sha256 -extfile "${tmp}/ca.ext" -out "${d}/ca.pem" 2>/dev/null
+  openssl genrsa -out "${d}/server-key.pem" 2048 2>/dev/null
+  openssl req -new -key "${d}/server-key.pem" -subj "/CN=tlsnode" -out "${tmp}/server.csr"
+  printf 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:tlsnode,DNS:localhost,IP:127.0.0.1\n' > "${tmp}/server.ext"
+  openssl x509 -req -in "${tmp}/server.csr" -CA "${d}/ca.pem" -CAkey "${d}/ca-key.pem" -CAcreateserial \
+    -CAserial "${tmp}/ca.srl" -days 30 -sha256 -extfile "${tmp}/server.ext" -out "${d}/server-cert.pem" 2>/dev/null
+  openssl genrsa -out "${d}/key.pem" 2048 2>/dev/null
+  openssl req -new -key "${d}/key.pem" -subj "/CN=tfdocker-e2e client" -out "${tmp}/client.csr"
+  printf 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=clientAuth\n' > "${tmp}/client.ext"
+  openssl x509 -req -in "${tmp}/client.csr" -CA "${d}/ca.pem" -CAkey "${d}/ca-key.pem" \
+    -CAserial "${tmp}/ca.srl" -days 30 -sha256 -extfile "${tmp}/client.ext" -out "${d}/cert.pem" 2>/dev/null
+  rm -f "${d}/ca-key.pem"
+  rm -rf "${tmp}"
+  unset MSYS2_ARG_CONV_EXCL
+  echo "Generated TLS material in ${d} (CA, server cert for tlsnode/localhost/127.0.0.1, client cert)."
+}
+
+# ---------------------------------------------------------------------------
+# Terraform CLI for terraform-plugin-testing (one download, cached in .bin).
+install_terraform() {
+  local os arch exe target zip base want got
+  case "$(uname -s)" in
+    Linux*) os=linux ;; Darwin*) os=darwin ;; MINGW*|MSYS*|CYGWIN*) os=windows ;; *) return 1 ;;
+  esac
+  case "$(uname -m)" in
+    aarch64|arm64) arch=arm64 ;; *) arch=amd64 ;;
+  esac
+  exe=terraform; [ "${os}" = windows ] && exe=terraform.exe
+  target="${BIN_DIR}/terraform_${TF_VERSION}"
+  if [ -x "${target}/${exe}" ] || [ -f "${target}/${exe}" ]; then echo "${target}/${exe}"; return 0; fi
+  command -v curl >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1 || return 1
+  mkdir -p "${target}"
+  zip="terraform_${TF_VERSION}_${os}_${arch}.zip"
+  base="https://releases.hashicorp.com/terraform/${TF_VERSION}"
+  curl -fsSL -o "${target}/${zip}" "${base}/${zip}" || return 1
+  want="$(curl -fsSL "${base}/terraform_${TF_VERSION}_SHA256SUMS" | awk -v f="${zip}" '$2==f {print $1}')"
+  if command -v sha256sum >/dev/null 2>&1; then got="$(sha256sum "${target}/${zip}" | awk '{print $1}')"; else got="$(shasum -a 256 "${target}/${zip}" | awk '{print $1}')"; fi
+  if [ -z "${want}" ] || [ "${got}" != "${want}" ]; then rm -rf "${target}"; echo "SHA256 mismatch for ${zip}" >&2; return 1; fi
+  unzip -o -q "${target}/${zip}" -d "${target}"
+  rm -f "${target}/${zip}"
+  chmod +x "${target}/${exe}" 2>/dev/null || true
+  echo "${target}/${exe}"
+}
+
+# Reuse existing material: a running tlsnode keeps the certs it started with
+# (harness-down removes tls/, so a fresh harness always gets new ones).
+if [ -f "${TLS_DIR}/ca.pem" ] && [ -f "${TLS_DIR}/cert.pem" ] && [ -f "${TLS_DIR}/key.pem" ] && [ -f "${TLS_DIR}/server-cert.pem" ] && [ -f "${TLS_DIR}/server-key.pem" ]; then
+  echo "Reusing TLS material in ${TLS_DIR}."
+else
+  gen_tls
+fi
+
+TF_PATH=""
+if p="$(install_terraform)"; then
+  TF_PATH="$(native_path "${p}")"
+  echo "Terraform ${TF_VERSION} at ${TF_PATH}"
+else
+  echo "WARNING: could not install Terraform ${TF_VERSION}; exporting TF_ACC_TERRAFORM_VERSION only (terraform-plugin-testing installs it per test)." >&2
+fi
+
+# The Docker Hub pull-through cache keeps its data in an external volume so
+# it survives harness-down (`compose down -v` leaves external volumes alone).
+docker volume inspect tfdocker-e2e-mirror-cache >/dev/null 2>&1 || docker volume create tfdocker-e2e-mirror-cache >/dev/null
 
 docker compose -f "${COMPOSE_FILE}" up -d --wait
 
 # --wait relies on the healthchecks; additionally confirm each published
 # endpoint answers from the host side (port publishing can lag).
 wait_daemon() {
-  local name="$1" host="$2" i
+  local name="$1" i
+  shift
   for i in $(seq 1 60); do
-    if docker -H "${host}" info >/dev/null 2>&1; then
-      echo "${name} ready at ${host}"
+    if docker "$@" info >/dev/null 2>&1; then
+      echo "${name} ready at $2"
       return 0
     fi
     sleep 2
   done
-  echo "ERROR: ${name} did not answer at ${host} within 120s" >&2
+  echo "ERROR: ${name} did not answer at $2 within 120s" >&2
   docker compose -f "${COMPOSE_FILE}" logs --tail=50 "${name}" >&2 || true
   return 1
 }
 
-wait_daemon manager tcp://127.0.0.1:12375
-wait_daemon worker1 tcp://127.0.0.1:12376
-wait_daemon worker2 tcp://127.0.0.1:12377
+wait_http() {
+  local name="$1" url="$2" i
+  for i in $(seq 1 60); do
+    if curl -fsS -o /dev/null "${url}" 2>/dev/null; then
+      echo "${name} ready at ${url}"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "ERROR: ${name} did not answer at ${url} within 120s" >&2
+  docker compose -f "${COMPOSE_FILE}" logs --tail=50 "${name}" >&2 || true
+  return 1
+}
 
-cat > "${ENV_FILE}" <<'ENVEOF'
-export DOCKER_HOST=tcp://127.0.0.1:12375
-export DOCKER_WORKER1_HOST=tcp://127.0.0.1:12376
-export DOCKER_WORKER2_HOST=tcp://127.0.0.1:12377
-export E2E_MANAGER_ADDR=manager:2377
-export E2E_ADVERTISE_ADDR=eth0
-ENVEOF
+TLS_CA="$(native_path "${TLS_DIR}/ca.pem")"
+TLS_CERT="$(native_path "${TLS_DIR}/cert.pem")"
+TLS_KEY="$(native_path "${TLS_DIR}/key.pem")"
+
+wait_daemon manager -H tcp://127.0.0.1:12375
+wait_daemon worker1 -H tcp://127.0.0.1:12376
+wait_daemon worker2 -H tcp://127.0.0.1:12377
+wait_daemon worker3 -H tcp://127.0.0.1:12379
+wait_daemon tlsnode -H tcp://127.0.0.1:12378 --tlsverify --tlscacert "${TLS_CA}" --tlscert "${TLS_CERT}" --tlskey "${TLS_KEY}"
+wait_http registry http://127.0.0.1:12380/v2/
+
+# Same values, same order as harness-up.ps1.
+{
+  echo "export DOCKER_HOST=tcp://127.0.0.1:12375"
+  echo "export DOCKER_WORKER1_HOST=tcp://127.0.0.1:12376"
+  echo "export DOCKER_WORKER2_HOST=tcp://127.0.0.1:12377"
+  echo "export DOCKER_WORKER3_HOST=tcp://127.0.0.1:12379"
+  echo "export E2E_MANAGER_ADDR=manager:2377"
+  echo "export E2E_ADVERTISE_ADDR=eth0"
+  echo "export TF_ACC_REGISTRY=127.0.0.1:12380"
+  echo "export TF_ACC_REGISTRY_NODES=manager:12380"
+  echo "export TF_ACC_TLS_HOST=tcp://127.0.0.1:12378"
+  echo "export TF_ACC_TLS_CA=${TLS_CA}"
+  echo "export TF_ACC_TLS_CERT=${TLS_CERT}"
+  echo "export TF_ACC_TLS_KEY=${TLS_KEY}"
+  echo "export TF_ACC_TLS_CERT_PATH=$(native_path "${TLS_DIR}")"
+  echo "export TF_ACC_GPU_NODE_LABEL=gpu=nvidia"
+  echo "export TF_ACC_HARNESS_COMPOSE=$(native_path "${COMPOSE_FILE}")"
+  echo "export TF_ACC_TERRAFORM_VERSION=${TF_VERSION}"
+  if [ -n "${TF_PATH}" ]; then echo "export TF_ACC_TERRAFORM_PATH=${TF_PATH}"; fi
+} > "${ENV_FILE}"
 
 echo "Wrote ${ENV_FILE}:"
 cat "${ENV_FILE}"

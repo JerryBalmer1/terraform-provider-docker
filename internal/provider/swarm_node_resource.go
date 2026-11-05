@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
@@ -22,6 +23,7 @@ var (
 	_ resource.Resource                = (*swarmNodeResource)(nil)
 	_ resource.ResourceWithConfigure   = (*swarmNodeResource)(nil)
 	_ resource.ResourceWithImportState = (*swarmNodeResource)(nil)
+	_ resource.ResourceWithIdentity    = (*swarmNodeResource)(nil)
 )
 
 // swarmNodeImportedKey is the private-state key set by ImportState. While it
@@ -42,6 +44,7 @@ type swarmNodeModel struct {
 	Hostname       types.String `tfsdk:"hostname"`
 	Host           types.String `tfsdk:"host"`
 	TLS            *tlsModel    `tfsdk:"tls"`
+	SSH            *sshModel    `tfsdk:"ssh"`
 	JoinToken      types.String `tfsdk:"join_token"`
 	ManagerAddress types.String `tfsdk:"manager_address"`
 	AdvertiseAddr  types.String `tfsdk:"advertise_addr"`
@@ -98,7 +101,7 @@ func (r *swarmNodeResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	replace := []planmodifier.String{swarmNodeRequiresReplace()}
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Joins a Docker host to an existing swarm. The join is sent to the joining node's OWN daemon (`host`, " +
-			"optionally with a `tls` block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. " +
+			"optionally with a `tls` block, or over SSH with an `ssh://` host and an `ssh` block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. " +
 			"Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list " +
 			"(managers are demoted first).\n\nImport with the node ID; `host`, `join_token` and `manager_address` must then be set in configuration " +
 			"(the next apply records them without replacing the node).",
@@ -117,7 +120,7 @@ func (r *swarmNodeResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"host": schema.StringAttribute{
 				Required: true, PlanModifiers: replace,
-				MarkdownDescription: "Docker endpoint of the JOINING node, e.g. `tcp://10.0.0.6:2376`. " +
+				MarkdownDescription: "Docker endpoint of the JOINING node, e.g. `tcp://10.0.0.6:2376` or `ssh://admin@10.0.0.6` (with an optional `ssh` block for credentials). " +
 					"Changing this forces a new resource.",
 			},
 			"join_token": schema.StringAttribute{
@@ -154,6 +157,7 @@ func (r *swarmNodeResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 		},
 		Blocks: map[string]schema.Block{
 			"tls": swarmNodeTLSBlockSchema(),
+			"ssh": sshResourceBlockSchema(swarmNodeSSHBlockDoc),
 		},
 	}
 }
@@ -208,12 +212,50 @@ func swarmNodeFlatten(m *swarmNodeModel, n swarm.Node) {
 	}
 }
 
-func (r *swarmNodeResource) nodeClient(m swarmNodeModel) (*client.Client, error) {
+// swarmNodeSSHBlockDoc documents docker_swarm_node's ssh block.
+const swarmNodeSSHBlockDoc = "Reach the JOINING node's daemon over SSH in pure Go (same shape as the provider's `ssh` block). " +
+	"Set `host` to `ssh://user@node[:port]`; this block adds credentials and may override user, host or port. " +
+	"Only used to reach that daemon; changing it does not replace the node."
+
+// swarmNodeSSH resolves the node's SSH endpoint, or nil when host is not
+// ssh:// and no ssh block is set. passwordWO is ssh.password_wo from config
+// (write-only, so absent from plan and state).
+func swarmNodeSSH(m swarmNodeModel, passwordWO string) (*sshConfig, error) {
+	host := m.Host.ValueString()
+	if m.SSH == nil && !isSSHHost(host) {
+		return nil, nil
+	}
+	if !isSSHHost(host) {
+		return nil, fmt.Errorf("the ssh block needs host = \"ssh://user@node[:port]\", got %q", host)
+	}
+	sm := m.SSH
+	if sm != nil && passwordWO != "" {
+		cp := *sm
+		cp.PasswordWO = types.StringValue(passwordWO)
+		sm = &cp
+	}
+	return sshConfigFrom(sm, host, os.Getenv)
+}
+
+func (r *swarmNodeResource) nodeClient(m swarmNodeModel, passwordWO string) (*client.Client, error) {
 	ua := ""
 	if r.pd != nil {
 		ua = r.pd.Endpoint.UserAgent
 	}
-	return newDockerClient(swarmNodeEndpoint(m, ua))
+	ep := swarmNodeEndpoint(m, ua)
+	sc, err := swarmNodeSSH(m, passwordWO)
+	if err != nil {
+		return nil, err
+	}
+	if sc != nil {
+		ep.SSH = sc
+		ep.Host = sc.dockerHost()
+	}
+	return newDockerClient(ep)
+}
+
+func (r *swarmNodeResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = listIDIdentitySchema()
 }
 
 func (r *swarmNodeResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -222,7 +264,20 @@ func (r *swarmNodeResource) Create(ctx context.Context, req resource.CreateReque
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	nc, err := r.nodeClient(plan)
+	// ssh.password_wo is write-only: it is only in the config.
+	var cfg swarmNodeModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	pwWO := ""
+	if cfg.SSH != nil {
+		pwWO = knownStr(cfg.SSH.PasswordWO)
+	}
+	if plan.SSH != nil {
+		plan.SSH.PasswordWO = types.StringNull()
+	}
+	nc, err := r.nodeClient(plan, pwWO)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("host"), "Cannot build Docker client for the joining node", err.Error())
 		return
@@ -246,6 +301,7 @@ func (r *swarmNodeResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.AddError("Cannot set node availability/role/labels", err.Error())
 		plan.Hostname = types.StringNull()
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, nodeID)...)
 		return
 	}
 	n, _, err := r.pd.Client.NodeInspectWithRaw(ctx, nodeID)
@@ -255,6 +311,7 @@ func (r *swarmNodeResource) Create(ctx context.Context, req resource.CreateReque
 	}
 	swarmNodeFlatten(&plan, n)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
 
 func (r *swarmNodeResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -274,6 +331,7 @@ func (r *swarmNodeResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 	swarmNodeFlatten(&state, n)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
 func (r *swarmNodeResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -302,6 +360,7 @@ func (r *swarmNodeResource) Update(ctx context.Context, req resource.UpdateReque
 	// Config is now complete; later changes to host etc. replace the node.
 	resp.Diagnostics.Append(resp.Private.SetKey(ctx, swarmNodeImportedKey, nil)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
 
 func (r *swarmNodeResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -312,7 +371,7 @@ func (r *swarmNodeResource) Delete(ctx context.Context, req resource.DeleteReque
 	}
 	var nc *client.Client
 	if _, ok := knownString(state.Host); ok {
-		c, err := r.nodeClient(state)
+		c, err := r.nodeClient(state, "")
 		if err != nil {
 			resp.Diagnostics.AddAttributeError(path.Root("host"), "Cannot build Docker client for the node", err.Error())
 			return
@@ -329,7 +388,12 @@ func (r *swarmNodeResource) Delete(ctx context.Context, req resource.DeleteReque
 }
 
 func (r *swarmNodeResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("node_id"), req.ID)...)
+	id := listIDFromImport(ctx, req, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), id)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("node_id"), id)...)
 	resp.Diagnostics.Append(resp.Private.SetKey(ctx, swarmNodeImportedKey, []byte("true"))...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, id)...)
 }

@@ -8,8 +8,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -26,25 +24,29 @@ import (
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/client"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
 )
 
 // ---------------------------------------------------------------------------
 // Client construction
 
 // endpointConfig describes one Docker daemon endpoint. CA, Cert and Key are
-// PEM content or file paths; all empty means no TLS.
+// PEM content or file paths; all empty means no TLS. SSH, when set (or when
+// Host is ssh://), routes every connection through the pure-Go SSH dialer.
 type endpointConfig struct {
-	Host       string
-	APIVersion string
-	CA         string
-	Cert       string
-	Key        string
-	UserAgent  string
+	Host          string
+	APIVersion    string
+	CA            string
+	Cert          string
+	Key           string
+	SkipTLSVerify bool
+	UserAgent     string
+	SSH           *sshConfig
+	// Context is the Docker CLI context the endpoint came from ("" if none).
+	Context string
 }
 
-// newDockerClient builds a client for one endpoint. It makes no network call.
+// newDockerClient builds a client for one endpoint. It makes no network call
+// (an SSH endpoint connects on the first API call).
 // docker_swarm_node uses it to reach the joining node's own daemon.
 func newDockerClient(ep endpointConfig) (*client.Client, error) {
 	host := ep.Host
@@ -52,6 +54,24 @@ func newDockerClient(ep endpointConfig) (*client.Client, error) {
 		host = defaultDockerHost
 	}
 	opts := []client.Opt{}
+	if ep.SSH != nil || isSSHHost(host) {
+		sc := ep.SSH
+		if sc == nil {
+			var err error
+			if sc, err = sshConfigFrom(nil, host, os.Getenv); err != nil {
+				return nil, err
+			}
+		}
+		dial := sc.dialContext
+		// The unix host gives the HTTP layer its dummy host name and no
+		// proxy; WithDialContext then swaps the unix dialer for SSH.
+		opts = append(opts,
+			client.WithHTTPClient(&http.Client{Transport: &http.Transport{DialContext: dial}}),
+			client.WithHost("unix://"+sc.RemoteSocket),
+			client.WithDialContext(dial),
+		)
+		return finishDockerClient(ep, opts)
+	}
 	tlsCfg, err := loadTLSConfig(ep)
 	if err != nil {
 		return nil, err
@@ -64,6 +84,10 @@ func newDockerClient(ep endpointConfig) (*client.Client, error) {
 		}))
 	}
 	opts = append(opts, client.WithHost(host))
+	return finishDockerClient(ep, opts)
+}
+
+func finishDockerClient(ep endpointConfig, opts []client.Opt) (*client.Client, error) {
 	if ep.APIVersion != "" {
 		opts = append(opts, client.WithVersion(ep.APIVersion))
 	} else {
@@ -85,10 +109,11 @@ func pemOrFile(v string) ([]byte, error) {
 }
 
 func loadTLSConfig(ep endpointConfig) (*tls.Config, error) {
-	if ep.CA == "" && ep.Cert == "" && ep.Key == "" {
+	if ep.CA == "" && ep.Cert == "" && ep.Key == "" && !ep.SkipTLSVerify {
 		return nil, nil
 	}
-	cfg := &tls.Config{MinVersion: tls.VersionTLS12}
+	// SkipTLSVerify only comes from a docker context that asked for it.
+	cfg := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: ep.SkipTLSVerify} //nolint:gosec
 	if ep.CA != "" {
 		ca, err := pemOrFile(ep.CA)
 		if err != nil {
@@ -149,70 +174,9 @@ type registryCredential struct {
 	// Auth is the base64 "user:pass" from a config.json auths entry, used
 	// when Username/Password are empty.
 	Auth string
-}
-
-func resolveRegistryAuth(in []registryAuthModel, diags *diag.Diagnostics) []registryCredential {
-	var out []registryCredential
-	for i, m := range in {
-		c := registryCredential{
-			Address:  m.Address.ValueString(),
-			Username: m.Username.ValueString(),
-			Password: m.Password.ValueString(),
-		}
-		if cf := m.ConfigFile.ValueString(); cf != "" && c.Username == "" {
-			u, p, err := credentialFromConfigFile(expandHome(cf), c.Address)
-			if err != nil {
-				diags.AddAttributeError(path.Root("registry_auth").AtListIndex(i).AtName("config_file"),
-					"Cannot read registry credentials", err.Error())
-				continue
-			}
-			c.Username, c.Password = u, p
-		}
-		if c.Username == "" {
-			diags.AddAttributeError(path.Root("registry_auth").AtListIndex(i),
-				"Incomplete registry_auth", fmt.Sprintf("registry_auth for %q needs username/password or a config_file with an auths entry.", c.Address))
-			continue
-		}
-		out = append(out, c)
-	}
-	return out
-}
-
-// credentialFromConfigFile reads the auths entry for address from a docker
-// config.json. Credential helpers (credsStore/credHelpers) are not supported.
-func credentialFromConfigFile(file, address string) (string, string, error) {
-	b, err := os.ReadFile(file)
-	if err != nil {
-		return "", "", err
-	}
-	var cfg struct {
-		Auths map[string]struct {
-			Auth     string `json:"auth"`
-			Username string `json:"username"`
-			Password string `json:"password"`
-		} `json:"auths"`
-	}
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return "", "", fmt.Errorf("parsing %s: %w", file, err)
-	}
-	for k, v := range cfg.Auths {
-		if normalizeRegistry(k) != normalizeRegistry(address) {
-			continue
-		}
-		if v.Username != "" {
-			return v.Username, v.Password, nil
-		}
-		raw, err := base64.StdEncoding.DecodeString(v.Auth)
-		if err != nil {
-			return "", "", fmt.Errorf("auths[%q].auth is not base64: %w", k, err)
-		}
-		u, p, ok := strings.Cut(string(raw), ":")
-		if !ok {
-			return "", "", fmt.Errorf("auths[%q].auth is not user:password", k)
-		}
-		return u, p, nil
-	}
-	return "", "", fmt.Errorf("%s has no auths entry for %q (credential helpers are not supported)", file, address)
+	// IdentityToken is an OAuth refresh token from a config.json entry or
+	// a credential helper, sent instead of a password when set.
+	IdentityToken string
 }
 
 // normalizeRegistry maps the many spellings of Docker Hub to docker.io and
@@ -256,7 +220,7 @@ func (pd *providerData) registryAuthConfigFor(imageRef string) (registry.AuthCon
 	}
 	for _, c := range pd.RegistryAuth {
 		if normalizeRegistry(c.Address) == normalizeRegistry(host) {
-			return registry.AuthConfig{Username: c.Username, Password: c.Password, ServerAddress: c.Address}, true, nil
+			return registry.AuthConfig{Username: c.Username, Password: c.Password, IdentityToken: c.IdentityToken, ServerAddress: c.Address}, true, nil
 		}
 	}
 	return registry.AuthConfig{}, false, nil

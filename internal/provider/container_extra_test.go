@@ -27,7 +27,16 @@ func containerP2Model() containerResourceModel {
 		User: types.StringNull(), WorkingDir: types.StringNull(), LogDriver: str("json-file"), LogOpts: types.MapNull(types.StringType),
 		Memory: types.Int64Null(), MemorySwap: types.Int64Value(0), CPUShares: types.Int64Null(), NanoCPUs: types.Int64Null(),
 		MustRun: types.BoolValue(true), Wait: types.BoolValue(false), WaitTimeout: str(containerDefaultWaitTimeout), Running: types.BoolValue(true),
-		Ports: []containerPortModel{}, Mounts: []containerMountModel{}, Ulimits: []containerUlimitModel{},
+		Ports: []containerPortModel{}, Ulimits: []containerUlimitModel{},
+		Mounts: []containerMountModel{
+			{Type: str("bind"), Source: str("/srv/a"), Target: str("/a"), ReadOnly: types.BoolValue(true), TmpfsSize: types.Int64Null(), SelinuxRelabel: types.StringNull()},
+			{Type: str("bind"), Source: str("/srv/b"), Target: str("/b"), ReadOnly: types.BoolValue(true), TmpfsSize: types.Int64Null(), SelinuxRelabel: str("Z")},
+			{Type: str("volume"), Source: str("vol"), Target: str("/v"), ReadOnly: types.BoolValue(false), TmpfsSize: types.Int64Null(), SelinuxRelabel: str("z")},
+		},
+		Upload: []containerUploadModel{{
+			File: str("/etc/app.conf"), Content: str("x=1"), ContentBase64: types.StringNull(), Source: types.StringNull(),
+			SourceHash: types.StringNull(), Executable: types.BoolValue(false), Permissions: str("0640"), Owner: types.Int64Value(1000), Group: types.Int64Null(),
+		}},
 		NetworksAdvanced: []containerNetworkModel{{Name: str("v6net"), Aliases: types.SetNull(types.StringType),
 			IPv4Address: types.StringNull(), IPv6Address: str("fd00::10")}},
 

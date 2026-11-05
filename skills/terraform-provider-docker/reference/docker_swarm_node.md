@@ -4,7 +4,7 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-Joins a Docker host to an existing swarm. The join is sent to the joining node's OWN daemon (`host`, optionally with a `tls` block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
+Joins a Docker host to an existing swarm. The join is sent to the joining node's OWN daemon (`host`, optionally with a `tls` block, or over SSH with an `ssh://` host and an `ssh` block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
 
 Import with the node ID; `host`, `join_token` and `manager_address` must then be set in configuration (the next apply records them without replacing the node).
 
@@ -14,7 +14,7 @@ Import with the node ID; `host`, `join_token` and `manager_address` must then be
 |---|---|---|---|---|---|
 | `advertise_addr` | `string` | optional | yes |  | Address the node advertises, `<ip\|interface>[:port]`. Changing this forces a new resource. |
 | `availability` | `string` | optional, computed |  |  | Scheduling availability: `active`, `pause` or `drain`. Default `active`. Updated in place through the manager. |
-| `host` | `string` | required | yes |  | Docker endpoint of the JOINING node, e.g. `tcp://10.0.0.6:2376`. Changing this forces a new resource. |
+| `host` | `string` | required | yes |  | Docker endpoint of the JOINING node, e.g. `tcp://10.0.0.6:2376` or `ssh://admin@10.0.0.6` (with an optional `ssh` block for credentials). Changing this forces a new resource. |
 | `hostname` | `string` | computed |  |  | Hostname the node reports to the swarm. |
 | `id` | `string` | computed |  |  | Swarm node ID (same as `node_id`). |
 | `join_token` | `string` | required | yes | yes | Worker or manager join token, e.g. `docker_swarm_init.this.worker_join_token`. Changing this forces a new resource. |
@@ -24,7 +24,26 @@ Import with the node ID; `host`, `join_token` and `manager_address` must then be
 | `node_id` | `string` | computed |  |  | Swarm node ID, read from the joining daemon after the join. |
 | `role` | `string` | optional, computed |  |  | Node role: `worker` or `manager`. Default `worker`. Updated in place (promote/demote) through the manager, whichever token was used to join. |
 
-Nested blocks: `tls` (single block).
+Nested blocks: `ssh` (single block), `tls` (single block).
+
+### `ssh`
+
+single block. Reach the JOINING node's daemon over SSH in pure Go (same shape as the provider's `ssh` block). Set `host` to `ssh://user@node[:port]`; this block adds credentials and may override user, host or port. Only used to reach that daemon; changing it does not replace the node.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `connect_timeout` | `string` | optional |  |  | Timeout for the TCP connection plus SSH handshake of each hop, as a Go duration (`10s`, `1m`). Default `10s`. |
+| `host` | `string` | optional |  |  | SSH server host name or IP. Default: the host of an `ssh://` Docker host (from `host`, the Docker context or `DOCKER_HOST`). |
+| `identity_agent` | `bool` | optional |  |  | Also offer the keys held by the running SSH agent: `SSH_AUTH_SOCK` on Linux/macOS, the Windows OpenSSH agent named pipe `\\.\pipe\openssh-ssh-agent` on Windows (or `SSH_AUTH_SOCK` when it names a pipe). Default `false`. |
+| `identity_file` | `string` | optional |  | yes | Private key used for public-key authentication: PEM/OpenSSH content or a path (`~` expands). Passphrase-protected keys are not supported; load them into an agent and use `identity_agent`. When unset, `~/.ssh/id_ed25519`, `~/.ssh/id_ecdsa` and `~/.ssh/id_rsa` are offered if they exist and are unencrypted. |
+| `known_hosts_file` | `string` | optional |  |  | OpenSSH `known_hosts` file used to verify the server's host key (and every `proxy_jump` hop). Default `~/.ssh/known_hosts`. |
+| `password` | `string` | optional |  | yes | SSH password (password and keyboard-interactive authentication). Conflicts with `password_wo`. |
+| `password_wo` | `string` | optional, write-only |  | yes | SSH password, write-only variant of `password`. Conflicts with `password`. Write-only: never stored in plan or state (needs Terraform >= 1.11). Because it is not in state, destroy cannot use it; give destroy another way in (`identity_file`, `identity_agent` or `password`). |
+| `port` | `number` | optional |  |  | SSH server port. Default `22` (or the port in an `ssh://` Docker host). |
+| `proxy_jump` | `string` | optional |  |  | Jump host(s) to reach the server through, OpenSSH `ProxyJump` style: `user@host:port`, or several hops separated by commas (`user@bastion:22,user@inner:2222`), dialled in order. User defaults to `user`, port to `22`. Each hop is authenticated with the same credentials and checked against the same `known_hosts_file`. |
+| `remote_socket` | `string` | optional |  |  | Path of the Docker daemon's unix socket on the remote host. Default `/var/run/docker.sock`. |
+| `strict_host_key_checking` | `bool` | optional |  |  | Reject servers whose host key is missing from, or does not match, `known_hosts_file`. Default `true`. `false` accepts any host key (insecure; for throwaway hosts only). |
+| `user` | `string` | optional |  |  | SSH user. Default: the user in an `ssh://user@host` Docker host, else `USER`/`USERNAME` from the environment. |
 
 ### `tls`
 

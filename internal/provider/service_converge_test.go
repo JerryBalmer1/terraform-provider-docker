@@ -32,6 +32,7 @@ func TestServiceConvergeCheck(t *testing.T) {
 		{"rejected task reported", []swarm.Task{svcTask("r", shut, swarm.TaskStateRejected, "no such image")}, 1, nil, false, false, 1},
 		{"zero replicas", nil, 0, nil, true, false, 0},
 		{"global all desired running", []swarm.Task{svcTask("a", run, run, ""), svcTask("b", run, run, "")}, -1, nil, true, false, 0},
+		{"global no tasks yet", nil, -1, nil, false, false, 0},
 		{"global one starting", []swarm.Task{svcTask("a", run, run, ""), svcTask("b", run, swarm.TaskStateStarting, "")}, -1, nil, false, false, 0},
 		{"updating not done", []swarm.Task{svcTask("a", run, run, "")}, 1, &swarm.UpdateStatus{State: swarm.UpdateStateUpdating, StartedAt: &now}, false, false, 0},
 		{"update completed", []swarm.Task{svcTask("a", run, run, "")}, 1, &swarm.UpdateStatus{State: swarm.UpdateStateCompleted, StartedAt: &now}, true, false, 0},

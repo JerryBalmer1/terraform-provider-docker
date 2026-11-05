@@ -1,15 +1,20 @@
 // Command genskill renders the terraform-provider-docker agent skill
 // (skills/terraform-provider-docker/SKILL.md and reference/*.md) from the
 // provider's live schema, plus README_resources.md (an index of every
-// resource and data source). It serves the provider in-process, asks it for
-// GetProviderSchema, walks every resource and data source, reads each
-// resource's framework schema for RequiresReplace plan modifiers, and renders
-// the embedded templates. Run it from the repository root:
+// registered type). It serves the provider in-process, asks it for
+// GetProviderSchema, walks every resource, data source, action, ephemeral
+// resource, list resource and provider function the provider's interfaces
+// return, reads each resource's framework schema for RequiresReplace plan
+// modifiers, and renders the embedded templates. Run it from the repository
+// root:
 //
 //	go run ./tools/genskill           # write the skill and README_resources.md
 //	go run ./tools/genskill -check    # exit 1 if the files on disk are stale
 //	go run ./tools/genskill -strict   # exit 1 if a RequiresReplace attribute's
-//	                                  # description lacks a replacement sentence
+//	                                  # description lacks a replacement sentence,
+//	                                  # or an action, ephemeral resource, list
+//	                                  # resource or function (or one of its
+//	                                  # attributes / parameters) is undescribed
 package main
 
 import (
@@ -26,6 +31,7 @@ import (
 	"strings"
 	"text/template"
 
+	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -41,6 +47,10 @@ const (
 	kindResource   = "resource"
 	kindDataSource = "data-source"
 	kindProvider   = "provider"
+	kindAction     = "action"
+	kindEphemeral  = "ephemeral-resource"
+	kindList       = "list-resource"
+	kindFunction   = "function"
 )
 
 //go:embed templates/*.tmpl
@@ -49,11 +59,11 @@ var templateFS embed.FS
 func main() {
 	var o options
 	flag.StringVar(&o.Out, "out", filepath.Join("skills", "terraform-provider-docker"), "output directory of the skill")
-	flag.StringVar(&o.Examples, "examples", "examples", "examples directory (examples/resources/<type>/resource.tf, import.sh, examples/data-sources/<type>/data-source.tf)")
-	flag.StringVar(&o.Readme, "readme", "README_resources.md", "path of the generated resource index; empty disables it")
-	flag.StringVar(&o.Docs, "docs", "docs", "tfplugindocs output directory the resource index links to")
+	flag.StringVar(&o.Examples, "examples", "examples", "examples directory (tfplugindocs layout: resources/<type>/resource.tf, import.sh, data-sources/<type>/data-source.tf, actions/<type>/action.tf, ephemeral-resources/<type>/ephemeral-resource.tf, list-resources/<type>/list-resource.tfquery.hcl, functions/<name>/function.tf)")
+	flag.StringVar(&o.Readme, "readme", "README_resources.md", "path of the generated type index; empty disables it")
+	flag.StringVar(&o.Docs, "docs", "docs", "tfplugindocs output directory the type index links to")
 	flag.BoolVar(&o.Check, "check", false, "render in memory and exit non-zero if files on disk differ")
-	flag.BoolVar(&o.Strict, "strict", false, "exit non-zero if an attribute or block with a RequiresReplace plan modifier has no replacement sentence in its description (does not write files)")
+	flag.BoolVar(&o.Strict, "strict", false, "exit non-zero if an attribute or block with a RequiresReplace plan modifier has no replacement sentence in its description, or an action, ephemeral resource, list resource or function lacks a description on the type or any attribute / parameter (does not write files)")
 	flag.Parse()
 	if err := run(context.Background(), o, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, "genskill:", err)
@@ -68,19 +78,25 @@ type options struct {
 	Docs     string
 	Check    bool
 	Strict   bool
+	// Provider builds the provider to document; nil means provider.New("dev").
+	Provider func() fwprovider.Provider
 }
 
 var (
 	errDrift  = errors.New("skill is out of date; run `go run ./tools/genskill`")
-	errStrict = errors.New(`RequiresReplace attributes without a replacement sentence (add "Forces replacement." to their MarkdownDescription)`)
+	errStrict = errors.New(`strict violations: RequiresReplace attributes need "Forces replacement." in their MarkdownDescription; actions, ephemeral resources, list resources and functions need a description on the type and on every attribute, block and parameter`)
 )
 
 func run(ctx context.Context, o options, stdout, stderr io.Writer) error {
-	resp, err := loadSchema(ctx)
+	newProvider := o.Provider
+	if newProvider == nil {
+		newProvider = provider.New("dev")
+	}
+	resp, err := loadSchema(ctx, newProvider)
 	if err != nil {
 		return err
 	}
-	fw, err := frameworkResources(ctx, provider.New("dev")())
+	fw, err := frameworkResources(ctx, newProvider())
 	if err != nil {
 		return err
 	}
@@ -91,11 +107,16 @@ func run(ctx context.Context, o options, stdout, stderr io.Writer) error {
 		for _, v := range violations {
 			fmt.Fprintln(stderr, "genskill: strict:", v)
 		}
-		if len(violations) > 0 {
-			fmt.Fprintf(stderr, "genskill: strict: %d violation(s)\n", len(violations))
+		missing := descriptionViolations(resp)
+		for _, m := range missing {
+			fmt.Fprintln(stderr, "genskill: strict: missing description:", m)
+		}
+		if n := len(violations) + len(missing); n > 0 {
+			fmt.Fprintf(stderr, "genskill: strict: %d violation(s)\n", n)
 			errs = append(errs, errStrict)
 		} else {
-			fmt.Fprintf(stdout, "genskill: strict: every RequiresReplace attribute says it forces replacement (%d resources)\n", len(fw))
+			fmt.Fprintf(stdout, "genskill: strict: every RequiresReplace attribute says it forces replacement (%d resources); every action (%d), ephemeral resource (%d), list resource (%d) and function (%d) is described\n",
+				len(fw), len(resp.ActionSchemas), len(resp.EphemeralResourceSchemas), len(resp.ListResourceSchemas), len(resp.Functions))
 		}
 		if !o.Check {
 			return errors.Join(errs...)
@@ -172,8 +193,11 @@ func relLink(file, target string) string {
 }
 
 // loadSchema serves the provider in-process and returns its protocol schema.
-func loadSchema(ctx context.Context) (*tfprotov6.GetProviderSchemaResponse, error) {
-	srv, err := providerserver.NewProtocol6WithError(provider.New("dev")())()
+// The framework builds it from the provider's Resources, DataSources,
+// Actions, EphemeralResources, ListResources and Functions, calling each
+// type's Metadata and Schema (Definition for functions).
+func loadSchema(ctx context.Context, newProvider func() fwprovider.Provider) (*tfprotov6.GetProviderSchemaResponse, error) {
+	srv, err := providerserver.NewProtocol6WithError(newProvider())()
 	if err != nil {
 		return nil, fmt.Errorf("serving provider: %w", err)
 	}
@@ -203,6 +227,7 @@ type attrInfo struct {
 	Optional          bool
 	Computed          bool
 	Sensitive         bool
+	WriteOnly         bool
 	ForcesReplacement bool
 	Deprecated        bool
 	Description       string
@@ -228,16 +253,41 @@ type typeDoc struct {
 	Kind        string
 	Description string
 	Root        blockInfo
+	Func        *funcInfo // provider functions only
 	Example     string
 	Import      string
 }
 
-// Address is how HCL refers to the type: docker_x or data.docker_x.
+// Address is how HCL refers to the type: docker_x, data.docker_x,
+// action.docker_x, ephemeral.docker_x, list.docker_x or
+// provider::docker::x.
 func (t typeDoc) Address() string {
-	if t.Kind == kindDataSource {
+	switch t.Kind {
+	case kindDataSource:
 		return "data." + t.Name
+	case kindAction:
+		return "action." + t.Name
+	case kindEphemeral:
+		return "ephemeral." + t.Name
+	case kindList:
+		return "list." + t.Name
+	case kindFunction:
+		return "provider::docker::" + t.Name
 	}
 	return t.Name
+}
+
+// KindLabel is the human name of the kind, for tables.
+func (t typeDoc) KindLabel() string {
+	switch t.Kind {
+	case kindDataSource:
+		return "data source"
+	case kindEphemeral:
+		return "ephemeral resource"
+	case kindList:
+		return "list resource"
+	}
+	return t.Kind
 }
 
 // File is the reference file name relative to the skill directory.
@@ -245,6 +295,14 @@ func (t typeDoc) File() string {
 	switch t.Kind {
 	case kindDataSource:
 		return "reference/data." + t.Name + ".md"
+	case kindAction:
+		return "reference/action." + t.Name + ".md"
+	case kindEphemeral:
+		return "reference/ephemeral." + t.Name + ".md"
+	case kindList:
+		return "reference/list." + t.Name + ".md"
+	case kindFunction:
+		return "reference/function." + t.Name + ".md"
 	case kindProvider:
 		return "reference/provider.md"
 	}
@@ -257,10 +315,36 @@ func (t typeDoc) DocPage() string {
 	switch t.Kind {
 	case kindDataSource:
 		return "data-sources/" + short + ".md"
+	case kindAction:
+		return "actions/" + short + ".md"
+	case kindEphemeral:
+		return "ephemeral-resources/" + short + ".md"
+	case kindList:
+		return "list-resources/" + short + ".md"
+	case kindFunction:
+		return "functions/" + t.Name + ".md"
 	case kindProvider:
 		return "index.md"
 	}
 	return "resources/" + short + ".md"
+}
+
+// Usage is the HCL skeleton that declares or calls an action, ephemeral
+// resource, list resource or function; "" for the long-standing kinds.
+func (t typeDoc) Usage() string {
+	switch t.Kind {
+	case kindAction:
+		return fmt.Sprintf("action %q \"<name>\" {\n  config {\n    # arguments below\n  }\n}\n\n# Run it: lifecycle { action_trigger { events = [after_create] actions = [action.%s.<name>] } }\n# on a resource, or: terraform apply -invoke=action.%s.<name>", t.Name, t.Name, t.Name)
+	case kindEphemeral:
+		return fmt.Sprintf("ephemeral %q \"<name>\" {\n  # arguments below\n}\n\n# Reference ephemeral.%s.<name>.<attr> only from ephemeral contexts:\n# write-only arguments, provider blocks, ephemeral variables/outputs/locals.", t.Name, t.Name)
+	case kindList:
+		return fmt.Sprintf("# in a *.tfquery.hcl file; run: terraform query\nlist %q \"<name>\" {\n  provider = docker\n  # include_resource = true   # also return full resource objects\n  # limit            = 100\n  config {\n    # arguments below\n  }\n}", t.Name)
+	case kindFunction:
+		if t.Func != nil {
+			return t.Func.Signature(t.Address())
+		}
+	}
+	return ""
 }
 
 // forcesReplacement reports whether a description states that changing the
@@ -367,6 +451,7 @@ func walkAttributes(prefix string, attrs []*tfprotov6.SchemaAttribute) []attrInf
 			Optional:          a.Optional,
 			Computed:          a.Computed,
 			Sensitive:         a.Sensitive,
+			WriteOnly:         a.WriteOnly,
 			Deprecated:        a.Deprecated,
 			Description:       strings.TrimSpace(a.Description),
 			ForcesReplacement: forcesReplacement(a.Description),
@@ -487,6 +572,23 @@ func replacementAttrs(b blockInfo) []replNode {
 	return out
 }
 
+// writeOnlyAttrs lists every write-only attribute under b, in document order.
+func writeOnlyAttrs(b blockInfo) []replNode {
+	var out []replNode
+	for _, a := range b.Attributes {
+		if a.WriteOnly {
+			out = append(out, replNode{Path: a.Path, Description: a.Description})
+		}
+		if a.Nested != nil {
+			out = append(out, writeOnlyAttrs(*a.Nested)...)
+		}
+	}
+	for _, c := range b.Blocks {
+		out = append(out, writeOnlyAttrs(c)...)
+	}
+	return out
+}
+
 // hasPath reports whether a dotted attribute or block path exists under b.
 func hasPath(b blockInfo, path string) bool {
 	head, rest, more := strings.Cut(path, ".")
@@ -518,30 +620,47 @@ type layerDef struct {
 }
 
 var layerDefs = []layerDef{
-	{"image", "1. Image", "Pull, build and push images. Everything else consumes an image reference."},
-	{"primitives", "2. Single-host primitives", "Networks, volumes and plain containers on the daemon the provider points at."},
+	{"image", "1. Image", "Pull, build, tag and push images. Everything else consumes an image reference."},
+	{"primitives", "2. Single-host primitives", "Networks, volumes, plugins and plain containers on the daemon the provider points at."},
 	{"topology", "3. Swarm topology", "Turn the provider's daemon into a Swarm manager and join further hosts as workers or managers."},
 	{"workload", "4. Swarm workload", "Secrets, configs, services and stacks scheduled by the Swarm. Needs layer 3."},
 	{"other", "Other", "Registered types not mapped to a layer yet."},
 }
 
-// typeLayer maps type names (resources and data sources share names) to a
+// typeLayer maps type names (resources, data sources, actions, ephemeral and
+// list resources share one namespace; functions use their bare name) to a
 // layer key. Unknown types land in "other".
 var typeLayer = map[string]string{
-	"docker_image":          "image",
-	"docker_registry_image": "image",
-	"docker_network":        "primitives",
-	"docker_volume":         "primitives",
-	"docker_container":      "primitives",
-	"docker_swarm_init":     "topology",
-	"docker_swarm_node":     "topology",
-	"docker_swarm_tokens":   "topology",
-	"docker_node":           "topology",
-	"docker_nodes":          "topology",
-	"docker_secret":         "workload",
-	"docker_config":         "workload",
-	"docker_service":        "workload",
-	"docker_stack":          "workload",
+	"docker_image":                    "image",
+	"docker_registry_image":           "image",
+	"docker_registry_image_manifests": "image",
+	"docker_registry_image_tags":      "image",
+	"docker_tag":                      "image",
+	"docker_buildx_builder":           "image",
+	"docker_image_import":             "image",
+	"docker_image_load":               "image",
+	"docker_image_save":               "image",
+	"docker_registry_auth":            "image",
+	"docker_network":                  "primitives",
+	"docker_volume":                   "primitives",
+	"docker_container":                "primitives",
+	"docker_containers":               "primitives",
+	"docker_logs":                     "primitives",
+	"docker_plugin":                   "primitives",
+	"docker_exec":                     "primitives",
+	"docker_container_export":         "primitives",
+	"docker_system_prune":             "primitives",
+	"docker_compose":                  "primitives",
+	"docker_swarm_init":               "topology",
+	"docker_swarm_node":               "topology",
+	"docker_swarm_tokens":             "topology",
+	"docker_node":                     "topology",
+	"docker_nodes":                    "topology",
+	"docker_secret":                   "workload",
+	"docker_config":                   "workload",
+	"docker_service":                  "workload",
+	"docker_service_scale":            "workload",
+	"docker_stack":                    "workload",
 }
 
 func layerOf(name string) string {
@@ -551,9 +670,9 @@ func layerOf(name string) string {
 	return "other"
 }
 
-// exampleUses lists the types and attribute paths the worked example in
-// SKILL.md relies on. Anything missing from the live schema is reported so a
-// rename cannot silently break the example.
+// exampleUses lists the types and attribute paths the first worked example
+// in SKILL.md relies on. Anything missing from the live schema is reported so
+// a rename cannot silently break the example.
 var exampleUses = map[string][]string{
 	"docker_image":      {"name", "keep_locally", "repo_digest"},
 	"docker_swarm_init": {"advertise_addr", "worker_join_token"},
@@ -570,6 +689,22 @@ var exampleUses = map[string][]string{
 	},
 }
 
+// example2Uses is the same for the second worked example (compose file ->
+// docker_stack -> actions), keyed by HCL address.
+var example2Uses = map[string][]string{
+	"docker_swarm_init": {"advertise_addr"},
+	"docker_stack": {
+		"name", "network", "network.name", "secret", "secret.name", "secret.data",
+		"service", "service.name", "service.image", "service.replicas", "service.env", "service.networks",
+		"service.secrets", "service.secrets.secret_id", "service.secrets.file_name",
+		"service.placement", "service.placement.constraints",
+		"service.endpoint_spec", "service.endpoint_spec.ports",
+		"service.endpoint_spec.ports.target_port", "service.endpoint_spec.ports.published_port",
+	},
+	"action.docker_exec":          {"service", "command"}, // service: run in a task container of that service
+	"action.docker_service_scale": {"service", "replicas"},
+}
+
 // ===== rendering =====
 
 type layerView struct {
@@ -577,6 +712,19 @@ type layerView struct {
 	Blurb       string
 	Resources   []typeDoc
 	DataSources []typeDoc
+	Actions     []typeDoc
+	Ephemeral   []typeDoc
+	Lists       []typeDoc
+	Functions   []typeDoc
+}
+
+// All returns every type of the layer in table order.
+func (l layerView) All() []typeDoc {
+	var out []typeDoc
+	for _, s := range [][]typeDoc{l.Resources, l.DataSources, l.Actions, l.Ephemeral, l.Lists, l.Functions} {
+		out = append(out, s...)
+	}
+	return out
 }
 
 type replRow struct {
@@ -590,9 +738,15 @@ type skillData struct {
 	Marker       string
 	Layers       []layerView
 	Replacements []replRow
+	WriteOnly    []replRow
 	References   []typeDoc
 	Provider     typeDoc
+	Actions      []typeDoc
+	Ephemeral    []typeDoc
+	Lists        []typeDoc
+	Functions    []typeDoc
 	ExampleGaps  []string
+	Example2Gaps []string
 	Resources    int
 	DataSources  int
 }
@@ -605,6 +759,10 @@ type readmeData struct {
 	DocsDir     string // link prefix from the README to docs/
 	Resources   int
 	DataSources int
+	Actions     int
+	Ephemeral   int
+	Lists       int
+	Functions   int
 }
 
 type refData struct {
@@ -621,6 +779,7 @@ var funcs = template.FuncMap{
 	"limits":  limits,
 	"code":    func(s string) string { return "`" + s + "`" },
 	"join":    strings.Join,
+	"inc":     func(i int) int { return i + 1 },
 }
 
 // cell makes text safe for one markdown table cell.
@@ -657,17 +816,21 @@ func summary(s string) string {
 }
 
 func status(a attrInfo) string {
+	var s string
 	switch {
 	case a.Required:
-		return "required"
+		s = "required"
 	case a.Optional && a.Computed:
-		return "optional, computed"
+		s = "optional, computed"
 	case a.Optional:
-		return "optional"
+		s = "optional"
 	case a.Computed:
-		return "computed"
+		s = "computed"
 	}
-	return ""
+	if a.WriteOnly {
+		s += ", write-only"
+	}
+	return s
 }
 
 func limits(b blockInfo) string {
@@ -697,32 +860,81 @@ func readExample(path string) string {
 	return strings.TrimRight(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n")
 }
 
+// collection is every documented type of one provider build, each kind
+// sorted by name.
+type collection struct {
+	Resources   []typeDoc
+	DataSources []typeDoc
+	Actions     []typeDoc
+	Ephemeral   []typeDoc
+	Lists       []typeDoc
+	Functions   []typeDoc
+	Provider    typeDoc
+}
+
+// all returns every type except the provider, kind by kind.
+func (c collection) all() []typeDoc {
+	var out []typeDoc
+	for _, s := range [][]typeDoc{c.Resources, c.DataSources, c.Actions, c.Ephemeral, c.Lists, c.Functions} {
+		out = append(out, s...)
+	}
+	return out
+}
+
+func sortDocs(d []typeDoc) {
+	sort.Slice(d, func(i, j int) bool { return d[i].Name < d[j].Name })
+}
+
+// schemaDocs walks every schema of one kind, attaching the example file
+// examples/<dir>/<type>/<file> when examplesDir is set.
+func schemaDocs(schemas map[string]*tfprotov6.Schema, kind, examplesDir, dir, file string) []typeDoc {
+	var out []typeDoc
+	for name, s := range schemas {
+		td := walkSchema(name, kind, s)
+		if examplesDir != "" {
+			td.Example = readExample(filepath.Join(examplesDir, dir, name, file))
+		}
+		out = append(out, td)
+	}
+	sortDocs(out)
+	return out
+}
+
 // collect turns the protocol response into sorted type docs. repl (may be
 // nil) adds framework-derived RequiresReplace flags to resources.
-func collect(resp *tfprotov6.GetProviderSchemaResponse, examplesDir string, repl replaceSet) (res, ds []typeDoc, prov typeDoc) {
-	for name, s := range resp.ResourceSchemas {
-		td := walkSchema(name, kindResource, s)
-		markReplacements(&td.Root, name, repl)
+func collect(resp *tfprotov6.GetProviderSchemaResponse, examplesDir string, repl replaceSet) collection {
+	var c collection
+	c.Resources = schemaDocs(resp.ResourceSchemas, kindResource, examplesDir, "resources", "resource.tf")
+	for i := range c.Resources {
+		td := &c.Resources[i]
+		markReplacements(&td.Root, td.Name, repl)
 		if examplesDir != "" {
-			td.Example = readExample(filepath.Join(examplesDir, "resources", name, "resource.tf"))
-			td.Import = readExample(filepath.Join(examplesDir, "resources", name, "import.sh"))
+			td.Import = readExample(filepath.Join(examplesDir, "resources", td.Name, "import.sh"))
 		}
-		res = append(res, td)
 	}
-	for name, s := range resp.DataSourceSchemas {
-		td := walkSchema(name, kindDataSource, s)
+	c.DataSources = schemaDocs(resp.DataSourceSchemas, kindDataSource, examplesDir, "data-sources", "data-source.tf")
+	actions := make(map[string]*tfprotov6.Schema, len(resp.ActionSchemas))
+	for name, a := range resp.ActionSchemas {
+		if a != nil {
+			actions[name] = a.Schema
+		}
+	}
+	c.Actions = schemaDocs(actions, kindAction, examplesDir, "actions", "action.tf")
+	c.Ephemeral = schemaDocs(resp.EphemeralResourceSchemas, kindEphemeral, examplesDir, "ephemeral-resources", "ephemeral-resource.tf")
+	c.Lists = schemaDocs(resp.ListResourceSchemas, kindList, examplesDir, "list-resources", "list-resource.tfquery.hcl")
+	for name, f := range resp.Functions {
+		td := walkFunction(name, f)
 		if examplesDir != "" {
-			td.Example = readExample(filepath.Join(examplesDir, "data-sources", name, "data-source.tf"))
+			td.Example = readExample(filepath.Join(examplesDir, "functions", name, "function.tf"))
 		}
-		ds = append(ds, td)
+		c.Functions = append(c.Functions, td)
 	}
-	sort.Slice(res, func(i, j int) bool { return res[i].Name < res[j].Name })
-	sort.Slice(ds, func(i, j int) bool { return ds[i].Name < ds[j].Name })
-	prov = walkSchema("docker", kindProvider, resp.Provider)
+	sortDocs(c.Functions)
+	c.Provider = walkSchema("docker", kindProvider, resp.Provider)
 	if examplesDir != "" {
-		prov.Example = readExample(filepath.Join(examplesDir, "provider", "provider.tf"))
+		c.Provider.Example = readExample(filepath.Join(examplesDir, "provider", "provider.tf"))
 	}
-	return res, ds, prov
+	return c
 }
 
 // renderOpts controls render.
@@ -733,6 +945,34 @@ type renderOpts struct {
 	ReadmeDocsDir  string     // link prefix from README_resources.md to docs/
 }
 
+// exampleGaps reports every type or path in uses (keyed by HCL address) that
+// the build does not have.
+func exampleGaps(uses map[string][]string, byAddr map[string]typeDoc) []string {
+	addrs := make([]string, 0, len(uses))
+	for a := range uses {
+		addrs = append(addrs, a)
+	}
+	sort.Strings(addrs)
+	var gaps []string
+	for _, a := range addrs {
+		td, ok := byAddr[a]
+		if !ok {
+			kind, name := "resource", a
+			if k, n, found := strings.Cut(a, "."); found {
+				kind, name = k, n
+			}
+			gaps = append(gaps, fmt.Sprintf("%s `%s` is not registered in this build", kind, name))
+			continue
+		}
+		for _, p := range uses[a] {
+			if !hasPath(td.Root, p) {
+				gaps = append(gaps, fmt.Sprintf("`%s.%s` is not in the schema", a, p))
+			}
+		}
+	}
+	return gaps
+}
+
 // render produces every skill file keyed by slash path relative to the skill
 // directory, the README_resources.md content (nil when disabled), and
 // warnings about example drift.
@@ -741,57 +981,56 @@ func render(resp *tfprotov6.GetProviderSchemaResponse, ro renderOpts) (map[strin
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	res, ds, prov := collect(resp, ro.Examples, ro.Replace)
+	c := collect(resp, ro.Examples, ro.Replace)
 
-	sd := skillData{Marker: generatedMarker, Provider: prov, Resources: len(res), DataSources: len(ds)}
+	sd := skillData{
+		Marker: generatedMarker, Provider: c.Provider,
+		Actions: c.Actions, Ephemeral: c.Ephemeral, Lists: c.Lists, Functions: c.Functions,
+		Resources: len(c.Resources), DataSources: len(c.DataSources),
+	}
+	pick := func(docs []typeDoc, key string) []typeDoc {
+		var out []typeDoc
+		for _, d := range docs {
+			if layerOf(d.Name) == key {
+				out = append(out, d)
+			}
+		}
+		return out
+	}
 	for _, l := range layerDefs {
-		lv := layerView{Title: l.Title, Blurb: l.Blurb}
-		for _, r := range res {
-			if layerOf(r.Name) == l.Key {
-				lv.Resources = append(lv.Resources, r)
-			}
+		lv := layerView{
+			Title: l.Title, Blurb: l.Blurb,
+			Resources: pick(c.Resources, l.Key), DataSources: pick(c.DataSources, l.Key),
+			Actions: pick(c.Actions, l.Key), Ephemeral: pick(c.Ephemeral, l.Key),
+			Lists: pick(c.Lists, l.Key), Functions: pick(c.Functions, l.Key),
 		}
-		for _, d := range ds {
-			if layerOf(d.Name) == l.Key {
-				lv.DataSources = append(lv.DataSources, d)
-			}
-		}
-		if l.Key == "other" && len(lv.Resources)+len(lv.DataSources) == 0 {
+		if l.Key == "other" && len(lv.All()) == 0 {
 			continue
 		}
 		sd.Layers = append(sd.Layers, lv)
 	}
-	byName := map[string]typeDoc{}
-	for _, r := range res {
-		byName[r.Name] = r
+	byAddr := map[string]typeDoc{}
+	for _, td := range c.all() {
+		byAddr[td.Address()] = td
+	}
+	for _, r := range c.Resources {
 		for _, a := range replacementAttrs(r.Root) {
 			sd.Replacements = append(sd.Replacements, replRow{Address: r.Name, Path: a.Path, Description: a.Description, Block: a.Block})
 		}
+		for _, a := range writeOnlyAttrs(r.Root) {
+			sd.WriteOnly = append(sd.WriteOnly, replRow{Address: r.Name, Path: a.Path, Description: a.Description})
+		}
 	}
-	sd.References = append(sd.References, prov)
-	sd.References = append(sd.References, res...)
-	sd.References = append(sd.References, ds...)
+	sd.References = append([]typeDoc{c.Provider}, c.all()...)
 
+	sd.ExampleGaps = exampleGaps(exampleUses, byAddr)
+	sd.Example2Gaps = exampleGaps(example2Uses, byAddr)
 	var warnings []string
-	exTypes := make([]string, 0, len(exampleUses))
-	for t := range exampleUses {
-		exTypes = append(exTypes, t)
-	}
-	sort.Strings(exTypes)
-	for _, t := range exTypes {
-		td, ok := byName[t]
-		if !ok {
-			sd.ExampleGaps = append(sd.ExampleGaps, fmt.Sprintf("resource `%s` is not registered in this build", t))
-			continue
-		}
-		for _, p := range exampleUses[t] {
-			if !hasPath(td.Root, p) {
-				sd.ExampleGaps = append(sd.ExampleGaps, fmt.Sprintf("`%s.%s` is not in the schema", t, p))
-			}
-		}
-	}
 	for _, g := range sd.ExampleGaps {
 		warnings = append(warnings, "worked example: "+strings.ReplaceAll(g, "`", ""))
+	}
+	for _, g := range sd.Example2Gaps {
+		warnings = append(warnings, "worked example 2: "+strings.ReplaceAll(g, "`", ""))
 	}
 
 	files := map[string][]byte{}
@@ -811,9 +1050,10 @@ func render(resp *tfprotov6.GetProviderSchemaResponse, ro renderOpts) (map[strin
 	if ro.ReadmeSkillDir != "" {
 		buf.Reset()
 		rd := readmeData{
-			Marker: generatedMarker, Layers: sd.Layers, Provider: prov,
+			Marker: generatedMarker, Layers: sd.Layers, Provider: c.Provider,
 			SkillDir: ro.ReadmeSkillDir, DocsDir: ro.ReadmeDocsDir,
-			Resources: len(res), DataSources: len(ds),
+			Resources: len(c.Resources), DataSources: len(c.DataSources),
+			Actions: len(c.Actions), Ephemeral: len(c.Ephemeral), Lists: len(c.Lists), Functions: len(c.Functions),
 		}
 		if rd.DocsDir == "" {
 			rd.DocsDir = "docs"

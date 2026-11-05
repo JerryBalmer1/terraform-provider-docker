@@ -1,0 +1,140 @@
+# converted from testdata/webapp/compose.yml
+# by tools/compose2stack -mode local (project "webapp")
+
+# TODO: service debug is not converted: its profiles [debug] are not enabled (rerun with -profiles)
+
+resource "docker_network" "back" {
+  name     = "webapp_back"
+  internal = true
+  labels = {
+    "com.docker.compose.network" = "back"
+    "com.docker.compose.project" = "webapp"
+  }
+}
+
+resource "docker_network" "front" {
+  name = "webapp_front"
+  labels = {
+    "com.docker.compose.network" = "front"
+    "com.docker.compose.project" = "webapp"
+  }
+}
+
+resource "docker_volume" "pgdata" {
+  name = "webapp_pgdata"
+  labels = {
+    backup                       = "daily"
+    "com.docker.compose.project" = "webapp"
+    "com.docker.compose.volume"  = "pgdata"
+  }
+}
+
+resource "docker_container" "cache" {
+  count   = 2
+  name    = "webapp-cache-${count.index + 1}"
+  image   = "redis:7-alpine"
+  command = ["redis-server", "--appendonly", "yes"]
+  labels = {
+    "com.docker.compose.container-number" = "${count.index + 1}"
+    "com.docker.compose.project"          = "webapp"
+    "com.docker.compose.service"          = "cache"
+  }
+  healthcheck {
+    test = ["CMD", "redis-cli", "ping"]
+  }
+  networks_advanced {
+    name    = docker_network.back.name
+    aliases = ["cache"]
+  }
+  ulimits {
+    name = "nofile"
+    soft = 1024
+    hard = 2048
+  }
+}
+
+resource "docker_container" "db" {
+  name  = "webapp-db-1"
+  image = "postgres:16-alpine"
+  env = {
+    POSTGRES_DB            = "shop"
+    POSTGRES_PASSWORD_FILE = "/run/secrets/db_password"
+  }
+  labels = {
+    "com.docker.compose.container-number" = "1"
+    "com.docker.compose.project"          = "webapp"
+    "com.docker.compose.service"          = "db"
+  }
+  restart = "on-failure"
+  # TODO: deploy.placement only applies to swarm (use -mode swarm)
+  healthcheck {
+    test         = ["CMD-SHELL", "pg_isready -U postgres"]
+    interval     = "5s"
+    start_period = "30s"
+  }
+  mounts {
+    type   = "volume"
+    source = docker_volume.pgdata.name
+    target = "/var/lib/postgresql/data"
+  }
+  mounts {
+    type      = "bind"
+    source    = abspath("${path.module}/secrets/db_password.txt")
+    target    = "/run/secrets/db_password"
+    read_only = true
+  }
+  # TODO: secret api_key (from environment API_KEY) cannot be mounted by docker_container: only file-backed secrets can (or use docker_compose / -mode swarm)
+  networks_advanced {
+    name    = docker_network.back.name
+    aliases = ["db"]
+  }
+}
+
+resource "docker_container" "web" {
+  count = 3
+  name  = "webapp-web-${count.index + 1}"
+  image = "nginx:1.27-alpine"
+  labels = {
+    "com.docker.compose.container-number" = "${count.index + 1}"
+    "com.docker.compose.project"          = "webapp"
+    "com.docker.compose.service"          = "web"
+  }
+  memory    = 134217728
+  nano_cpus = 500000000
+  # TODO: depends_on db condition service_healthy: Terraform only orders creation (docker_container waits for its own healthcheck when wait = true)
+  depends_on = [docker_container.cache, docker_container.db]
+  # TODO: build (context ./web) is not supported: build the image with docker_image and reference it
+  # TODO: deploy.placement only applies to swarm (use -mode swarm)
+  # TODO: deploy.update_config/rollback_config only apply to swarm
+  healthcheck {
+    test     = ["CMD", "wget", "-q", "-O-", "http://127.0.0.1/"]
+    interval = "10s"
+    timeout  = "3s"
+    retries  = 3
+  }
+  mounts {
+    type      = "bind"
+    source    = abspath("${path.module}/html")
+    target    = "/usr/share/nginx/html"
+    read_only = true
+  }
+  mounts {
+    type      = "bind"
+    source    = abspath("${path.module}/nginx.conf")
+    target    = "/etc/nginx/conf.d/default.conf"
+    read_only = true
+  }
+  # TODO: config banner (from content) cannot be mounted by docker_container: only file-backed configs can (or use docker_compose / -mode swarm)
+  networks_advanced {
+    name    = docker_network.back.name
+    aliases = ["web"]
+  }
+  networks_advanced {
+    name    = docker_network.front.name
+    aliases = ["web"]
+  }
+  ports {
+    internal = 80
+    external = 8080
+  }
+}

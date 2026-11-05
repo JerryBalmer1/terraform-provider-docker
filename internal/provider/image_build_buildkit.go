@@ -191,6 +191,10 @@ func (a *imgBuildKitAuth) Credentials(_ context.Context, req *auth.CredentialsRe
 		if normalizeRegistry(c.Address) != host {
 			continue
 		}
+		if c.IdentityToken != "" {
+			// An identity (refresh) token goes in Secret with no username, as the CLI does.
+			return &auth.CredentialsResponse{Secret: c.IdentityToken}, nil
+		}
 		user, pass := c.Username, c.Password
 		if user == "" && c.Auth != "" {
 			if dec, err := base64.StdEncoding.DecodeString(c.Auth); err == nil {

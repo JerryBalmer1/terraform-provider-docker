@@ -9,8 +9,9 @@ description: |-
 
 {{ .Description | trimspace }}
 
-The provider talks to the Docker Engine API directly. It never reads compose
-files and never shells out to the `docker` CLI. Resources fall into four layers:
+The provider talks to the Docker Engine API directly. Compose files are parsed
+in-process by `docker_compose` (never handed to the compose plugin), and it never
+shells out to the `docker` CLI. Resources fall into four layers:
 
 | Layer | Resources | Data sources |
 |---|---|---|
@@ -22,6 +23,58 @@ files and never shells out to the `docker` CLI. Resources fall into four layers:
 Create the layers in that order. `docker_swarm_init` must exist before overlay
 networks, secrets, configs and services; `docker_swarm_node` joins extra hosts
 with the tokens `docker_swarm_init` exports. Destroy runs in reverse.
+
+## Connecting to the daemon
+
+The endpoint is chosen in this order: `host`; the `ssh` block's `host`;
+`context`; `DOCKER_HOST`; `DOCKER_CONTEXT`; `currentContext` in the docker
+`config.json` (under `DOCKER_CONFIG`, default `~/.docker`); and finally
+`unix:///var/run/docker.sock`. The context named `default` means "no context".
+
+- **Docker contexts.** `context = "staging"` reads the context store written by
+  `docker context create`, through docker/cli's context store package. The
+  context supplies the host, its TLS material and `skip-tls-verify`. An
+  `ssh://` context host uses the SSH transport below.
+- **TLS.** Give the `tls` block (PEM content or paths), or `cert_path`, a
+  directory holding `ca.pem`, `cert.pem` and `key.pem`. You can't set both;
+  plan rejects that. With neither set, TLS material comes from the context,
+  or from `DOCKER_CERT_PATH` when `DOCKER_TLS_VERIFY` is set.
+- **SSH.** An `ssh://user@host[:port]` host, or an `ssh` block, reaches the
+  daemon over SSH in pure Go (golang.org/x/crypto/ssh). No `ssh` binary runs.
+  The provider opens one connection per distinct configuration, reuses it for
+  every API call, and opens a `direct-streamlocal@openssh.com` channel to
+  `remote_socket` for each one. Authentication can use `identity_file`, the
+  SSH agent (`identity_agent`: `SSH_AUTH_SOCK`, or the Windows OpenSSH agent
+  pipe) and `password` / `password_wo`. Host keys are checked against
+  `known_hosts_file` unless `strict_host_key_checking = false`. `proxy_jump`
+  chains through one or more bastions. `docker_swarm_node` takes the same
+  `ssh` block for each joining node.
+- **Daemon check.** Configure pings the daemon once. If the daemon doesn't
+  answer, you get a *warning*: validate and plan never fail because a daemon
+  is missing. Set `disable_docker_daemon_check = true` to skip the ping.
+  Either way, the client makes no other call until a resource needs the
+  daemon.
+
+## Registry credentials
+
+Each `registry_auth` block takes its credentials from the first of these
+sources that is set:
+
+1. `username` with `password` (or `password_wo`).
+2. `DOCKER_REGISTRY_USER` / `DOCKER_REGISTRY_PASS`, used only when the block
+   names no config file.
+3. `config_file_content`.
+4. `config_file`.
+5. The default config: `DOCKER_CONFIG` (a directory or a file), else
+   `~/.docker/config.json`.
+
+Config files are read like the docker CLI reads them: `credHelpers` for the
+registry, then `credsStore`, then `auths`. The `docker-credential-<name>`
+helpers are external programs. Running them is the provider's only exception
+to "nothing shells out", and it needs `allow_credential_helpers = true`.
+Without that setting, a usable `auths` entry is still used. A registry whose
+credentials live only in a helper gives an error that names the setting.
+`auth_disabled = true` makes a registry anonymous.
 
 A generated agent skill with dependency rules, the attributes that force
 replacement and a worked cold-start example lives in

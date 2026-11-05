@@ -1,0 +1,34 @@
+# converted from testdata/minimal/compose.yml
+# by tools/compose2stack -mode swarm (project "minimal")
+
+resource "docker_stack" "minimal" {
+  name = "minimal"
+
+  service {
+    name  = "app"
+    image = "ghcr.io/example/app:1.0"
+    env = {
+      LOG_LEVEL = "info"
+    }
+    networks = ["traefik_public"]
+    # TODO: tmpfs is not supported by docker_stack services
+    restart_policy {
+      condition = "any"
+    }
+    endpoint_spec {
+      ports {
+        target_port    = 3000
+        published_port = 3000
+        # TODO: host_ip 127.0.0.1 is not supported in swarm
+      }
+      ports {
+        target_port    = 9000
+        published_port = 9000
+      }
+      ports {
+        target_port    = 9001
+        published_port = 9001
+      }
+    }
+  }
+}

@@ -4,31 +4,59 @@
 
 Kind: provider.
 
-Owns the whole Docker chain through the Docker Engine API: image build and push, single-host networks, volumes and containers, Swarm init and node join, and Swarm secrets, configs, services and stacks. No compose files and no docker CLI are involved.
+Owns the whole Docker chain through the Docker Engine API: image build and push, single-host networks, volumes and containers, Swarm init and node join, and Swarm secrets, configs, services and stacks. Compose files are parsed in-process (docker_compose) and never handed to the compose plugin; no docker CLI is involved; SSH hosts are reached in pure Go. The one external program the provider can run is a docker credential helper, and only with `allow_credential_helpers = true`.
+
+Endpoint precedence: `host`, then the `ssh` block's `host`, then `context`, then `DOCKER_HOST`, then `DOCKER_CONTEXT`, then `currentContext` in the docker `config.json`, then `unix:///var/run/docker.sock`.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `allow_credential_helpers` | `bool` | optional |  |  | Let `registry_auth` run the docker credential helpers (`docker-credential-<name>`) named by `credsStore` / `credHelpers` in a docker `config.json`. Default `false`: the provider never starts another program, and a registry whose credentials only live in a helper is an error naming this attribute. This is the provider's one documented exception to running nothing external. |
 | `api_version` | `string` | optional |  |  | Engine API version to pin, e.g. `1.47`. Environment: `DOCKER_API_VERSION`. Default: negotiated with the daemon. |
-| `host` | `string` | optional |  |  | Docker daemon address, e.g. `unix:///var/run/docker.sock`, `npipe:////./pipe/docker_engine` or `tcp://10.0.0.5:2376`. Environment: `DOCKER_HOST`. Default `unix:///var/run/docker.sock`. |
+| `cert_path` | `string` | optional |  |  | Directory holding `ca.pem`, `cert.pem` and `key.pem` for a TLS `tcp://` host: a shortcut for the `tls` block, and mutually exclusive with it (checked at plan time). `~` expands to the home directory. |
+| `context` | `string` | optional |  |  | Name of a Docker CLI context (as created by `docker context create`), read from `contexts/` under `DOCKER_CONFIG` (default `~/.docker`). It supplies the host, TLS material and `skip-tls-verify`; an `ssh://` context host uses the pure-Go `ssh` transport (the `ssh` block can add credentials). An explicitly set `host` wins. `default` means no context. Environment: `DOCKER_CONTEXT` (applies only when `DOCKER_HOST` is unset), then `currentContext` in `config.json`. |
+| `disable_docker_daemon_check` | `bool` | optional |  |  | Skip the daemon reachability check. When `false` (default), Configure pings the daemon (`GET /_ping`, 5s timeout, plus `ssh.connect_timeout` for SSH hosts) and reports a *warning* if it does not answer; it never fails validate or plan. The client itself is lazy either way: no other daemon call happens until a resource or data source needs one. Set `true` to skip the ping (no delay when the daemon is expected to be absent at plan time). |
+| `host` | `string` | optional |  |  | Docker daemon address, e.g. `unix:///var/run/docker.sock`, `npipe:////./pipe/docker_engine`, `tcp://10.0.0.5:2376` or `ssh://user@10.0.0.5[:port]` (see the `ssh` block). Environment: `DOCKER_HOST`. Wins over `context`. Default: the Docker context, else `unix:///var/run/docker.sock`. |
 
-Nested blocks: `registry_auth` (list of blocks), `tls` (single block).
+Nested blocks: `registry_auth` (list of blocks), `ssh` (single block), `tls` (single block).
 
 ### `registry_auth`
 
-list of blocks. Credentials for registries, used for pulls and pushes. Give `username`/`password`, or `config_file` (a docker `config.json`; its `auths` entry for `address` is used).
+list of blocks. Credentials for registries, used for pulls and pushes. Sources, first match wins: `username` with `password`/`password_wo`; `DOCKER_REGISTRY_USER`/`DOCKER_REGISTRY_PASS` (when no config file is named); `config_file_content`; `config_file`; the default config (`DOCKER_CONFIG`, a directory or a file, else `~/.docker/config.json`). In a config file, `credHelpers` and `credsStore` are honored like the docker CLI (needs `allow_credential_helpers`), falling back to `auths` entries.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `address` | `string` | required |  |  | Registry host, e.g. `registry-1.docker.io` or `ghcr.io`. |
-| `config_file` | `string` | optional |  |  | Path to a docker `config.json`. `~` expands to the home directory. |
-| `password` | `string` | optional |  | yes | Registry password or token. |
-| `username` | `string` | optional |  |  | Registry user. |
+| `auth_disabled` | `bool` | optional |  |  | Access this registry anonymously: no credentials are looked up or sent. Default `false`. |
+| `config_file` | `string` | optional |  |  | Path to a docker `config.json`. `~` expands to the home directory. Default: `DOCKER_CONFIG` (directory or file), else `~/.docker/config.json`. Conflicts with `config_file_content`. |
+| `config_file_content` | `string` | optional |  | yes | Content of a docker `config.json` (e.g. `file("~/.docker/config.json")` or a secret). Conflicts with `config_file`. |
+| `password` | `string` | optional |  | yes | Registry password or token. Environment: `DOCKER_REGISTRY_PASS`. Conflicts with `password_wo`. |
+| `password_wo` | `string` | optional |  | yes | Registry password or token, the write-only spelling of `password` (conflicts with it). Provider configuration is never stored in state, so both are equally ephemeral here; Terraform's write-only marker only exists for resource schemas. |
+| `username` | `string` | optional |  |  | Registry user. Environment: `DOCKER_REGISTRY_USER` (when no config file is named). |
+
+### `ssh`
+
+single block. Reach the Docker daemon over SSH in pure Go (no `ssh` binary is run): the provider opens one SSH connection, reuses it for every API call, and forwards each call to the remote daemon's unix socket. Applies when the Docker host is `ssh://user@host[:port]` (from `host`, the Docker context or `DOCKER_HOST`), or when `host` is unset and this block names a `host`. Provider configuration is never written to state, so `password` and `password_wo` behave the same here; `password_wo` exists for symmetry with resources.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `connect_timeout` | `string` | optional |  |  | Timeout for the TCP connection plus SSH handshake of each hop, as a Go duration (`10s`, `1m`). Default `10s`. |
+| `host` | `string` | optional |  |  | SSH server host name or IP. Default: the host of an `ssh://` Docker host (from `host`, the Docker context or `DOCKER_HOST`). |
+| `identity_agent` | `bool` | optional |  |  | Also offer the keys held by the running SSH agent: `SSH_AUTH_SOCK` on Linux/macOS, the Windows OpenSSH agent named pipe `\\.\pipe\openssh-ssh-agent` on Windows (or `SSH_AUTH_SOCK` when it names a pipe). Default `false`. |
+| `identity_file` | `string` | optional |  | yes | Private key used for public-key authentication: PEM/OpenSSH content or a path (`~` expands). Passphrase-protected keys are not supported; load them into an agent and use `identity_agent`. When unset, `~/.ssh/id_ed25519`, `~/.ssh/id_ecdsa` and `~/.ssh/id_rsa` are offered if they exist and are unencrypted. |
+| `known_hosts_file` | `string` | optional |  |  | OpenSSH `known_hosts` file used to verify the server's host key (and every `proxy_jump` hop). Default `~/.ssh/known_hosts`. |
+| `password` | `string` | optional |  | yes | SSH password (password and keyboard-interactive authentication). Conflicts with `password_wo`. |
+| `password_wo` | `string` | optional |  | yes | SSH password, write-only variant of `password`. Conflicts with `password`. |
+| `port` | `number` | optional |  |  | SSH server port. Default `22` (or the port in an `ssh://` Docker host). |
+| `proxy_jump` | `string` | optional |  |  | Jump host(s) to reach the server through, OpenSSH `ProxyJump` style: `user@host:port`, or several hops separated by commas (`user@bastion:22,user@inner:2222`), dialled in order. User defaults to `user`, port to `22`. Each hop is authenticated with the same credentials and checked against the same `known_hosts_file`. |
+| `remote_socket` | `string` | optional |  |  | Path of the Docker daemon's unix socket on the remote host. Default `/var/run/docker.sock`. |
+| `strict_host_key_checking` | `bool` | optional |  |  | Reject servers whose host key is missing from, or does not match, `known_hosts_file`. Default `true`. `false` accepts any host key (insecure; for throwaway hosts only). |
+| `user` | `string` | optional |  |  | SSH user. Default: the user in an `ssh://user@host` Docker host, else `USER`/`USERNAME` from the environment. |
 
 ### `tls`
 
-single block. TLS client material for a `tcp://` host. Each value is PEM content or a path to a PEM file. When the block is absent and `DOCKER_TLS_VERIFY` is set, `ca.pem`, `cert.pem` and `key.pem` are read from `DOCKER_CERT_PATH`.
+single block. TLS client material for a `tcp://` host. Each value is PEM content or a path to a PEM file. Conflicts with `cert_path`. When neither is set, TLS material comes from the Docker context, else (with `DOCKER_TLS_VERIFY` set) `ca.pem`, `cert.pem` and `key.pem` are read from `DOCKER_CERT_PATH`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
@@ -40,6 +68,8 @@ single block. TLS client material for a `tcp://` host. Each value is PEM content
 
 ```terraform
 terraform {
+  required_version = ">= 1.14.0"
+
   required_providers {
     docker = {
       source = "JerryBalmer1/docker"
@@ -47,7 +77,8 @@ terraform {
   }
 }
 
-# Local daemon (DOCKER_HOST or unix:///var/run/docker.sock).
+# Local daemon: DOCKER_HOST, else the current Docker CLI context, else
+# unix:///var/run/docker.sock.
 provider "docker" {}
 
 # Remote daemon over TLS with registry credentials.
@@ -68,8 +99,71 @@ provider "docker" {
   }
 }
 
+# The same TLS host with cert_path: a directory holding ca.pem, cert.pem and
+# key.pem. cert_path and the tls block are mutually exclusive.
+provider "docker" {
+  alias     = "remote_certs"
+  host      = "tcp://10.0.0.5:2376"
+  cert_path = "~/.docker/remote"
+}
+
+# A Docker CLI context created with `docker context create staging ...`.
+# Host and TLS material come from ~/.docker/contexts (or DOCKER_CONFIG).
+provider "docker" {
+  alias   = "staging"
+  context = "staging"
+}
+
+# SSH in pure Go (no ssh binary): one connection, reused for every call and
+# forwarded to the remote daemon's unix socket, here through a bastion.
+provider "docker" {
+  alias = "ssh"
+  host  = "ssh://deploy@10.0.1.20"
+
+  ssh {
+    identity_file    = "~/.ssh/id_ed25519"
+    identity_agent   = true
+    known_hosts_file = "~/.ssh/known_hosts"
+    proxy_jump       = "deploy@bastion.example.com:22"
+    connect_timeout  = "15s"
+    remote_socket    = "/var/run/docker.sock"
+  }
+
+  # Skip the plan-time ping (it only ever warns) when the host may be down.
+  disable_docker_daemon_check = true
+}
+
+# Registry credentials from docker config.json files, including credsStore /
+# credHelpers (Docker Desktop's "desktop" helper, ecr-login, ...). Running
+# docker-credential-* helpers must be allowed explicitly.
+provider "docker" {
+  alias                    = "helpers"
+  allow_credential_helpers = true
+
+  registry_auth {
+    address     = "registry-1.docker.io"
+    config_file = "~/.docker/config.json"
+  }
+
+  registry_auth {
+    address             = "123456789012.dkr.ecr.eu-west-1.amazonaws.com"
+    config_file_content = var.docker_config_json
+  }
+
+  registry_auth {
+    address       = "public.ecr.aws"
+    auth_disabled = true
+  }
+}
+
 variable "ghcr_token" {
   type      = string
   sensitive = true
+}
+
+variable "docker_config_json" {
+  type      = string
+  sensitive = true
+  default   = "{\"credHelpers\": {\"123456789012.dkr.ecr.eu-west-1.amazonaws.com\": \"ecr-login\"}}"
 }
 ```

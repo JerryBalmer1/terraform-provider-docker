@@ -133,14 +133,21 @@ func swarmUpdateNode(ctx context.Context, c *client.Client, nodeID string, chang
 		if err == nil {
 			return nil
 		}
-		if !swarmIsVersionConflict(err) {
+		// A just-promoted manager may not be in the raft member list yet;
+		// that settles within seconds, so it is retried with a longer wait.
+		raftLag := strings.Contains(err.Error(), "raft memberlist")
+		if !swarmIsVersionConflict(err) && !raftLag {
 			return fmt.Errorf("updating node %s: %w", nodeID, err)
 		}
 		lastErr = err
+		wait := time.Duration(attempt+1) * 100 * time.Millisecond
+		if raftLag {
+			wait = time.Duration(attempt+1) * time.Second
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(time.Duration(attempt+1) * 100 * time.Millisecond):
+		case <-time.After(wait):
 		}
 	}
 	return fmt.Errorf("updating node %s: gave up after %d version conflicts: %w", nodeID, swarmNodeUpdateAttempts, lastErr)

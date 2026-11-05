@@ -8,3 +8,11 @@ resource "docker_config" "nginx" {
   CONF
   )
 }
+
+# Terraform 1.11+: write-only content, kept out of plan and state. Bump
+# data_wo_version whenever the content changes.
+resource "docker_config" "app" {
+  name            = "app.ini"
+  data_wo         = base64encode("debug = false\n")
+  data_wo_version = 1
+}

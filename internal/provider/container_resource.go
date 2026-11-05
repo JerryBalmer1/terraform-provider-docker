@@ -37,6 +37,7 @@ var (
 	_ resource.ResourceWithConfigure   = (*containerResource)(nil)
 	_ resource.ResourceWithImportState = (*containerResource)(nil)
 	_ resource.ResourceWithModifyPlan  = (*containerResource)(nil)
+	_ resource.ResourceWithIdentity    = (*containerResource)(nil)
 )
 
 // containerDefaultWaitTimeout is the wait_timeout default.
@@ -95,6 +96,7 @@ type containerResourceModel struct {
 	SecurityOpt      types.Set                   `tfsdk:"security_opt"`
 	ReadOnly         types.Bool                  `tfsdk:"read_only"`
 	GPUs             types.String                `tfsdk:"gpus"`
+	Upload           []containerUploadModel      `tfsdk:"upload"`
 }
 
 func (r *containerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -122,7 +124,8 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, " +
 			"working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. " +
 			"`name`, `restart`, `max_retry_count`, `memory`, `memory_swap`, `cpu_shares` and `nano_cpus` update in place " +
-			"(`ContainerRename`/`ContainerUpdate`); every other argument forces a new container. Destroy force-removes the container " +
+			"(`ContainerRename`/`ContainerUpdate`); `upload` blocks are copied in with `CopyToContainer` before start. Every other argument forces " +
+			"a new container. Destroy force-removes the container " +
 			"but keeps its volumes. Import by container name or ID.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -333,6 +336,13 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 						MarkdownDescription: "Mount read-only. Default `false`.",
 					},
 					"tmpfs_size": schema.Int64Attribute{Optional: true, MarkdownDescription: "tmpfs size in bytes (tmpfs only)."},
+					"selinux_relabel": schema.StringAttribute{
+						Optional: true,
+						MarkdownDescription: "SELinux relabel for a `bind` or named `volume` mount: `z` (shared label) or `Z` (private label), " +
+							"like the `docker run -v src:dst:z` suffix. The entry is then sent as a `HostConfig.Binds` string, because the " +
+							"`Mounts` API has no relabel option. Forces replacement like any mounts change.",
+						Validators: []validator.String{stringvalidator.OneOf(containerSELinuxModes...)},
+					},
 				}},
 			},
 			"networks_advanced": schema.ListNestedBlock{
@@ -381,6 +391,7 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					},
 				}},
 			},
+			"upload": containerUploadBlockSchema(),
 			"ulimits": schema.ListNestedBlock{
 				MarkdownDescription: "Resource ulimits. Changing them forces a new resource.",
 				PlanModifiers:       []planmodifier.List{listplanmodifier.RequiresReplace()},
@@ -474,7 +485,7 @@ func containerBuildCreate(ctx context.Context, m containerResourceModel, diags *
 	if cfg.ExposedPorts, hc.PortBindings, err = containerExpandPorts(m.Ports); err != nil {
 		diags.AddAttributeError(path.Root("ports"), "Invalid ports", err.Error())
 	}
-	if hc.Mounts, err = containerExpandMounts(m.Mounts); err != nil {
+	if hc.Mounts, hc.Binds, err = containerExpandMountsBinds(m.Mounts); err != nil {
 		diags.AddAttributeError(path.Root("mounts"), "Invalid mounts", err.Error())
 	}
 	hc.Ulimits = containerExpandUlimits(m.Ulimits)
@@ -593,6 +604,10 @@ func (r *containerResource) startAndWait(ctx context.Context, m containerResourc
 	}
 }
 
+func (r *containerResource) IdentitySchema(_ context.Context, _ resource.IdentitySchemaRequest, resp *resource.IdentitySchemaResponse) {
+	resp.IdentitySchema = listIDIdentitySchema()
+}
+
 func (r *containerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan containerResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -601,6 +616,11 @@ func (r *containerResource) Create(ctx context.Context, req resource.CreateReque
 	}
 	cfg, hc, netCfg, extra := containerBuildCreate(ctx, plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+	uploads, err := containerPrepareUploads(plan.Upload)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("upload"), "Invalid upload", err.Error())
 		return
 	}
 	if err := containerEnsureImage(ctx, r.pd, cfg.Image); err != nil {
@@ -615,6 +635,7 @@ func (r *containerResource) Create(ctx context.Context, req resource.CreateReque
 	plan.ID = types.StringValue(created.ID)
 	// Save the ID first so a failure below leaves a tainted, destroyable resource.
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), plan.ID)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, created.ID)...)
 
 	for _, n := range extra {
 		ep := containerEndpointSettings(stringSetFrom(ctx, n.Aliases, &resp.Diagnostics), n.IPv4Address.ValueString(), n.IPv6Address.ValueString())
@@ -622,6 +643,10 @@ func (r *containerResource) Create(ctx context.Context, req resource.CreateReque
 			resp.Diagnostics.AddError("Cannot connect container to network", fmt.Sprintf("%s: %v", n.Name.ValueString(), err))
 			return
 		}
+	}
+	if err := containerApplyUploads(ctx, r.pd, created.ID, uploads); err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("upload"), "Cannot upload file into container", err.Error())
+		return
 	}
 	r.startAndWait(ctx, plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
@@ -636,6 +661,7 @@ func (r *containerResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
 func (r *containerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -654,6 +680,7 @@ func (r *containerResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
 // refresh inspects the container and maps it onto prior (state on Read, plan
@@ -730,7 +757,7 @@ func containerFromInspect(insp container.InspectResponse, imgCfg *container.Conf
 	out.Capabilities = containerFlattenCapabilities(hc.CapAdd, hc.CapDrop, priorAdd, priorDrop, prior.Capabilities)
 
 	out.Ports = containerFlattenPorts(hc.PortBindings, prior.Ports)
-	out.Mounts = containerFlattenMounts(hc.Mounts, prior.Mounts)
+	out.Mounts = containerFlattenMounts(hc.Mounts, hc.Binds, prior.Mounts)
 	out.Ulimits = containerFlattenUlimits(hc.Ulimits, prior.Ulimits, importing)
 	if insp.NetworkSettings != nil {
 		id, name := out.ID.ValueString(), out.Name.ValueString()
@@ -839,6 +866,19 @@ func (r *containerResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 	}
 
+	if !containerUploadsEqual(plan.Upload, state.Upload) {
+		// Reached only for a stopped container (containerUploadReplaceIf).
+		uploads, err := containerPrepareUploads(plan.Upload)
+		if err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root("upload"), "Invalid upload", err.Error())
+			return
+		}
+		if err := containerApplyUploads(ctx, r.pd, id, uploads); err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root("upload"), "Cannot upload file into container", err.Error())
+			return
+		}
+	}
+
 	insp, err := r.pd.Client.ContainerInspect(ctx, id)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect container", err.Error())
@@ -864,6 +904,7 @@ func (r *containerResource) Update(ctx context.Context, req resource.UpdateReque
 		out.Running = planned
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &out)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, out.ID.ValueString())...)
 }
 
 func (r *containerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -883,10 +924,15 @@ func (r *containerResource) ImportState(ctx context.Context, req resource.Import
 		resp.Diagnostics.AddError("Provider not configured", "Cannot import before the provider is configured.")
 		return
 	}
-	insp, err := r.pd.Client.ContainerInspect(ctx, req.ID)
+	ref := listIDFromImport(ctx, req, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	insp, err := r.pd.Client.ContainerInspect(ctx, ref)
 	if err != nil {
-		resp.Diagnostics.AddError("Cannot find container", fmt.Sprintf("%q: %v", req.ID, err))
+		resp.Diagnostics.AddError("Cannot find container", fmt.Sprintf("%q: %v", ref, err))
 		return
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), insp.ID)...)
+	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, insp.ID)...)
 }

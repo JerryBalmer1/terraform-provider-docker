@@ -1,0 +1,151 @@
+# converted from testdata/webapp/compose.yml
+# by tools/compose2stack -mode swarm (project "webapp")
+
+# TODO: service debug is not converted: its profiles [debug] are not enabled (rerun with -profiles)
+
+resource "docker_stack" "webapp" {
+  name = "webapp"
+
+  network {
+    name     = "back"
+    internal = true
+  }
+
+  network {
+    name = "front"
+  }
+
+  volume {
+    name = "pgdata"
+    labels = {
+      backup = "daily"
+    }
+  }
+
+  secret {
+    name = "api_key"
+    data = base64encode(var.API_KEY)
+  }
+
+  secret {
+    name = "db_password"
+    data = filebase64("${path.module}/secrets/db_password.txt")
+  }
+
+  config {
+    name = "banner"
+    data = base64encode("welcome")
+  }
+
+  config {
+    name = "nginx_conf"
+    data = filebase64("${path.module}/nginx.conf")
+  }
+
+  service {
+    name     = "cache"
+    image    = "redis:7-alpine"
+    args     = ["redis-server", "--appendonly", "yes"]
+    replicas = 2
+    networks = ["back"]
+    healthcheck {
+      test = ["CMD", "redis-cli", "ping"]
+    }
+    ulimits {
+      name = "nofile"
+      soft = 1024
+      hard = 2048
+    }
+  }
+
+  service {
+    name  = "db"
+    image = "postgres:16-alpine"
+    env = {
+      POSTGRES_DB            = "shop"
+      POSTGRES_PASSWORD_FILE = "/run/secrets/db_password"
+    }
+    networks = ["back"]
+    healthcheck {
+      test         = ["CMD-SHELL", "pg_isready -U postgres"]
+      interval     = "5s"
+      start_period = "30s"
+    }
+    mounts {
+      type   = "volume"
+      source = "pgdata"
+      target = "/var/lib/postgresql/data"
+    }
+    secrets {
+      secret_id = "db_password"
+    }
+    secrets {
+      secret_id = "api_key"
+      file_name = "api.key"
+      mode      = 256
+    }
+    placement {
+      constraints = ["node.labels.db==true"]
+    }
+    restart_policy {
+      condition    = "on-failure"
+      max_attempts = 3
+    }
+  }
+
+  service {
+    name     = "web"
+    image    = "nginx:1.27-alpine"
+    replicas = 3
+    networks = ["back", "front"]
+    # TODO: build (context ./web) is not supported: build the image with docker_image and reference it
+    # TODO: depends_on [cache db]: swarm starts services independently; add healthchecks and retry logic instead
+    healthcheck {
+      test     = ["CMD", "wget", "-q", "-O-", "http://127.0.0.1/"]
+      interval = "10s"
+      timeout  = "3s"
+      retries  = 3
+    }
+    mounts {
+      type      = "bind"
+      source    = abspath("${path.module}/html")
+      target    = "/usr/share/nginx/html"
+      read_only = true
+    }
+    configs {
+      config_id = "nginx_conf"
+      file_name = "/etc/nginx/conf.d/default.conf"
+    }
+    configs {
+      config_id = "banner"
+      file_name = "/banner"
+    }
+    placement {
+      constraints = ["node.role==worker"]
+      preferences = ["spread=node.labels.zone"]
+    }
+    resources {
+      limits {
+        nano_cpus    = 500000000
+        memory_bytes = 134217728
+      }
+    }
+    update_config {
+      parallelism = 1
+      delay       = "10s"
+      order       = "start-first"
+    }
+    endpoint_spec {
+      ports {
+        target_port    = 80
+        published_port = 8080
+      }
+    }
+  }
+}
+
+variable "API_KEY" {
+  type        = string
+  sensitive   = true
+  description = "Value of the compose environment variable API_KEY."
+}

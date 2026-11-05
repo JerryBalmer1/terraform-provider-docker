@@ -79,7 +79,9 @@ func svcConvergeCheck(tasks []swarm.Task, replicas int, us *swarm.UpdateStatus, 
 			return st
 		}
 	}
-	st.Done = st.Running == st.Want
+	// A global service reports 0/0 before the orchestrator creates its first
+	// task; don't call that converged.
+	st.Done = st.Running == st.Want && (replicas >= 0 || st.Want > 0)
 	return st
 }
 

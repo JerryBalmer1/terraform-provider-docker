@@ -157,6 +157,9 @@ func swarmInitBuildRequest(ctx context.Context, m swarmInitModel, diags *diag.Di
 	}
 	if v, ok := knownBool(m.Autolock); ok {
 		req.AutoLockManagers = v
+		// dockerd's initClusterSpec copies Spec.EncryptionConfig over the
+		// top-level flag, so set both or autolock reads back false.
+		req.Spec.EncryptionConfig.AutoLockManagers = v
 	}
 	return req
 }
