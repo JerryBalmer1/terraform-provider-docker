@@ -1,0 +1,11 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp catalog pull <oci-reference>
+
+
+Examples:
+  # Pull the community MCP server catalog
+  docker mcp catalog pull mcp/community-registry:latest
+
+  # Pull a custom catalog
+  docker mcp catalog pull myorg/my-catalog:latest

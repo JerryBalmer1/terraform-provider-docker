@@ -1,0 +1,3 @@
+Usage:  docker model context inspect NAME [NAME...]
+
+Display detailed information about one or more contexts

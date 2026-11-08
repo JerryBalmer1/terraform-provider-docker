@@ -1,0 +1,3 @@
+Usage:  docker context use CONTEXT
+
+Set the default docker context

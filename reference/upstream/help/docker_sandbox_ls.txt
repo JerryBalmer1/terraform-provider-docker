@@ -1,0 +1,11 @@
+Usage:  docker sandbox ls [OPTIONS]
+
+List all VMs managed by sandboxd with their sandboxes
+
+Aliases:
+  docker sandbox ls, docker sandbox list
+
+Options:
+  -D, --debug   Enable debug logging
+      --json    Output in JSON format
+  -q, --quiet   Only display VM names

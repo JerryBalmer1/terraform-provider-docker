@@ -1,0 +1,8 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp server init <directory>
+
+Flags:
+      --language string   Programming language for the server (currently only 'go' is supported) (default "go")
+      --template string   Template to use (basic, chatgpt-app-basic) (default "basic")
+

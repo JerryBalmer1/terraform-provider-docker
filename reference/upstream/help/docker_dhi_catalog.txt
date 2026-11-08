@@ -1,0 +1,12 @@
+Usage:  docker dhi catalog [OPTIONS] COMMAND
+
+Commands to browse available Docker Hardened Images and Helm charts
+
+Options:
+      --org string   Docker Hub organization (overrides config)
+
+Commands:
+  get         Get details of a Docker Hardened Image
+  list        List available Docker Hardened Images
+
+Run 'docker dhi catalog COMMAND --help' for more information on a command.

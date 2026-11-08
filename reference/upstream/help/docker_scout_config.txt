@@ -1,0 +1,33 @@
+ Manage Docker Scout configuration
+
+Usage
+  docker scout config [KEY] [VALUE]
+
+Description
+List, get and set Docker Scout configuration.
+
+Available configuration key(s):
+- organization: Namespace of the Docker organization to be used by default if it cannot be inferred from the image reference
+- epss: Show EPSS scores in the CVE list
+
+
+
+Examples
+  List existing configuration
+  $ docker scout config[0m
+
+  Print existing value of a configuration, here organization
+  $ docker scout config organization[0m
+
+  Set a configuration
+  $ docker scout config organization my-org-namespace[0m
+
+Learn More
+  Read docker scout cli reference at https://docs.docker.com/engine/reference/commandline/scout/
+
+Report Issues
+  Raise bugs and feature requests at https://github.com/docker/scout-cli/issues
+
+Send Feedback
+  Send feedback with docker feedback
+

@@ -1,0 +1,13 @@
+Usage:  docker buildx history inspect [OPTIONS] COMMAND
+
+Inspect a build record
+
+Options:
+      --builder string   Override the configured builder instance
+  -D, --debug            Enable debug logging
+      --format string    Format the output (default "pretty")
+
+Commands:
+  attachment  Inspect a build record attachment
+
+Run 'docker buildx history inspect COMMAND --help' for more information on a command.

@@ -1,0 +1,7 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp gateway
+
+Available Commands:
+  run         Run the gateway
+

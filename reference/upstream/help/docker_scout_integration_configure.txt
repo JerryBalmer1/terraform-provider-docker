@@ -1,0 +1,24 @@
+ Configure or update a new integration configuration
+
+Usage
+  docker scout integration configure INTEGRATION
+
+Description
+The docker scout integration configure command creates or updates a new integration configuration for an organization.
+
+
+
+Flags
+      --name string         Name of integration configuration to create
+      --org string          Namespace of the Docker organization
+      --parameter strings   Integration parameters in the form of --parameter NAME=VALUE
+
+Learn More
+  Read docker scout cli reference at https://docs.docker.com/engine/reference/commandline/scout/
+
+Report Issues
+  Raise bugs and feature requests at https://github.com/docker/scout-cli/issues
+
+Send Feedback
+  Send feedback with docker feedback
+

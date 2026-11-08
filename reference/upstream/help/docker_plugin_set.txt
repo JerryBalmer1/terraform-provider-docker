@@ -1,0 +1,3 @@
+Usage:  docker plugin set PLUGIN KEY=VALUE [KEY=VALUE...]
+
+Change settings for a plugin

@@ -1,0 +1,11 @@
+Usage:  docker offload COMMAND
+
+Docker Offload
+
+Commands:
+  start                   Start a Docker Offload session
+  status                  Show the status of the Docker Offload connection
+  stop                    Stop a Docker Offload session
+  version                 Prints the version
+
+Run 'docker offload COMMAND --help' for more information on a command.

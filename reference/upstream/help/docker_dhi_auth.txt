@@ -1,0 +1,9 @@
+Usage:  docker dhi auth COMMAND
+
+Commands to authenticate with Docker Hub
+
+Commands:
+  apk         Create authentication details for DHI APK repositories
+  deb         Create authentication details for DHI DEB repositories
+
+Run 'docker dhi auth COMMAND --help' for more information on a command.

@@ -1,0 +1,16 @@
+Usage:
+  docker agent alias list
+
+Aliases:
+  list, ls
+
+Flags:
+      --json   Output aliases as JSON
+
+Global Flags:
+      --cache-dir string    Override the cache directory (default: ~/Library/Caches/cagent on macOS)
+      --config-dir string   Override the config directory (default: ~/.config/cagent)
+      --data-dir string     Override the data directory (default: ~/.cagent)
+  -d, --debug               Enable debug logging
+      --log-file string     Path to debug log file (default: ~/.cagent/cagent.debug.log; only used with --debug)
+  -o, --otel                Enable OpenTelemetry tracing

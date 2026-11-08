@@ -1,0 +1,3 @@
+Usage:  docker dhi auth apk
+
+Create authentication details for DHI APK repositories

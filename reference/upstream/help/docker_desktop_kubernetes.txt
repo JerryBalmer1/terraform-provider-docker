@@ -1,0 +1,10 @@
+Usage:  docker desktop kubernetes COMMAND
+
+Manage Kubernetes
+
+Commands:
+  images        List Kubernetes images used by Docker Desktop
+  reset-cluster Reset the Kubernetes cluster managed by Docker Desktop
+  status        Get the status of the Kubernetes cluster managed by Docker Desktop
+
+Run 'docker desktop kubernetes COMMAND --help' for more information on a command.

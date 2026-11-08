@@ -1,0 +1,35 @@
+ Command line tool for Docker Scout
+
+Usage
+  docker scout [command]
+
+Available Commands
+  attestation             Manage attestations on images
+  cache                   Manage Docker Scout cache and temporary files
+  compare                 Compare two images and display differences (experimental)
+  config                  Manage Docker Scout configuration
+  cves                    Display CVEs identified in a software artifact
+  enroll                  Enroll an organization with Docker Scout
+  environment             Manage environments (experimental)
+  help                    Display information about the available commands
+  integration             Commands to list, configure, and delete Docker Scout integrations
+  policy                  Evaluate policies against an image and display the policy evaluation results (experimental)
+  push                    Push an image or image index to Docker Scout
+  quickview               Quick overview of an image
+  recommendations         Display available base image updates and remediation recommendations
+  repo                    Commands to list, enable, and disable Docker Scout on repositories
+  version                 Show Docker Scout version information
+  vex                     Manage VEX attestations on images
+  watch                   Watch repositories in a registry and push images and indexes to Docker Scout
+
+Use "docker scout [command] --help" for more information about a command.
+
+Learn More
+  Read docker scout cli reference at https://docs.docker.com/engine/reference/commandline/scout/
+
+Report Issues
+  Raise bugs and feature requests at https://github.com/docker/scout-cli/issues
+
+Send Feedback
+  Send feedback with docker feedback
+

@@ -1,0 +1,29 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp profile tools <profile-id> [--enable <tool> ...] [--disable <tool> ...] [--enable-all <server> ...] [--disable-all <server> ...]
+
+Flags:
+      --disable stringArray       Disable specific tools: <serverName>.<toolName> (repeatable)
+      --disable-all stringArray   Disable all tools for a server: <serverName> (repeatable)
+      --enable stringArray        Enable specific tools: <serverName>.<toolName> (repeatable)
+      --enable-all stringArray    Enable all tools for a server: <serverName> (repeatable)
+
+
+Examples:
+  # Enable specific tools for a server
+  docker mcp profile tools my-profile --enable github.create_issue --enable github.list_repos
+
+  # Disable specific tools for a server
+  docker mcp profile tools my-profile --disable github.create_issue --disable github.search_code
+
+  # Enable and disable in one command
+  docker mcp profile tools my-profile --enable github.create_issue --disable github.search_code
+
+  # Enable all tools for a server
+  docker mcp profile tools my-profile --enable-all github
+
+  # Disable all tools for a server
+  docker mcp profile tools my-profile --disable-all github
+
+  # View all enabled tools in the profile
+  docker mcp profile show my-profile

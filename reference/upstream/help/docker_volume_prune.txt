@@ -1,0 +1,8 @@
+Usage:  docker volume prune [OPTIONS]
+
+Remove unused local volumes
+
+Options:
+  -a, --all             Remove all unused volumes, not just anonymous ones
+      --filter filter   Provide filter values (e.g. "label=<label>")
+  -f, --force           Do not prompt for confirmation

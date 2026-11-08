@@ -1,0 +1,6 @@
+Usage:  docker desktop diagnose
+
+Diagnose Docker Desktop
+
+Options:
+  -u, --upload   Upload diagnostics

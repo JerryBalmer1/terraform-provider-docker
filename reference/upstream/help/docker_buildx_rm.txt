@@ -1,0 +1,13 @@
+Usage:  docker buildx rm [OPTIONS] [NAME...]
+
+Remove one or more builder instances
+
+Options:
+      --all-inactive       Remove all inactive builders
+      --builder string     Override the configured builder instance
+  -D, --debug              Enable debug logging
+  -f, --force              Do not prompt for confirmation
+      --keep-daemon        Keep the BuildKit daemon running
+      --keep-state         Keep BuildKit state
+      --timeout duration   Override the default timeout for loading
+                           builder status (default 20s)

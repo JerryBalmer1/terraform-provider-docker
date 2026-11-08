@@ -1,0 +1,38 @@
+Usage:
+  docker agent serve chat <agent-file>|<registry-ref>
+
+Examples:
+  docker agent serve chat ./agent.yaml
+  docker agent serve chat ./team.yaml --agent reviewer
+  docker agent serve chat agentcatalog/pirate --listen 127.0.0.1:9090
+
+Flags:
+  -a, --agent string                          Name of the agent to expose (all agents if not specified)
+      --api-key string                        Required Bearer token clients must present (Authorization: Bearer <token>); empty disables auth
+      --api-key-env string                    Read the API key from this environment variable instead of the command line
+      --code-mode-tools                       Provide a single tool to call other tools via Javascript
+      --conversation-ttl duration             Idle TTL after which a cached conversation is evicted (default 30m0s)
+      --conversations-max int                 Cache up to N conversations server-side, keyed by X-Conversation-Id (0 disables; clients must resend full history)
+      --cors-origin string                    Allowed CORS origin (e.g. https://example.com); empty disables CORS entirely
+      --env-from-file strings                 Set environment variables from file
+      --hook-on-user-input stringArray        Add an on-user-input hook command (repeatable)
+      --hook-post-tool-use stringArray        Add a post-tool-use hook command that runs after every tool call (repeatable)
+      --hook-pre-tool-use stringArray         Add a pre-tool-use hook command that runs before every tool call (repeatable)
+      --hook-session-end stringArray          Add a session-end hook command (repeatable)
+      --hook-session-start stringArray        Add a session-start hook command (repeatable)
+      --hook-stop stringArray                 Add a stop hook command, fired when the model finishes responding (repeatable)
+  -l, --listen string                         Address to listen on (default "127.0.0.1:8083")
+      --max-idle-runtimes int                 Maximum number of idle runtimes pooled per agent (0 disables pooling) (default 4)
+      --max-request-size int                  Maximum request body size in bytes (default 1 MiB) (default 1048576)
+      --mcp-oauth-redirect-uri redirect_uri   Public HTTPS URL to advertise as the OAuth redirect_uri for MCP servers running in unmanaged OAuth mode. When set, docker-agent drives the OAuth flow itself (PKCE + DCR + token exchange) and expects clients to return `{code, state}` via ResumeElicitation. When empty, the client is expected to perform the OAuth flow and return an access token (legacy behavior).
+      --models-gateway string                 Set the models gateway address
+      --request-timeout duration              Per-request timeout (covers model + tool calls + streaming) (default 5m0s)
+      --working-dir string                    Set the working directory for the session (applies to tools and relative paths)
+
+Global Flags:
+      --cache-dir string    Override the cache directory (default: ~/Library/Caches/cagent on macOS)
+      --config-dir string   Override the config directory (default: ~/.config/cagent)
+      --data-dir string     Override the data directory (default: ~/.cagent)
+  -d, --debug               Enable debug logging
+      --log-file string     Path to debug log file (default: ~/.cagent/cagent.debug.log; only used with --debug)
+  -o, --otel                Enable OpenTelemetry tracing

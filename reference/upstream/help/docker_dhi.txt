@@ -1,0 +1,16 @@
+Usage:  docker dhi [OPTIONS] COMMAND
+
+command-line interface for administering Docker Hardened Images.
+It provides commands to browse the DHI catalog, mirror images into your organisations and manage customizations.
+
+Options:
+  -v, --version   version for dhi
+
+Management Commands:
+  attestation   View attestations for Docker Hardened Images
+  auth          Authenticate with Docker Hub
+  catalog       Browse the Docker Hardened Images catalog
+  customization Manage Docker Hardened Images customizations
+  mirror        Mirror Docker Hardened Images to your organization
+
+Run 'docker dhi COMMAND --help' for more information on a command.

@@ -1,0 +1,9 @@
+Usage:  docker plugin upgrade [OPTIONS] PLUGIN [REMOTE]
+
+Upgrade an existing plugin
+
+Options:
+      --grant-all-permissions   Grant all permissions necessary to run
+                                the plugin
+      --skip-remote-check       Do not check if specified remote plugin
+                                matches existing plugin image

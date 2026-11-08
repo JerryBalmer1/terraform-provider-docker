@@ -1,0 +1,6 @@
+Usage:  docker model context rm NAME [NAME...]
+
+Remove one or more Model Runner contexts
+
+Aliases:
+  docker model context rm, docker model context remove

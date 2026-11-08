@@ -1,0 +1,10 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp catalog server
+
+Available Commands:
+  add         Add MCP servers to a catalog
+  inspect     Inspect a server in a catalog
+  ls          List servers in a catalog
+  remove      Remove MCP servers from a catalog
+

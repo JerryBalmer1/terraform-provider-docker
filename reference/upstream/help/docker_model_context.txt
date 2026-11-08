@@ -1,0 +1,12 @@
+Usage:  docker model context COMMAND
+
+Manage Docker Model Runner contexts
+
+Commands:
+  create      Create a named Model Runner context
+  inspect     Display detailed information about one or more contexts
+  ls          List Model Runner contexts
+  rm          Remove one or more Model Runner contexts
+  use         Set the active Model Runner context
+
+Run 'docker model context COMMAND --help' for more information on a command.

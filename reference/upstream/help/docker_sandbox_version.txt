@@ -1,0 +1,6 @@
+Usage:  docker sandbox version
+
+Show sandbox version information
+
+Options:
+  -D, --debug   Enable debug logging

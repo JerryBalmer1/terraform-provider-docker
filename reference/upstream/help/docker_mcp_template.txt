@@ -1,0 +1,8 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp template
+
+Available Commands:
+  list        List available starter templates
+  use         Create a profile from a starter template
+

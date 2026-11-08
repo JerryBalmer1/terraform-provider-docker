@@ -1,0 +1,38 @@
+ Remove temporary or cached data
+
+Usage
+  docker scout cache prune
+
+Description
+Remove temporary or cached data used by Docker Scout.
+
+Temporary data are where image is temporarily stored while generating the SBOM.
+These date are usually deleted at the end of the generation, but in case the process has been
+killed some data might still be there.
+
+Once generated, SBOMs are cached locally so they are not generated or fetched again. These cached
+SBOMs are used by Scout when you want to display data for an image.
+
+
+
+Flags
+  -f, --force   Do not prompt for confirmation
+      --sboms   Prune cached SBOMs
+
+Examples
+  Delete temporary data
+$ docker scout cache prune[0m
+
+  Delete all data, including cached SBOMs
+$ docker scout cache prune --sboms[0m
+
+
+Learn More
+  Read docker scout cli reference at https://docs.docker.com/engine/reference/commandline/scout/
+
+Report Issues
+  Raise bugs and feature requests at https://github.com/docker/scout-cli/issues
+
+Send Feedback
+  Send feedback with docker feedback
+

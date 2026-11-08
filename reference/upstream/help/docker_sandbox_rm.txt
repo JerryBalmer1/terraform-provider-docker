@@ -1,0 +1,13 @@
+Usage:  docker sandbox rm SANDBOX [SANDBOX...]
+
+Remove one or more sandboxes and all their associated resources.
+
+This command will:
+- Check if the sandbox exists
+- Remove the sandbox and clean up its associated resources
+
+Aliases:
+  docker sandbox rm, docker sandbox remove
+
+Options:
+  -D, --debug   Enable debug logging

@@ -1,0 +1,4 @@
+Usage:  docker desktop engine use [MODE]
+
+Docker Desktop for Windows supports both Windows and Linux containers.
+This command lets you switch between Windows and Linux mode from the command line.

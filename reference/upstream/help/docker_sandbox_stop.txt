@@ -1,0 +1,6 @@
+Usage:  docker sandbox stop SANDBOX [SANDBOX...]
+
+Stop one or more sandboxes without removing them. The sandboxes can be restarted later.
+
+Options:
+  -D, --debug   Enable debug logging

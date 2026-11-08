@@ -1,0 +1,8 @@
+Usage:  docker desktop enable COMMAND
+
+Enable or manage an individual feature
+
+Commands:
+  model-runner Manage Docker Model Runner settings
+
+Run 'docker desktop enable COMMAND --help' for more information on a command.

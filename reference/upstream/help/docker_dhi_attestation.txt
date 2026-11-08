@@ -1,0 +1,16 @@
+Usage:  docker dhi attestation [OPTIONS] COMMAND
+
+Commands to list and inspect attestations attached to Docker Hardened Images
+
+Aliases:
+  docker dhi attestation, docker dhi attest, docker dhi a
+
+Options:
+      --org string   Docker Hub organization (overrides config)
+
+Commands:
+  get         Get attestation for a Docker Hardened Image
+  list        List attestations for a Docker Hardened Image
+  sbom        Display the SPDX SBOM for a Docker Hardened Image
+
+Run 'docker dhi attestation COMMAND --help' for more information on a command.

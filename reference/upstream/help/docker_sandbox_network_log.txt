@@ -1,0 +1,9 @@
+Usage:  docker sandbox network log
+
+Show network logs
+
+Options:
+  -D, --debug       Enable debug logging
+      --json        Output in JSON format
+      --limit int   Maximum number of log entries to show
+  -q, --quiet       Only display log entries

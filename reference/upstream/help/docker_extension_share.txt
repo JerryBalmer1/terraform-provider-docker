@@ -1,0 +1,4 @@
+
+Usage:  docker extension share IMAGE:[TAG]
+
+Generate a URL to distribute an extension. Clicking on this link will display the extension in Docker Desktop, allowing an easy install.

@@ -1,0 +1,10 @@
+Usage:  docker model unload (MODEL [MODEL ...] [--backend BACKEND] | --all)
+
+Unload running models
+
+Aliases:
+  docker model unload, docker model stop
+
+Options:
+      --all              Unload all running models
+      --backend string   Optional backend to target

@@ -1,0 +1,10 @@
+Usage:  docker buildx inspect [NAME]
+
+Inspect current builder instance
+
+Options:
+      --bootstrap          Ensure builder has booted before inspecting
+      --builder string     Override the configured builder instance
+  -D, --debug              Enable debug logging
+      --timeout duration   Override the default timeout for loading
+                           builder status (default 20s)

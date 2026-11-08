@@ -1,0 +1,3 @@
+Usage:  docker dhi auth deb
+
+Create authentication details for DHI DEB repositories

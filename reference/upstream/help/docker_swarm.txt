@@ -1,0 +1,9 @@
+Usage:  docker swarm COMMAND
+
+Manage Swarm
+
+Commands:
+  init        Initialize a swarm
+  join        Join a swarm as a node and/or manager
+
+Run 'docker swarm COMMAND --help' for more information on a command.

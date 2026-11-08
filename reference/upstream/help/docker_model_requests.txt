@@ -1,0 +1,9 @@
+Usage:  docker model requests [OPTIONS]
+
+Fetch requests+responses from Docker Model Runner
+
+Options:
+  -f, --follow             Follow requests stream
+      --include-existing   Include existing requests when starting to
+                           follow (only available with --follow)
+      --model string       Specify the model to filter requests

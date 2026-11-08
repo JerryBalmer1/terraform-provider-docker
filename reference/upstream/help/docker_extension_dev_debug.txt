@@ -1,0 +1,7 @@
+
+Usage:  docker extension dev debug
+
+Set the debug mode for an extension
+
+Examples:
+docker extension dev debug my-extension

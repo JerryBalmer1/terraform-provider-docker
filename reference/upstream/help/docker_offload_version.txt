@@ -1,0 +1,7 @@
+Usage:  docker offload version
+
+Prints the version
+
+Options:
+      --json    Prints the version as JSON
+      --short   Prints the short version

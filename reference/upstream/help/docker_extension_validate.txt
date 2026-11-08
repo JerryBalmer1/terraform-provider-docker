@@ -1,0 +1,19 @@
+
+Usage:  docker extension validate [IMAGE | metadata.json]
+
+Validate an extension image or metadata file
+
+Options:
+  -a, --auto-resolve-tag             Use the greatest semver tag
+                                     available in the DockerHub
+                                     repository (overrides the tag
+                                     specified, if any)
+  -e, --errors-only                  Only outputs validation errors (no
+                                     log or debug messages). Can't be set
+                                     alongside verbose flag.
+  -s, --sdk-compatibility            Validate the extension is compatible
+                                     with the SDK version (requires
+                                     having Docker Desktop running)
+  -i, --validate-install-uninstall   Validate the installation and
+                                     uninstallation process
+  -v, --verbose                      Show a more verbose output

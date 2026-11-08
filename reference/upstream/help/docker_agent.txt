@@ -1,0 +1,33 @@
+Usage:
+  docker agent
+  docker agent [command]
+
+Examples:
+  docker agent run
+  docker agent run ./agent.yaml
+  docker agent run agentcatalog/pirate
+
+Core Commands:
+  models      List available models
+  new         Create a new agent configuration
+  run         Run an agent
+  share       Share agents
+
+Advanced Commands:
+  alias       Manage aliases
+  eval        Run evaluations for an agent
+  sandbox     Manage docker-agent sandbox settings
+  serve       Start an agent as a server
+
+Additional Commands:
+  version     Print the version information
+
+Flags:
+      --cache-dir string    Override the cache directory (default: ~/Library/Caches/cagent on macOS)
+      --config-dir string   Override the config directory (default: ~/.config/cagent)
+      --data-dir string     Override the data directory (default: ~/.cagent)
+  -d, --debug               Enable debug logging
+      --log-file string     Path to debug log file (default: ~/.cagent/cagent.debug.log; only used with --debug)
+  -o, --otel                Enable OpenTelemetry tracing
+
+Use "docker agent [command] --help" for more information about a command.

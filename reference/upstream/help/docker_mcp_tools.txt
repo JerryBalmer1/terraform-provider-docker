@@ -1,0 +1,16 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp tools
+
+Flags:
+      --format string         Output format (json|list) (default "list")
+      --gateway-arg strings   Additional arguments passed to the gateway
+      --verbose               Verbose output
+      --version string        Version of the gateway (default "2")
+
+Available Commands:
+  call        Call a tool
+  count       Count tools
+  inspect     Inspect a tool
+  ls          List tools
+

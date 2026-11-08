@@ -1,0 +1,17 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp profile
+
+Available Commands:
+  config              Update the configuration of a profile
+  create              Create a new profile of MCP servers
+  export              Export profile to file
+  import              Import profile from file
+  list                List profiles
+  pull                Pull profile from OCI registry
+  push                Push profile to OCI registry
+  remove              Remove a profile
+  server              Manage servers in profiles
+  show                Show profile
+  tools               Manage tool allowlist for servers in a profile
+

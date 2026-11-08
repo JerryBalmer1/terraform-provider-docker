@@ -1,0 +1,19 @@
+Usage:
+  docker agent serve [command]
+
+Available Commands:
+  a2a         Start an agent as an A2A (Agent-to-Agent) server
+  acp         Start an agent as an ACP (Agent Client Protocol) server
+  api         Start the API server
+  chat        Start an agent as an OpenAI-compatible chat completions server
+  mcp         Start an agent as an MCP (Model Context Protocol) server
+
+Global Flags:
+      --cache-dir string    Override the cache directory (default: ~/Library/Caches/cagent on macOS)
+      --config-dir string   Override the config directory (default: ~/.config/cagent)
+      --data-dir string     Override the data directory (default: ~/.cagent)
+  -d, --debug               Enable debug logging
+      --log-file string     Path to debug log file (default: ~/.cagent/cagent.debug.log; only used with --debug)
+  -o, --otel                Enable OpenTelemetry tracing
+
+Use "docker agent serve [command] --help" for more information about a command.

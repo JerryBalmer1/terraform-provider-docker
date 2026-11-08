@@ -1,0 +1,11 @@
+
+Usage:  docker extension dev COMMAND
+
+Extension development helpers
+
+Commands:
+  debug       Set the debug mode for an extension
+  reset       Reset the source and disables the debug mode for the extension UI
+  ui-source   Set a new source for the extension UI
+
+Run 'docker extension dev COMMAND --help' for more information on a command.

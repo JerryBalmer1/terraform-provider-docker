@@ -1,0 +1,372 @@
+# Inventory
+
+Proposed Terraform names for every item in [upstream/](upstream/) ([SOURCES.md](SOURCES.md)). Names only, no code. Machine-readable: [inventory.json](inventory.json).
+
+Status is against the provider's registered types on 2026-11-08. `cli` = CLI-only (no Engine API endpoint, client-side). Update: `in place` / `replace` for resources.
+
+## Engine
+
+| kind | name | update | sources | min API | status | note |
+|---|---|---|---|---|---|---|
+| resource | `docker_container` | in place | `POST /containers/create` (ContainerCreate)<br>`GET /containers/{id}/json` (ContainerInspect)<br>`POST /containers/{id}/update` (ContainerUpdate)<br>`POST /containers/{id}/rename` (ContainerRename)<br>`DELETE /containers/{id}` (ContainerDelete)<br>`PUT /containers/{id}/archive` (PutContainerArchive)<br>+8 more |  | exists | (has: docker_container (resource), list.docker_container (list resource)) |
+| resource | `docker_image` | replace | `POST /images/create` (ImageCreate)<br>`POST /build` (ImageBuild)<br>`GET /images/{name}/json` (ImageInspect)<br>`DELETE /images/{name}` (ImageDelete)<br>`docker image pull`<br>`docker image build`<br>+1 more |  | exists | (has: docker_image (resource), list.docker_image (list resource)) |
+| resource | `docker_network` | replace | `POST /networks/create` (NetworkCreate)<br>`GET /networks/{id}` (NetworkInspect)<br>`DELETE /networks/{id}` (NetworkDelete)<br>`docker network create`<br>`docker network rm` |  | exists | (has: docker_network (resource), list.docker_network (list resource)) |
+| resource | `docker_network_attachment` | replace | `POST /networks/{id}/connect` (NetworkConnect)<br>`POST /networks/{id}/disconnect` (NetworkDisconnect)<br>`docker network connect`<br>`docker network disconnect` |  | partial | docker_container connects its `networks` at create only; NetworkDisconnect is never called and there is no standalone attachment. (has: docker_container (resource)) ⚠ Overlaps docker_container `networks`; managing the same pair in both would fight. |
+| resource | `docker_plugin` | in place | `GET /plugins/privileges` (GetPluginPrivileges)<br>`POST /plugins/pull` (PluginPull)<br>`GET /plugins/{name}/json` (PluginInspect)<br>`POST /plugins/{name}/enable` (PluginEnable)<br>`POST /plugins/{name}/disable` (PluginDisable)<br>`POST /plugins/{name}/set` (PluginSet)<br>+8 more | 1.25 | partial | PluginUpgrade (1.26) is never used: a changed remote reference forces replacement instead of an in-place upgrade. (has: docker_plugin (resource)) |
+| resource | `docker_registry_image` | replace | `POST /images/{name}/push` (ImagePush)<br>`GET /distribution/{name}/json` (DistributionInspect)<br>`docker image push` |  | exists | (has: docker_registry_image (resource)) |
+| resource | `docker_tag` | replace | `POST /images/{name}/tag` (ImageTag)<br>`docker image tag` |  | exists | (has: docker_tag (resource)) |
+| resource | `docker_volume` | in place | `POST /volumes/create` (VolumeCreate)<br>`GET /volumes/{name}` (VolumeInspect)<br>`PUT /volumes/{name}` (VolumeUpdate)<br>`DELETE /volumes/{name}` (VolumeDelete)<br>`docker volume create`<br>`docker volume update`<br>+1 more | 1.21 | partial | Local volumes complete; no ClusterVolumeSpec (swarm CSI volumes) and VolumeUpdate (1.42, cluster volumes only) is unused. (has: docker_volume (resource), list.docker_volume (list resource)) |
+| data source | `docker_container` |  | `GET /containers/{id}/json` (ContainerInspect)<br>`docker container inspect`<br>`docker inspect` |  | missing |  |
+| data source | `docker_container_changes` |  | `GET /containers/{id}/changes` (ContainerChanges)<br>`docker container diff` |  | missing |  |
+| data source | `docker_container_file` |  | `HEAD /containers/{id}/archive` (ContainerArchiveInfo)<br>`GET /containers/{id}/archive` (ContainerArchive)<br>`docker container cp (out of a container)` | 1.20 | missing |  ⚠ Confusable with docker_container `upload` blocks (the write direction); also consider an action instead if large archives are expected. |
+| data source | `docker_container_stats` |  | `GET /containers/{id}/stats` (ContainerStats)<br>`docker container stats --no-stream` |  | missing |  |
+| data source | `docker_container_top` |  | `GET /containers/{id}/top` (ContainerTop)<br>`docker container top` |  | missing |  |
+| data source | `docker_containers` |  | `GET /containers/json` (ContainerList)<br>`docker container ls`<br>`docker ps` |  | exists | (has: data.docker_containers (data source), list.docker_container (list resource)) |
+| data source | `docker_image` |  | `GET /images/{name}/json` (ImageInspect)<br>`docker image inspect` |  | exists | (has: data.docker_image (data source)) |
+| data source | `docker_image_attestations` |  | `GET /images/{name}/attestations` (ImageAttestations) | 1.55 | missing |  |
+| data source | `docker_image_history` |  | `GET /images/{name}/history` (ImageHistory)<br>`docker image history` |  | missing |  |
+| data source | `docker_image_search` |  | `GET /images/search` (ImageSearch)<br>`docker search` |  | missing |  |
+| data source | `docker_images` |  | `GET /images/json` (ImageList)<br>`docker image ls`<br>`docker images` |  | partial | Only as a list resource for `terraform query`; no plural data source. (has: list.docker_image (list resource)) |
+| data source | `docker_info` |  | `GET /info` (SystemInfo)<br>`docker system info`<br>`docker info` |  | missing |  |
+| data source | `docker_logs` |  | `GET /containers/{id}/logs` (ContainerLogs)<br>`docker container logs` |  | exists | (has: data.docker_logs (data source)) |
+| data source | `docker_network` |  | `GET /networks/{id}` (NetworkInspect)<br>`docker network inspect` |  | exists | (has: data.docker_network (data source)) |
+| data source | `docker_networks` |  | `GET /networks` (NetworkList)<br>`docker network ls` |  | partial | Only as a list resource; no plural data source. (has: list.docker_network (list resource)) |
+| data source | `docker_plugin` |  | `GET /plugins/{name}/json` (PluginInspect)<br>`docker plugin inspect` | 1.25 | exists | (has: data.docker_plugin (data source)) |
+| data source | `docker_plugins` |  | `GET /plugins` (PluginList)<br>`docker plugin ls` | 1.25 | missing |  |
+| data source | `docker_registry_auth` |  | `POST /auth` (SystemAuth)<br>`docker login` |  | partial | docker_registry_token gets a bearer token straight from the registry; nothing calls /auth. Should be ephemeral (returns a secret), which this schema has no kind for. (has: ephemeral.docker_registry_token (ephemeral resource)) ⚠ Confusable with ephemeral docker_registry_token and with provider registry_auth blocks. |
+| data source | `docker_registry_image` |  | `GET /distribution/{name}/json` (DistributionInspect) | 1.30 | exists | (has: data.docker_registry_image (data source)) |
+| data source | `docker_system_df` |  | `GET /system/df` (SystemDataUsage)<br>`docker system df` |  | missing |  |
+| data source | `docker_version` |  | `GET /version` (SystemVersion)<br>`docker version` |  | missing |  |
+| data source | `docker_volume` |  | `GET /volumes/{name}` (VolumeInspect)<br>`docker volume inspect` | 1.21 | exists | (has: data.docker_volume (data source)) |
+| data source | `docker_volumes` |  | `GET /volumes` (VolumeList)<br>`docker volume ls` | 1.21 | partial | Only as a list resource; no plural data source. (has: list.docker_volume (list resource)) |
+| action | `docker_builder_prune` |  | `POST /build/prune` (BuildPrune)<br>`docker builder prune` |  | partial | Only through docker_system_prune build_cache=true; no dedicated action with keep/reserved-space options. (has: action.docker_system_prune (action)) ⚠ docker_builder_prune (Engine build cache) is easy to confuse with docker_buildx_builder (a BuildKit builder container); docker_build_cache_prune avoids it. |
+| action | `docker_container_export` |  | `GET /containers/{id}/export` (ContainerExport)<br>`docker container export` |  | exists | (has: action.docker_container_export (action)) |
+| action | `docker_container_kill` |  | `POST /containers/{id}/kill` (ContainerKill)<br>`docker container kill` |  | missing |  |
+| action | `docker_container_pause` |  | `POST /containers/{id}/pause` (ContainerPause)<br>`docker container pause` |  | missing |  |
+| action | `docker_container_prune` |  | `POST /containers/prune` (ContainerPrune)<br>`docker container prune` | 1.25 | partial | Only through docker_system_prune with containers=true (and other kinds switched off); no dedicated action. (has: action.docker_system_prune (action)) |
+| action | `docker_container_restart` |  | `POST /containers/{id}/restart` (ContainerRestart)<br>`docker container restart` |  | missing |  |
+| action | `docker_container_start` |  | `POST /containers/{id}/start` (ContainerStart)<br>`docker container start` |  | missing |  |
+| action | `docker_container_stop` |  | `POST /containers/{id}/stop` (ContainerStop)<br>`docker container stop` |  | missing |  |
+| action | `docker_container_unpause` |  | `POST /containers/{id}/unpause` (ContainerUnpause)<br>`docker container unpause` |  | missing |  |
+| action | `docker_container_upload` |  | `PUT /containers/{id}/archive` (PutContainerArchive)<br>`docker container cp` | 1.20 | partial | Only docker_container `upload` blocks (before first start) use PutContainerArchive. (has: docker_container (resource)) |
+| action | `docker_container_wait` |  | `POST /containers/{id}/wait` (ContainerWait)<br>`docker container wait` |  | missing |  |
+| action | `docker_exec` |  | `POST /containers/{id}/exec` (ContainerExec)<br>`POST /exec/{id}/start` (ExecStart)<br>`GET /exec/{id}/json` (ExecInspect)<br>`docker container exec` |  | exists | (has: action.docker_exec (action), ephemeral.docker_exec_output (ephemeral resource)) |
+| action | `docker_image_build` |  | `POST /build` (ImageBuild)<br>`docker image build`<br>`docker build` |  | partial | Builds exist only as the docker_image `build` block (legacy builder and BuildKit via /session). (has: docker_image (resource)) ⚠ Confusable with docker_image (resource whose `build` block already calls ImageBuild) and with docker_buildx_builder. |
+| action | `docker_image_commit` |  | `POST /commit` (ImageCommit)<br>`docker container commit` |  | missing |  |
+| action | `docker_image_import` |  | `POST /images/create` (ImageCreate)<br>`docker image import` |  | exists | (has: action.docker_image_import (action)) |
+| action | `docker_image_load` |  | `POST /images/load` (ImageLoad)<br>`docker image load` |  | exists | (has: action.docker_image_load (action)) |
+| action | `docker_image_prune` |  | `POST /images/prune` (ImagePrune)<br>`docker image prune` | 1.25 | exists | (has: action.docker_image_prune (action), action.docker_system_prune (action)) |
+| action | `docker_image_save` |  | `GET /images/{name}/get` (ImageGet)<br>`GET /images/get` (ImageGetAll)<br>`docker image save` |  | exists | (has: action.docker_image_save (action)) |
+| action | `docker_network_prune` |  | `POST /networks/prune` (NetworkPrune)<br>`docker network prune` | 1.25 | partial | Only through docker_system_prune networks=true. (has: action.docker_system_prune (action)) |
+| action | `docker_plugin_create` |  | `POST /plugins/create` (PluginCreate)<br>`docker plugin create` | 1.25 | missing |  ⚠ Confusable with docker_plugin (install from a registry). PluginCreate has a delete counterpart, so it could also be a resource. |
+| action | `docker_plugin_push` |  | `POST /plugins/{name}/push` (PluginPush)<br>`docker plugin push` | 1.25 | missing |  |
+| action | `docker_volume_prune` |  | `POST /volumes/prune` (VolumePrune)<br>`docker volume prune` | 1.25 | partial | Only through docker_system_prune volumes=true. (has: action.docker_system_prune (action)) |
+| skip | - |  | `POST /containers/{id}/attach` (ContainerAttach)<br>`GET /containers/{id}/attach/ws` (ContainerAttachWebsocket)<br>`docker container attach` |  | - | skip: Interactive hijacked/websocket stream. |
+| skip | - |  | `GET /events` (SystemEvents)<br>`docker system events` |  | - | skip: Unbounded streaming endpoint; no Terraform lifecycle fits (a bounded since/until snapshot data source is possible later). |
+| skip | - |  | `GET /_ping` (SystemPing)<br>`HEAD /_ping` (SystemPingHead) | 1.11 | - | skip: Used internally by provider configure for API version negotiation; no user-facing object. |
+| skip | - |  | `POST /containers/{id}/resize` (ContainerResize)<br>`POST /exec/{id}/resize` (ExecResize) |  | - | skip: Only meaningful for an interactive TTY session. |
+| skip | - |  | `POST /session` (Session) | 1.31 | - | skip: Deprecated (API 1.53) transport; used internally by the docker_image BuildKit build path, not a user-facing object. |
+
+## Swarm
+
+| kind | name | update | sources | min API | status | note |
+|---|---|---|---|---|---|---|
+| resource | `docker_config` | in place | `POST /configs/create` (ConfigCreate)<br>`GET /configs/{id}` (ConfigInspect)<br>`POST /configs/{id}/update` (ConfigUpdate)<br>`DELETE /configs/{id}` (ConfigDelete)<br>`docker config create`<br>`docker config rm` |  | exists | (has: docker_config (resource), list.docker_config (list resource)) ⚠ docker_config (swarm config object) vs compose top-level `configs` and the provider's own configuration block. |
+| resource | `docker_secret` | in place | `POST /secrets/create` (SecretCreate)<br>`GET /secrets/{id}` (SecretInspect)<br>`POST /secrets/{id}/update` (SecretUpdate)<br>`DELETE /secrets/{id}` (SecretDelete)<br>`docker secret create`<br>`docker secret rm` | 1.25 | exists | (has: docker_secret (resource), list.docker_secret (list resource)) |
+| resource | `docker_service` | in place | `POST /services/create` (ServiceCreate)<br>`GET /services/{id}` (ServiceInspect)<br>`POST /services/{id}/update` (ServiceUpdate)<br>`DELETE /services/{id}` (ServiceDelete)<br>`docker service create`<br>`docker service update`<br>+1 more |  | exists | (has: docker_service (resource), list.docker_service (list resource)) |
+| resource | `docker_swarm_init` | in place | `POST /swarm/init` (SwarmInit)<br>`GET /swarm` (SwarmInspect)<br>`POST /swarm/update` (SwarmUpdate)<br>`GET /swarm/unlockkey` (SwarmUnlockkey)<br>`POST /swarm/leave` (SwarmLeave)<br>`docker swarm init`<br>+2 more |  | exists | (has: docker_swarm_init (resource)) |
+| resource | `docker_swarm_node` | in place | `POST /swarm/join` (SwarmJoin)<br>`POST /swarm/leave` (SwarmLeave)<br>`POST /nodes/{id}/update` (NodeUpdate)<br>`GET /nodes/{id}` (NodeInspect)<br>`DELETE /nodes/{id}` (NodeDelete)<br>`docker swarm join`<br>+3 more |  | exists | (has: docker_swarm_node (resource), list.docker_swarm_node (list resource)) ⚠ docker_swarm_node is a *join* resource; a user expecting it to manage an already-joined node (labels/availability only, NodeUpdate) would need a separate type, e.g. docker_node. |
+| data source | `docker_config` |  | `GET /configs/{id}` (ConfigInspect)<br>`docker config inspect` |  | missing |  ⚠ Same confusion as docker_config resource (swarm config vs compose configs). |
+| data source | `docker_configs` |  | `GET /configs` (ConfigList)<br>`docker config ls` |  | exists | (has: data.docker_configs (data source), list.docker_config (list resource)) |
+| data source | `docker_node` |  | `GET /nodes/{id}` (NodeInspect)<br>`docker node inspect` |  | exists | (has: data.docker_node (data source)) |
+| data source | `docker_nodes` |  | `GET /nodes` (NodeList)<br>`docker node ls` |  | exists | (has: data.docker_nodes (data source), list.docker_swarm_node (list resource)) |
+| data source | `docker_secret` |  | `GET /secrets/{id}` (SecretInspect)<br>`docker secret inspect` | 1.25 | missing |  |
+| data source | `docker_secrets` |  | `GET /secrets` (SecretList)<br>`docker secret ls` | 1.25 | exists | (has: data.docker_secrets (data source), list.docker_secret (list resource)) |
+| data source | `docker_service` |  | `GET /services/{id}` (ServiceInspect)<br>`docker service inspect` |  | missing |  |
+| data source | `docker_service_logs` |  | `GET /services/{id}/logs` (ServiceLogs)<br>`docker service logs` |  | missing |  ⚠ Could instead extend data.docker_logs with a service_id/task_id argument. |
+| data source | `docker_services` |  | `GET /services` (ServiceList)<br>`docker service ls` |  | exists | (has: data.docker_services (data source), list.docker_service (list resource)) |
+| data source | `docker_swarm` |  | `GET /swarm` (SwarmInspect)<br>`docker swarm join-token` |  | partial | Only join tokens and ID are exposed; spec/CA/TLS info has no data source. (has: data.docker_swarm_tokens (data source), ephemeral.docker_swarm_tokens (ephemeral resource)) |
+| data source | `docker_task` |  | `GET /tasks/{id}` (TaskInspect)<br>`docker inspect` |  | missing |  |
+| data source | `docker_task_logs` |  | `GET /tasks/{id}/logs` (TaskLogs)<br>`docker service logs <task-id>` |  | missing |  ⚠ Could merge with docker_service_logs or data.docker_logs. |
+| data source | `docker_tasks` |  | `GET /tasks` (TaskList)<br>`docker service ps`<br>`docker node ps`<br>`docker stack ps` |  | missing |  |
+| action | `docker_node_activate` |  | `POST /nodes/{id}/update` (NodeUpdate)<br>`docker node update --availability active` |  | exists | (has: action.docker_node_activate (action)) |
+| action | `docker_node_demote` |  | `POST /nodes/{id}/update` (NodeUpdate)<br>`docker node demote` |  | partial | Only as docker_swarm_node `role` for nodes Terraform joined; no imperative action. (has: docker_swarm_node (resource)) |
+| action | `docker_node_drain` |  | `POST /nodes/{id}/update` (NodeUpdate)<br>`docker node update --availability drain` |  | exists | (has: action.docker_node_drain (action)) |
+| action | `docker_node_promote` |  | `POST /nodes/{id}/update` (NodeUpdate)<br>`docker node promote` |  | partial | Only as docker_swarm_node `role` for nodes Terraform joined; no imperative action. (has: docker_swarm_node (resource)) |
+| action | `docker_service_force_update` |  | `POST /services/{id}/update` (ServiceUpdate)<br>`docker service update --force` |  | exists | (has: action.docker_service_force_update (action)) |
+| action | `docker_service_rollback` |  | `POST /services/{id}/update` (ServiceUpdate)<br>`docker service rollback` |  | exists | (has: action.docker_service_rollback (action)) |
+| action | `docker_service_scale` |  | `POST /services/{id}/update` (ServiceUpdate)<br>`docker service scale` |  | exists | (has: action.docker_service_scale (action)) |
+| action | `docker_swarm_ca_rotate` |  | `POST /swarm/update` (SwarmUpdate)<br>`docker swarm ca --rotate` |  | missing |  |
+| action | `docker_swarm_rotate_tokens` |  | `POST /swarm/update` (SwarmUpdate)<br>`docker swarm join-token --rotate` |  | exists | (has: action.docker_swarm_rotate_tokens (action)) |
+| action | `docker_swarm_rotate_unlock_key` |  | `POST /swarm/update` (SwarmUpdate)<br>`docker swarm unlock-key --rotate` |  | missing |  |
+| action | `docker_swarm_unlock` |  | `POST /swarm/unlock` (SwarmUnlock)<br>`docker swarm unlock` |  | missing |  |
+
+## Compose
+
+| kind | name | update | sources | min API | status | note |
+|---|---|---|---|---|---|---|
+| resource | `docker_compose` | in place | `#/properties/configs`<br>`#/properties/configs`<br>`#/$defs/config`<br>`#/$defs/config`<br>08-configs.md#configs-top-level-element |  | partial | Local mode copies the content into the container (no bind mount); swarm mode creates Swarm configs but ignores driver and template_driver with a warning. (has: docker_compose (resource), docker_config (resource)) ⚠ Top-level `configs` vs docker_config (Swarm config resource) vs the proposed docker_compose_config data source (CLI `compose config`, rendered model). |
+| resource | `docker_compose` | in place | `#/properties/include`<br>`#/properties/include`<br>`#/$defs/include`<br>`#/$defs/include`<br>14-include.md#include |  | partial | Local-path includes are resolved by the compose-go loader; remote (git/oci) includes are disabled by design (compose_parse.go). (has: docker_compose (resource)) |
+| resource | `docker_compose` | in place | `#/properties/jobs`<br>`#/properties/jobs`<br>`#/$defs/job`<br>`#/$defs/job`<br>`#/$defs/schedule`<br>`#/$defs/schedule`<br>+2 more |  | missing | (has: docker_compose (resource)) |
+| resource | `docker_compose` | in place | `#/properties/models`<br>`#/properties/models`<br>`#/$defs/model`<br>`#/$defs/model`<br>models.md#models-top-level-element |  | missing | (has: docker_compose (resource)) |
+| resource | `docker_compose` | in place | `#/properties/name`<br>`#/properties/name`<br>04-version-and-name.md#name-top-level-element |  | exists | (has: docker_compose (resource)) |
+| resource | `docker_compose` | in place | `#/properties/networks`<br>`#/properties/networks`<br>`#/$defs/network`<br>`#/$defs/network`<br>06-networks.md#networks-top-level-element |  | exists | (has: docker_compose (resource), docker_network (resource)) ⚠ docker_compose_network would be confusable with docker_network. |
+| resource | `docker_compose` | in place | `#/properties/secrets`<br>`#/properties/secrets`<br>`#/$defs/secret`<br>`#/$defs/secret`<br>09-secrets.md#secrets-top-level-element |  | partial | Local mode copies content into the container (no bind mount as compose does); swarm mode ignores driver and template_driver with a warning. (has: docker_compose (resource), docker_secret (resource)) ⚠ docker_compose_secret would be confusable with docker_secret. |
+| resource | `docker_compose` | in place | `#/properties/services`<br>`#/properties/services`<br>`#/$defs/service`<br>`#/$defs/service`<br>05-services.md#services-top-level-element<br>container_spec.md#container-specification<br>+1 more |  | partial | docker_compose loads services with compose-go and creates containers (local) or Swarm services (swarm). Ignored with a warning: build (no image is an error, pull_policy build errors), develop, pre_start/post_start/pre_stop hooks, models, provider, credential_spec, blkio_config, use_api_socket, external_links, attach (local); swarm mode also ignores container_name, depends_on, network_mode, privileged, devices, ipc/pid/userns/uts/cgroup_parent, security_opt, shm_size, volumes_from, gpus, links, tmpfs, pull_policy other than missing/always. (has: docker_compose (resource), docker_stack (resource), docker_service (resource), docker_container (resource)) ⚠ A per-service type named docker_compose_service would be confusable with docker_service (swarm). Keep services inside docker_compose. |
+| resource | `docker_compose` | in place | `#/properties/volumes`<br>`#/properties/volumes`<br>`#/$defs/volume`<br>`#/$defs/volume`<br>07-volumes.md#volumes-top-level-element |  | exists | (has: docker_compose (resource), docker_volume (resource)) ⚠ docker_compose_volume(s) would be confusable with docker_volume and with the proposed docker_compose_volumes data source (CLI `compose volumes`). |
+| resource | `docker_image` | in place | `#/$defs/service/properties/build`<br>`#/$defs/service/properties/build`<br>build.md#compose-build-specification |  | partial | docker_compose does not build (warns; errors when image is unset); docker_image covers the build as a separate resource. A build action would be docker_compose_build. (has: docker_image (resource), docker_buildx_builder (resource)) |
+| resource | `docker_service` | in place | `#/$defs/service/properties/deploy`<br>`#/$defs/service/properties/deploy`<br>`#/$defs/deployment`<br>`#/$defs/deployment`<br>deploy.md#compose-deploy-specification |  | partial | docker_compose swarm mode maps deploy to the Swarm service spec; local mode uses replicas (scale), global mode and resources. Not its own Terraform type: it is the docker_service spec. (has: docker_compose (resource), docker_service (resource), docker_stack (resource)) |
+| data source | `docker_compose_config` |  | `docker compose config`<br>`docker compose config` |  | missing · cli |  ⚠ Confusable with top-level compose `configs` and docker_config (swarm config resource). Alternatives: docker_compose_project, docker_compose_model, or function compose_render. |
+| data source | `docker_compose_containers` |  | `docker compose ps`<br>`docker compose ps` |  | partial · cli | docker_compose.services gives container IDs for managed projects; docker_containers can filter by label for others. (has: docker_compose (resource), data.docker_containers (data source), list.docker_container (list resource)) ⚠ Name options: docker_compose_ps (CLI-shaped) vs docker_compose_containers (plural-noun convention beside docker_containers). |
+| data source | `docker_compose_images` |  | `docker compose images`<br>`docker compose images` |  | missing · cli |  ⚠ Beside data.docker_image (singular) and list.docker_image. |
+| data source | `docker_compose_logs` |  | `docker compose logs`<br>`docker compose logs` |  | partial · cli | climap maps it to docker_logs per container; no project/service selector. (has: data.docker_logs (data source)) |
+| data source | `docker_compose_port` |  | `docker compose port`<br>`docker compose port` |  | missing · cli |  ⚠ Confusable with the port_spec function. |
+| data source | `docker_compose_projects` |  | `docker compose ls`<br>`docker compose ls` |  | missing · cli |  ⚠ docker_compose_ls (CLI-shaped) vs docker_compose_projects (noun). |
+| data source | `docker_compose_top` |  | `docker compose top`<br>`docker compose top` |  | missing · cli |  |
+| data source | `docker_compose_volumes` |  | `docker compose volumes`<br>`docker compose volumes` |  | partial · cli | docker_compose.volumes lists managed project volumes; no lookup for others. (has: docker_compose (resource), data.docker_volume (data source), list.docker_volume (list resource)) ⚠ docker_compose_volumes vs docker_volume / top-level compose `volumes`. |
+| action | `docker_compose_build` |  | `docker compose build`<br>`docker compose build` |  | partial · cli | docker_compose ignores build: and climap says no equivalent; docker_image builds one image per resource. (has: docker_image (resource)) |
+| action | `docker_compose_commit` |  | `docker compose commit`<br>`docker compose commit` |  | missing · cli |  |
+| action | `docker_compose_cp` |  | `docker compose cp`<br>`docker compose cp` |  | partial · cli | docker_container has upload blocks for containers it manages; nothing for compose containers or for copying out. (has: docker_container (resource)) |
+| action | `docker_compose_down` |  | `docker compose down`<br>`docker compose down` |  | partial · cli | Destroying docker_compose (keep_volumes) is down; no action for projects outside Terraform. (has: docker_compose (resource)) |
+| action | `docker_compose_exec` |  | `docker compose exec`<br>`docker compose exec` |  | partial · cli | climap maps it to docker_exec with the <project>-<service>-<n> container name; no service selector. (has: docker_exec (action), docker_exec_output (ephemeral resource)) |
+| action | `docker_compose_export` |  | `docker compose export`<br>`docker compose export` |  | partial · cli | docker_container_export takes a container, not a project/service. (has: docker_container_export (action)) |
+| action | `docker_compose_kill` |  | `docker compose kill`<br>`docker compose kill` |  | missing · cli |  ⚠ Would mirror single-container docker_container_kill actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those. |
+| action | `docker_compose_pause` |  | `docker compose pause`<br>`docker compose pause` |  | missing · cli |  ⚠ Would mirror single-container docker_container_pause actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those. |
+| action | `docker_compose_publish` |  | `docker compose publish`<br>`docker compose publish` |  | missing · cli |  |
+| action | `docker_compose_pull` |  | `docker compose pull`<br>`docker compose pull` |  | partial · cli | docker_compose pulls missing images during apply; climap maps it to docker_image. (has: docker_image (resource), docker_compose (resource)) |
+| action | `docker_compose_push` |  | `docker compose push`<br>`docker compose push` |  | partial · cli | docker_registry_image pushes one image per resource; no project-wide push. (has: docker_registry_image (resource)) |
+| action | `docker_compose_restart` |  | `docker compose restart`<br>`docker compose restart` |  | missing · cli |  ⚠ Would mirror single-container docker_container_restart actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those. |
+| action | `docker_compose_run` |  | `docker compose run`<br>`docker compose run` |  | missing · cli |  |
+| action | `docker_compose_scale` |  | `docker compose scale`<br>`docker compose scale` |  | partial · cli | Declaratively via deploy.replicas in docker_compose content; docker_service_scale covers swarm services. (has: docker_compose (resource), docker_service_scale (action)) ⚠ docker_service_scale (swarm action) already exists; docker_compose_scale is near-identical in purpose. |
+| action | `docker_compose_start` |  | `docker compose start`<br>`docker compose start` |  | missing · cli |  ⚠ Would mirror single-container docker_container_start actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those. |
+| action | `docker_compose_stop` |  | `docker compose stop`<br>`docker compose stop` |  | missing · cli |  ⚠ Would mirror single-container docker_container_stop actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those. |
+| action | `docker_compose_unpause` |  | `docker compose unpause`<br>`docker compose unpause` |  | missing · cli |  ⚠ Would mirror single-container docker_container_unpause actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those. |
+| action | `docker_compose_up` |  | `docker compose up`<br>`docker compose up` |  | partial · cli | The docker_compose resource does up on create/update; climap maps `compose up` to it. A standalone action would serve projects not managed by Terraform. (has: docker_compose (resource)) ⚠ docker_compose (resource) already means up; an action docker_compose_up beside it invites confusion. |
+| action | `docker_compose_wait` |  | `docker compose wait`<br>`docker compose wait` |  | partial · cli | docker_compose has wait/wait_timeout for readiness after apply, not for exit. (has: docker_compose (resource)) |
+| skip | - |  | `docker compose alpha`<br>`docker compose alpha` |  | - · cli | skip: command group only |
+| skip | - |  | `docker compose alpha dry-run`<br>`docker compose alpha dry-run` |  | - · cli | skip: Terraform plan already is the dry run |
+| skip | - |  | `docker compose alpha generate`<br>`docker compose alpha generate` |  | - · cli | skip: experimental authoring helper; output is a file, not infra (terraform query + list resources cover discovery) |
+| skip | - |  | `docker compose alpha publish`<br>`docker compose alpha publish` |  | - · cli | skip: duplicate of docker_compose_publish |
+| skip | - |  | `docker compose alpha scale`<br>`docker compose alpha scale` |  | - · cli | skip: duplicate of docker_compose_scale |
+| skip | - |  | `docker compose alpha viz`<br>`docker compose alpha viz` |  | - · cli | skip: visualisation only; terraform graph covers it |
+| skip | - |  | `docker compose alpha watch`<br>`docker compose alpha watch` |  | - · cli | skip: interactive file watcher |
+| skip | - |  | `docker compose attach`<br>`docker compose attach` |  | - · cli | skip: interactive attach stream |
+| skip | - |  | `docker compose bridge`<br>`docker compose bridge` |  | - · cli | skip: command group; targets non-Docker platforms |
+| skip | - |  | `docker compose bridge convert`<br>`docker compose bridge convert` |  | - · cli | skip: out of scope (Kubernetes output) |
+| skip | - |  | `docker compose bridge transformations`<br>`docker compose bridge transformations` |  | - · cli | skip: command group |
+| skip | - |  | `docker compose bridge transformations create`<br>`docker compose bridge transformations create` |  | - · cli | skip: out of scope (compose-bridge tooling) |
+| skip | - |  | `docker compose bridge transformations list`<br>`docker compose bridge transformations list` |  | - · cli | skip: out of scope (compose-bridge tooling) |
+| skip | - |  | `docker compose convert` |  | - · cli | skip: alias of config |
+| skip | - |  | `docker compose create`<br>`docker compose create` |  | - · cli | skip: half of `up`; the docker_compose resource owns container creation |
+| skip | - |  | `docker compose events`<br>`docker compose events` |  | - · cli | skip: streaming |
+| skip | - |  | `docker compose rm`<br>`docker compose rm` |  | - · cli | skip: docker_compose reconciles and removes its own containers; one-off cleanup is docker_system_prune |
+| skip | - |  | `docker compose`<br>`docker compose` |  | - · cli | skip: command group only; global flags (-f, -p, --profile, --env-file) are docker_compose attributes |
+| skip | - |  | `docker compose stats`<br>`docker compose stats` |  | - · cli | skip: streaming (a --no-stream snapshot could be a data source later) |
+| skip | - |  | `docker compose version`<br>`docker compose version` |  | - · cli | skip: client version only; provider embeds compose-go v2.16.2 |
+| skip | - |  | `docker compose watch`<br>`docker compose watch` |  | - · cli | skip: interactive, long-running file watcher |
+| skip | - |  | 11-extension.md#extension |  | - | skip: file-format mechanic, handled by the compose loader |
+| skip | - |  | 10-fragments.md#fragments |  | - | skip: file-format mechanic, handled by the compose loader |
+| skip | - |  | 12-interpolation.md#interpolation |  | - | skip: file-format mechanic, handled by the compose loader |
+| skip | - |  | 13-merge.md#merge-and-override |  | - | skip: file-format mechanic, handled by the compose loader |
+| skip | - |  | 15-profiles.md#profiles |  | - | skip: file-format mechanic, handled by the compose loader |
+| skip | - |  | `#/$defs/service/properties/develop`<br>`#/$defs/service/properties/develop`<br>`#/$defs/development`<br>`#/$defs/development`<br>develop.md#compose-develop-specification |  | - | skip: developer inner-loop file watching; not declarative (docker_compose warns and ignores it) |
+| skip | - |  | `#/properties/version`<br>`#/properties/version`<br>04-version-and-name.md#version-top-level-element-obsolete |  | - | skip: obsolete; Compose ignores it (warns) and so does the loader |
+
+## Dockerfile
+
+| kind | name | flags | sources | status |
+|---|---|---|---|---|
+| block | `docker_dockerfile_add` | `sources/destination`, `--keep-git-dir`, `--checksum`, `--chmod`, `--chown`, `--link`, `--unpack`, `--exclude` | reference.md#add | missing |
+| block | `docker_dockerfile_arg` | `<name>[=<default>]`, `predefined ARGs`, `automatic platform ARGs`, `BuildKit built-in build args` | reference.md#arg | missing |
+| block | `docker_dockerfile_cmd` | `exec form`, `exec form (params to ENTRYPOINT)`, `shell form` | reference.md#cmd | missing |
+| block | `docker_dockerfile_copy` | `sources/destination`, `heredoc`, `--from`, `--chmod`, `--chown`, `--link`, `--parents`, `--exclude` | reference.md#copy | missing |
+| block | `docker_dockerfile_directive_check` | `skip`, `error`, `ConsistentInstructionCasing`, `CopyIgnoredFile`, `DuplicateStageName`, `ExposeInvalidFormat`, `ExposeProtoCasing`, `FromAsCasing`, `FromPlatformFlagConstDisallowed`, `InvalidDefaultArgInFrom`, `InvalidDefinitionDescription`, `JSONArgsRecommended`, `LegacyKeyValueFormat`, `MaintainerDeprecated`, `MultipleInstructionsDisallowed`, `NoEmptyContinuation`, `RedundantTargetPlatform`, `ReservedStageName`, `SecretsUsedInArgOrEnv`, `StageNameCasing`, `UndefinedArgInFrom`, `UndefinedVar`, `WorkdirRelativePath` | reference.md#check<br>consistent-instruction-casing.md<br>copy-ignored-file.md<br>duplicate-stage-name.md<br>expose-invalid-format.md<br>expose-proto-casing.md<br>+17 more | missing |
+| block | `docker_dockerfile_directive_escape` | `escape` | reference.md#escape | missing |
+| block | `docker_dockerfile_directive_syntax` | `syntax` | reference.md#syntax | missing |
+| block | `docker_dockerfile_entrypoint` | `exec form`, `shell form` | reference.md#entrypoint | missing |
+| block | `docker_dockerfile_env` | `<key>=<value>` | reference.md#env | missing |
+| block | `docker_dockerfile_expose` | `<port>[/<protocol>]` | reference.md#expose | missing |
+| block | `docker_dockerfile_from` | `--platform`, `image`, `AS name`, `global ARG substitution` | reference.md#from | missing |
+| block | `docker_dockerfile_healthcheck` | `CMD`, `NONE`, `--interval`, `--timeout`, `--start-period`, `--start-interval`, `--retries` | reference.md#healthcheck | missing |
+| block | `docker_dockerfile_label` | `<key>=<value>` | reference.md#label | missing |
+| block | `docker_dockerfile_maintainer` | `<name>` | reference.md#maintainer-deprecated | missing |
+| block | `docker_dockerfile_onbuild` | `trigger`, `trigger with --from / --mount from` | reference.md#onbuild | missing |
+| block | `docker_dockerfile_run` | `shell form`, `exec form`, `heredoc`, `--device`, `--mount`, `--mount=type=bind`, `--mount=type=cache`, `--mount=type=tmpfs`, `--mount=type=secret`, `--mount=type=ssh`, `--network`, `--network=default`, `--network=none`, `--network=host`, `--security` | reference.md#run | missing |
+| block | `docker_dockerfile_shell` | `exec form` | reference.md#shell | missing |
+| block | `docker_dockerfile_stopsignal` | `signal` | reference.md#stopsignal | missing |
+| block | `docker_dockerfile_user` | `user` | reference.md#user | missing |
+| block | `docker_dockerfile_volume` | `paths` | reference.md#volume | missing |
+| block | `docker_dockerfile_workdir` | `path` | reference.md#workdir | missing |
+
+## Buildx
+
+| kind | name | update | sources | min API | status | note |
+|---|---|---|---|---|---|---|
+| resource | `docker_buildx_builder` | in place | `docker buildx create`<br>`docker buildx create --help`<br>`docker buildx rm`<br>`docker buildx rm --help` |  | partial · cli | Only the docker-container driver, single node: no kubernetes/remote/cloud drivers, no --append/--node/--leave multi-node builders, no --platform pinning per node, no --driver-opt beyond image/network/env/restart/memory etc. Builder is a container + state volume created via Engine API; buildx's local store (~/.docker/buildx/instances) is not written, so `docker buildx ls` will not list it. (has: docker_buildx_builder (resource)) |
+| resource | `docker_image` | replace | `docker buildx build`<br>`docker buildx build --help`<br>`docker build`<br>`docker build --help`<br>`docker image build`<br>`docker image build --help`<br>+3 more |  | partial · cli | docker_image.build has context, dockerfile, target, args, labels, platform(s), pull, no_cache, cache_from, secrets, builder. Missing: --output/exporters (local, tar, oci, registry with push), --cache-to, --ssh, --attest/--sbom/--provenance, --annotation, --network, --add-host, --build-context (named contexts), --shm-size, --ulimit, --call/--check, --iidfile/metadata, --policy (0.38). (has: docker_image (resource, build block), docker_buildx_builder (resource)) ⚠ Do not add docker_buildx_build: it would duplicate docker_image. If exporters that produce no local image are wanted, that is an action (docker_buildx_bake or docker_image_build action), not a second build resource. |
+| data source | `docker_buildx_builder` |  | `docker buildx inspect`<br>`docker buildx inspect --help` |  | missing · cli | (has: docker_buildx_builder (resource, computed attrs)) ⚠ Same name as the resource (resource/data source pair, allowed). For builders not created by Terraform, discovery is limited to buildx_buildkit_* containers on the daemon (buildx's builder store is client-side). |
+| data source | `docker_buildx_builders` |  | `docker buildx ls`<br>`docker buildx ls --help` |  | missing · cli |  |
+| data source | `docker_buildx_disk_usage` |  | `docker buildx du`<br>`docker buildx du --help`<br>`GET /system/df` (SystemDataUsage) |  | missing · cli |  ⚠ Overlaps Z1's system df data source (BuildCache section); merge or keep builder-scoped. |
+| data source | `docker_buildx_history` |  | `docker buildx history ls`<br>`docker buildx history ls --help`<br>`docker buildx history`<br>`docker buildx history --help` |  | missing · cli |  |
+| data source | `docker_buildx_history_record` |  | `docker buildx history inspect`<br>`docker buildx history inspect --help` |  | missing · cli |  ⚠ Could be folded into docker_buildx_history as a `ref` filter; naming question. |
+| data source | `docker_registry_image_manifests` |  | `docker buildx imagetools inspect`<br>`docker buildx imagetools inspect --help` |  | partial · cli | Manifests and platforms are covered; provenance/SBOM attestation content (--format '{{json .Provenance}}') is not. (has: docker_registry_image_manifests (data source)) ⚠ Same type as cli-only:manifest-inspect. |
+| action | `docker_buildx_bake` |  | `docker buildx bake`<br>`docker buildx bake --help`<br>`docker bake`<br>`docker bake --help`<br>bake-reference.md#file-format |  | missing · cli |  ⚠ Overlaps docker_image (build block) for single targets. |
+| action | `docker_buildx_builder_stop` |  | `docker buildx stop`<br>`docker buildx stop --help`<br>`POST /containers/{id}/stop` (ContainerStop) |  | missing · cli |  ⚠ Low value: docker_buildx_builder with bootstrap=false or a must_run-style flag could cover it; consider skip. |
+| action | `docker_buildx_prune` |  | `docker buildx prune`<br>`docker buildx prune --help`<br>`POST /build/prune` (BuildPrune) |  | partial · cli | docker_system_prune can include the daemon's build cache (POST /build/prune) for the built-in builder only; nothing prunes a docker-container builder's cache. (has: docker_system_prune (action)) ⚠ Z1 will likely propose an Engine action for POST /build/prune (e.g. docker_build_cache_prune / docker_builder_prune). One type should take an optional `builder` and choose BuildKit gRPC vs POST /build/prune. |
+| skip | - |  | bake-reference.md#function<br>bake-stdlib.md |  | - · cli | skip: Bake HCL is itself HCL built on the same go-cty stdlib; Terraform functions (plus provider functions) replace user functions. |
+| skip | - |  | bake-reference.md#group |  | - · cli | skip: A list of target names; in Terraform this is the docker_buildx_bake action's `targets` argument or a for_each over targets. |
+| skip | - |  | bake-reference.md#target |  | - · cli | skip: Not a Terraform type: becomes a nested `target` block of the docker_buildx_bake action (and its attributes mirror docker_image.build). `inherits` and `matrix` map to Terraform locals/for_each. |
+| skip | - |  | bake-reference.md#variable |  | - · cli | skip: Terraform variables/locals replace them; when the action consumes an existing bake file, overrides go through a `set`/`variables` map argument. |
+| skip | - |  | `docker buildx dap`<br>`docker buildx dap --help`<br>`docker buildx dap build`<br>`docker buildx dap build --help` |  | - · cli | skip: Interactive IDE debugging session; not declarative. |
+| skip | - |  | `docker buildx debug`<br>`docker buildx debug build` |  | - · cli | skip: Experimental, interactive; also newer than the installed buildx v0.34.1 (not in help capture). |
+| skip | - |  | `docker buildx dial-stdio`<br>`docker buildx dial-stdio --help` |  | - · cli | skip: Transport plumbing for other tools; the provider dials BuildKit directly. |
+| skip | - |  | `docker buildx history export`<br>`docker buildx history export --help` |  | - · cli | skip: Exports a Docker Desktop .dockerbuild bundle (Desktop UI artifact). |
+| skip | - |  | `docker buildx history import`<br>`docker buildx history import --help` |  | - · cli | skip: Imports a Docker Desktop .dockerbuild bundle (Desktop UI artifact). |
+| skip | - |  | `docker buildx history inspect attachment`<br>`docker buildx history inspect attachment --help` |  | - · cli | skip: Returns raw attachment blobs (SBOM/provenance) of a record; low value as state, and docker_image attestations are Z1's ImageAttestations territory. |
+| skip | - |  | `docker buildx history logs`<br>`docker buildx history logs --help` |  | - · cli | skip: Build log stream; logs are not Terraform state. |
+| skip | - |  | `docker buildx history open`<br>`docker buildx history open --help` |  | - · cli | skip: Opens the Docker Desktop UI. |
+| skip | - |  | `docker buildx history rm`<br>`docker buildx history rm --help` |  | - · cli | skip: Deleting build records is housekeeping; covered well enough by buildx prune / builder recreation. Revisit as an action if asked. |
+| skip | - |  | `docker buildx history trace`<br>`docker buildx history trace --help` |  | - · cli | skip: Starts a local Jaeger UI for the trace; interactive. |
+| skip | - |  | `docker buildx imagetools create`<br>`docker buildx imagetools create --help`<br>`docker buildx imagetools`<br>`docker buildx imagetools --help` |  | - · cli | skip: Same object as cli-only:manifest-list (proposed docker_registry_manifest_list); one resource covers both `docker manifest create/push` and imagetools create. ⚠ docker_buildx_imagetools_create would duplicate docker_registry_manifest_list. |
+| skip | - |  | `docker buildx policy`<br>`docker buildx policy --help`<br>`docker buildx policy eval`<br>`docker buildx policy eval --help` |  | - · cli | skip: Build-policy (Rego) development tooling, client-local; build policy itself is a --policy input on build/bake. |
+| skip | - |  | `docker buildx policy json-schema` |  | - · cli | skip: Prints a JSON schema; newer than installed buildx v0.34.1. |
+| skip | - |  | `docker buildx policy test`<br>`docker buildx policy test --help` |  | - · cli | skip: Build-policy (Rego) development tooling, client-local. |
+| skip | - |  | `docker buildx replay`<br>`docker buildx replay build` |  | - · cli | skip: New and experimental reproducibility tooling, newer than installed buildx v0.34.1; revisit as an action docker_buildx_replay once stable. |
+| skip | - |  | `docker buildx use`<br>`docker buildx use --help` |  | - · cli | skip: Client-side default selection; Terraform references the builder explicitly via docker_image.build.builder. |
+| skip | - |  | `docker buildx version`<br>`docker buildx version --help` |  | - · cli | skip: Client version print. |
+
+## CLI-only
+
+| kind | name | update | sources | min API | status | note |
+|---|---|---|---|---|---|---|
+| resource | `docker_registry_manifest_list` | in place | `docker manifest create`<br>`docker manifest create --help`<br>`docker manifest annotate`<br>`docker manifest annotate --help`<br>`docker manifest push`<br>`docker manifest push --help`<br>+6 more |  | missing · cli | (has: docker_registry_image (resource)) ⚠ Same job as `docker buildx imagetools create` (buildx:imagetools-create points here). Do not also add docker_buildx_imagetools / docker_manifest. `docker manifest rm` only deletes the local draft, so destroy semantics (registry DELETE of the tag vs leave it) need a flag like docker_registry_image.keep_remotely. |
+| resource | `docker_stack` | in place | `docker stack deploy`<br>`docker stack rm`<br>`docker stack`<br>`POST /services/create` (ServiceCreate)<br>`POST /services/{id}/update` (ServiceUpdate)<br>`DELETE /services/{id}` (ServiceDelete)<br>+1 more |  | exists · cli | (has: docker_stack (resource), docker_compose (resource, swarm mode)) ⚠ Keep `docker_stack` (exists); do not rename to docker_swarm_stack even though it is a swarm-layer type. |
+| data source | `docker_registry_image_manifests` |  | `docker manifest inspect`<br>`docker manifest inspect --help`<br>`docker buildx imagetools inspect`<br>`docker buildx imagetools inspect --help`<br>`GET /distribution/{name}/json` (DistributionInspect) |  | exists · cli | (has: docker_registry_image_manifests (data source), docker_registry_image (data source)) ⚠ buildx:imagetools-inspect maps to the same data source. |
+| data source | `docker_stack` |  | `docker stack services`<br>`GET /services` (ServiceList)<br>`GET /tasks` (TaskList) |  | partial · cli | docker_services + label filter covers the list; running/desired replica counts (from tasks) are missing. (has: docker_services (data source)) ⚠ Data source `docker_stack` would share its name with the existing docker_stack resource (allowed by Terraform, same pattern as docker_image); alternative name docker_stack_services. |
+| data source | `docker_stacks` |  | `docker stack ls`<br>`GET /services` (ServiceList) |  | partial · cli | docker_services with a label filter returns the services but not the grouped stack list. (has: docker_services (data source)) |
+| skip | - |  | `docker checkpoint create`<br>`docker checkpoint ls`<br>`docker checkpoint rm`<br>`docker checkpoint` |  | - · cli | skip: Experimental (needs experimental daemon + CRIU, Linux only); daemon endpoints /containers/{id}/checkpoints exist but are undocumented and absent from swagger.yaml 1.56. Revisit only if moby documents them (then: action docker_container_checkpoint). |
+| skip | - |  | `docker context create`<br>`docker context create --help`<br>`docker context update`<br>`docker context update --help`<br>`docker context rm`<br>`docker context rm --help`<br>+14 more |  | - · cli | skip: Client-side config store, no Engine API; the provider's `context`, `host`, `tls` and `ssh` arguments already select the daemon, and writing files under ~/.docker from Terraform would be a local-file side effect. ⚠ A `docker_context` resource would be confusable with the provider-level `context` argument. |
+| skip | - |  | `docker login`<br>`docker login --help`<br>`POST /auth` (SystemAuth) |  | - | skip: Only the validation half is Engine API (POST /auth, which Z1 owns); persisting credentials is client config. Terraform supplies credentials per run via provider registry_auth (password_wo) and ephemeral docker_registry_token. |
+| skip | - |  | `docker logout`<br>`docker logout --help` |  | - · cli | skip: Pure client config edit, no endpoint; Terraform never persists credentials, so there is nothing to log out of. |
+| skip | - |  | `docker stack config` |  | - · cli | skip: Pure client-side compose rendering with no daemon call; covered by tools/compose2stack and the compose lane. |
+| skip | - |  | `docker stack ps`<br>`GET /tasks` (TaskList) |  | - · cli | skip: Same as the tasks list data source Z1 derives from GET /tasks with a label filter (com.docker.stack.namespace); no separate type. |
+| skip | - |  | `docker system dial-stdio` |  | - · cli | skip: Transport plumbing for the CLI's ssh:// helper; the provider's ssh block is pure Go and does not need it. |
+| skip | - |  | `docker trust`<br>`docker trust inspect`<br>`docker trust key`<br>`docker trust key generate`<br>`docker trust key load`<br>`docker trust revoke`<br>+4 more |  | - · cli | skip: Notary v1 client against a Notary server, no Engine API; split out of docker/cli into the docker-trust plugin and DCT is being retired by Docker Hub. Signing belongs to cosign/notation-style providers. |
+| skip | - |  | `docker agent --help`<br>`docker --help` |  | - · cli | skip: Docker Desktop AI product plugin; talks to model providers and its own runtime, not the Engine API. |
+| skip | - |  | `docker ai --help`<br>`docker --help` |  | - · cli | skip: Interactive Docker Desktop product feature; no Engine API. |
+| skip | - |  | `docker debug --help`<br>`docker --help` |  | - · cli | skip: Docker Desktop (Pro) plugin; composite of Engine calls (create helper container, exec) plus proprietary toolbox; interactive. docker_exec covers the declarative part. |
+| skip | - |  | `docker desktop --help`<br>`docker --help` |  | - · cli | skip: Controls the Docker Desktop app via its backend socket, not the Engine API. |
+| skip | - |  | `docker dhi --help`<br>`docker --help` |  | - · cli | skip: Docker Hub product API (DHI), not Engine API; mirroring could later be a registry-side resource in a Hub provider. |
+| skip | - |  | `docker extension --help`<br>`docker --help` |  | - · cli | skip: Docker Desktop extension manager; not Engine API. |
+| skip | - |  | `docker init --help`<br>`docker --help` |  | - · cli | skip: Interactive local file scaffolding; no daemon involved. |
+| skip | - |  | `docker mcp --help`<br>`docker --help` |  | - · cli | skip: Docker Desktop MCP product; own gateway/catalog APIs, not Engine API (gateway runs MCP servers as containers through Docker but via its own logic). |
+| skip | - |  | `docker model --help`<br>`docker --help` |  | - · cli | skip: Model Runner has its own HTTP API (OpenAI-compatible, /models, /engines via the Desktop socket or localhost:12434, or a docker/model-runner container on plain Engine), not the Engine API. Plausible future provider surface (docker_model resource for pull/rm, install-runner as a container), but it is a separate API; out of scope for Engine-API parity. |
+| skip | - |  | `docker offload --help`<br>`docker --help` |  | - · cli | skip: Docker cloud product session; not Engine API (it switches the daemon endpoint). |
+| skip | - |  | `docker pass --help`<br>`docker --help` |  | - · cli | skip: Local/Desktop secrets store; Terraform has its own secret handling (write-only args, ephemeral). |
+| skip | - |  | `docker sandbox --help`<br>`docker --help` |  | - · cli | skip: Docker Desktop sandbox product with its own VM backend API, not Engine API. |
+| skip | - |  | `docker scout --help`<br>`docker --help` |  | - · cli | skip: Docker Scout SaaS/analysis tool; not Engine API. Vulnerability data could later be a data source in a Scout/Hub provider. |
+
+## Totals
+
+Counts as exists / partial / missing.
+
+| layer | resources | data sources | actions | blocks | skipped |
+|---|---|---|---|---|---|
+| engine | 8 (5 / 3 / 0) | 23 (7 / 4 / 12) | 22 (6 / 6 / 10) | 0 | 5 |
+| swarm | 5 (5 / 0 / 0) | 13 (5 / 1 / 7) | 11 (6 / 2 / 3) | 0 | 0 |
+| compose | 11 (3 / 6 / 2) | 8 (0 / 3 / 5) | 19 (0 / 10 / 9) | 0 | 28 |
+| dockerfile | 0 | 0 | 0 | 21 (0 / 0 / 21) | 0 |
+| buildx | 2 (0 / 2 / 0) | 6 (0 / 1 / 5) | 3 (0 / 1 / 2) | 0 | 21 |
+| cli-only | 2 (1 / 0 / 1) | 3 (1 / 2 / 0) | 0 | 0 | 21 |
+| **all** | 28 (14 / 11 / 3) | 53 (13 / 11 / 29) | 55 (12 / 19 / 24) | 21 (0 / 0 / 21) | 75 |
+
+Engine API coverage: 108 of 108 swagger operations placed.
+
+## Naming collisions
+
+Shared names below are intentional: the items are facets of one existing type, not competing proposals.
+
+- Shared data name `docker_registry_image_manifests`: cli-only:manifest-inspect, buildx:imagetools-inspect
+- Shared resource name `docker_compose`: compose:services, compose:networks, compose:volumes, compose:configs, compose:secrets, compose:models, compose:jobs, compose:include, compose:name
+- Shared resource name `docker_image`: engine:image, compose:service-build, buildx:build
+- Shared resource name `docker_service`: swarm:service, compose:service-deploy
+- `docker_container_file` (engine:container-file): Confusable with docker_container `upload` blocks (the write direction); also consider an action instead if large archives are expected.
+- `docker_image_build` (engine:image-build): Confusable with docker_image (resource whose `build` block already calls ImageBuild) and with docker_buildx_builder.
+- `docker_builder_prune` (engine:build-prune): docker_builder_prune (Engine build cache) is easy to confuse with docker_buildx_builder (a BuildKit builder container); docker_build_cache_prune avoids it.
+- `docker_registry_auth` (engine:registry-auth): Confusable with ephemeral docker_registry_token and with provider registry_auth blocks.
+- `docker_network_attachment` (engine:network-attachment): Overlaps docker_container `networks`; managing the same pair in both would fight.
+- `docker_plugin_create` (engine:plugin-create): Confusable with docker_plugin (install from a registry). PluginCreate has a delete counterpart, so it could also be a resource.
+- `docker_swarm_node` (swarm:swarm-node): docker_swarm_node is a *join* resource; a user expecting it to manage an already-joined node (labels/availability only, NodeUpdate) would need a separate type, e.g. docker_node.
+- `docker_service_logs` (swarm:service-logs): Could instead extend data.docker_logs with a service_id/task_id argument.
+- `docker_task_logs` (swarm:task-logs): Could merge with docker_service_logs or data.docker_logs.
+- `docker_config` (swarm:config): docker_config (swarm config object) vs compose top-level `configs` and the provider's own configuration block.
+- `docker_config` (swarm:config-data): Same confusion as docker_config resource (swarm config vs compose configs).
+- `docker_compose` (compose:services): A per-service type named docker_compose_service would be confusable with docker_service (swarm). Keep services inside docker_compose.
+- `docker_compose` (compose:networks): docker_compose_network would be confusable with docker_network.
+- `docker_compose` (compose:volumes): docker_compose_volume(s) would be confusable with docker_volume and with the proposed docker_compose_volumes data source (CLI `compose volumes`).
+- `docker_compose` (compose:configs): Top-level `configs` vs docker_config (Swarm config resource) vs the proposed docker_compose_config data source (CLI `compose config`, rendered model).
+- `docker_compose` (compose:secrets): docker_compose_secret would be confusable with docker_secret.
+- `docker_compose_up` (compose:cli-up): docker_compose (resource) already means up; an action docker_compose_up beside it invites confusion.
+- `docker_compose_start` (compose:cli-start): Would mirror single-container docker_container_start actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.
+- `docker_compose_stop` (compose:cli-stop): Would mirror single-container docker_container_stop actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.
+- `docker_compose_restart` (compose:cli-restart): Would mirror single-container docker_container_restart actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.
+- `docker_compose_kill` (compose:cli-kill): Would mirror single-container docker_container_kill actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.
+- `docker_compose_pause` (compose:cli-pause): Would mirror single-container docker_container_pause actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.
+- `docker_compose_unpause` (compose:cli-unpause): Would mirror single-container docker_container_unpause actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.
+- `docker_compose_scale` (compose:cli-scale): docker_service_scale (swarm action) already exists; docker_compose_scale is near-identical in purpose.
+- `docker_compose_containers` (compose:cli-ps): Name options: docker_compose_ps (CLI-shaped) vs docker_compose_containers (plural-noun convention beside docker_containers).
+- `docker_compose_projects` (compose:cli-ls): docker_compose_ls (CLI-shaped) vs docker_compose_projects (noun).
+- `docker_compose_config` (compose:cli-config): Confusable with top-level compose `configs` and docker_config (swarm config resource). Alternatives: docker_compose_project, docker_compose_model, or function compose_render.
+- `docker_compose_images` (compose:cli-images): Beside data.docker_image (singular) and list.docker_image.
+- `docker_compose_volumes` (compose:cli-volumes): docker_compose_volumes vs docker_volume / top-level compose `volumes`.
+- `docker_compose_port` (compose:cli-port): Confusable with the port_spec function.
+- `-` (cli-only:context): A `docker_context` resource would be confusable with the provider-level `context` argument.
+- `docker_registry_manifest_list` (cli-only:manifest-list): Same job as `docker buildx imagetools create` (buildx:imagetools-create points here). Do not also add docker_buildx_imagetools / docker_manifest. `docker manifest rm` only deletes the local draft, so destroy semantics (registry DELETE of the tag vs leave it) need a flag like docker_registry_image.keep_remotely.
+- `docker_registry_image_manifests` (cli-only:manifest-inspect): buildx:imagetools-inspect maps to the same data source.
+- `docker_stack` (cli-only:stack): Keep `docker_stack` (exists); do not rename to docker_swarm_stack even though it is a swarm-layer type.
+- `docker_stack` (cli-only:stack-services): Data source `docker_stack` would share its name with the existing docker_stack resource (allowed by Terraform, same pattern as docker_image); alternative name docker_stack_services.
+- `docker_image` (buildx:build): Do not add docker_buildx_build: it would duplicate docker_image. If exporters that produce no local image are wanted, that is an action (docker_buildx_bake or docker_image_build action), not a second build resource.
+- `docker_buildx_bake` (buildx:bake): Overlaps docker_image (build block) for single targets.
+- `docker_buildx_builder` (buildx:builder-inspect): Same name as the resource (resource/data source pair, allowed). For builders not created by Terraform, discovery is limited to buildx_buildkit_* containers on the daemon (buildx's builder store is client-side).
+- `docker_buildx_builder_stop` (buildx:stop): Low value: docker_buildx_builder with bootstrap=false or a must_run-style flag could cover it; consider skip.
+- `docker_buildx_prune` (buildx:prune): Z1 will likely propose an Engine action for POST /build/prune (e.g. docker_build_cache_prune / docker_builder_prune). One type should take an optional `builder` and choose BuildKit gRPC vs POST /build/prune.
+- `docker_buildx_disk_usage` (buildx:du): Overlaps Z1's system df data source (BuildCache section); merge or keep builder-scoped.
+- `docker_buildx_history_record` (buildx:history-inspect): Could be folded into docker_buildx_history as a `ref` filter; naming question.
+- `-` (buildx:imagetools-create): docker_buildx_imagetools_create would duplicate docker_registry_manifest_list.
+- `docker_registry_image_manifests` (buildx:imagetools-inspect): Same type as cli-only:manifest-inspect.
+- `docker_dockerfile_onbuild` (dockerfile:ONBUILD): Nests another instruction block; could instead be an `onbuild` attribute on each docker_dockerfile_* block.
+
+## Naming questions
+
+1. NetworkConnect/NetworkDisconnect: add a standalone `docker_network_attachment` resource (container x network pair), or make docker_container `networks` connect/disconnect in place instead of forcing replacement? (or both, with a conflict warning)
+2. Build cache prune action name: `docker_builder_prune` (matches `docker builder prune`) or `docker_build_cache_prune` (avoids confusion with docker_buildx_builder)?
+3. Standalone build: add an action `docker_image_build`, or keep builds only in docker_image's `build` block? If added, is the name too close to docker_image?
+4. Managing an already-joined swarm node (labels/availability/role via NodeUpdate) that Terraform did not join: extend docker_swarm_node with an adopt mode, or add a separate `docker_node` resource (name matches existing data.docker_node)?
+5. Node role actions: `docker_node_promote` / `docker_node_demote` (CLI words, matching docker_node_drain/activate) or one `docker_node_role` action with role = manager\|worker?
+6. Logs: separate `docker_service_logs` and `docker_task_logs` data sources, or extend data.docker_logs with service_id / task_id arguments?
+7. SystemAuth (/auth) returns an identity token: model as an ephemeral resource (e.g. `docker_registry_login`) next to ephemeral docker_registry_token, or skip it?
+8. PluginCreate: action `docker_plugin_create` (one-shot) or a resource (it has PluginDelete) with a different name to avoid confusion with docker_plugin (install from registry)?
+9. Container one-off read of files: data source `docker_container_file` (GET archive) vs an action; and copy-in at any time: action `docker_container_upload` or `docker_container_cp`?
+10. Swarm rotation actions: separate `docker_swarm_rotate_unlock_key` and `docker_swarm_ca_rotate`, or one `docker_swarm_rotate` action with what = worker_token\|manager_token\|unlock_key\|ca (absorbing docker_swarm_rotate_tokens)?
+11. Imperative compose actions beside the docker_compose resource: name them docker_compose_up/down (CLI-shaped), docker_compose_apply/destroy, or skip up/down since the resource covers them?
+12. `compose config` render: data source docker_compose_config (visually collides with docker_config and top-level `configs`), docker_compose_project / docker_compose_model, or a provider function compose_render?
+13. `compose ps` / `compose ls`: docker_compose_ps + docker_compose_ls (CLI names) or docker_compose_containers + docker_compose_projects (noun convention like docker_containers)?
+14. `compose volumes`: add a docker_compose_volumes data source, or document data.docker_volume/list.docker_volume with a project label filter (avoids the docker_volume clash)?
+15. Per-container verbs (start/stop/restart/kill/pause/unpause): separate docker_compose_* actions, or one set of docker_container_* actions with an optional project/service selector?
+16. `compose scale` vs existing docker_service_scale: new docker_compose_scale action, or extend docker_service_scale to compose local projects?
+17. Compose top-level elements: keep all inside docker_compose, or split docker_compose_service/network/volume (confusable with docker_service/docker_network/docker_volume)?
+18. jobs: support in docker_compose (run once on apply) plus docker_compose_run for manual triggers, or leave unsupported but add a warning?
+19. Manifest lists: `docker_registry_manifest_list` (proposed, registry family) vs `docker_manifest_list` vs `docker_buildx_imagetools`? One resource for both `docker manifest create/push` and `buildx imagetools create`.
+20. BuildKit build: keep extending `docker_image` (build block) vs add `docker_buildx_build`? Proposed: extend docker_image, and add action `docker_buildx_bake` for multi-target / non-image outputs.
+21. Stack: keep existing `docker_stack` vs a `docker_swarm_stack` prefix for consistency with docker_swarm_*? Proposed: keep docker_stack; new stack data sources `docker_stacks` and `docker_stack` (or `docker_stack_services`).
+22. Context: skip `docker_context` (provider `context`/`host` arguments already select the daemon) vs a read-only `docker_context` data source that resolves a context's endpoint/TLS from ~/.docker? Proposed: skip.
+23. Build cache prune: one action for both daemon build cache (POST /build/prune, Z1) and buildx builders (BuildKit gRPC): `docker_buildx_prune` vs `docker_build_cache_prune` vs `docker_builder_prune`?
+24. Buildx builder data sources: `docker_buildx_builder` (singular, same name as the resource) + `docker_buildx_builders`; buildx history as `docker_buildx_history` (+ `docker_buildx_history_record`) or one data source with an optional ref?
+25. docker buildx stop: action `docker_buildx_builder_stop` or skip (low value)?
+26. Disk usage: `docker_buildx_disk_usage` separate from Z1's system df data source, or one data source with an optional builder?
+27. Shape: (a) one type per instruction (docker_dockerfile_run, docker_dockerfile_from, ...) vs (b) a single data source data.docker_dockerfile with ordered nested blocks (stage { from, run, copy ... }) rendering Dockerfile text vs (c) a provider function. (b) recommended: ordering and stages fit nested blocks; 21 trivial types would bloat the registry.
+28. Directives: docker_dockerfile_directive_syntax/escape/check types vs top-level attributes syntax, escape, check { skip = [...], error = bool } on data.docker_dockerfile (recommended).
+29. Include MAINTAINER (deprecated) at all, or omit and steer users to LABEL org.opencontainers.image.authors?
+30. ONBUILD: separate block nesting an instruction vs an `onbuild = true` attribute on each instruction block?
+31. Stages: model FROM ... AS name as a `stage` block with `name` (recommended) rather than a FROM flag?
+32. check rule names: validate against a pinned list (21 rules at frontend 1.28) or accept free strings?

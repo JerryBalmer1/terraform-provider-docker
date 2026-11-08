@@ -1,0 +1,25 @@
+Usage:
+  docker agent models list
+
+Aliases:
+  list, ls
+
+Examples:
+  docker agent models
+  docker agent models list --provider openai
+  docker agent models ls --all
+  docker agent models --format json
+
+Flags:
+  -a, --all                     Include models from all providers, not just those with credentials
+      --format string           Output format: table, json (default "table")
+      --models-gateway string   Set the models gateway address
+  -p, --provider string         Filter by provider name
+
+Global Flags:
+      --cache-dir string    Override the cache directory (default: ~/Library/Caches/cagent on macOS)
+      --config-dir string   Override the config directory (default: ~/.config/cagent)
+      --data-dir string     Override the data directory (default: ~/.cagent)
+  -d, --debug               Enable debug logging
+      --log-file string     Path to debug log file (default: ~/.cagent/cagent.debug.log; only used with --debug)
+  -o, --otel                Enable OpenTelemetry tracing

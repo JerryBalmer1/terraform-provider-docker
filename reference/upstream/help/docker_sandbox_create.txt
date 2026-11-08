@@ -1,0 +1,31 @@
+Usage:  docker sandbox create [OPTIONS] COMMAND
+
+Create a sandbox with access to a host workspace for an agent.
+
+Available agents are provided as subcommands. Use "create AGENT --help" for agent-specific options.
+
+Options:
+  -D, --debug                  Enable debug logging
+      --name string            Name for the sandbox (default:
+                               <agent>-<workdir>, letters, numbers,
+                               hyphens, underscores, periods, plus signs
+                               and minus signs only)
+      --pull-template string   Template image pull policy: always (always
+                               pull from registry), missing (pull only if
+                               not cached), never (use only cached
+                               images) (default "missing")
+  -q, --quiet                  Suppress verbose output
+  -t, --template string        Container image to use for the sandbox
+                               (default: agent-specific image)
+
+Commands:
+  cagent      Create a sandbox for cagent
+  claude      Create a sandbox for claude
+  codex       Create a sandbox for codex
+  copilot     Create a sandbox for copilot
+  gemini      Create a sandbox for gemini
+  kiro        Create a sandbox for kiro
+  opencode    Create a sandbox for opencode
+  shell       Create a sandbox for shell
+
+Run 'docker sandbox create COMMAND --help' for more information on a command.

@@ -1,0 +1,6 @@
+Usage:  docker model rm [MODEL...]
+
+Remove local models downloaded from Docker Hub
+
+Options:
+  -f, --force   Forcefully remove the model

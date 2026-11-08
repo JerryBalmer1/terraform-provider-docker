@@ -1,0 +1,13 @@
+Usage:  docker dhi mirror [OPTIONS] COMMAND
+
+Commands to mirror Docker Hardened Images to your organization's registry
+
+Options:
+      --org string   Docker Hub organization (overrides config)
+
+Commands:
+  list        List all mirrored Docker Hardened Images
+  start       Start mirroring Docker Hardened Images
+  stop        Stop mirroring one or more Docker Hardened Images
+
+Run 'docker dhi mirror COMMAND --help' for more information on a command.

@@ -1,0 +1,30 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp profile create [--name <name>] [--id <id>] [--server <ref> ...] [--from-template <template-id>] [--connect <client> ...]
+
+Flags:
+      --connect stringArray                      Clients to connect to: mcp-client (can be specified multiple times). Supported clients: [claude-code claude-desktop cline codex continue crush cursor gemini goose gordon kiro lmstudio opencode sema4 vscode zed]
+      --from-template docker mcp template list   Create profile from a starter template (use docker mcp template list to see options)
+      --id string                                ID of the profile (defaults to a slugified version of the name)
+      --name string                              Name of the profile (required unless --from-template is used)
+      --server stringArray                       Server to include specified with a URI: https:// (MCP Registry reference) or docker:// (Docker Image reference) or catalog:// (Catalog reference) or file:// (Local file path). Can be specified multiple times.
+
+
+Examples:
+  # Create a profile from a starter template
+  docker mcp profile create --from-template ai-coding
+
+  # Create from a template and connect to a client
+  docker mcp profile create --from-template ai-coding --connect cursor
+
+  # Create from a template with a custom name
+  docker mcp profile create --from-template ai-coding --name "My AI Tools"
+
+  # Create a profile with servers from a catalog
+  docker mcp profile create --name dev-tools --server catalog://mcp/docker-mcp-catalog/github+obsidian
+
+  # Create a profile with multiple servers (OCI references)
+  docker mcp profile create --name my-profile --server docker://my-server:latest --server docker://my-other-server:latest
+
+  # Connect to clients upon creation
+  docker mcp profile create --name dev-tools --connect cursor

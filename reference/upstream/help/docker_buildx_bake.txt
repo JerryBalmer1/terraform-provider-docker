@@ -1,0 +1,35 @@
+Usage:  docker buildx bake [OPTIONS] [TARGET...]
+
+Build from a file
+
+Aliases:
+  docker buildx bake, docker buildx f
+
+Options:
+      --allow stringArray      Allow build to access specified resources
+      --builder string         Override the configured builder instance
+      --call string            Set method for evaluating build ("check",
+                               "outline", "targets") (default "build")
+      --check                  Shorthand for "--call=check"
+  -D, --debug                  Enable debug logging
+  -f, --file stringArray       Build definition file
+      --list string            List targets or variables
+      --load                   Shorthand for
+                               "--set=*.output=type=docker". Conditional.
+      --metadata-file string   Write build result metadata to a file
+      --no-cache               Do not use cache when building the image
+      --policy stringArray     Global policy evaluation options (format:
+                               "[disabled=true|false][,strict=true|false][,log-level=level]")
+      --print                  Print the options without building
+      --progress string        Set type of progress output ("auto",
+                               "none",  "plain", "quiet", "rawjson",
+                               "tty"). Use plain to show container output
+                               (default "auto")
+      --provenance string      Shorthand for "--set=*.attest=type=provenance"
+      --pull                   Always attempt to pull all referenced images
+      --push                   Shorthand for
+                               "--set=*.output=type=registry". Conditional.
+      --sbom string            Shorthand for "--set=*.attest=type=sbom"
+      --set stringArray        Override target value (e.g.,
+                               "targetpattern.key=value")
+      --var stringArray        Set a variable value (e.g., "name=value")

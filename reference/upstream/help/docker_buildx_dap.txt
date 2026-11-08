@@ -1,0 +1,12 @@
+Usage:  docker buildx dap [OPTIONS] COMMAND
+
+Start debug adapter protocol compatible debugger
+
+Options:
+      --builder string   Override the configured builder instance
+  -D, --debug            Enable debug logging
+
+Commands:
+  build       Start a build
+
+Run 'docker buildx dap COMMAND --help' for more information on a command.

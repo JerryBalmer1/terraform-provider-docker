@@ -1,0 +1,27 @@
+Usage:  docker dhi mirror list
+
+List all Docker Hardened Images currently being mirrored to your organization's registry.
+
+Shows the source repositories, destination repositories, and mirroring status.
+
+Examples:
+  # List all mirrored repositories
+  dhictl mirror list --org myorg
+
+  # List only image repositories
+  dhictl mirror list --org myorg --type image
+
+  # List only helm chart repositories
+  dhictl mirror list --org myorg --type helm-chart
+
+  # Search for a specific repository by name
+  dhictl mirror list --org myorg --filter dhi-python
+
+  # Output in JSON format
+  dhictl mirror list --org myorg --json
+
+Options:
+  -f, --filter string   Filter by repository name (partial match)
+      --json            Output in JSON format
+      --org string      Docker Hub organization (overrides config)
+      --type string     Filter by repository type (image or helm-chart)

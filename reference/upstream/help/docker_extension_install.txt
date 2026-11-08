@@ -1,0 +1,7 @@
+
+Usage:  docker extension install IMAGE[:TAG]
+
+Install a Docker extension with the specified image
+
+Options:
+  -f, --force   Do not prompt for confirmation

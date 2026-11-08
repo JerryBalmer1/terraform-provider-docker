@@ -1,0 +1,7 @@
+Usage:  docker desktop update
+
+Manage Docker Desktop updates
+
+Options:
+  -k, --check-only   Check for updates without applying them
+  -q, --quiet        Quietly check and apply updates

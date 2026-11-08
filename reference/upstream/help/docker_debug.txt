@@ -1,0 +1,23 @@
+
+Usage:  docker debug [OPTIONS] COMMAND
+
+Get an enhanced shell with additional tools into any container or image
+
+Options:
+  -c, --command string   Evaluate the specified commands instead, passing
+                         additional positional arguments through $argv.
+      --host string      Daemon docker socket to connect to. E.g.:
+                         'ssh://root@example.org',
+                         'unix:///some/path/docker.sock'
+      --preserve-user    Running containers only: Use same user as the
+                         running container. Default is root.
+      --privileged       Running containers only: Give privileges to the
+                         shell (all capabilities).
+      --shell shell      Select a shell. Supported: "bash", "fish",
+                         "zsh", "auto". (default auto)
+      --version          Display version of the docker-debug plugin
+
+Commands:
+  docker-cli-plugin-hooks 
+
+Run 'docker debug COMMAND --help' for more information on a command.

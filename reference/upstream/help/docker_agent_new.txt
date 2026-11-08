@@ -1,0 +1,30 @@
+Usage:
+  docker agent new [description]
+
+Examples:
+  docker agent new
+  docker agent new "a web scraper that extracts product prices"
+  docker agent new --model openai/gpt-4o "a code reviewer agent"
+
+Flags:
+      --code-mode-tools                       Provide a single tool to call other tools via Javascript
+      --env-from-file strings                 Set environment variables from file
+      --hook-on-user-input stringArray        Add an on-user-input hook command (repeatable)
+      --hook-post-tool-use stringArray        Add a post-tool-use hook command that runs after every tool call (repeatable)
+      --hook-pre-tool-use stringArray         Add a pre-tool-use hook command that runs before every tool call (repeatable)
+      --hook-session-end stringArray          Add a session-end hook command (repeatable)
+      --hook-session-start stringArray        Add a session-start hook command (repeatable)
+      --hook-stop stringArray                 Add a stop hook command, fired when the model finishes responding (repeatable)
+      --max-iterations int                    Maximum number of agentic loop iterations to prevent infinite loops (default: 20 for DMR, unlimited for other providers)
+      --mcp-oauth-redirect-uri redirect_uri   Public HTTPS URL to advertise as the OAuth redirect_uri for MCP servers running in unmanaged OAuth mode. When set, docker-agent drives the OAuth flow itself (PKCE + DCR + token exchange) and expects clients to return `{code, state}` via ResumeElicitation. When empty, the client is expected to perform the OAuth flow and return an access token (legacy behavior).
+      --model string                          Model to use, optionally as provider/model where provider is one of: anthropic, openai, google, dmr. If omitted, provider is auto-selected based on available credentials or gateway
+      --models-gateway string                 Set the models gateway address
+      --working-dir string                    Set the working directory for the session (applies to tools and relative paths)
+
+Global Flags:
+      --cache-dir string    Override the cache directory (default: ~/Library/Caches/cagent on macOS)
+      --config-dir string   Override the config directory (default: ~/.config/cagent)
+      --data-dir string     Override the data directory (default: ~/.cagent)
+  -d, --debug               Enable debug logging
+      --log-file string     Path to debug log file (default: ~/.cagent/cagent.debug.log; only used with --debug)
+  -o, --otel                Enable OpenTelemetry tracing

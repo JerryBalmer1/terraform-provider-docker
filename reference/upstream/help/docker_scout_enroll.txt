@@ -1,0 +1,19 @@
+ Enroll an organization with Docker Scout
+
+Usage
+  docker scout enroll ORG
+
+Description
+The docker scout enroll command enrolls an organization with Docker Scout.
+
+
+
+Learn More
+  Read docker scout cli reference at https://docs.docker.com/engine/reference/commandline/scout/
+
+Report Issues
+  Raise bugs and feature requests at https://github.com/docker/scout-cli/issues
+
+Send Feedback
+  Send feedback with docker feedback
+

@@ -1,0 +1,6 @@
+Usage:  docker buildx version
+
+Show buildx version information
+
+Options:
+  -D, --debug   Enable debug logging

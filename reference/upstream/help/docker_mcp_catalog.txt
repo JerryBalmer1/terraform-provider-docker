@@ -1,0 +1,14 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp catalog
+
+Available Commands:
+  create      Create a new catalog from server references, a profile, legacy catalog, or community registry
+  list        List catalogs
+  pull        Pull and import an MCP server catalog from an OCI registry
+  push        Push a catalog to an OCI registry
+  remove      Remove a catalog
+  server      Manage servers in catalogs
+  show        Show a catalog
+  tag         Create a tagged copy of a catalog
+

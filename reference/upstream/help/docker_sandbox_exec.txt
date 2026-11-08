@@ -1,0 +1,19 @@
+Usage:  docker sandbox exec [OPTIONS] SANDBOX COMMAND [ARG...]
+
+Execute a command in a sandbox that was previously created with 'docker sandbox create'.
+
+The command and any additional arguments are executed inside the sandbox container.
+
+Options:
+  -D, --debug                  Enable debug logging
+  -d, --detach                 Detached mode: run command in the background
+      --detach-keys string     Override the key sequence for detaching a
+                               container
+  -e, --env stringArray        Set environment variables
+      --env-file stringArray   Read in a file of environment variables
+  -i, --interactive            Keep STDIN open even if not attached
+      --privileged             Give extended privileges to the command
+  -t, --tty                    Allocate a pseudo-TTY
+  -u, --user string            Username or UID (format:
+                               <name|uid>[:<group|gid>])
+  -w, --workdir string         Working directory inside the container

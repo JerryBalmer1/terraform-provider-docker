@@ -1,0 +1,23 @@
+ Manage attestations on images
+
+Usage
+
+Aliases
+  attestation, attest
+
+Available Commands
+  add         Add attestation to image
+  get         Get attestation for image
+  list        List attestations for image
+
+Use "docker scout attestation [command] --help" for more information about a command.
+
+Learn More
+  Read docker scout cli reference at https://docs.docker.com/engine/reference/commandline/scout/
+
+Report Issues
+  Raise bugs and feature requests at https://github.com/docker/scout-cli/issues
+
+Send Feedback
+  Send feedback with docker feedback
+

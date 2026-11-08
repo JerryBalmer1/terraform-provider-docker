@@ -1,0 +1,8 @@
+Usage:  docker buildx history rm [OPTIONS] [REF...]
+
+Remove build records
+
+Options:
+      --all              Remove all build records
+      --builder string   Override the configured builder instance
+  -D, --debug            Enable debug logging

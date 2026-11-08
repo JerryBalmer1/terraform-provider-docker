@@ -1,0 +1,7 @@
+Usage:  docker desktop kubernetes status
+
+Get the status of the Kubernetes cluster managed by Docker Desktop
+
+Options:
+      --format string   Format the output. Values: [pretty | json].
+                        (Default: pretty) (default "pretty")

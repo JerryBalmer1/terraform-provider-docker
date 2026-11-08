@@ -1,0 +1,17 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp profile server remove <profile-id> [<name1> <name2> ...] [--name <name>]
+
+Flags:
+      --name stringArray   Server name to remove (can be specified multiple times)
+
+
+Examples:
+  # Remove servers by name (positional)
+  docker mcp profile server remove dev-tools github slack
+
+  # Remove a single server
+  docker mcp profile server remove dev-tools github
+
+  # Remove servers using --name flag
+  docker mcp profile server remove dev-tools --name github --name slack

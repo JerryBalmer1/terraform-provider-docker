@@ -1,0 +1,9 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp profile server
+
+Available Commands:
+  add         Add MCP servers to a profile
+  ls          List servers across profiles
+  remove      Remove MCP servers from a profile
+

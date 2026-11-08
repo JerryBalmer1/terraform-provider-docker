@@ -1,0 +1,33 @@
+ Push an image or image index to Docker Scout
+
+Usage
+  docker scout push IMAGE
+
+Description
+The docker scout push command allows to push an image or image index to Docker Scout.
+
+
+
+Flags
+      --author string      Name of the author of the image
+      --dry-run            Do not push the image but process it
+      --org string         Namespace of the Docker organization to which image will be pushed
+  -o, --output string      Write the report to a file
+      --platform string    Platform of image to be pushed
+      --sbom               Create and upload SBOMs
+      --secrets            Scan for secrets in the image
+      --timestamp string   Timestamp of image or tag creation
+
+Examples
+  Push an image to Docker Scout
+  $ docker scout push --org my-org registry.example.com/repo:tag[0m
+
+Learn More
+  Read docker scout cli reference at https://docs.docker.com/engine/reference/commandline/scout/
+
+Report Issues
+  Raise bugs and feature requests at https://github.com/docker/scout-cli/issues
+
+Send Feedback
+  Send feedback with docker feedback
+

@@ -1,0 +1,7 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp template list
+
+Flags:
+      --format string   Supported: json, yaml, human. (default "human")
+

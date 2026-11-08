@@ -1,0 +1,6 @@
+Usage:  docker model purge [OPTIONS]
+
+Remove all models
+
+Options:
+  -f, --force   Forcefully remove all models

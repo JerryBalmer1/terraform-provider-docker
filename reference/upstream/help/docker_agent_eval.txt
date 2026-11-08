@@ -1,0 +1,31 @@
+Usage:
+  docker agent eval <agent-file>|<registry-ref> [<eval-dir>|./evals]
+
+Flags:
+      --base-image string                     Custom base Docker image for running evaluations
+      --code-mode-tools                       Provide a single tool to call other tools via Javascript
+  -c, --concurrency int                       Number of concurrent evaluation runs (default 16)
+  -e, --env strings                           Environment variables to pass to container (KEY or KEY=VALUE)
+      --env-from-file strings                 Set environment variables from file
+      --hook-on-user-input stringArray        Add an on-user-input hook command (repeatable)
+      --hook-post-tool-use stringArray        Add a post-tool-use hook command that runs after every tool call (repeatable)
+      --hook-pre-tool-use stringArray         Add a pre-tool-use hook command that runs before every tool call (repeatable)
+      --hook-session-end stringArray          Add a session-end hook command (repeatable)
+      --hook-session-start stringArray        Add a session-start hook command (repeatable)
+      --hook-stop stringArray                 Add a stop hook command, fired when the model finishes responding (repeatable)
+      --judge-model string                    Model to use for relevance checking (format: provider/model) (default "anthropic/claude-opus-4-5-20251101")
+      --keep-containers                       Keep containers after evaluation (don't use --rm)
+      --mcp-oauth-redirect-uri redirect_uri   Public HTTPS URL to advertise as the OAuth redirect_uri for MCP servers running in unmanaged OAuth mode. When set, docker-agent drives the OAuth flow itself (PKCE + DCR + token exchange) and expects clients to return `{code, state}` via ResumeElicitation. When empty, the client is expected to perform the OAuth flow and return an access token (legacy behavior).
+      --models-gateway string                 Set the models gateway address
+      --only strings                          Only run evaluations with file names matching these patterns (can be specified multiple times)
+      --output string                         Directory for results and logs (default: <eval-dir>/results)
+      --repeat int                            Number of times to repeat each evaluation (useful for computing baselines) (default 1)
+      --working-dir string                    Set the working directory for the session (applies to tools and relative paths)
+
+Global Flags:
+      --cache-dir string    Override the cache directory (default: ~/Library/Caches/cagent on macOS)
+      --config-dir string   Override the config directory (default: ~/.config/cagent)
+      --data-dir string     Override the data directory (default: ~/.cagent)
+  -d, --debug               Enable debug logging
+      --log-file string     Path to debug log file (default: ~/.cagent/cagent.debug.log; only used with --debug)
+  -o, --otel                Enable OpenTelemetry tracing

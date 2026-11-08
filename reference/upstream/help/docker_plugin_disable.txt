@@ -1,0 +1,6 @@
+Usage:  docker plugin disable [OPTIONS] PLUGIN
+
+Disable a plugin
+
+Options:
+  -f, --force   Force the disable of an active plugin

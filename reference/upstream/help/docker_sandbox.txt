@@ -1,0 +1,22 @@
+Usage:  docker sandbox [OPTIONS] COMMAND
+
+Local sandbox environments for AI agents, using Docker.
+
+Options:
+  -D, --debug   Enable debug logging
+
+Management Commands:
+  create      Create a sandbox for an agent
+  network     Manage sandbox networking
+
+Commands:
+  exec        Execute a command inside a sandbox
+  ls          List VMs
+  reset       Reset all VM sandboxes and clean up state
+  rm          Remove one or more sandboxes
+  run         Run an agent in a sandbox
+  save        Save a snapshot of the sandbox as a template
+  stop        Stop one or more sandboxes without removing them
+  version     Show sandbox version information
+
+Run 'docker sandbox COMMAND --help' for more information on a command.

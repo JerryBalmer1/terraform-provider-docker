@@ -1,0 +1,13 @@
+Usage:  docker dhi catalog list
+
+List all available Docker Hardened Images and Helm charts in the catalog
+
+Options:
+  -f, --filter string   Filter by name (case-insensitive substring match)
+      --fips            Filter to FIPS compliant images (use --fips=false
+                        to exclude)
+      --json            Output in JSON format
+      --org string      Docker Hub organization (overrides config)
+      --stig            Filter to STIG certified images (use --stig=false
+                        to exclude)
+      --type string     Filter by type (image, helm, chart, or helm-chart)

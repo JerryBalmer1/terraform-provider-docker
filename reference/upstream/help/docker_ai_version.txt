@@ -1,0 +1,3 @@
+Usage:  docker ai version
+
+Show the version information

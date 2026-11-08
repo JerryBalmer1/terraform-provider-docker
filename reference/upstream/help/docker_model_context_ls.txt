@@ -1,0 +1,6 @@
+Usage:  docker model context ls
+
+List Model Runner contexts
+
+Aliases:
+  docker model context ls, docker model context list

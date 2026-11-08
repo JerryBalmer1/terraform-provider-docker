@@ -1,0 +1,8 @@
+Usage:  docker desktop disable COMMAND
+
+Disable an individual feature
+
+Commands:
+  model-runner Disable Docker Model Runner
+
+Run 'docker desktop disable COMMAND --help' for more information on a command.

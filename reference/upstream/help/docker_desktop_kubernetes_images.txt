@@ -1,0 +1,7 @@
+Usage:  docker desktop kubernetes images
+
+List Kubernetes images used by Docker Desktop
+
+Options:
+      --format string   Format the output. Values: [pretty | json].
+                        (Default: pretty) (default "pretty")

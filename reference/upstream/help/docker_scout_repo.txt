@@ -1,0 +1,20 @@
+ Commands to list, enable, and disable Docker Scout on repositories
+
+Usage
+
+Available Commands
+  disable     Disable Docker Scout
+  enable      Enable Docker Scout
+  list        List Docker Scout repositories
+
+Use "docker scout repo [command] --help" for more information about a command.
+
+Learn More
+  Read docker scout cli reference at https://docs.docker.com/engine/reference/commandline/scout/
+
+Report Issues
+  Raise bugs and feature requests at https://github.com/docker/scout-cli/issues
+
+Send Feedback
+  Send feedback with docker feedback
+

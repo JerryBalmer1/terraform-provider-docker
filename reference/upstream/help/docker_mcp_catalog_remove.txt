@@ -1,0 +1,11 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp catalog remove <oci-reference>
+
+
+Examples:
+  # Remove the community registry catalog
+  docker mcp catalog remove mcp/community-registry:latest
+
+  # Remove a custom catalog
+  docker mcp catalog remove myorg/my-catalog:latest

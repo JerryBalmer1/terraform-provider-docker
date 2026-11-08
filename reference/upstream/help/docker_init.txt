@@ -1,0 +1,7 @@
+
+Usage:  docker init [OPTIONS]
+
+Creates Docker-related starter files for your project
+
+Options:
+      --version   Display version of the init plugin

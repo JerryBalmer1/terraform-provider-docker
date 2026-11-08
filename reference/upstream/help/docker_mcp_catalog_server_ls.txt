@@ -1,0 +1,21 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp catalog server ls <oci-reference>
+
+Flags:
+  -f, --filter stringArray   Filter output (e.g., name=github)
+      --format string        Supported: json, yaml, human. (default "human")
+
+
+Examples:
+  # List all servers in a catalog
+  docker mcp catalog server ls mcp/docker-mcp-catalog:latest
+
+  # Filter servers by name
+  docker mcp catalog server ls mcp/docker-mcp-catalog:latest --filter name=github
+
+  # Combine multiple filters (using short flag)
+  docker mcp catalog server ls mcp/docker-mcp-catalog:latest -f name=slack -f name=github
+
+  # Output in JSON format
+  docker mcp catalog server ls mcp/docker-mcp-catalog:latest --format json

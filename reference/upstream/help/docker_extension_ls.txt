@@ -1,0 +1,12 @@
+
+Usage:  docker extension ls
+
+List installed Docker extensions
+
+Aliases:
+  docker extension ls, docker extension list
+
+Options:
+      --format string   Format the output. Values: [pretty | json].
+                        (default "pretty")
+  -q, --quiet           Only display IDs.

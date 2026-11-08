@@ -1,0 +1,19 @@
+ Manage Docker Scout cache and temporary files
+
+Usage
+
+Available Commands
+  df          Show Docker Scout disk usage
+  prune       Remove temporary or cached data
+
+Use "docker scout cache [command] --help" for more information about a command.
+
+Learn More
+  Read docker scout cli reference at https://docs.docker.com/engine/reference/commandline/scout/
+
+Report Issues
+  Raise bugs and feature requests at https://github.com/docker/scout-cli/issues
+
+Send Feedback
+  Send feedback with docker feedback
+

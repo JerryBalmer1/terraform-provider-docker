@@ -1,0 +1,11 @@
+Usage:  docker buildx dial-stdio
+
+Proxy current stdio streams to builder instance
+
+Options:
+      --builder string    Override the configured builder instance
+  -D, --debug             Enable debug logging
+      --platform string   Target platform: this is used for node selection
+      --progress string   Set type of progress output ("auto", "plain",
+                          "rawjson", "tty"). Use plain to show container
+                          output (default "none")

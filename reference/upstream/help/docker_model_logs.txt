@@ -1,0 +1,7 @@
+Usage:  docker model logs [OPTIONS]
+
+Fetch the Docker Model Runner logs
+
+Options:
+  -f, --follow       View logs with real-time streaming
+      --no-engines   Exclude inference engine logs from the output

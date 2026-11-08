@@ -1,0 +1,9 @@
+Usage:  docker buildx imagetools inspect [OPTIONS] NAME
+
+Show details of an image in the registry
+
+Options:
+      --builder string   Override the configured builder instance
+  -D, --debug            Enable debug logging
+      --format string    Format the output using the given Go template
+      --raw              Show original, unformatted JSON manifest

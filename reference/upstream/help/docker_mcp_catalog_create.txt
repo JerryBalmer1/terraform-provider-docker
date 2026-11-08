@@ -1,0 +1,35 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp catalog create <oci-reference> [--server <ref1> --server <ref2> ...] [--from-profile <profile-id>] [--from-legacy-catalog <url>] [--from-community-registry <hostname>] [--title <title>]
+
+Flags:
+      --exclude stringArray              Server name to exclude from the catalog (can be specified multiple times, only valid with --from-community-registry)
+      --from-community-registry string   Community registry hostname to fetch servers from (e.g. registry.modelcontextprotocol.io)
+      --from-legacy-catalog string       Legacy catalog URL to create the catalog from
+      --from-profile string              Profile ID to create the catalog from
+      --server stringArray               Server to include specified with a URI: https:// (MCP Registry reference) or docker:// (Docker Image reference) or catalog:// (Catalog reference) or file:// (Local file path). Can be specified multiple times.
+      --title string                     Title of the catalog
+
+
+Examples:
+  # Build a catalog directly from server references
+  docker mcp catalog create myorg/catalog:latest --title "My Team Catalog" \
+    --server docker://mcp/custom-tool:latest \
+    --server catalog://my-org/team-catalog:v1/custom-tool
+
+  # Build a catalog with a specific version tag
+  docker mcp catalog create myorg/catalog:v1 --title "v1 Release" \
+    --server catalog://vonwig/private-catalog:v1/bigquery-mcp
+
+  # Copy all servers from one catalog into a new one
+  docker mcp catalog create myorg/new-catalog:latest --title "Combined" \
+    --server catalog://my-org/team-catalog:latest
+
+  # Create from a profile
+  docker mcp catalog create my-catalog --from-profile my-profile --title "My Catalog"
+
+  # Create from a legacy catalog
+  docker mcp catalog create docker-mcp-catalog --from-legacy-catalog https://desktop.docker.com/mcp/catalog/v3/catalog.json
+
+  # Create from a community registry
+  docker mcp catalog create my-catalog --from-community-registry registry.modelcontextprotocol.io --title "Community Servers"

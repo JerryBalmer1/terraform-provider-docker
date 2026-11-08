@@ -1,0 +1,11 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp profile config <profile-id> [--set <config-arg1> <config-arg2> ...] [--get <config-key1> <config-key2> ...] [--del <config-arg1> <config-arg2> ...]
+
+Flags:
+      --del stringArray   Delete configuration values: <key> (can be specified multiple times)
+      --format string     Supported: json, yaml, human. (default "human")
+      --get stringArray   Get configuration values: <key> (can be specified multiple times)
+      --get-all           Get all configuration values
+      --set stringArray   Set configuration values: <key>=<value> (repeatable). Value may be JSON to set typed values (arrays, numbers, booleans, objects).
+

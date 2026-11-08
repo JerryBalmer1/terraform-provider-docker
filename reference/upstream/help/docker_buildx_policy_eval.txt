@@ -1,0 +1,11 @@
+Usage:  docker buildx policy eval [OPTIONS] source
+
+Evaluate policy for a source
+
+Options:
+      --builder string    Override the configured builder instance
+  -D, --debug             Enable debug logging
+      --fields strings    Fields to evaluate
+  -f, --file string       Policy filename to evaluate (default "Dockerfile")
+      --platform string   Target platform for policy evaluation
+      --print             Print policy output

@@ -1,0 +1,7 @@
+Usage:  docker desktop status
+
+Show the status of the Docker Desktop engines
+
+Options:
+      --format string   Format the output. Accepted values are: pretty,
+                        json (default "pretty")

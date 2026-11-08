@@ -1,0 +1,19 @@
+Usage:  docker ai [OPTIONS] COMMAND
+
+Docker AI Agent - Ask Gordon
+
+Examples:
+	To start a conversation thread
+	$ docker ai
+
+	Or ask a single question:
+	$ docker ai "How do I run redis?"
+	$ docker ai "What's Docker Scout?"
+
+Options:
+  -C, --working-dir string   Sets the working directory for the command
+
+Commands:
+  version                 Show the version information
+
+Run 'docker ai COMMAND --help' for more information on a command.

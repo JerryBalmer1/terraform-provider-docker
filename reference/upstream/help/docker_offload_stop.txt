@@ -1,0 +1,9 @@
+Usage:  docker offload stop
+
+Stop a Docker Offload session
+
+Examples:
+docker offload stop
+
+Options:
+      --terminate   Terminate the remote lease

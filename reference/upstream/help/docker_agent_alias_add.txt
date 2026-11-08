@@ -1,0 +1,35 @@
+Usage:
+  docker agent alias add <alias-name> <agent-path>
+
+Examples:
+  # Create a simple alias
+  docker agent alias add code agentcatalog/notion-expert
+
+  # Create an alias that always runs in yolo mode
+  docker agent alias add yolo-coder agentcatalog/coder --yolo
+
+  # Create an alias with a specific model
+  docker agent alias add fast-coder agentcatalog/coder --model openai/gpt-4o-mini
+
+  # Create an alias with hidden tool results
+  docker agent alias add quiet agentcatalog/coder --hide-tool-results
+
+  # Create an alias that always runs in a sandbox
+  docker agent alias add safe-coder agentcatalog/coder --sandbox
+
+  # Create an alias with multiple options
+  docker agent alias add turbo agentcatalog/coder --yolo --model anthropic/claude-sonnet-4-0
+
+Flags:
+      --hide-tool-results   Hide tool call results in the TUI
+      --model string        Override agent model (format: [agent=]provider/model)
+      --sandbox             Always run the agent inside a Docker sandbox
+      --yolo                Automatically approve all tool calls without prompting
+
+Global Flags:
+      --cache-dir string    Override the cache directory (default: ~/Library/Caches/cagent on macOS)
+      --config-dir string   Override the config directory (default: ~/.config/cagent)
+      --data-dir string     Override the data directory (default: ~/.cagent)
+  -d, --debug               Enable debug logging
+      --log-file string     Path to debug log file (default: ~/.cagent/cagent.debug.log; only used with --debug)
+  -o, --otel                Enable OpenTelemetry tracing

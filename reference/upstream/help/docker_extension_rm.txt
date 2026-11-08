@@ -1,0 +1,7 @@
+
+Usage:  docker extension rm EXTENSION
+
+Remove a Docker extension
+
+Aliases:
+  docker extension rm, docker extension uninstall, docker extension remove

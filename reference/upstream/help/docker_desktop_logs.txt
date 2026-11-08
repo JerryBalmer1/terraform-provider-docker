@@ -1,0 +1,25 @@
+Usage:  docker desktop logs
+
+Print log entries
+
+Options:
+  -b, --boot int            Show logs from a specified boot. Zero means
+                            the current or boot, one the second last
+                            boot, and so on.
+  -c, --color               Always enable colored output.
+  -m, --color-mode string   Color mode to use. Can be 'default' or
+                            'priority' (default "default")
+  -D, --directory string    Specifies a custom directory to search for
+                            log entries.
+      --no-color            Disable colored output.
+  -p, --priority int        Filter output by log priorities. -1 (default)
+                            is all, 0 is info or above, 1 warnings or
+                            above, 2 errors. (default -1)
+  -S, --since string        Start showing entries on or newer than the
+                            specified date and time. Uses the
+                            systemd.time(7) format.
+  -u, --unit strings        Filter by one or more categories (e.g.
+                            --unit=com.docker.backend.ipc,com.docker.backend.apiproxy)
+  -U, --until string        Start showing entries on or before than the
+                            specified date and time. Uses the
+                            systemd.time(7) format.

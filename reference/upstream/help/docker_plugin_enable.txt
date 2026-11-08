@@ -1,0 +1,6 @@
+Usage:  docker plugin enable [OPTIONS] PLUGIN
+
+Enable a plugin
+
+Options:
+      --timeout int   HTTP client timeout (in seconds) (default 30)

@@ -1,0 +1,7 @@
+Usage:  docker model inspect MODEL
+
+Display detailed information on one model
+
+Options:
+      --openai   List model in an OpenAI format
+  -r, --remote   Show info for remote models

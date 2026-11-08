@@ -1,0 +1,38 @@
+Usage:  docker model COMMAND
+
+Docker Model Runner
+
+Management Commands:
+  context          Manage Docker Model Runner contexts
+
+Commands:
+  bench            Benchmark a model's performance at different concurrency levels
+  df               Show Docker Model Runner disk usage
+  gateway          Run an OpenAI-compatible LLM gateway
+  inspect          Display detailed information on one model
+  install-runner   Install Docker Model Runner (Docker Engine only)
+  launch           Launch an app configured to use Docker Model Runner
+  list             List the models pulled to your local environment
+  logs             Fetch the Docker Model Runner logs
+  package          Package a model into a Docker Model OCI artifact
+  ps               List running models
+  pull             Pull a model from Docker Hub or HuggingFace to your local environment
+  purge            Remove all models
+  push             Push a model to Docker Hub or Hugging Face
+  reinstall-runner Reinstall Docker Model Runner (Docker Engine only)
+  requests         Fetch requests+responses from Docker Model Runner
+  restart-runner   Restart Docker Model Runner (Docker Engine only)
+  rm               Remove local models downloaded from Docker Hub
+  run              Run a model and interact with it using a submitted prompt or chat mode
+  search           Search for models on Docker Hub and HuggingFace
+  show             Show information for a model
+  skills           Install Docker Model Runner skills for AI coding assistants
+  start-runner     Start Docker Model Runner (Docker Engine only)
+  status           Check if the Docker Model Runner is running
+  stop-runner      Stop Docker Model Runner (Docker Engine only)
+  tag              Tag a model
+  uninstall-runner Uninstall Docker Model Runner (Docker Engine only)
+  unload           Unload running models
+  version          Show the Docker Model Runner version
+
+Run 'docker model COMMAND --help' for more information on a command.

@@ -1,0 +1,8 @@
+Usage:  docker desktop version [OPTIONS]
+
+Show the Docker Desktop CLI plugin version information
+
+Options:
+  -f, --format string   Format the output. Values: [pretty | json].
+                        (Default: pretty)
+      --short           Shows only the version number

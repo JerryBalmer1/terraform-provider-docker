@@ -1,0 +1,9 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp feature
+
+Available Commands:
+  disable     Disable an experimental feature
+  enable      Enable an experimental feature
+  ls          List all available features and their status
+

@@ -1,0 +1,13 @@
+Usage:  docker buildx policy [OPTIONS] COMMAND
+
+Commands for working with build policies
+
+Options:
+      --builder string   Override the configured builder instance
+  -D, --debug            Enable debug logging
+
+Commands:
+  eval        Evaluate policy for a source
+  test        Run policy tests
+
+Run 'docker buildx policy COMMAND --help' for more information on a command.

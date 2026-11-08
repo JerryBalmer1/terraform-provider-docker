@@ -1,0 +1,23 @@
+ List integrations which can be installed
+
+Usage
+  docker scout integration list [INTEGRATION]
+
+Description
+The docker scout integration list configured integrations for an organization.
+
+
+
+Flags
+      --name string   Name of integration configuration to list
+      --org string    Namespace of the Docker organization
+
+Learn More
+  Read docker scout cli reference at https://docs.docker.com/engine/reference/commandline/scout/
+
+Report Issues
+  Raise bugs and feature requests at https://github.com/docker/scout-cli/issues
+
+Send Feedback
+  Send feedback with docker feedback
+

@@ -1,0 +1,10 @@
+Usage:  docker buildx ls
+
+List builder instances
+
+Options:
+  -D, --debug              Enable debug logging
+      --format string      Format the output (default "table")
+      --no-trunc           Don't truncate output
+      --timeout duration   Override the default timeout for loading
+                           builder status (default 20s)

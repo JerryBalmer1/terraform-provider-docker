@@ -1,0 +1,12 @@
+Usage:  docker sandbox network [OPTIONS] COMMAND
+
+Manage sandbox networking
+
+Options:
+  -D, --debug   Enable debug logging
+
+Commands:
+  log         Show network logs
+  proxy       Manage proxy configuration for a sandbox
+
+Run 'docker sandbox network COMMAND --help' for more information on a command.

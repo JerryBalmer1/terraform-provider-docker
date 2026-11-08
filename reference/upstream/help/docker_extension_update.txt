@@ -1,0 +1,7 @@
+
+Usage:  docker extension update EXTENSION
+
+Remove and re-install a Docker extension
+
+Options:
+  -f, --force   Do not prompt for confirmation

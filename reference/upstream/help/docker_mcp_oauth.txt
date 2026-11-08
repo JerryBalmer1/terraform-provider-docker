@@ -1,0 +1,9 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp oauth
+
+Available Commands:
+  authorize   Authorize the specified OAuth app.
+  ls          List available OAuth apps.
+  revoke      Revoke the specified OAuth app.
+

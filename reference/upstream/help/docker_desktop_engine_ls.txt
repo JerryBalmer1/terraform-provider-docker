@@ -1,0 +1,7 @@
+Usage:  docker desktop engine ls
+
+List available engine modes (Windows only)
+
+Options:
+      --format string   Format the output. Accepted values are: pretty,
+                        json (default "pretty")

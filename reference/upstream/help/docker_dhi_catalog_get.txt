@@ -1,0 +1,7 @@
+Usage:  docker dhi catalog get <name>
+
+Get detailed information about a Docker Hardened Image or Helm chart, including available tags and CVE counts
+
+Options:
+      --json         Output in JSON format
+      --org string   Docker Hub organization (overrides config)

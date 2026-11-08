@@ -1,0 +1,17 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp catalog server remove <oci-reference> [<name1> <name2> ...] [--name <name>]
+
+Flags:
+      --name stringArray   Server name to remove (can be specified multiple times)
+
+
+Examples:
+  # Remove servers by name (positional)
+  docker mcp catalog server remove mcp/my-catalog:latest github slack
+
+  # Remove a single server
+  docker mcp catalog server remove mcp/my-catalog:latest github
+
+  # Remove servers using --name flag
+  docker mcp catalog server remove mcp/my-catalog:latest --name github --name slack

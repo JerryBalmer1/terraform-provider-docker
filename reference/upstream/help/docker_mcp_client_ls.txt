@@ -1,0 +1,8 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp client ls
+
+Flags:
+  -g, --global   Change the system wide configuration or the clients setup in your current git repo.
+      --json     Print as JSON.
+

@@ -1,0 +1,3 @@
+Usage:  docker model push MODEL
+
+Push a model to Docker Hub or Hugging Face

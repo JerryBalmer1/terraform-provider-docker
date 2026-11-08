@@ -1,0 +1,62 @@
+Usage:
+  docker agent run [<agent-file>|<registry-ref>] [message]...
+
+Examples:
+  docker agent run ./agent.yaml
+  docker agent run ./team.yaml --agent root
+  docker agent run # built-in default agent
+  docker agent run coder # built-in coding agent
+  docker agent run ./echo.yaml "INSTRUCTIONS"
+  docker agent run ./echo.yaml "First question" "Follow-up question"
+  echo "INSTRUCTIONS" | docker agent run ./echo.yaml -
+  docker agent run ./agent.yaml --record  # Records session to auto-generated file
+
+Flags:
+  -a, --agent string                            Name of the agent to run (defaults to the team's first agent)
+      --agent-picker string[="default,coder"]   Show a full-screen picker to choose an agent before launching. Optional comma-separated list of agent refs (defaults to "default,coder")
+      --app-name string                         Application name shown in the TUI in place of "docker agent"
+      --attach string                           Attach an image file to the message
+      --code-mode-tools                         Provide a single tool to call other tools via Javascript
+      --disable-commands strings                Comma-separated list of slash commands to hide and disable in the TUI (e.g. /cost,/eval,/model)
+      --dry-run                                 Initialize the agent without executing anything
+      --env-from-file strings                   Set environment variables from file
+      --exec                                    Execute without a TUI
+      --fake string                             Replay AI responses from cassette file (for testing)
+      --fake-stream int[=15]                    Simulate streaming with delay in ms between chunks (default 15ms if no value given)
+      --hide-tool-calls                         Hide the tool calls in the output
+      --hide-tool-results                       Hide tool call results
+      --hook-on-user-input stringArray          Add an on-user-input hook command (repeatable)
+      --hook-post-tool-use stringArray          Add a post-tool-use hook command that runs after every tool call (repeatable)
+      --hook-pre-tool-use stringArray           Add a pre-tool-use hook command that runs before every tool call (repeatable)
+      --hook-session-end stringArray            Add a session-end hook command (repeatable)
+      --hook-session-start stringArray          Add a session-start hook command (repeatable)
+      --hook-stop stringArray                   Add a stop hook command, fired when the model finishes responding (repeatable)
+      --json                                    Output results in JSON format
+      --lean                                    Use a simplified TUI with minimal chrome
+      --mcp-oauth-redirect-uri redirect_uri     Public HTTPS URL to advertise as the OAuth redirect_uri for MCP servers running in unmanaged OAuth mode. When set, docker-agent drives the OAuth flow itself (PKCE + DCR + token exchange) and expects clients to return `{code, state}` via ResumeElicitation. When empty, the client is expected to perform the OAuth flow and return an access token (legacy behavior).
+      --model stringArray                       Override agent model: [agent=]provider/model (repeatable)
+      --models-gateway string                   Set the models gateway address
+      --no-kit                                  Do not stage a docker-agent kit (skills, prompt files) when running in a sandbox
+      --on-event stringArray                    Run shell command on event: --on-event <type>=<cmd> (or *=<cmd> for any). Repeatable.
+      --prompt-file stringArray                 Append file contents to the prompt (repeatable)
+      --record string[="true"]                  Record AI API interactions to cassette file (auto-generates filename if empty)
+      --remote string                           Use remote runtime with specified address
+      --sandbox                                 Run the agent inside a Docker sandbox (requires Docker Desktop with sandbox support)
+      --sbx                                     Prefer the sbx CLI backend when available (set --sbx=false to force docker sandbox) (default true)
+      --session string                          Continue from a previous session by ID or relative offset (e.g., -1 for last session)
+  -s, --session-db string                       Path to the session database (default "C:\\Users\\jlbal\\.cagent\\session.db")
+      --sidebar                                 Show the sidebar in the TUI (set --sidebar=false to hide it) (default true)
+      --template string                         Template image for the sandbox (passed to docker sandbox create -t) (default "docker/sandbox-templates:docker-agent")
+      --theme string                            Preselect a TUI theme by name (overrides the theme from user config; ignored outside the interactive TUI)
+      --working-dir string                      Set the working directory for the session (applies to tools and relative paths)
+  -w, --worktree string[="auto"]                Run the agent in a fresh git worktree of the working directory (isolates changes from your checkout). Optionally name it: --worktree=my-name
+      --worktree-pr string                      Run the agent in a git worktree checked out on an existing GitHub pull request (number or URL). Continues the PR's branch; requires the GitHub CLI (gh).
+      --yolo                                    Automatically approve all tool calls without prompting
+
+Global Flags:
+      --cache-dir string    Override the cache directory (default: ~/Library/Caches/cagent on macOS)
+      --config-dir string   Override the config directory (default: ~/.config/cagent)
+      --data-dir string     Override the data directory (default: ~/.cagent)
+  -d, --debug               Enable debug logging
+      --log-file string     Path to debug log file (default: ~/.cagent/cagent.debug.log; only used with --debug)
+  -o, --otel                Enable OpenTelemetry tracing

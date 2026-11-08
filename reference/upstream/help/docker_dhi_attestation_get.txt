@@ -1,0 +1,26 @@
+Usage:  docker dhi attestation get <image> <digest>
+
+Get an attestation attached to a Docker Hardened Image.
+
+Returns the in-toto statement extracted from the attestation referrer.
+The referrer digest must be provided to select which attestation to retrieve.
+Use 'dhictl attestation list' to discover available attestation digests.
+
+The image can be specified as:
+  - name:tag (e.g., nginx:1.27)
+  - namespace/name:tag (e.g., dhi/nginx:1.27)
+  - name@sha256:digest (e.g., nginx@sha256:abc123...)
+
+Examples:
+  # Get attestation by referrer digest
+  dhictl attestation get dhi/nginx:1.27 sha256:abc123...
+
+  # Save attestation to a file
+  dhictl attestation get dhi/nginx:1.27 sha256:abc123... -o provenance.json
+
+  # Extract only the predicate using jq
+  dhictl attestation get dhi/nginx:1.27 sha256:abc123... | jq .predicate
+
+Options:
+      --org string      Docker Hub organization (overrides config)
+  -o, --output string   Write output to file instead of stdout

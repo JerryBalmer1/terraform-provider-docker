@@ -1,0 +1,8 @@
+Usage:  docker offload status
+
+Show the status of the Docker Offload connection
+
+Options:
+  -f, --format string   Format of output (default: pretty, one of:
+                        pretty|json)
+  -w, --watch           Watch for status updates

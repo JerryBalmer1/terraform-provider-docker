@@ -1,0 +1,10 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp client disconnect [OPTIONS] <mcp-client>
+
+Supported clients: claude-code claude-desktop cline codex continue crush cursor gemini goose gordon kiro lmstudio opencode sema4 vscode zed
+
+Flags:
+  -g, --global   Change the system wide configuration or the clients setup in your current git repo.
+  -q, --quiet    Only display errors.
+

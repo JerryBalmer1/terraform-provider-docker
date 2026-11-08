@@ -1,0 +1,20 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp [OPTIONS]
+
+Flags:
+  -v, --version   Print version information and quit
+
+Available Commands:
+  catalog     Manage MCP server OCI catalogs
+  client      Manage MCP clients
+  feature     Manage experimental features
+  gateway     Manage the MCP Server gateway
+  oauth       Manage OAuth app authorizations
+  profile     Manage profiles
+  secret      Manage secrets in the local OS Keychain
+  server      Manage servers
+  template    Manage starter profile templates
+  tools       Manage tools
+  version     Show the version information
+

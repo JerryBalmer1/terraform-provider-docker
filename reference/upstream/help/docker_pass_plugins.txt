@@ -1,0 +1,25 @@
+Docker Pass CLI - Manage your local secrets.
+
+Usage: docker pass plugins
+
+Available Commands:
+  1password   Manage the 1Password SDK plugin.
+  disable     Disable a secrets engine plugin.
+  enable      Enable a secrets engine plugin.
+  ls          List registered secrets engine plugins.
+
+
+Examples:
+List all registered plugins and their status:
+
+```sh
+docker pass plugins ls
+```
+
+Enable or disable a configurable plugin:
+
+```sh
+docker pass plugins enable 1password-cli
+docker pass plugins disable 1password-cli
+```
+

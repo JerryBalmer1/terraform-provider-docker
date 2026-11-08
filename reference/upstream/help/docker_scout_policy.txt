@@ -1,0 +1,41 @@
+ Evaluate policies against an image and display the policy evaluation results (experimental)
+
+Usage
+  docker scout policy [IMAGE | REPO]
+
+Description
+The docker scout policy command evaluates policies against an image and displays the policy evaluation results. If the policy results for an image are already available in the Scout platform, they are retrieved from there, otherwise the policies are evaluated locally. It can also compare policy results for a repository in a specific environment.
+
+
+
+Flags
+  -e, --exit-code             Return exit code '2' if policies are not met, '0' otherwise
+      --only-policy strings   Comma separated list of policies to evaluate
+      --org string            Namespace of the Docker organization
+  -o, --output string         Write the report to a file
+      --platform string       Platform of image to pull policy results from
+      --to-env string         Name of the environment to compare to
+      --to-latest             Latest image processed to compare to
+
+Examples
+  Evaluate policies against an image:
+  $ docker scout policy IMAGE[0m
+
+  Evaluate policies against an image for a specific organization:
+  $ docker scout policy IMAGE --org ORG[0m
+
+  Evaluate policies against an image with a specific platform:
+  $ docker scout policy IMAGE --platform PLATFORM[0m
+
+  Compare policy results for a repository in a specific environment:
+  $ docker scout policy REPO --to-env ENV[0m
+
+Learn More
+  Read docker scout cli reference at https://docs.docker.com/engine/reference/commandline/scout/
+
+Report Issues
+  Raise bugs and feature requests at https://github.com/docker/scout-cli/issues
+
+Send Feedback
+  Send feedback with docker feedback
+

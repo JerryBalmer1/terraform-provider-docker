@@ -1,0 +1,9 @@
+Usage:  docker desktop engine COMMAND
+
+Commands to list and switch engine modes (Windows only)
+
+Commands:
+  ls          List available engine modes (Windows only)
+  use         Switch between Windows and Linux containers (Windows only)
+
+Run 'docker desktop engine COMMAND --help' for more information on a command.

@@ -1,0 +1,9 @@
+Usage:  docker buildx use [OPTIONS] NAME
+
+Set the current builder instance
+
+Options:
+      --builder string   Override the configured builder instance
+  -D, --debug            Enable debug logging
+      --default          Set builder as default for current context
+      --global           Builder persists context changes

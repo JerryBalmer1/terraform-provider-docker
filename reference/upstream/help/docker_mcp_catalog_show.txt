@@ -1,0 +1,10 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp catalog show <oci-reference> [--pull <pull-option>]
+
+Flags:
+      --format string   Supported: json, yaml, human. (default "human")
+      --no-tools        Exclude tools from output (deprecated, use --yq instead)
+      --pull string     Supported: missing, never, always, initial, exists, or duration (e.g. '1h', '1d'). Duration represents time since last update. (default "never")
+      --yq string       YQ expression to apply to the output
+

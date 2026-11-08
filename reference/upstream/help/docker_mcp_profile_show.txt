@@ -1,0 +1,9 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp profile show <profile-id>
+
+Flags:
+      --clients         Include client information in output
+      --format string   Supported: json, yaml, human. (default "human")
+      --yq string       YQ expression to apply to the output
+

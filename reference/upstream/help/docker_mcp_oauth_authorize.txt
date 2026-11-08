@@ -1,0 +1,8 @@
+Docker MCP Toolkit's CLI - Manage your MCP servers and clients.
+
+Usage: docker mcp oauth authorize <app>
+
+Flags:
+      --open-browser    Open the authorization URL in the default browser automatically
+      --scopes string   OAuth scopes to request (space-separated)
+

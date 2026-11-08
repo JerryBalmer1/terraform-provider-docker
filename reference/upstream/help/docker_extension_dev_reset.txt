@@ -1,0 +1,10 @@
+
+Usage:  docker extension dev reset
+
+Reset the source and disables the debug mode for the extension UI
+
+Aliases:
+  docker extension dev reset, docker extension dev remove
+
+Examples:
+docker extension dev reset my-extension
