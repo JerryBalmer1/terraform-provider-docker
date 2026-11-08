@@ -230,7 +230,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Today: id plus the name/labels/data arguments. Missing: inspect_json, inspect, content_sha256, version_index, engine_api_version, docker_server_version. known_after_apply true: computed by create."
+   "outputs_note": "Today: id plus the name/labels/data arguments. Missing: inspect_json, inspect, content_sha256, version_index, engine_api_version, docker_server_version. known_after_apply true: computed by create.",
+   "uses_cli": false
   },
   "swarm:secret": {
    "outputs": [
@@ -465,7 +466,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Today: id plus the name/labels/data arguments (data is the sensitive input, not an output). Missing: inspect_json, inspect, content_sha256, version_index, version outputs. The inspect output carries no secret value (the Engine never returns Spec.Data)."
+   "outputs_note": "Today: id plus the name/labels/data arguments (data is the sensitive input, not an output). Missing: inspect_json, inspect, content_sha256, version_index, version outputs. The inspect output carries no secret value (the Engine never returns Spec.Data).",
+   "uses_cli": false
   },
   "swarm:service": {
    "outputs": [
@@ -2109,7 +2111,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Today: id plus the input spec attributes (some Computed, e.g. endpoint_spec ports, restart_policy). Missing: inspect_json, inspect, content_sha256, version_index, image_digest_ref, published_ports, version outputs. inspect_json is sensitive; inspect is sensitive only at ContainerSpec.Env (field-level); image_digest_ref, replicas and published_ports are non-sensitive copies so consumers need no nonsensitive()."
+   "outputs_note": "Today: id plus the input spec attributes (some Computed, e.g. endpoint_spec ports, restart_policy). Missing: inspect_json, inspect, content_sha256, version_index, image_digest_ref, published_ports, version outputs. inspect_json is sensitive; inspect is sensitive only at ContainerSpec.Env (field-level); image_digest_ref, replicas and published_ports are non-sensitive copies so consumers need no nonsensitive().",
+   "uses_cli": false
   },
   "swarm:swarm-init": {
    "outputs": [
@@ -2592,7 +2595,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Today: id, cluster_id, node_id, worker_join_token, manager_join_token, unlock_key, data_path_port, default_addr_pool, subnet_size. Missing: inspect_json, inspect, join_tokens, content_sha256, labels, version_index, version outputs. Today's attribute for the cluster ID is cluster_id; this contract uses id = ClusterInfo.ID (see naming question)."
+   "outputs_note": "Today: id, cluster_id, node_id, worker_join_token, manager_join_token, unlock_key, data_path_port, default_addr_pool, subnet_size. Missing: inspect_json, inspect, join_tokens, content_sha256, labels, version_index, version outputs. Today's attribute for the cluster ID is cluster_id; this contract uses id = ClusterInfo.ID (see naming question).",
+   "uses_cli": false
   },
   "swarm:swarm-node": {
    "outputs": [
@@ -3055,7 +3059,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Today: id, node_id, hostname, role, availability. Missing: inspect_json, inspect, content_sha256, name, labels, version_index, addr, version outputs. Values come from NodeInspect on a manager after SwarmJoin."
+   "outputs_note": "Today: id, node_id, hostname, role, availability. Missing: inspect_json, inspect, content_sha256, name, labels, version_index, addr, version outputs. Values come from NodeInspect on a manager after SwarmJoin.",
+   "uses_cli": false
   },
   "swarm:config-data": {
    "outputs": [
@@ -3270,7 +3275,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Type does not exist yet. known_after_apply false (reads an existing object; unknown only when its id/name argument comes from a not-yet-applied resource)."
+   "outputs_note": "Type does not exist yet. known_after_apply false (reads an existing object; unknown only when its id/name argument comes from a not-yet-applied resource).",
+   "uses_cli": false
   },
   "swarm:secret-data": {
    "outputs": [
@@ -3505,7 +3511,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Type does not exist yet. known_after_apply false (see swarm:config-data)."
+   "outputs_note": "Type does not exist yet. known_after_apply false (see swarm:config-data).",
+   "uses_cli": false
   },
   "swarm:service-data": {
    "outputs": [
@@ -5149,7 +5156,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Type does not exist yet. known_after_apply false."
+   "outputs_note": "Type does not exist yet. known_after_apply false.",
+   "uses_cli": false
   },
   "swarm:node-data": {
    "outputs": [
@@ -5612,7 +5620,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Today: id, hostname, role, availability, state, addr, labels, engine_version, leader. Missing: inspect_json, inspect, content_sha256, name, version_index, version outputs. known_after_apply false."
+   "outputs_note": "Today: id, hostname, role, availability, state, addr, labels, engine_version, leader. Missing: inspect_json, inspect, content_sha256, name, version_index, version outputs. known_after_apply false.",
+   "uses_cli": false
   },
   "swarm:task-data": {
    "outputs": [
@@ -7181,7 +7190,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Type does not exist yet. known_after_apply false."
+   "outputs_note": "Type does not exist yet. known_after_apply false.",
+   "uses_cli": false
   },
   "swarm:configs": {
    "outputs": [
@@ -7368,7 +7378,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Today: a list of configs with id/name/labels. Missing: configs_json, full per-object fields, content_sha256, ids/names, version outputs. known_after_apply false."
+   "outputs_note": "Today: a list of configs with id/name/labels. Missing: configs_json, full per-object fields, content_sha256, ids/names, version outputs. known_after_apply false.",
+   "uses_cli": false
   },
   "swarm:secrets": {
    "outputs": [
@@ -7575,7 +7586,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Today: a list of secrets with id/name/labels. Missing: secrets_json, full per-object fields, content_sha256, ids/names, version outputs. known_after_apply false."
+   "outputs_note": "Today: a list of secrets with id/name/labels. Missing: secrets_json, full per-object fields, content_sha256, ids/names, version outputs. known_after_apply false.",
+   "uses_cli": false
   },
   "swarm:services": {
    "outputs": [
@@ -9116,7 +9128,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Today: a list of services with id/name/labels. Missing: services_json, the full spec chain, content_sha256, ids/names, version outputs. services_json sensitive; services only at ContainerSpec.Env (field-level); ids/names are not. known_after_apply false."
+   "outputs_note": "Today: a list of services with id/name/labels. Missing: services_json, the full spec chain, content_sha256, ids/names, version outputs. services_json sensitive; services only at ContainerSpec.Env (field-level); ids/names are not. known_after_apply false.",
+   "uses_cli": false
   },
   "swarm:nodes": {
    "outputs": [
@@ -9509,7 +9522,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Today: nodes list with id, hostname, role, availability, state, addr, labels, engine_version, leader. Missing: nodes_json, full Node fields (Spec/Description/Status/ManagerStatus), content_sha256, ids/names, version outputs. names = Description.Hostname (Spec.Name is usually empty). known_after_apply false."
+   "outputs_note": "Today: nodes list with id, hostname, role, availability, state, addr, labels, engine_version, leader. Missing: nodes_json, full Node fields (Spec/Description/Status/ManagerStatus), content_sha256, ids/names, version outputs. names = Description.Hostname (Spec.Name is usually empty). known_after_apply false.",
+   "uses_cli": false
   },
   "swarm:tasks": {
    "outputs": [
@@ -10994,7 +11008,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Type does not exist yet. tasks_json sensitive; tasks only at ContainerSpec.Env (field-level); ids/names are not. known_after_apply false."
+   "outputs_note": "Type does not exist yet. tasks_json sensitive; tasks only at ContainerSpec.Env (field-level); ids/names are not. known_after_apply false.",
+   "uses_cli": false
   },
   "swarm:swarm-data": {
    "outputs": [
@@ -11449,7 +11464,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Today only data.docker_swarm_tokens (id, worker, manager) and ephemeral.docker_swarm_tokens. Missing: inspect_json, inspect, join_tokens, content_sha256, labels, version_index, version outputs. Tokens read by a data source land in state (sensitive); the ephemeral resource stays the preferred way to get them. known_after_apply false."
+   "outputs_note": "Today only data.docker_swarm_tokens (id, worker, manager) and ephemeral.docker_swarm_tokens. Missing: inspect_json, inspect, join_tokens, content_sha256, labels, version_index, version outputs. Tokens read by a data source land in state (sensitive); the ephemeral resource stays the preferred way to get them. known_after_apply false.",
+   "uses_cli": false
   },
   "swarm:service-logs": {
    "outputs": [
@@ -11458,31 +11474,60 @@
      "tf_type": "string",
      "category": "raw",
      "source": {
+      "type": "derived",
+      "from": "log_entries",
+      "how": "one line per entry, \"<timestamp> <stream> <source> <message>\", joined with \\n"
+     },
+     "known_after_apply": false,
+     "sensitive": true,
+     "description": "The log entries as plain text, one line per entry: \"<timestamp> <stream> <source> <message>\". Sensitive: log lines can print secrets.",
+     "provided": false,
+     "serializes": "log_entries"
+    },
+    {
+     "name": "log_entries",
+     "tf_type": "list(object({timestamp=string, stream=string, source=string, message=string}))",
+     "category": "structured",
+     "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/paths/~1services~1{id}~1logs/get/responses/200/schema"
+      "pointer": "#/paths/~1services~1{id}~1logs/get"
      },
      "known_after_apply": false,
-     "sensitive": true,
-     "description": "The service logs, demultiplexed (stdout and stderr in arrival order) as one UTF-8 string. Sensitive: logs routinely contain secrets.",
+     "sensitive": false,
+     "description": "One entry per log line in arrival order, read with timestamps=true and bounded by the tail/since inputs; `source` is the service name. Only `message` is sensitive (log lines can print secrets).",
+     "fields": [
+      {
+       "name": "timestamp",
+       "upstream": "timestamps=true line prefix (RFC 3339 nano)",
+       "tf_type": "string",
+       "pointer": "#/paths/~1services~1{id}~1logs/get/parameters"
+      },
+      {
+       "name": "stream",
+       "upstream": "multiplexed frame header stream type: 1 = stdout, 2 = stderr; a TTY stream is not multiplexed (the Engine merges stdout and stderr at the source), so it is \"combined\"",
+       "tf_type": "string",
+       "pointer": "#/paths/~1services~1{id}~1logs/get/responses/200"
+      },
+      {
+       "name": "source",
+       "upstream": "Spec.Name",
+       "tf_type": "string",
+       "pointer": "#/definitions/ServiceSpec/properties/Name"
+      },
+      {
+       "name": "message",
+       "upstream": "log line without the timestamp prefix and trailing newline",
+       "tf_type": "string",
+       "pointer": "#/paths/~1services~1{id}~1logs/get/responses/200",
+       "sensitive": true
+      }
+     ],
+     "fields_complete": true,
      "provided": false
     },
     {
-     "name": "logs_json",
-     "tf_type": "string",
-     "category": "raw",
-     "source": {
-      "type": "derived",
-      "from": "the same stream as logs",
-      "how": "JSON array with one object per log line, in arrival order: {\"timestamp\": RFC 3339 nano from the frame (timestamps=true), \"stream\": \"stdout\"|\"stderr\" from the multiplexed frame header (\"stdout\" for a TTY), \"line\": the text without the trailing newline}"
-     },
-     "known_after_apply": false,
-     "sensitive": true,
-     "description": "The same log lines as a JSON array of {timestamp, stream, line} entries. Sensitive: logs routinely contain secrets.",
-     "provided": false
-    },
-    {
-     "name": "logs_sha256",
+     "name": "content_sha256",
      "tf_type": "string",
      "category": "hash",
      "source": {
@@ -11494,21 +11539,6 @@
      "sensitive": false,
      "hash_of": "logs",
      "description": "sha256 of logs.",
-     "provided": false
-    },
-    {
-     "name": "logs_json_sha256",
-     "tf_type": "string",
-     "category": "hash",
-     "source": {
-      "type": "derived",
-      "from": "logs_json",
-      "how": "hex sha256 of the UTF-8 bytes of logs_json"
-     },
-     "known_after_apply": false,
-     "sensitive": false,
-     "hash_of": "logs_json",
-     "description": "sha256 of logs_json.",
      "provided": false
     },
     {
@@ -11554,9 +11584,35 @@
      "provided": false
     }
    ],
-   "no_structured_reason": "ServiceLogs returns a raw or multiplexed byte stream (type string, format binary), not a JSON schema; there is no upstream object to mirror.",
    "outputs_status": "missing",
-   "outputs_note": "Type does not exist yet. Sensitive by default (log content). known_after_apply false."
+   "outputs_note": "Type does not exist yet. Sensitive by default (log content). known_after_apply false.",
+   "inputs": [
+    {
+     "name": "tail",
+     "tf_type": "number",
+     "default": 1000,
+     "upstream": "tail",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1services~1{id}~1logs/get/parameters"
+     },
+     "description": "Lines to keep from the end of the logs per service (Engine `tail`); default 1000 so state cannot grow without bound. 0 reads none; there is no \"all\"."
+    },
+    {
+     "name": "since",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "since",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1services~1{id}~1logs/get/parameters"
+     },
+     "description": "Only lines at or after this time: RFC 3339, or a duration before now such as \"42m\" (sent as the Engine's UNIX-timestamp `since`). Combined with tail when both are set."
+    }
+   ],
+   "uses_cli": false
   },
   "swarm:task-logs": {
    "outputs": [
@@ -11565,31 +11621,60 @@
      "tf_type": "string",
      "category": "raw",
      "source": {
+      "type": "derived",
+      "from": "log_entries",
+      "how": "one line per entry, \"<timestamp> <stream> <source> <message>\", joined with \\n"
+     },
+     "known_after_apply": false,
+     "sensitive": true,
+     "description": "The log entries as plain text, one line per entry: \"<timestamp> <stream> <source> <message>\". Sensitive: log lines can print secrets.",
+     "provided": false,
+     "serializes": "log_entries"
+    },
+    {
+     "name": "log_entries",
+     "tf_type": "list(object({timestamp=string, stream=string, source=string, message=string}))",
+     "category": "structured",
+     "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/paths/~1tasks~1{id}~1logs/get/responses/200/schema"
+      "pointer": "#/paths/~1tasks~1{id}~1logs/get"
      },
      "known_after_apply": false,
-     "sensitive": true,
-     "description": "The task logs, demultiplexed (stdout and stderr in arrival order) as one UTF-8 string. Sensitive: logs routinely contain secrets.",
+     "sensitive": false,
+     "description": "One entry per log line in arrival order, read with timestamps=true and bounded by the tail/since inputs; `source` is the task ID. Only `message` is sensitive (log lines can print secrets).",
+     "fields": [
+      {
+       "name": "timestamp",
+       "upstream": "timestamps=true line prefix (RFC 3339 nano)",
+       "tf_type": "string",
+       "pointer": "#/paths/~1tasks~1{id}~1logs/get/parameters"
+      },
+      {
+       "name": "stream",
+       "upstream": "multiplexed frame header stream type: 1 = stdout, 2 = stderr; a TTY stream is not multiplexed (the Engine merges stdout and stderr at the source), so it is \"combined\"",
+       "tf_type": "string",
+       "pointer": "#/paths/~1tasks~1{id}~1logs/get/responses/200"
+      },
+      {
+       "name": "source",
+       "upstream": "ID",
+       "tf_type": "string",
+       "pointer": "#/definitions/Task/properties/ID"
+      },
+      {
+       "name": "message",
+       "upstream": "log line without the timestamp prefix and trailing newline",
+       "tf_type": "string",
+       "pointer": "#/paths/~1tasks~1{id}~1logs/get/responses/200",
+       "sensitive": true
+      }
+     ],
+     "fields_complete": true,
      "provided": false
     },
     {
-     "name": "logs_json",
-     "tf_type": "string",
-     "category": "raw",
-     "source": {
-      "type": "derived",
-      "from": "the same stream as logs",
-      "how": "JSON array with one object per log line, in arrival order: {\"timestamp\": RFC 3339 nano from the frame (timestamps=true), \"stream\": \"stdout\"|\"stderr\" from the multiplexed frame header (\"stdout\" for a TTY), \"line\": the text without the trailing newline}"
-     },
-     "known_after_apply": false,
-     "sensitive": true,
-     "description": "The same log lines as a JSON array of {timestamp, stream, line} entries. Sensitive: logs routinely contain secrets.",
-     "provided": false
-    },
-    {
-     "name": "logs_sha256",
+     "name": "content_sha256",
      "tf_type": "string",
      "category": "hash",
      "source": {
@@ -11601,21 +11686,6 @@
      "sensitive": false,
      "hash_of": "logs",
      "description": "sha256 of logs.",
-     "provided": false
-    },
-    {
-     "name": "logs_json_sha256",
-     "tf_type": "string",
-     "category": "hash",
-     "source": {
-      "type": "derived",
-      "from": "logs_json",
-      "how": "hex sha256 of the UTF-8 bytes of logs_json"
-     },
-     "known_after_apply": false,
-     "sensitive": false,
-     "hash_of": "logs_json",
-     "description": "sha256 of logs_json.",
      "provided": false
     },
     {
@@ -11661,9 +11731,35 @@
      "provided": false
     }
    ],
-   "no_structured_reason": "TaskLogs returns a raw or multiplexed byte stream (type string, format binary), not a JSON schema; there is no upstream object to mirror.",
    "outputs_status": "missing",
-   "outputs_note": "Type does not exist yet. Sensitive by default (log content). known_after_apply false."
+   "outputs_note": "Type does not exist yet. Sensitive by default (log content). known_after_apply false.",
+   "inputs": [
+    {
+     "name": "tail",
+     "tf_type": "number",
+     "default": 1000,
+     "upstream": "tail",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1tasks~1{id}~1logs/get/parameters"
+     },
+     "description": "Lines to keep from the end of the logs per task (Engine `tail`); default 1000 so state cannot grow without bound. 0 reads none; there is no \"all\"."
+    },
+    {
+     "name": "since",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "since",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1tasks~1{id}~1logs/get/parameters"
+     },
+     "description": "Only lines at or after this time: RFC 3339, or a duration before now such as \"42m\" (sent as the Engine's UNIX-timestamp `since`). Combined with tail when both are set."
+    }
+   ],
+   "uses_cli": false
   },
   "swarm:node-activate": {
    "outputs": [
@@ -11776,7 +11872,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Action exists; actions return no attributes today. Changed value: Spec.Availability = active."
+   "outputs_note": "Action exists; actions return no attributes today. Changed value: Spec.Availability = active.",
+   "uses_cli": false
   },
   "swarm:node-drain": {
    "outputs": [
@@ -11889,7 +11986,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Action exists; actions return no attributes today. Changed value: Spec.Availability = drain."
+   "outputs_note": "Action exists; actions return no attributes today. Changed value: Spec.Availability = drain.",
+   "uses_cli": false
   },
   "swarm:node-promote": {
    "outputs": [
@@ -12002,7 +12100,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No action yet (role is an argument of docker_swarm_node). Changed value: Spec.Role = manager."
+   "outputs_note": "No action yet (role is an argument of docker_swarm_node). Changed value: Spec.Role = manager.",
+   "uses_cli": false
   },
   "swarm:node-demote": {
    "outputs": [
@@ -12115,7 +12214,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No action yet (role is an argument of docker_swarm_node). Changed value: Spec.Role = worker."
+   "outputs_note": "No action yet (role is an argument of docker_swarm_node). Changed value: Spec.Role = worker.",
+   "uses_cli": false
   },
   "swarm:service-force-update": {
    "outputs": [
@@ -12263,7 +12363,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Action exists; returns no attributes today. Changed value: TaskTemplate.ForceUpdate."
+   "outputs_note": "Action exists; returns no attributes today. Changed value: TaskTemplate.ForceUpdate.",
+   "uses_cli": false
   },
   "swarm:service-rollback": {
    "outputs": [
@@ -12411,7 +12512,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Action exists; returns no attributes today. Rollback is ServiceUpdate with rollback=previous; the whole spec reverts."
+   "outputs_note": "Action exists; returns no attributes today. Rollback is ServiceUpdate with rollback=previous; the whole spec reverts.",
+   "uses_cli": false
   },
   "swarm:service-scale": {
    "outputs": [
@@ -12642,7 +12744,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Action exists; returns no attributes today. Changed value: Spec.Mode.Replicated.Replicas."
+   "outputs_note": "Action exists; returns no attributes today. Changed value: Spec.Mode.Replicated.Replicas.",
+   "uses_cli": false
   },
   "swarm:swarm-ca-rotate": {
    "outputs": [
@@ -12749,7 +12852,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No action yet. SwarmUpdate with Spec.CAConfig.ForceRotate incremented; a supplied signing key is a sensitive input and never returned."
+   "outputs_note": "No action yet. SwarmUpdate with Spec.CAConfig.ForceRotate incremented; a supplied signing key is a sensitive input and never returned.",
+   "uses_cli": false
   },
   "swarm:swarm-rotate-tokens": {
    "outputs": [
@@ -12865,7 +12969,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Action exists; returns no attributes today (new tokens are read with ephemeral.docker_swarm_tokens). Token outputs must stay sensitive."
+   "outputs_note": "Action exists; returns no attributes today (new tokens are read with ephemeral.docker_swarm_tokens). Token outputs must stay sensitive.",
+   "uses_cli": false
   },
   "swarm:swarm-rotate-unlock-key": {
    "outputs": [
@@ -12909,6 +13014,20 @@
      "description": "New unlock key (GET /swarm/unlockkey after rotation). Sensitive."
     },
     {
+     "name": "autolock_managers",
+     "tf_type": "bool",
+     "category": "result",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/definitions/SwarmSpec/properties/EncryptionConfig/properties/AutoLockManagers"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "Whether autolock is on after the rotation (the new key only matters when it is).",
+     "provided": false
+    },
+    {
      "name": "engine_api_version",
      "tf_type": "string",
      "category": "version",
@@ -12938,7 +13057,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No action yet. SwarmUpdate with rotateManagerUnlockKey=true, then SwarmUnlockkey."
+   "outputs_note": "No action yet. SwarmUpdate with rotateManagerUnlockKey=true, then SwarmUnlockkey.",
+   "uses_cli": false
   },
   "swarm:swarm-unlock": {
    "outputs": [
@@ -13031,7 +13151,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No action yet. SwarmUnlock returns no body; outputs come from GET /info afterwards. The unlock key is a sensitive input, never an output."
+   "outputs_note": "No action yet. SwarmUnlock returns no body; outputs come from GET /info afterwards. The unlock key is a sensitive input, never an output.",
+   "uses_cli": false
   }
  }
 }

@@ -360,7 +360,8 @@
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Today: id, name, driver, endpoint, tcp_address, container_name, volume_name, buildkit_version, platforms (first node). Missing: inspect_json, builder (nodes, driver_opts, status, flags, labels, gc_policy, last_activity), labels, the three version outputs. Gaps vs `buildx inspect`: the '*' marker for manually pinned platforms and the --debug extra view."
+      "outputs_note": "Today: id, name, driver, endpoint, tcp_address, container_name, volume_name, buildkit_version, platforms (first node). Missing: inspect_json, builder (nodes, driver_opts, status, flags, labels, gc_policy, last_activity), labels, the three version outputs. Gaps vs `buildx inspect`: the '*' marker for manually pinned platforms and the --debug extra view.",
+      "uses_cli": false
     },
     "buildx:builder-inspect": {
       "outputs": [
@@ -695,7 +696,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No data source today. Builders not created by Terraform are discoverable only as buildx_buildkit_* containers (buildx's client-side store is not read), so last_activity may be empty for them."
+      "outputs_note": "No data source today. Builders not created by Terraform are discoverable only as buildx_buildkit_* containers (buildx's client-side store is not read), so last_activity may be empty for them.",
+      "uses_cli": false
     },
     "buildx:builders": {
       "outputs": [
@@ -951,7 +953,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No data source today. The current-builder '*' marker of `buildx ls` is client-side state (~/.docker/buildx) and has no output."
+      "outputs_note": "No data source today. The current-builder '*' marker of `buildx ls` is client-side state (~/.docker/buildx) and has no output.",
+      "uses_cli": false
     },
     "buildx:du": {
       "outputs": [
@@ -1172,7 +1175,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No data source today (docker_system_df / Z1 may expose the daemon BuildCache section). Mutable and Reclaimable are buildx terms; the Engine BuildCache model has InUse instead."
+      "outputs_note": "No data source today (docker_system_df / Z1 may expose the daemon BuildCache section). Mutable and Reclaimable are buildx terms; the Engine BuildCache model has InUse instead.",
+      "uses_cli": false
     },
     "buildx:history-ls": {
       "outputs": [
@@ -1293,7 +1297,8 @@
           "description": "The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "buildx:history-inspect": {
       "outputs": [
@@ -1602,7 +1607,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No data source today. Gap: attachment content (provenance/SBOM bodies, `docker buildx history inspect attachment`) is not an output; only attachment digests/types. Config holds more keys than ImageResolveMode in practice (fields_complete false)."
+      "outputs_note": "No data source today. Gap: attachment content (provenance/SBOM bodies, `docker buildx history inspect attachment`) is not an output; only attachment digests/types. Config holds more keys than ImageResolveMode in practice (fields_complete false).",
+      "uses_cli": false
     },
     "buildx:imagetools-inspect": {
       "outputs": [
@@ -2126,7 +2132,8 @@
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Today: digest, media_type, manifests (flattened: digest, media_type, size, os, architecture, variant, os_version). Missing: manifest_json, image_config_json/image_config, provenance_json, sbom_json, image_ref, image_digest_ref, platforms, buildx_version; manifests[] lacks annotations, urls, artifact_type, os.features. Same Terraform type as cli-only:manifest-inspect, same outputs. Existing `name` is the input reference, so the normalized ref is `image_ref`."
+      "outputs_note": "Today: digest, media_type, manifests (flattened: digest, media_type, size, os, architecture, variant, os_version). Missing: manifest_json, image_config_json/image_config, provenance_json, sbom_json, image_ref, image_digest_ref, platforms, buildx_version; manifests[] lacks annotations, urls, artifact_type, os.features. Same Terraform type as cli-only:manifest-inspect, same outputs. Existing `name` is the input reference, so the normalized ref is `image_ref`.",
+      "uses_cli": false
     },
     "cli-only:manifest-inspect": {
       "outputs": [
@@ -2646,22 +2653,11 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx."
-        },
-        {
-          "name": "docker_cli_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "docker_cli"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Same type and outputs as buildx:imagetools-inspect (docker_registry_image_manifests). Gap vs `docker manifest inspect --verbose`: for a list, the verbose view also expands every child manifest (its config and layers); the data source only reads the top-level document. The type reads the registry v2 API directly; DistributionInspect (GET /distribution/{name}/json) would give Descriptor+Platforms only."
+      "outputs_note": "Same type and outputs as buildx:imagetools-inspect (docker_registry_image_manifests). Gap vs `docker manifest inspect --verbose`: for a list, the verbose view also expands every child manifest (its config and layers); the data source only reads the top-level document. The type reads the registry v2 API directly; DistributionInspect (GET /distribution/{name}/json) would give Descriptor+Platforms only. uses_cli false: reads the manifest from the registry v2 HTTP API, not `docker manifest inspect`; so no docker_cli_version.",
+      "uses_cli": false
     },
     "cli-only:manifest-list": {
       "outputs": [
@@ -2900,22 +2896,11 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx."
-        },
-        {
-          "name": "docker_cli_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "docker_cli"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "Type does not exist yet. Talks to the registry v2 HTTP API, so neither engine_api_version nor docker_server_version applies; buildx_version records the `imagetools create` semantics it mirrors."
+      "outputs_note": "Type does not exist yet. Talks to the registry v2 HTTP API, so neither engine_api_version nor docker_server_version applies; buildx_version records the `imagetools create` semantics it mirrors. uses_cli false: assembles the index and pushes it through the registry v2 HTTP API, not `docker manifest`; so no docker_cli_version.",
+      "uses_cli": false
     },
     "buildx:bake": {
       "outputs": [
@@ -3482,7 +3467,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "Action does not exist yet. variable/function blocks are inputs only (Terraform variables replace them) and do not appear in --print output."
+      "outputs_note": "Action does not exist yet. variable/function blocks are inputs only (Terraform variables replace them) and do not appear in --print output.",
+      "uses_cli": false
     },
     "buildx:build": {
       "outputs": [
@@ -3784,7 +3770,8 @@
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Today docker_image exposes id, image_id, repo_digest (= image_digest_ref), context_digest. Missing: metadata_json/build_metadata, dockerfile text, digest, platforms, labels, build_ref, the version outputs. Image inspect outputs (inspect_json) belong to the engine image item, not here."
+      "outputs_note": "Today docker_image exposes id, image_id, repo_digest (= image_digest_ref), context_digest. Missing: metadata_json/build_metadata, dockerfile text, digest, platforms, labels, build_ref, the version outputs. Image inspect outputs (inspect_json) belong to the engine image item, not here.",
+      "uses_cli": false
     },
     "buildx:stop": {
       "outputs": [
@@ -3864,7 +3851,8 @@
           "description": "Engine API version negotiated with the daemon for this read/apply."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "buildx:prune": {
       "outputs": [
@@ -3937,7 +3925,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "docker_system_prune reports the daemon build-cache prune today; nothing for docker-container builders."
+      "outputs_note": "docker_system_prune reports the daemon build-cache prune today; nothing for docker-container builders.",
+      "uses_cli": false
     },
     "cli-only:stack": {
       "outputs": [
@@ -4832,22 +4821,11 @@
           "known_after_apply": true,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
-        },
-        {
-          "name": "docker_cli_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "docker_cli"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Today only id and name (plus the configured blocks). Missing: stack_yaml, stack (compose-spec shaped), service_status, namespace, labels, *_ids maps, versions. stack_yaml is the docker_stack -> compose direction (cli-only:stack-config is skipped as a type, it is only an output here). A whole-namespace Engine inspect_json was dropped to keep one raw (content_sha256); per-object inspect stays with docker_service/docker_network data sources."
+      "outputs_note": "Today only id and name (plus the configured blocks). Missing: stack_yaml, stack (compose-spec shaped), service_status, namespace, labels, *_ids maps, versions. stack_yaml is the docker_stack -> compose direction (cli-only:stack-config is skipped as a type, it is only an output here). A whole-namespace Engine inspect_json was dropped to keep one raw (content_sha256); per-object inspect stays with docker_service/docker_network data sources. uses_cli false: deploys through the Engine API (NetworkCreate, ServiceCreate/Update/Delete, secret and config create) with the namespace label; it mirrors `docker stack deploy` but never runs it; so no docker_cli_version.",
+      "uses_cli": false
     },
     "cli-only:stack-services": {
       "outputs": [
@@ -5103,22 +5081,11 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
-        },
-        {
-          "name": "docker_cli_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "docker_cli"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "docker_services with a label filter returns services today but no replica counts, no tasks, no raw JSON."
+      "outputs_note": "docker_services with a label filter returns services today but no replica counts, no tasks, no raw JSON. uses_cli false: GET /services and GET /tasks filtered by the namespace label; no `docker stack services`; so no docker_cli_version.",
+      "uses_cli": false
     },
     "cli-only:stacks": {
       "outputs": [
@@ -5236,21 +5203,11 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
-        },
-        {
-          "name": "docker_cli_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "docker_cli"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false,
+      "outputs_note": "uses_cli false: groups GET /services by the com.docker.stack.namespace label; no `docker stack ls`; so no docker_cli_version."
     }
   }
 }

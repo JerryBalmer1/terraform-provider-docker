@@ -2602,7 +2602,8 @@
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Today: id, project_name and spec_hash (a digest of the parsed project, not of compose_yaml). Missing: compose_yaml, content_sha256, project, labels, config_files and all version outputs."
+      "outputs_note": "Today: id, project_name and spec_hash (a digest of the parsed project, not of compose_yaml). Missing: compose_yaml, content_sha256, project, labels, config_files and all version outputs.",
+      "uses_cli": false
     },
     "compose:services": {
       "outputs": [
@@ -3891,7 +3892,8 @@
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
       "outputs_status": "partial",
-      "outputs_note": "Today: `services` (name -> container IDs / service ID). Missing: project.services, container_names, image_refs, versions."
+      "outputs_note": "Today: `services` (name -> container IDs / service ID). Missing: project.services, container_names, image_refs, versions.",
+      "uses_cli": false
     },
     "compose:networks": {
       "outputs": [
@@ -4068,7 +4070,8 @@
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
       "outputs_status": "partial",
-      "outputs_note": "Today: `networks` (key -> ID). Missing: project.networks, network_names, versions."
+      "outputs_note": "Today: `networks` (key -> ID). Missing: project.networks, network_names, versions.",
+      "uses_cli": false
     },
     "compose:volumes": {
       "outputs": [
@@ -4183,7 +4186,8 @@
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
       "outputs_status": "partial",
-      "outputs_note": "Today: `volumes` (key -> name). Missing: project.volumes, versions."
+      "outputs_note": "Today: `volumes` (key -> name). Missing: project.volumes, versions.",
+      "uses_cli": false
     },
     "compose:configs": {
       "outputs": [
@@ -4309,7 +4313,8 @@
         }
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:secrets": {
       "outputs": [
@@ -4440,7 +4445,8 @@
         }
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:models": {
       "outputs": [
@@ -4533,7 +4539,8 @@
         }
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:jobs": {
       "outputs": [
@@ -5539,7 +5546,8 @@
         }
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:include": {
       "outputs": [
@@ -5627,7 +5635,8 @@
         }
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:service-build": {
       "outputs": [
@@ -5938,7 +5947,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "no_raw_reason": "The build section is serialized inside compose_yaml (compose:name); docker_image's own inspect_json belongs to the engine image item."
+      "no_raw_reason": "The build section is serialized inside compose_yaml (compose:name); docker_image's own inspect_json belongs to the engine image item.",
+      "uses_cli": false
     },
     "compose:service-deploy": {
       "outputs": [
@@ -6226,7 +6236,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "no_raw_reason": "The deploy section is serialized inside compose_yaml (compose:name); docker_service's own inspect_json belongs to the swarm service item."
+      "no_raw_reason": "The deploy section is serialized inside compose_yaml (compose:name); docker_service's own inspect_json belongs to the swarm service item.",
+      "uses_cli": false
     },
     "compose:cli-config": {
       "outputs": [
@@ -8767,7 +8778,8 @@
           "description": "compose-go version that loads, interpolates, merges and validates the project (v2.16.2, from go.mod)."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-ps": {
       "outputs": [
@@ -9008,7 +9020,8 @@
           "description": "Docker Engine version of the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-images": {
       "outputs": [
@@ -9201,7 +9214,8 @@
           "description": "Docker Engine version of the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-logs": {
       "outputs": [
@@ -9211,58 +9225,17 @@
           "category": "raw",
           "source": {
             "type": "derived",
-            "from": "entries",
-            "how": "one line per entry, as `docker compose logs` prints it without color: \"<container_name>  | <line>\", joined with \n"
+            "from": "log_entries",
+            "how": "one line per entry, \"<timestamp> <stream> <source> <message>\", joined with \\n"
           },
           "known_after_apply": true,
           "sensitive": true,
-          "description": "The log lines as plain text, prefixed with the container name like `docker compose logs`. Sensitive: application output can print secrets."
+          "description": "The log entries as plain text, one line per entry: \"<timestamp> <stream> <source> <message>\". Sensitive: log lines can print secrets.",
+          "serializes": "log_entries"
         },
         {
-          "name": "logs_json",
-          "tf_type": "string",
-          "category": "raw",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/paths/~1containers~1{id}~1logs/get"
-          },
-          "known_after_apply": true,
-          "sensitive": true,
-          "description": "JSON array of the log entries (serialization of `entries`). Sensitive: application output can print secrets.",
-          "serializes": "entries"
-        },
-        {
-          "name": "logs_sha256",
-          "tf_type": "string",
-          "category": "hash",
-          "source": {
-            "type": "derived",
-            "from": "logs",
-            "how": "hex sha256 of the UTF-8 bytes of logs"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "hash_of": "logs",
-          "description": "sha256 of logs."
-        },
-        {
-          "name": "logs_json_sha256",
-          "tf_type": "string",
-          "category": "hash",
-          "source": {
-            "type": "derived",
-            "from": "logs_json",
-            "how": "hex sha256 of the UTF-8 bytes of logs_json"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "hash_of": "logs_json",
-          "description": "sha256 of logs_json."
-        },
-        {
-          "name": "entries",
-          "tf_type": "list(object({...}))",
+          "name": "log_entries",
+          "tf_type": "list(object({timestamp=string, stream=string, source=string, message=string}))",
           "category": "structured",
           "source": {
             "type": "swagger",
@@ -9271,47 +9244,49 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "Log lines of the selected service containers, in time order.",
+          "description": "One entry per log line in arrival order, read with timestamps=true and bounded by the tail/since inputs; `source` is \"<compose service>.<container name>\". Only `message` is sensitive (log lines can print secrets).",
           "fields": [
             {
-              "name": "service",
-              "upstream": "Labels[com.docker.compose.service]",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Labels"
-            },
-            {
-              "name": "container_id",
-              "upstream": "Id",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Id"
-            },
-            {
-              "name": "container_name",
-              "upstream": "Names",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Names"
-            },
-            {
-              "name": "stream",
-              "upstream": "stdout|stderr (multiplexed stream header)",
-              "tf_type": "string",
-              "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200"
-            },
-            {
               "name": "timestamp",
-              "upstream": "timestamps=true prefix",
+              "upstream": "timestamps=true line prefix (RFC 3339 nano)",
               "tf_type": "string",
               "pointer": "#/paths/~1containers~1{id}~1logs/get/parameters"
             },
             {
-              "name": "line",
-              "upstream": "log line",
+              "name": "stream",
+              "upstream": "multiplexed frame header stream type: 1 = stdout, 2 = stderr; a TTY stream is not multiplexed (the Engine merges stdout and stderr at the source), so it is \"combined\"",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200"
+            },
+            {
+              "name": "source",
+              "upstream": "Labels[com.docker.compose.service] + \".\" + Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "message",
+              "upstream": "log line without the timestamp prefix and trailing newline",
               "tf_type": "string",
               "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200",
               "sensitive": true
             }
           ],
           "fields_complete": true
+        },
+        {
+          "name": "content_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "logs",
+            "how": "hex sha256 of the UTF-8 bytes of logs"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "hash_of": "logs",
+          "description": "sha256 of logs."
         },
         {
           "name": "name",
@@ -9366,7 +9341,36 @@
           "description": "Docker Engine version of the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "inputs": [
+        {
+          "name": "tail",
+          "tf_type": "number",
+          "default": 1000,
+          "upstream": "tail",
+          "source": {
+            "type": "cli",
+            "command": "docker compose logs",
+            "flag": "--tail",
+            "file": "upstream/compose-cli/docs/reference/compose_logs.md"
+          },
+          "description": "Lines to keep from the end of the logs per container (Engine `tail`); default 1000 so state cannot grow without bound. 0 reads none; there is no \"all\"."
+        },
+        {
+          "name": "since",
+          "tf_type": "string",
+          "default": null,
+          "upstream": "since",
+          "source": {
+            "type": "cli",
+            "command": "docker compose logs",
+            "flag": "--since",
+            "file": "upstream/compose-cli/docs/reference/compose_logs.md"
+          },
+          "description": "Only lines at or after this time: RFC 3339, or a duration before now such as \"42m\" (sent as the Engine's UNIX-timestamp `since`). Combined with tail when both are set."
+        }
+      ],
+      "uses_cli": false
     },
     "compose:cli-port": {
       "outputs": [
@@ -9465,7 +9469,8 @@
         }
       ],
       "outputs_status": "missing",
-      "no_raw_reason": "The answer is one port binding; `bindings` is the whole result and has no separate serialized form upstream."
+      "no_raw_reason": "The answer is one port binding; `bindings` is the whole result and has no separate serialized form upstream.",
+      "uses_cli": false
     },
     "compose:cli-ls": {
       "outputs": [
@@ -9576,7 +9581,8 @@
           "description": "Docker Engine version of the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-top": {
       "outputs": [
@@ -9695,7 +9701,8 @@
           "description": "Docker Engine version of the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-volumes": {
       "outputs": [
@@ -9856,7 +9863,8 @@
           "description": "Docker Engine version of the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-build": {
       "outputs": [
@@ -9913,6 +9921,52 @@
           "description": "Service name -> built image ID."
         },
         {
+          "name": "built_images",
+          "tf_type": "map(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/ImageInspect"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Service name -> summary of the image built for it (GET /images/{id}/json).",
+          "fields": [
+            {
+              "name": "size",
+              "upstream": "Size",
+              "tf_type": "number",
+              "pointer": "#/definitions/ImageInspect/properties/Size"
+            },
+            {
+              "name": "created",
+              "upstream": "Created",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Created"
+            },
+            {
+              "name": "architecture",
+              "upstream": "Architecture",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Architecture"
+            },
+            {
+              "name": "os",
+              "upstream": "Os",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Os"
+            },
+            {
+              "name": "variant",
+              "upstream": "Variant",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Variant"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "compose_spec_version",
           "tf_type": "string",
           "category": "version",
@@ -9950,7 +10004,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-commit": {
       "outputs": [
@@ -10007,6 +10062,34 @@
           "description": "repo:tag given to the new image (empty when untagged)."
         },
         {
+          "name": "changes",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1{id}~1changes/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "The container filesystem changes the commit captured (GET /containers/{id}/changes just before the commit).",
+          "fields": [
+            {
+              "name": "path",
+              "upstream": "Path",
+              "tf_type": "string",
+              "pointer": "#/definitions/FilesystemChange/properties/Path"
+            },
+            {
+              "name": "kind",
+              "upstream": "Kind",
+              "tf_type": "number",
+              "pointer": "#/definitions/ChangeType"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -10020,7 +10103,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-cp": {
       "outputs": [
@@ -10064,6 +10148,52 @@
           "description": "Path inside the container that was written or read."
         },
         {
+          "name": "path_stat",
+          "tf_type": "object({...})",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Stat of the container-side path after the copy (HEAD /containers/{id}/archive).",
+          "fields": [
+            {
+              "name": "name",
+              "upstream": "name",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "size",
+              "upstream": "size",
+              "tf_type": "number",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "mode",
+              "upstream": "mode",
+              "tf_type": "number",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "mtime",
+              "upstream": "mtime",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "link_target",
+              "upstream": "linkTarget",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -10077,7 +10207,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-down": {
       "outputs": [
@@ -10147,6 +10278,46 @@
           "description": "Images removed (with rmi)."
         },
         {
+          "name": "removed_counts",
+          "tf_type": "object({...})",
+          "category": "result",
+          "source": {
+            "type": "derived",
+            "from": "removed_*",
+            "how": "length of each removed_* list"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "How many containers, networks, volumes and images `down` removed.",
+          "fields": [
+            {
+              "name": "containers",
+              "upstream": "len(removed_container_ids)",
+              "tf_type": "number",
+              "pointer": "#/paths/~1containers~1{id}/delete"
+            },
+            {
+              "name": "networks",
+              "upstream": "len(removed_network_ids)",
+              "tf_type": "number",
+              "pointer": "#/paths/~1networks~1{id}/delete"
+            },
+            {
+              "name": "volumes",
+              "upstream": "len(removed_volume_names)",
+              "tf_type": "number",
+              "pointer": "#/paths/~1volumes~1{id}/delete"
+            },
+            {
+              "name": "images",
+              "upstream": "len(removed_image_ids)",
+              "tf_type": "number",
+              "pointer": "#/paths/~1images~1{id}/delete"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -10173,7 +10344,8 @@
           "description": "Docker Engine version of the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-exec": {
       "outputs": [
@@ -10266,7 +10438,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-export": {
       "outputs": [
@@ -10310,6 +10483,19 @@
           "description": "Local tar file written."
         },
         {
+          "name": "archive_size",
+          "tf_type": "number",
+          "category": "result",
+          "source": {
+            "type": "derived",
+            "from": "streamed from GET /containers/{id}/export",
+            "how": "byte count of the tar stream"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Bytes in the tar archive the action streamed."
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -10323,7 +10509,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-kill": {
       "outputs": [
@@ -10367,6 +10554,52 @@
           "description": "Service name -> IDs of the containers signalled."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -10380,7 +10613,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-pause": {
       "outputs": [
@@ -10424,6 +10658,52 @@
           "description": "Service name -> IDs of the containers paused."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -10437,7 +10717,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-unpause": {
       "outputs": [
@@ -10481,6 +10762,52 @@
           "description": "Service name -> IDs of the containers unpaused."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -10494,7 +10821,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-start": {
       "outputs": [
@@ -10538,6 +10866,52 @@
           "description": "Service name -> IDs of the containers started."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -10551,7 +10925,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-stop": {
       "outputs": [
@@ -10595,6 +10970,52 @@
           "description": "Service name -> IDs of the containers stopped."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -10608,7 +11029,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-restart": {
       "outputs": [
@@ -10652,6 +11074,52 @@
           "description": "Service name -> IDs of the containers restarted."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -10665,7 +11133,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-publish": {
       "outputs": [
@@ -10722,6 +11191,40 @@
           "description": "Manifest digest of the published artifact."
         },
         {
+          "name": "layers",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "cli",
+            "command": "docker compose publish",
+            "file": "upstream/compose-cli/docs/reference/compose_publish.md"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "OCI descriptors of the layers pushed in the published artifact (compose files, env files).",
+          "fields": [
+            {
+              "name": "media_type",
+              "upstream": "mediaType",
+              "tf_type": "string",
+              "pointer": "OCI image-spec descriptor mediaType"
+            },
+            {
+              "name": "digest",
+              "upstream": "digest",
+              "tf_type": "string",
+              "pointer": "OCI image-spec descriptor digest"
+            },
+            {
+              "name": "size",
+              "upstream": "size",
+              "tf_type": "number",
+              "pointer": "OCI image-spec descriptor size"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "compose_spec_version",
           "tf_type": "string",
           "category": "version",
@@ -10746,7 +11249,8 @@
           "description": "compose-go version that loads, interpolates, merges and validates the project (v2.16.2, from go.mod)."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-pull": {
       "outputs": [
@@ -10803,6 +11307,19 @@
           "description": "Service name -> local image ID."
         },
         {
+          "name": "pull_status",
+          "tf_type": "map(string)",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/CreateImageInfo/properties/status"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Service name -> last status of the pull stream (\"Image is up to date for …\" or \"Downloaded newer image for …\")."
+        },
+        {
           "name": "compose_go_version",
           "tf_type": "string",
           "category": "version",
@@ -10828,7 +11345,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-push": {
       "outputs": [
@@ -10885,6 +11403,19 @@
           "description": "Service name -> repo@sha256:... the registry returned."
         },
         {
+          "name": "push_status",
+          "tf_type": "map(string)",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/PushImageInfo/properties/status"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Service name -> last status of the push stream (\"<tag>: digest: sha256:… size: N\")."
+        },
+        {
           "name": "compose_go_version",
           "tf_type": "string",
           "category": "version",
@@ -10910,7 +11441,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-run": {
       "outputs": [
@@ -11015,7 +11547,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-scale": {
       "outputs": [
@@ -11059,6 +11592,52 @@
           "description": "Service name -> replica count set."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -11072,7 +11651,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-up": {
       "outputs": [
@@ -11142,6 +11722,52 @@
           "description": "Volume key -> volume name."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "compose_spec_version",
           "tf_type": "string",
           "category": "version",
@@ -11192,7 +11818,8 @@
           "description": "Docker Engine version of the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     },
     "compose:cli-wait": {
       "outputs": [
@@ -11264,7 +11891,8 @@
           "description": "Engine API version negotiated with the daemon."
         }
       ],
-      "outputs_status": "missing"
+      "outputs_status": "missing",
+      "uses_cli": false
     }
   }
 }

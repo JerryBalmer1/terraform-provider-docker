@@ -285,7 +285,7 @@ task InventoryCheck Inventory, {
     print Green 'InventoryCheck: inventory.json and INVENTORY.md match the fragments'
 }
 
-# Synopsis: Inventory, then check the outputs contract (V1-V4, reference/_gen/SCHEMA.md); violations fail unless listed in reference/_gen/allowed-violations.txt.
+# Synopsis: Inventory, then check the outputs contract (V1 identity+version, V2 raw+structured, V3 registered version names + uses_cli, V4 fields, V5 per-field sensitivity, V6 action result, L1 bounded logs; reference/_gen/SCHEMA.md); violations fail unless listed in reference/_gen/allowed-violations.txt.
 task InventoryValidate Inventory, {
     requires -Variable PythonExe
     requires -Path (Join-Path $RefDir '_gen/validate.py')

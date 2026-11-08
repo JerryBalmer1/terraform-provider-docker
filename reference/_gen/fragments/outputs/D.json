@@ -168,7 +168,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:RUN": {
       "outputs": [
@@ -649,7 +650,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:CMD": {
       "outputs": [
@@ -771,7 +773,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:LABEL": {
       "outputs": [
@@ -878,7 +881,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:MAINTAINER": {
       "outputs": [
@@ -985,7 +989,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:EXPOSE": {
       "outputs": [
@@ -1111,7 +1116,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:ENV": {
       "outputs": [
@@ -1225,7 +1231,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:ADD": {
       "outputs": [
@@ -1399,7 +1406,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:COPY": {
       "outputs": [
@@ -1605,7 +1613,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:ENTRYPOINT": {
       "outputs": [
@@ -1727,7 +1736,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:VOLUME": {
       "outputs": [
@@ -1844,7 +1854,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:USER": {
       "outputs": [
@@ -1957,7 +1968,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:WORKDIR": {
       "outputs": [
@@ -2065,7 +2077,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:ARG": {
       "outputs": [
@@ -2209,7 +2222,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:ONBUILD": {
       "outputs": [
@@ -2345,7 +2359,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:STOPSIGNAL": {
       "outputs": [
@@ -2453,7 +2468,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:HEALTHCHECK": {
       "outputs": [
@@ -2624,7 +2640,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:SHELL": {
       "outputs": [
@@ -2732,7 +2749,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path."
+      "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false
     },
     "dockerfile:directive-syntax": {
       "outputs": [
@@ -2814,7 +2832,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet; directives would be top-level attributes of data.docker_dockerfile."
+      "outputs_note": "No Dockerfile composer exists yet; directives would be top-level attributes of data.docker_dockerfile.",
+      "uses_cli": false
     },
     "dockerfile:directive-escape": {
       "outputs": [
@@ -2900,7 +2919,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet; directives would be top-level attributes of data.docker_dockerfile."
+      "outputs_note": "No Dockerfile composer exists yet; directives would be top-level attributes of data.docker_dockerfile.",
+      "uses_cli": false
     },
     "dockerfile:directive-check": {
       "outputs": [
@@ -3014,7 +3034,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "No Dockerfile composer exists yet; directives would be top-level attributes of data.docker_dockerfile."
+      "outputs_note": "No Dockerfile composer exists yet; directives would be top-level attributes of data.docker_dockerfile.",
+      "uses_cli": false
     },
     "engine:image-data": {
       "outputs": [
@@ -3974,7 +3995,8 @@
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Today: id, image_id, name, repo_digest (= image_digest_ref), repo_tags, labels. Missing: image_ref, digest, platforms, created, manifests, config, inspect, inspect_json, content_sha256, engine_api_version, docker_server_version. Shares identity/structured/version shape with data.docker_registry_image; local-only fields: labels, created, repo_tags, config, manifests[].digest/media_type/size/available."
+      "outputs_note": "Today: id, image_id, name, repo_digest (= image_digest_ref), repo_tags, labels. Missing: image_ref, digest, platforms, created, manifests, config, inspect, inspect_json, content_sha256, engine_api_version, docker_server_version. Shares identity/structured/version shape with data.docker_registry_image; local-only fields: labels, created, repo_tags, config, manifests[].digest/media_type/size/available.",
+      "uses_cli": false
     },
     "engine:registry-image-data": {
       "outputs": [
@@ -4536,7 +4558,8 @@
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Today: name, id (`name@digest`, ~ image_digest_ref), sha256_digest (= digest). Missing: image_ref, image_digest_ref, platforms, manifests, inspect, inspect_json, content_sha256, versions. labels, created and config stay null on this side: DistributionInspect returns only the descriptor and the platform list, not the image config or per-platform digests."
+      "outputs_note": "Today: name, id (`name@digest`, ~ image_digest_ref), sha256_digest (= digest). Missing: image_ref, image_digest_ref, platforms, manifests, inspect, inspect_json, content_sha256, versions. labels, created and config stay null on this side: DistributionInspect returns only the descriptor and the platform list, not the image config or per-platform digests.",
+      "uses_cli": false
     },
     "engine:image": {
       "outputs": [
@@ -5553,7 +5576,8 @@
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Today: id, image_id (dup of id), name, repo_digest (= image_digest_ref), context_digest. Missing: image_ref, digest, platforms, labels, dockerfile, stages, inspect_json, inspect, both hashes, dockerfile_syntax, engine_api_version, docker_server_version. No buildx_version: docker_image builds through the Engine API /build (classic or BuildKit session), not buildx."
+      "outputs_note": "Today: id, image_id (dup of id), name, repo_digest (= image_digest_ref), context_digest. Missing: image_ref, digest, platforms, labels, dockerfile, stages, inspect_json, inspect, both hashes, dockerfile_syntax, engine_api_version, docker_server_version. No buildx_version: docker_image builds through the Engine API /build (classic or BuildKit session), not buildx.",
+      "uses_cli": false
     },
     "dockerfile:data-dockerfile": {
       "outputs": [
@@ -6249,7 +6273,8 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "The data source does not exist (no docker_dockerfile in internal/provider)."
+      "outputs_note": "The data source does not exist (no docker_dockerfile in internal/provider).",
+      "uses_cli": false
     }
   }
 }

@@ -19,7 +19,7 @@ Each output has `name`, `tf_type`, `category`, `source`, `known_after_apply` and
 |---|---|---|
 | **raw** | The whole result as one string, serialized from the structured output where possible. | `dockerfile` (rendered), `compose_yaml` (normalized, as `docker compose config` prints it), `stack_yaml`, `inspect_json` (the exact Engine API inspect response), `bake_hcl` / `bake_json`, `manifest_json` |
 | **structured** | A nested object mirroring the upstream schema, so every field is addressable. | `stages[0].base_image`, `project.services["web"].ports`, `inspect.spec.task_template.container_spec.image` |
-| **result** | The outcome of running an action, or a descriptive value about how the data was produced, not the identity or state of a lasting object. Every structured output of an action is a result. | prune `result` (`space_reclaimed`), container `state` after start/stop, exec/run `result` (`exit_code`, `stdout`), service `update_status`, `created`, `fidelity`, `reconstructed` |
+| **result** | The outcome of running an action, or a descriptive value about how the data was produced, not the identity or state of a lasting object. Every structured output of an action is a result, and every action has at least one (V6). | prune `result` (`space_reclaimed`), container `state` after start/stop, compose `container_states` after up/stop, exec/run `result` (`exit_code`, `stdout`), service `update_status`, `archive_size`, commit `changes`, `created`, `fidelity`, `reconstructed` |
 | **identity** | Stable handoff values. | `id`, `name`, `image_ref` (repo:tag), `image_digest_ref` (repo@sha256:…), `digest`, `platforms`, `labels` |
 | **version** | Which versions produced or describe the result. | see [Version metadata](#version-metadata) |
 | **hash** | `sha256` of a raw output, so a consumer can detect change without diffing the text. | `content_sha256`, or `<raw>_sha256` when an item has more than one raw output |
@@ -37,8 +37,7 @@ Rules:
     `sensitive: true`, so harmless fields (image, ports, names) stay readable in plans. A `dynamic` field cannot hide
     nested values, so the whole field is marked. Only an output whose every field is a secret (join tokens) is
     `sensitive` as a whole, and it says why in `sensitive_reason` (rule V5).
-  - A secret interpolated (`${VAR}`) into a field that is not a secret channel is not hidden; secrets belong in env
-    or secrets.
+  - What stays readable on purpose is listed under [Known exposures](#known-exposures).
   - Hashes are never sensitive.
 - `known_after_apply` is true for values computed by create/update or by the action run, and false for inputs
   echoed back and for data sources that read existing objects.
@@ -48,9 +47,19 @@ Rules:
 - Attribute names are snake_case, derived from the upstream name: `HostConfig` → `host_config`,
   `IPAddress` → `ip_address`, `Id`/`ID` → `id`, `EnableIPv6` → `enable_ipv6`. Acronym runs stay whole
   (`LinkLocalIPs` → `link_local_ips`, `NanoCPUs` → `nano_cpus`).
-- Logs: every logs item has two raw outputs, `logs` (plain text, as the CLI prints it) and `logs_json` (a JSON array
-  of `{timestamp, stream, line}` entries, plus service/container for compose), hashed as `logs_sha256` and
-  `logs_json_sha256`.
+- Logs: every logs item (`docker_logs`, `docker_service_logs`, `docker_task_logs`, `docker_compose_logs`) has the
+  structured `log_entries`, `list(object({timestamp=string, stream=string, source=string, message=string}))`, and the
+  raw `logs` that serializes it, one line per entry `<timestamp> <stream> <source> <message>`, hashed as
+  `content_sha256`.
+  - `timestamp` is RFC 3339 nano from the Engine's `timestamps=true`.
+  - `stream` is `stdout` or `stderr`, or `combined` when the container has a TTY: the Engine merges the two streams
+    at the source, so they cannot be separated.
+  - `source` is whatever produced the line: the container name, the service name, the task ID, or
+    `<compose service>.<container name>`.
+  - Only `message` is sensitive; `timestamp`, `stream` and `source` stay readable in plans.
+  - Every logs item takes a `tail` input (lines per container / service / task, default 1000) and a `since` input
+    (RFC 3339 or a duration such as `42m`), recorded as `inputs` on the item, so state cannot grow without bound
+    (rule L1).
 - Compose keys are already snake_case (hyphens become `_`). Dockerfile flags drop the dashes
   (`--keep-git-dir` → `keep_git_dir`).
 - Each structured output records the full upstream → snake_case mapping in its `fields`, so no mapping is
@@ -71,9 +80,13 @@ Rules:
 | `dockerfile_syntax` | The `# syntax=` value, or the default frontend when there is none | Dockerfile reference `#syntax`; pin `dockerfile` (1.28.0) |
 | `buildx_version` | The buildx release the bake/imagetools model follows | SOURCES.md pin `buildx` (v0.38.2) |
 | `buildkit_version` | The BuildKit version a builder node runs | `docker buildx inspect` node `BuildkitVersion` |
-| `docker_cli_version` | The docker CLI release whose client-side behaviour a cli-only type reproduces (stack, manifest) | SOURCES.md pin `docker_cli` (v29.5.3) |
+| `docker_cli_version` | The docker CLI binary an item runs; allowed only on items with `uses_cli: true` | `docker version` client `Version` |
 
-Only these eight names may use the version category (rule V3). A swarm object's `Version.Index` is an identity value
+The authoritative list is the version registry in [_gen/SCHEMA.md](_gen/SCHEMA.md); this table mirrors it. Any
+`<component>_version` name registered there with its source may use the version category, and an unregistered name
+fails (rule V3). Every item says whether it runs the docker CLI (`uses_cli`). None does today, since the provider
+never shells out, so no item carries `docker_cli_version`. The cli-only types (stack, manifest) reproduce CLI
+behaviour through the Engine and registry APIs instead. A swarm object's `Version.Index` is an identity value
 (`version_index`), not version metadata.
 
 ## Validation rules
@@ -82,14 +95,30 @@ Only these eight names may use the version category (rule V3). A swarm object's 
 |---|---|
 | V1 | Every non-skipped item has at least one identity and one version output. |
 | V2 | Every resource and data source has a raw and a structured output, or a written `no_raw_reason` / `no_structured_reason`. |
-| V3 | Version outputs use only the eight names above. |
+| V3 | Version outputs use only names in the SCHEMA.md registry; `docker_cli_version` only on items with `uses_cli: true`. |
 | V4 | Every structured output, and every object-typed result output, has a non-empty `fields` mapping. |
 | V5 | A structured or result output is `sensitive` as a whole only with a `sensitive_reason`; otherwise its secret-carrying fields are marked. |
+| V6 | Every action has at least one `result` output. Resources and data sources need not have one. |
+| L1 | Every logs item has a `tail` and/or `since` input, and a `tail` input has a positive default limit. |
 
 A violation fails `Invoke-Build InventoryValidate` unless [_gen/allowed-violations.txt](_gen/allowed-violations.txt)
 lists it with a reason. merge.py separately fails on structural errors: unknown or duplicate ids, bad categories or
 types, a raw output without a hash, a sensitive hash, a field marked sensitive inside an output that is already
 sensitive as a whole.
+
+## Known exposures
+
+These values stay readable in plans by decision, not oversight:
+
+- **Command lines are not secret.** Container and service args / cmd / entrypoint, compose `ps` commands and `top`
+  process lists stay plain, because hiding them would hide the most useful debugging fields of every container, and
+  a secret belongs in env or a secret, not on a command line.
+- **Compose `secrets` and `configs` maps are not hidden as a whole.** Only their `environment` and `content` children
+  are marked, because a whole-map mark hid every name, file path and target along with the one field that carries
+  the value.
+- **Interpolated `${VAR}` values are not hidden.** A secret interpolated into a field that is not a secret channel
+  shows in plans, because the provider sees only the interpolated result and cannot tell which plain field held a
+  secret; secrets belong in environment, env_file or secrets.
 
 ## Handoff
 

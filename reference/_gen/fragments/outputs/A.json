@@ -1109,7 +1109,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Exposed today: id, name, image_id, labels. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256."
+   "outputs_note": "Exposed today: id, name, image_id, labels. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+   "uses_cli": false
   },
   "engine:container-data": {
    "outputs": [
@@ -2190,7 +2191,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_container data source today (inventory status missing)."
+   "outputs_note": "No docker_container data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:network": {
    "outputs": [
@@ -2509,7 +2511,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Exposed today: id, name, labels. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256."
+   "outputs_note": "Exposed today: id, name, labels. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+   "uses_cli": false
   },
   "engine:network-data": {
    "outputs": [
@@ -2828,7 +2831,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Exposed today: id, name, labels. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256."
+   "outputs_note": "Exposed today: id, name, labels. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+   "uses_cli": false
   },
   "engine:network-attachment": {
    "outputs": [
@@ -3066,7 +3070,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_network_attachment resource today (inventory status partial)."
+   "outputs_note": "No docker_network_attachment resource today (inventory status partial).",
+   "uses_cli": false
   },
   "engine:plugin": {
    "outputs": [
@@ -3345,7 +3350,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Exposed today: id, name, plugin_reference. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256."
+   "outputs_note": "Exposed today: id, name, plugin_reference. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+   "uses_cli": false
   },
   "engine:plugin-data": {
    "outputs": [
@@ -3624,7 +3630,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Exposed today: id, name, plugin_reference. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256."
+   "outputs_note": "Exposed today: id, name, plugin_reference. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+   "uses_cli": false
   },
   "engine:registry-image": {
    "outputs": [
@@ -3869,7 +3876,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Exposed today: name. Missing: image_ref, digest, image_digest_ref, platforms, distribution_json, distribution, engine_api_version, docker_server_version, content_sha256."
+   "outputs_note": "Exposed today: name. Missing: image_ref, digest, image_digest_ref, platforms, distribution_json, distribution, engine_api_version, docker_server_version, content_sha256.",
+   "uses_cli": false
   },
   "engine:tag": {
    "outputs": [
@@ -4330,7 +4338,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Exposed today: id. Missing: image_ref, repo_digests, inspect_json, inspect, engine_api_version, docker_server_version, content_sha256."
+   "outputs_note": "Exposed today: id. Missing: image_ref, repo_digests, inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+   "uses_cli": false
   },
   "engine:volume": {
    "outputs": [
@@ -4572,7 +4581,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Exposed today: name, labels, mountpoint. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256."
+   "outputs_note": "Exposed today: name, labels, mountpoint. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+   "uses_cli": false
   },
   "engine:volume-data": {
    "outputs": [
@@ -4814,7 +4824,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Exposed today: name, labels, mountpoint. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256."
+   "outputs_note": "Exposed today: name, labels, mountpoint. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+   "uses_cli": false
   },
   "engine:container-changes": {
    "outputs": [
@@ -4915,7 +4926,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_container_changes data source today (inventory status missing)."
+   "outputs_note": "No docker_container_changes data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:container-file": {
    "outputs": [
@@ -5074,7 +5086,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_container_file data source today (inventory status missing)."
+   "outputs_note": "No docker_container_file data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:container-stats": {
    "outputs": [
@@ -5508,7 +5521,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_container_stats data source today (inventory status missing)."
+   "outputs_note": "No docker_container_stats data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:container-top": {
    "outputs": [
@@ -5609,7 +5623,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_container_top data source today (inventory status missing)."
+   "outputs_note": "No docker_container_top data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:containers": {
    "outputs": [
@@ -5968,7 +5983,8 @@
     }
    ],
    "outputs_status": "partial",
-   "outputs_note": "Exposed today: containers. Missing: ids, containers_json, engine_api_version, docker_server_version, content_sha256."
+   "outputs_note": "Exposed today: containers. Missing: ids, containers_json, engine_api_version, docker_server_version, content_sha256.",
+   "uses_cli": false
   },
   "engine:image-attestations": {
    "outputs": [
@@ -6140,7 +6156,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_image_attestations data source today (inventory status missing)."
+   "outputs_note": "No docker_image_attestations data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:image-history": {
    "outputs": [
@@ -6266,7 +6283,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_image_history data source today (inventory status missing)."
+   "outputs_note": "No docker_image_history data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:image-search": {
    "outputs": [
@@ -6385,7 +6403,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_image_search data source today (inventory status missing)."
+   "outputs_note": "No docker_image_search data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:images": {
    "outputs": [
@@ -6634,7 +6653,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_images data source today (inventory status partial)."
+   "outputs_note": "No docker_images data source today (inventory status partial).",
+   "uses_cli": false
   },
   "engine:info": {
    "outputs": [
@@ -7332,7 +7352,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_info data source today (inventory status missing)."
+   "outputs_note": "No docker_info data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:container-logs": {
    "outputs": [
@@ -7355,31 +7376,60 @@
      "tf_type": "string",
      "category": "raw",
      "source": {
+      "type": "derived",
+      "from": "log_entries",
+      "how": "one line per entry, \"<timestamp> <stream> <source> <message>\", joined with \\n"
+     },
+     "known_after_apply": false,
+     "sensitive": true,
+     "description": "The log entries as plain text, one line per entry: \"<timestamp> <stream> <source> <message>\". Sensitive: log lines can print secrets.",
+     "provided": false,
+     "serializes": "log_entries"
+    },
+    {
+     "name": "log_entries",
+     "tf_type": "list(object({timestamp=string, stream=string, source=string, message=string}))",
+     "category": "structured",
+     "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200/schema"
+      "pointer": "#/paths/~1containers~1{id}~1logs/get"
      },
      "known_after_apply": false,
-     "sensitive": true,
-     "description": "The demultiplexed log output (stdout and stderr interleaved) as one string.",
+     "sensitive": false,
+     "description": "One entry per log line in arrival order, read with timestamps=true and bounded by the tail/since inputs; `source` is the container name (without the leading \"/\"). Only `message` is sensitive (log lines can print secrets).",
+     "fields": [
+      {
+       "name": "timestamp",
+       "upstream": "timestamps=true line prefix (RFC 3339 nano)",
+       "tf_type": "string",
+       "pointer": "#/paths/~1containers~1{id}~1logs/get/parameters"
+      },
+      {
+       "name": "stream",
+       "upstream": "multiplexed frame header stream type: 1 = stdout, 2 = stderr; a TTY stream is not multiplexed (the Engine merges stdout and stderr at the source), so it is \"combined\"",
+       "tf_type": "string",
+       "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200"
+      },
+      {
+       "name": "source",
+       "upstream": "Name (leading \"/\" removed)",
+       "tf_type": "string",
+       "pointer": "#/definitions/ContainerInspectResponse/properties/Name"
+      },
+      {
+       "name": "message",
+       "upstream": "log line without the timestamp prefix and trailing newline",
+       "tf_type": "string",
+       "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200",
+       "sensitive": true
+      }
+     ],
+     "fields_complete": true,
      "provided": false
     },
     {
-     "name": "logs_json",
-     "tf_type": "string",
-     "category": "raw",
-     "source": {
-      "type": "derived",
-      "from": "the same stream as logs",
-      "how": "JSON array with one object per log line, in arrival order: {\"timestamp\": RFC 3339 nano from the frame (timestamps=true), \"stream\": \"stdout\"|\"stderr\" from the multiplexed frame header (\"stdout\" for a TTY), \"line\": the text without the trailing newline}"
-     },
-     "known_after_apply": false,
-     "sensitive": true,
-     "description": "The same log lines as a JSON array of {timestamp, stream, line} entries. Sensitive: logs routinely contain secrets.",
-     "provided": false
-    },
-    {
-     "name": "logs_sha256",
+     "name": "content_sha256",
      "tf_type": "string",
      "category": "hash",
      "source": {
@@ -7391,21 +7441,6 @@
      "sensitive": false,
      "hash_of": "logs",
      "description": "sha256 of logs.",
-     "provided": false
-    },
-    {
-     "name": "logs_json_sha256",
-     "tf_type": "string",
-     "category": "hash",
-     "source": {
-      "type": "derived",
-      "from": "logs_json",
-      "how": "hex sha256 of the UTF-8 bytes of logs_json"
-     },
-     "known_after_apply": false,
-     "sensitive": false,
-     "hash_of": "logs_json",
-     "description": "sha256 of logs_json.",
      "provided": false
     },
     {
@@ -7437,9 +7472,35 @@
      "provided": false
     }
    ],
-   "no_structured_reason": "GET /containers/{id}/logs returns an unstructured byte stream (raw or multiplexed stdout/stderr frames); swagger has no schema to map field by field. The existing logs_list_string (one element per line) is a convenience split, not an upstream structure.",
    "outputs_status": "missing",
-   "outputs_note": "Exposed today: none. Missing: container_id, logs, engine_api_version, docker_server_version, logs_sha256, logs_json_sha256."
+   "outputs_note": "Exposed today: none. Missing: container_id, logs, log_entries, content_sha256, engine_api_version, docker_server_version, and the tail/since inputs.",
+   "inputs": [
+    {
+     "name": "tail",
+     "tf_type": "number",
+     "default": 1000,
+     "upstream": "tail",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1logs/get/parameters"
+     },
+     "description": "Lines to keep from the end of the logs per container (Engine `tail`); default 1000 so state cannot grow without bound. 0 reads none; there is no \"all\"."
+    },
+    {
+     "name": "since",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "since",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1logs/get/parameters"
+     },
+     "description": "Only lines at or after this time: RFC 3339, or a duration before now such as \"42m\" (sent as the Engine's UNIX-timestamp `since`). Combined with tail when both are set."
+    }
+   ],
+   "uses_cli": false
   },
   "engine:networks": {
    "outputs": [
@@ -7666,7 +7727,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_networks data source today (inventory status partial)."
+   "outputs_note": "No docker_networks data source today (inventory status partial).",
+   "uses_cli": false
   },
   "engine:plugins": {
    "outputs": [
@@ -7911,7 +7973,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_plugins data source today (inventory status missing)."
+   "outputs_note": "No docker_plugins data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:registry-auth": {
    "outputs": [
@@ -8026,7 +8089,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_registry_auth data source today (inventory status partial)."
+   "outputs_note": "No docker_registry_auth data source today (inventory status partial).",
+   "uses_cli": false
   },
   "engine:system-df": {
    "outputs": [
@@ -8267,7 +8331,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_system_df data source today (inventory status missing)."
+   "outputs_note": "No docker_system_df data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:version": {
    "outputs": [
@@ -8469,7 +8534,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_version data source today (inventory status missing)."
+   "outputs_note": "No docker_version data source today (inventory status missing).",
+   "uses_cli": false
   },
   "engine:volumes": {
    "outputs": [
@@ -8633,7 +8699,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "No docker_volumes data source today (inventory status partial)."
+   "outputs_note": "No docker_volumes data source today (inventory status partial).",
+   "uses_cli": false
   },
   "engine:build-prune": {
    "outputs": [
@@ -8706,7 +8773,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+   "uses_cli": false
   },
   "engine:container-prune": {
    "outputs": [
@@ -8779,7 +8847,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+   "uses_cli": false
   },
   "engine:image-prune": {
    "outputs": [
@@ -8866,7 +8935,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+   "uses_cli": false
   },
   "engine:network-prune": {
    "outputs": [
@@ -8933,7 +9003,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+   "uses_cli": false
   },
   "engine:volume-prune": {
    "outputs": [
@@ -9006,7 +9077,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+   "uses_cli": false
   },
   "engine:container-kill": {
    "outputs": [
@@ -9159,7 +9231,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+   "uses_cli": false
   },
   "engine:container-pause": {
    "outputs": [
@@ -9312,7 +9385,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+   "uses_cli": false
   },
   "engine:container-restart": {
    "outputs": [
@@ -9465,7 +9539,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+   "uses_cli": false
   },
   "engine:container-start": {
    "outputs": [
@@ -9618,7 +9693,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+   "uses_cli": false
   },
   "engine:container-stop": {
    "outputs": [
@@ -9771,7 +9847,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+   "uses_cli": false
   },
   "engine:container-unpause": {
    "outputs": [
@@ -9924,7 +10001,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+   "uses_cli": false
   },
   "engine:container-wait": {
    "outputs": [
@@ -10005,7 +10083,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+   "uses_cli": false
   },
   "engine:container-export": {
    "outputs": [
@@ -10049,6 +10128,20 @@
      "description": "sha256 of the written archive (a file, not a raw string output)."
     },
     {
+     "name": "archive_size",
+     "tf_type": "number",
+     "category": "result",
+     "source": {
+      "type": "derived",
+      "from": "streamed from GET /containers/{id}/export",
+      "how": "byte count of the tar stream"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "Bytes in the tar archive the action streamed.",
+     "provided": false
+    },
+    {
      "name": "engine_api_version",
      "tf_type": "string",
      "category": "version",
@@ -10076,7 +10169,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+   "uses_cli": false
   },
   "engine:container-upload": {
    "outputs": [
@@ -10120,6 +10214,53 @@
      "description": "sha256 of the uploaded tar archive."
     },
     {
+     "name": "path_stat",
+     "tf_type": "object({...})",
+     "category": "result",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "Stat of the target path after the upload (HEAD /containers/{id}/archive, X-Docker-Container-Path-Stat).",
+     "fields": [
+      {
+       "name": "name",
+       "upstream": "name",
+       "tf_type": "string",
+       "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+      },
+      {
+       "name": "size",
+       "upstream": "size",
+       "tf_type": "number",
+       "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+      },
+      {
+       "name": "mode",
+       "upstream": "mode",
+       "tf_type": "number",
+       "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+      },
+      {
+       "name": "mtime",
+       "upstream": "mtime",
+       "tf_type": "string",
+       "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+      },
+      {
+       "name": "link_target",
+       "upstream": "linkTarget",
+       "tf_type": "string",
+       "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+      }
+     ],
+     "fields_complete": true,
+     "provided": false
+    },
+    {
      "name": "engine_api_version",
      "tf_type": "string",
      "category": "version",
@@ -10147,7 +10288,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+   "uses_cli": false
   },
   "engine:exec": {
    "outputs": [
@@ -10346,7 +10488,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+   "uses_cli": false
   },
   "engine:image-build": {
    "outputs": [
@@ -10375,6 +10518,53 @@
      "known_after_apply": true,
      "sensitive": false,
      "description": "Tag given to the built image."
+    },
+    {
+     "name": "image",
+     "tf_type": "object({...})",
+     "category": "result",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/definitions/ImageInspect"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "Summary of the image the build produced (GET /images/{id}/json).",
+     "fields": [
+      {
+       "name": "size",
+       "upstream": "Size",
+       "tf_type": "number",
+       "pointer": "#/definitions/ImageInspect/properties/Size"
+      },
+      {
+       "name": "created",
+       "upstream": "Created",
+       "tf_type": "string",
+       "pointer": "#/definitions/ImageInspect/properties/Created"
+      },
+      {
+       "name": "architecture",
+       "upstream": "Architecture",
+       "tf_type": "string",
+       "pointer": "#/definitions/ImageInspect/properties/Architecture"
+      },
+      {
+       "name": "os",
+       "upstream": "Os",
+       "tf_type": "string",
+       "pointer": "#/definitions/ImageInspect/properties/Os"
+      },
+      {
+       "name": "variant",
+       "upstream": "Variant",
+       "tf_type": "string",
+       "pointer": "#/definitions/ImageInspect/properties/Variant"
+      }
+     ],
+     "fields_complete": true,
+     "provided": false
     },
     {
      "name": "build_log",
@@ -10431,7 +10621,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+   "uses_cli": false
   },
   "engine:image-commit": {
    "outputs": [
@@ -10475,6 +10666,35 @@
      "description": "ID of the committed container."
     },
     {
+     "name": "changes",
+     "tf_type": "list(object({...}))",
+     "category": "result",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1changes/get/responses/200/schema"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "The container filesystem changes the commit captured (GET /containers/{id}/changes just before the commit).",
+     "fields": [
+      {
+       "name": "path",
+       "upstream": "Path",
+       "tf_type": "string",
+       "pointer": "#/definitions/FilesystemChange/properties/Path"
+      },
+      {
+       "name": "kind",
+       "upstream": "Kind",
+       "tf_type": "number",
+       "pointer": "#/definitions/ChangeType"
+      }
+     ],
+     "fields_complete": true,
+     "provided": false
+    },
+    {
      "name": "engine_api_version",
      "tf_type": "string",
      "category": "version",
@@ -10502,7 +10722,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+   "uses_cli": false
   },
   "engine:image-import": {
    "outputs": [
@@ -10533,6 +10754,53 @@
      "description": "Reference the imported image was tagged with."
     },
     {
+     "name": "image",
+     "tf_type": "object({...})",
+     "category": "result",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/definitions/ImageInspect"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "Summary of the imported image (GET /images/{id}/json).",
+     "fields": [
+      {
+       "name": "size",
+       "upstream": "Size",
+       "tf_type": "number",
+       "pointer": "#/definitions/ImageInspect/properties/Size"
+      },
+      {
+       "name": "created",
+       "upstream": "Created",
+       "tf_type": "string",
+       "pointer": "#/definitions/ImageInspect/properties/Created"
+      },
+      {
+       "name": "architecture",
+       "upstream": "Architecture",
+       "tf_type": "string",
+       "pointer": "#/definitions/ImageInspect/properties/Architecture"
+      },
+      {
+       "name": "os",
+       "upstream": "Os",
+       "tf_type": "string",
+       "pointer": "#/definitions/ImageInspect/properties/Os"
+      },
+      {
+       "name": "variant",
+       "upstream": "Variant",
+       "tf_type": "string",
+       "pointer": "#/definitions/ImageInspect/properties/Variant"
+      }
+     ],
+     "fields_complete": true,
+     "provided": false
+    },
+    {
      "name": "engine_api_version",
      "tf_type": "string",
      "category": "version",
@@ -10560,7 +10828,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+   "uses_cli": false
   },
   "engine:image-load": {
    "outputs": [
@@ -10578,6 +10847,20 @@
      "description": "References or IDs reported as \"Loaded image: ...\" / \"Loaded image ID: ...\" in the POST /images/load stream."
     },
     {
+     "name": "archive_size",
+     "tf_type": "number",
+     "category": "result",
+     "source": {
+      "type": "derived",
+      "from": "read from the input archive for POST /images/load",
+      "how": "byte count of the tar stream"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "Bytes in the tar archive the action read.",
+     "provided": false
+    },
+    {
      "name": "engine_api_version",
      "tf_type": "string",
      "category": "version",
@@ -10605,7 +10888,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+   "uses_cli": false
   },
   "engine:image-save": {
    "outputs": [
@@ -10649,6 +10933,20 @@
      "description": "sha256 of the written archive."
     },
     {
+     "name": "archive_size",
+     "tf_type": "number",
+     "category": "result",
+     "source": {
+      "type": "derived",
+      "from": "streamed from GET /images/get",
+      "how": "byte count of the tar stream"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "Bytes in the tar archive the action streamed.",
+     "provided": false
+    },
+    {
      "name": "engine_api_version",
      "tf_type": "string",
      "category": "version",
@@ -10676,7 +10974,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+   "uses_cli": false
   },
   "engine:plugin-create": {
    "outputs": [
@@ -10707,6 +11006,20 @@
      "description": "ID of the created plugin (GET /plugins/{name}/json after create)."
     },
     {
+     "name": "enabled",
+     "tf_type": "bool",
+     "category": "result",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/definitions/Plugin/properties/Enabled"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "Whether the plugin is enabled after create (a created plugin starts disabled).",
+     "provided": false
+    },
+    {
      "name": "engine_api_version",
      "tf_type": "string",
      "category": "version",
@@ -10734,7 +11047,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+   "uses_cli": false
   },
   "engine:plugin-push": {
    "outputs": [
@@ -10765,6 +11079,20 @@
      "description": "Digest reported by the push stream (\"<tag>: digest: sha256:... size: N\")."
     },
     {
+     "name": "push_status",
+     "tf_type": "string",
+     "category": "result",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/definitions/PushImageInfo/properties/status"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "Last status message of the push stream (\"<tag>: digest: sha256:… size: N\").",
+     "provided": false
+    },
+    {
      "name": "engine_api_version",
      "tf_type": "string",
      "category": "version",
@@ -10792,7 +11120,8 @@
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing)."
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+   "uses_cli": false
   }
  }
 }

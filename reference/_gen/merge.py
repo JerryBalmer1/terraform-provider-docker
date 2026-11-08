@@ -19,7 +19,7 @@ EXTRA_FRAGS = ["dockerfile-sources.json"]
 OUTPUTS_DIR = os.path.join(Z, "outputs")  # outputs/<lane>.json, joined onto items by id (SCHEMA.md)
 OUT_CATEGORIES = ["raw", "structured", "result", "identity", "version", "hash"]
 OUT_SOURCE_TYPES = ["swagger", "schema", "doc", "cli", "sources_md", "derived"]
-ITEM_OUT_KEYS = {"no_raw_reason", "no_structured_reason", "outputs_status", "outputs_note"}
+ITEM_OUT_KEYS = {"no_raw_reason", "no_structured_reason", "outputs_status", "outputs_note", "uses_cli", "inputs"}
 TF_TYPE = re.compile(r"^(string|number|bool|dynamic|(list|set|map)\(.+\)|object\(\{.*\}\))$", re.S)
 LAYERS = ["engine", "swarm", "compose", "dockerfile", "buildx", "cli-only"]
 KINDS = ["resource", "data_source", "action", "dockerfile_block", "skip"]
@@ -171,6 +171,18 @@ for fn in out_files:
                 errors.append("%s: unknown item-level key %s in %s" % (iid, k, fn))
                 continue
             it[k] = v
+        if not isinstance(entry.get("uses_cli"), bool):
+            errors.append("%s: uses_cli must be true or false (does the item run the docker CLI?)" % iid)
+        inputs = entry.get("inputs", [])
+        if not isinstance(inputs, list):
+            errors.append("%s: inputs is not a list" % iid)
+            inputs = []
+        for inp in inputs:
+            for k in ("name", "tf_type", "default", "source"):
+                if not isinstance(inp, dict) or k not in inp:
+                    errors.append("%s: input %r missing %s" % (iid, inp.get("name") if isinstance(inp, dict) else inp, k))
+            if isinstance(inp, dict) and (inp.get("source") or {}).get("type") not in OUT_SOURCE_TYPES:
+                errors.append("%s: input %s bad source type" % (iid, inp.get("name")))
         if entry.get("outputs_status") not in (None, "exists", "partial", "missing"):
             errors.append("%s: bad outputs_status %r" % (iid, entry.get("outputs_status")))
         it["outputs_lane"] = d.get("lane", fn[:-5])

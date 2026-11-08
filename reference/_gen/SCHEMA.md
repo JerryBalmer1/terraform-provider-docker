@@ -66,14 +66,17 @@ hash output; a `hash_of` does not name a raw output of the same item; an item-le
   "lane": "A",
   "notes": ["free-text caveats"],
   "naming_questions": ["one-line question, with the options"],   // appended to INVENTORY.md after the existing ones
-  "allowed_violations": [ {"id": "<item id>", "rule": "V1|V2|V3|V4", "reason": "why"} ],  // proposals; Lane Z copies accepted ones into allowed-violations.txt
+  "allowed_violations": [ {"id": "<item id>", "rule": "V1..V6|L1", "reason": "why"} ],  // proposals; Lane Z copies accepted ones into allowed-violations.txt
   "items": {
     "<item id>": {
       "outputs": [ OUTPUT, ... ],
       "no_raw_reason": "why there is no raw output",               // optional; satisfies V2 for raw
       "no_structured_reason": "why there is no structured output", // optional; satisfies V2 for structured
       "outputs_status": "exists|partial|missing",                  // optional: do today's provider attributes cover these outputs?
-      "outputs_note": "what exists today / what is missing"        // optional
+      "outputs_note": "what exists today / what is missing",       // optional
+      "uses_cli": false,                                           // required: true only if the item runs the docker CLI
+                                                                   //   binary (the provider never does today); gates docker_cli_version
+      "inputs": [ INPUT, ... ]                                     // optional; logs items must record tail/since here (rule L1)
     }
   }
 }
@@ -101,6 +104,11 @@ FIELD:
   "sensitive": true,                      // optional: this field (and everything under it) is a secret channel; only in an output that is not sensitive
   "fields": [ FIELD, ... ] }              // nested fields optional; tf_type "object({...})" / "list(object({...}))" / "map(object({...}))" means "see fields"
 
+INPUT (an argument the outputs depend on; today only the logs bounds):
+{ "name": "tail", "tf_type": "number", "default": 1000, "upstream": "tail",
+  "source": SOURCE,                       // the Engine query parameter or CLI flag it maps to
+  "description": "one line" }             // "default": null means no default
+
 SOURCE (paths relative to reference/):
   {"type": "swagger", "file": "upstream/engine-api/api/swagger.yaml", "pointer": "#/definitions/ContainerInspectResponse"}
   {"type": "schema",  "file": "upstream/compose-spec/schema/compose-spec.json", "pointer": "#/definitions/service"}
@@ -115,21 +123,41 @@ Naming rules:
   `EnableIPv6` -> `enable_ipv6`; compose keys are already snake_case (hyphens become `_`); Dockerfile flags drop the
   dashes (`--keep-git-dir` -> `keep_git_dir`). `fields` always records both names, so no mapping is implicit.
 - raw outputs: `dockerfile`, `compose_yaml`, `stack_yaml`, `inspect_json`, `bake_hcl`, `bake_json`, or `<thing>_json`.
-  Logs items have both `logs` (plain text) and `logs_json` (JSON array of entries).
+  Logs items have raw `logs` (text, one line per entry: `<timestamp> <stream> <source> <message>`) serializing the
+  structured `log_entries`, `list(object({timestamp=string, stream=string, source=string, message=string}))`:
+  timestamp RFC 3339 nano (timestamps=true); stream `stdout` | `stderr`, or `combined` for a TTY (the Engine merges
+  the streams at the source); source the container name, service name, task ID or `<compose service>.<container>`
+  that produced the line; only `message` is sensitive. There is no `logs_json`.
 - hash outputs: `content_sha256` when the item has one raw output, else `<raw name>_sha256`.
-- version outputs use exactly these names: `engine_api_version` (negotiated), `docker_server_version`,
-  `compose_spec_version` (pinned commit), `compose_go_version`, `dockerfile_syntax` (the `# syntax=` value or the
-  default frontend), `buildx_version`, `buildkit_version` (a builder node's BuildKit), `docker_cli_version` (pin
-  `docker_cli`, for cli-only types).
+- version outputs use only names registered below (rule V3). A new `<component>_version` name is added by a row
+  here, with its source; an unregistered name fails. "only on" names an item flag that must be true.
+
+<!-- version-registry -->
+| name | source | only on |
+|---|---|---|
+| `engine_api_version` | `GET /version` `ApiVersion`, negotiated (min of the client maximum and the daemon's) | - |
+| `docker_server_version` | `GET /version` `Version` | - |
+| `compose_spec_version` | SOURCES.md pin `compose_spec` (the compose-spec commit followed) | - |
+| `compose_go_version` | SOURCES.md pin `compose_go` (the library that parses and validates) | - |
+| `dockerfile_syntax` | the `# syntax=` value, else the default frontend (SOURCES.md pin `dockerfile`) | - |
+| `buildx_version` | SOURCES.md pin `buildx` (the release the bake / imagetools model follows) | - |
+| `buildkit_version` | builder inspect: `docker buildx inspect` node `BuildkitVersion` (BuildKit's ListWorkers / Info) | - |
+| `docker_cli_version` | `docker version` client `Version` of the docker CLI binary the item runs | `uses_cli` |
+<!-- /version-registry -->
+
 - result outputs: the outcome of an action (every structured output of an action) or a descriptive value about how
   the data was produced (`created`, `fidelity`, `reconstructed`), not the identity or state of a lasting object.
 - identity outputs: `id`, `name`, `image_ref` (repo:tag), `image_digest_ref` (repo@sha256:...), `digest`, `platforms`,
   `labels`, or another stable handoff value.
 
-Contract rules V1-V5 (checked by `Invoke-Build InventoryValidate`, reference/_gen/validate.py; exceptions only through
+Contract rules V1-V6 and L1 (checked by `Invoke-Build InventoryValidate`, reference/_gen/validate.py; exceptions only through
 `reference/_gen/allowed-violations.txt`, one `<id><TAB><rule><TAB><reason>` per line):
 - V1: every non-skipped item has at least one identity output and at least one version output.
 - V2: every resource and data source has a raw and a structured output, or `no_raw_reason` / `no_structured_reason`.
-- V3: every version output name is one of the eight version names above.
+- V3: every version output name is registered in the version registry above; a name with an "only on" flag
+  (`docker_cli_version`: `uses_cli`) appears only on items where that flag is true.
 - V4: every structured output, and every object-typed result output, has a non-empty `fields` list.
 - V5: a structured or result output with `sensitive: true` has a `sensitive_reason`; otherwise mark the secret-carrying fields.
+- V6: every action has at least one `result` output. Resources and data sources need not have one.
+- L1: every logs item (an item with a `logs` or `log_entries` output) has a `tail` and/or `since` input; a `tail`
+  input has a positive integer default, so state cannot grow without bound.

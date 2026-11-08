@@ -40,7 +40,8 @@ merge.py joins them and fails on an unknown or skipped id, an id in two lanes' f
 Lanes: A engine, B swarm, C compose, D dockerfile + image data sources + the builder (`engine:image`),
 E buildx + cli-only (incl. docker_stack), Z cross-lane questions only.
 
-- `Invoke-Build InventoryValidate` runs `validate.py` (rules V1-V5) on the merged inventory.json. Exceptions go
+- `Invoke-Build InventoryValidate` runs `validate.py` (rules V1-V6 and L1; V3 reads the version registry in
+  SCHEMA.md) on the merged inventory.json. Exceptions go
   in `allowed-violations.txt` with a reason; an entry that no longer matches a violation fails as STALE.
 - Checking one lane without touching the repo:
   `python -I reference/_gen/merge.py --dry-run --outputs <lane> --emit <tmp>/inv.json`, then
@@ -54,3 +55,21 @@ byte (`python reference/_gen/generators/<script>`; z1_build.py needs PyYAML,
 z3_items.py runs after z3_gen.py). They are provenance, not part of the build:
 once a fragment is edited by hand, re-running its generator overwrites the edit.
 Port the edit into the generator first if you want to keep using it.
+
+`generators/lanez/` holds the Lane Z scripts that edit `fragments/outputs/*.json` in place. Each runs from
+`fragments/outputs/` with the script folder as its first argument, in this order, starting from the outputs files
+of commit 9df9acf (Lanes A-E, before Lane Z):
+
+| script | pass | what it does |
+|---|---|---|
+| `frag.py` | - | load/save helper (keeps each file's indent) |
+| `mech.py <dir> <inventory.json of 9df9acf>` | 4.5 Z | logs outputs, `result` category, version names |
+| `sens.py <dir>` | 4.5 Z | per-field sensitivity (V5) |
+| `desc.py <dir>` | 4.5 Z | description and note text for V5 |
+| `qs.py <dir>` | 4.5 Z | closes the decided questions, Z notes |
+| `p45c.py <dir>` | 4.5 Z corrections | `log_entries` + tail/since inputs, V6 results for 26 actions, `uses_cli`, docker_cli_version removed |
+
+e.g. `cd reference/_gen/fragments/outputs; python -I -B ../../generators/lanez/mech.py ../../generators/lanez <inv>`.
+Replayed in that order on 9df9acf's files, the first four reproduce the Lane Z commit (df79456) byte for byte, and
+`p45c.py` then gives the current files. `p45c_docs.py` (run from the repo root) made the matching prose edits.
+They are provenance: re-running one on the current files fails or doubles its edits.

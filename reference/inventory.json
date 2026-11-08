@@ -703,11 +703,12 @@
       "Lane Z (merge/contract) owns no items. It carries cross-lane questions raised while merging lanes A-E; per-lane questions stay in each lane's file.",
       "Lane Z fix: removed schema=compose-go-embedded from the 7 build.shm_size fields in C.json (Lane C reported it as a generator mistake). build.shm_size is integer|string in both compose-spec.json and compose-go-embedded.json (#/$defs/workload_spec/properties/build/oneOf/1/properties/shm_size); only container_spec.shm_size differs.",
       "Decided by the user 2026-11-08 (Pass 4.5 Lane Z), applied to A-E by Lane Z; the four cross-lane questions and the lane questions they answer (B: logs name, service/task inspect sensitivity; C: compose logs output; D: whole-Dockerfile sensitivity; E: buildkit_version, docker_cli_version) are closed.",
-      "Logs: every logs item has both `logs` (plain text) and `logs_json` (JSON array of entries) as raw outputs, each with its own hash (`logs_sha256`, `logs_json_sha256`, per the two-raw hash rule): engine:container-logs, swarm:service-logs, swarm:task-logs (logs_text renamed to logs), compose:cli-logs (logs added).",
+      "Logs (Pass 4.5 Lane Z corrections): every logs item (engine:container-logs, swarm:service-logs, swarm:task-logs, compose:cli-logs) has raw `logs` (text, one line per entry: \"<timestamp> <stream> <source> <message>\") hashed as `content_sha256`, and structured `log_entries` list(object({timestamp, stream, source, message})); stream is stdout|stderr, or combined for a TTY; only message is sensitive. logs_json is gone. Each records `inputs` tail (default 1000) and since; rule L1.",
       "Sixth category `result`: the outcome of running an action or a descriptive value about how data was produced, not the identity or state of a lasting object. Every structured output of an action is now `result` (prune results, container state after start/stop/..., exec/wait/run results, service update_status/update_response/mode/service_status, node spec, swarm tls_info/swarm_info/join_tokens, buildx bake/metadata/status/result); plus root_rotation_in_progress, force_update, image created, dockerfile reconstructed/fidelity, stack service_status. Identity handoff values (deleted IDs, tokens, digests) stay identity. V2 still asks resources and data sources for a structured output; V4 also applies to object-typed result outputs.",
       "Sensitivity is per field (new rule V5): a structured or result output is sensitive as a whole only with a `sensitive_reason` (only the three join_tokens outputs, where every field is a secret). Otherwise the output is not sensitive and the secret-carrying FIELDs carry `sensitive: true`. Raw outputs (JSON/text strings) stay sensitive as before; hashes never are. Secret channels marked: container/service/task env, plugin settings/config env, image config env, volume driver options (CIFS/NFS passwords), compose environment/env_file/secrets/build args/ssh/secrets/dockerfile_inline/configs content/environment-sourced values, Dockerfile ENV values/ARG defaults/history created_by, build provenance, attestation statements, buildx driver_opts, bake args/secret/ssh/dockerfile_inline, log lines, exec/run stdout/stderr, registry identity_token. A `dynamic` field cannot hide nested values, so the whole field is marked (stack service spec, image config blobs, provenance).",
       "Sensitivity judgment calls by Lane Z, reversible: (1) command lines (container args/cmd/entrypoint, service Args/Command, compose ps Command, compose top processes) are NOT a secret channel, following Lane A and CONTRACT.md's list; B and C had treated them as sensitive, so compose:cli-ps containers and compose:cli-top processes are now plain. (2) Lane C's parent-level marks on the whole `secrets` and `configs` maps were dropped (they hid every field); their environment/content children stay marked. (3) compose networks/models slices carry no secret channel and are now plain. Accepted risk: a secret interpolated (${VAR}) into a field that is not a secret channel is no longer hidden in plans; secrets belong in environment/secrets.",
-      "Version names: V3 now allows eight names: the six plus `buildkit_version` (buildx:builder, buildx:builder-inspect, moved from identity) and `docker_cli_version` (sources_md pin docker_cli, added to the five cli-only items: stack, stacks, stack-services, manifest-list, manifest-inspect)."
+      "Version names (Pass 4.5 Lane Z corrections): V3 reads the registry in SCHEMA.md. docker_cli_version is registered but only allowed on items with uses_cli true; every item now carries uses_cli, and all are false (the provider never runs the docker CLI), so docker_cli_version was removed from stack, stacks, stack-services, manifest-list and manifest-inspect.",
+      "Result (Pass 4.5 Lane Z corrections): rule V6, every action has a result output. 26 actions had none and got one: archive_size (exports, image save/load), path_stat (upload, cp), changes (commits), image / built_images (build, import), enabled (plugin create), push_status / pull_status (plugin push, compose push/pull), autolock_managers (rotate unlock key), removed_counts (compose down), layers (compose publish), container_states (compose kill/pause/restart/scale/start/stop/unpause/up)."
     ]
   },
   "items": [
@@ -1901,6 +1902,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Exposed today: id, name, image_id, labels. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -2978,6 +2980,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: id, image_id (dup of id), name, repo_digest (= image_digest_ref), context_digest. Missing: image_ref, digest, platforms, labels, dockerfile, stages, inspect_json, inspect, both hashes, dockerfile_syntax, engine_api_version, docker_server_version. No buildx_version: docker_image builds through the Engine API /build (classic or BuildKit session), not buildx.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z1"
     },
@@ -3344,6 +3347,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Exposed today: id, name, labels. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -3624,6 +3628,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_network_attachment resource today (inventory status partial).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -4012,6 +4017,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Exposed today: id, name, plugin_reference. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -4292,6 +4298,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Exposed today: name. Missing: image_ref, digest, image_digest_ref, platforms, distribution_json, distribution, engine_api_version, docker_server_version, content_sha256.",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -4782,6 +4789,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Exposed today: id. Missing: image_ref, repo_digests, inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -5088,6 +5096,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Exposed today: name, labels, mountpoint. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -6199,6 +6208,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_container data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -6325,6 +6335,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_container_changes data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -6518,6 +6529,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_container_file data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -6977,6 +6989,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_container_stats data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -7103,6 +7116,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_container_top data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -7495,6 +7509,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Exposed today: containers. Missing: ids, containers_json, engine_api_version, docker_server_version, content_sha256.",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -8482,6 +8497,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: id, image_id, name, repo_digest (= image_digest_ref), repo_tags, labels. Missing: image_ref, digest, platforms, created, manifests, config, inspect, inspect_json, content_sha256, engine_api_version, docker_server_version. Shares identity/structured/version shape with data.docker_registry_image; local-only fields: labels, created, repo_tags, config, manifests[].digest/media_type/size/available.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z1"
     },
@@ -8675,6 +8691,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_image_attestations data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -8826,6 +8843,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_image_history data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -8970,6 +8988,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_image_search data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -9252,6 +9271,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_images data source today (inventory status partial).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -9981,6 +10001,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_info data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -10030,31 +10051,60 @@
           "tf_type": "string",
           "category": "raw",
           "source": {
+            "type": "derived",
+            "from": "log_entries",
+            "how": "one line per entry, \"<timestamp> <stream> <source> <message>\", joined with \\n"
+          },
+          "known_after_apply": false,
+          "sensitive": true,
+          "description": "The log entries as plain text, one line per entry: \"<timestamp> <stream> <source> <message>\". Sensitive: log lines can print secrets.",
+          "provided": false,
+          "serializes": "log_entries"
+        },
+        {
+          "name": "log_entries",
+          "tf_type": "list(object({timestamp=string, stream=string, source=string, message=string}))",
+          "category": "structured",
+          "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200/schema"
+            "pointer": "#/paths/~1containers~1{id}~1logs/get"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "The demultiplexed log output (stdout and stderr interleaved) as one string.",
+          "sensitive": false,
+          "description": "One entry per log line in arrival order, read with timestamps=true and bounded by the tail/since inputs; `source` is the container name (without the leading \"/\"). Only `message` is sensitive (log lines can print secrets).",
+          "fields": [
+            {
+              "name": "timestamp",
+              "upstream": "timestamps=true line prefix (RFC 3339 nano)",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1logs/get/parameters"
+            },
+            {
+              "name": "stream",
+              "upstream": "multiplexed frame header stream type: 1 = stdout, 2 = stderr; a TTY stream is not multiplexed (the Engine merges stdout and stderr at the source), so it is \"combined\"",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200"
+            },
+            {
+              "name": "source",
+              "upstream": "Name (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerInspectResponse/properties/Name"
+            },
+            {
+              "name": "message",
+              "upstream": "log line without the timestamp prefix and trailing newline",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200",
+              "sensitive": true
+            }
+          ],
+          "fields_complete": true,
           "provided": false
         },
         {
-          "name": "logs_json",
-          "tf_type": "string",
-          "category": "raw",
-          "source": {
-            "type": "derived",
-            "from": "the same stream as logs",
-            "how": "JSON array with one object per log line, in arrival order: {\"timestamp\": RFC 3339 nano from the frame (timestamps=true), \"stream\": \"stdout\"|\"stderr\" from the multiplexed frame header (\"stdout\" for a TTY), \"line\": the text without the trailing newline}"
-          },
-          "known_after_apply": false,
-          "sensitive": true,
-          "description": "The same log lines as a JSON array of {timestamp, stream, line} entries. Sensitive: logs routinely contain secrets.",
-          "provided": false
-        },
-        {
-          "name": "logs_sha256",
+          "name": "content_sha256",
           "tf_type": "string",
           "category": "hash",
           "source": {
@@ -10066,21 +10116,6 @@
           "sensitive": false,
           "hash_of": "logs",
           "description": "sha256 of logs.",
-          "provided": false
-        },
-        {
-          "name": "logs_json_sha256",
-          "tf_type": "string",
-          "category": "hash",
-          "source": {
-            "type": "derived",
-            "from": "logs_json",
-            "how": "hex sha256 of the UTF-8 bytes of logs_json"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "hash_of": "logs_json",
-          "description": "sha256 of logs_json.",
           "provided": false
         },
         {
@@ -10112,9 +10147,35 @@
           "provided": false
         }
       ],
-      "no_structured_reason": "GET /containers/{id}/logs returns an unstructured byte stream (raw or multiplexed stdout/stderr frames); swagger has no schema to map field by field. The existing logs_list_string (one element per line) is a convenience split, not an upstream structure.",
       "outputs_status": "missing",
-      "outputs_note": "Exposed today: none. Missing: container_id, logs, engine_api_version, docker_server_version, logs_sha256, logs_json_sha256.",
+      "outputs_note": "Exposed today: none. Missing: container_id, logs, log_entries, content_sha256, engine_api_version, docker_server_version, and the tail/since inputs.",
+      "inputs": [
+        {
+          "name": "tail",
+          "tf_type": "number",
+          "default": 1000,
+          "upstream": "tail",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1{id}~1logs/get/parameters"
+          },
+          "description": "Lines to keep from the end of the logs per container (Engine `tail`); default 1000 so state cannot grow without bound. 0 reads none; there is no \"all\"."
+        },
+        {
+          "name": "since",
+          "tf_type": "string",
+          "default": null,
+          "upstream": "since",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1{id}~1logs/get/parameters"
+          },
+          "description": "Only lines at or after this time: RFC 3339, or a duration before now such as \"42m\" (sent as the Engine's UNIX-timestamp `since`). Combined with tail when both are set."
+        }
+      ],
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -10461,6 +10522,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Exposed today: id, name, labels. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -10716,6 +10778,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_networks data source today (inventory status partial).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -11023,6 +11086,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Exposed today: id, name, plugin_reference. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -11294,6 +11358,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_plugins data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -11438,6 +11503,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_registry_auth data source today (inventory status partial).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -12024,6 +12090,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: name, id (`name@digest`, ~ image_digest_ref), sha256_digest (= digest). Missing: image_ref, image_digest_ref, platforms, manifests, inspect, inspect_json, content_sha256, versions. labels, created and config stay null on this side: DistributionInspect returns only the descriptor and the platform list, not the image config or per-platform digests.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z1"
     },
@@ -12290,6 +12357,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_system_df data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -12517,6 +12585,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_version data source today (inventory status missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -12787,6 +12856,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Exposed today: name, labels, mountpoint. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -12980,6 +13050,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No docker_volumes data source today (inventory status partial).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -13082,6 +13153,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -13152,6 +13224,20 @@
           "description": "sha256 of the written archive (a file, not a raw string output)."
         },
         {
+          "name": "archive_size",
+          "tf_type": "number",
+          "category": "result",
+          "source": {
+            "type": "derived",
+            "from": "streamed from GET /containers/{id}/export",
+            "how": "byte count of the tar stream"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Bytes in the tar archive the action streamed.",
+          "provided": false
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -13180,6 +13266,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -13358,6 +13445,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -13536,6 +13624,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -13638,6 +13727,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -13816,6 +13906,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -13994,6 +14085,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -14172,6 +14264,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -14350,6 +14443,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -14421,6 +14515,53 @@
           "description": "sha256 of the uploaded tar archive."
         },
         {
+          "name": "path_stat",
+          "tf_type": "object({...})",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Stat of the target path after the upload (HEAD /containers/{id}/archive, X-Docker-Container-Path-Stat).",
+          "fields": [
+            {
+              "name": "name",
+              "upstream": "name",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "size",
+              "upstream": "size",
+              "tf_type": "number",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "mode",
+              "upstream": "mode",
+              "tf_type": "number",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "mtime",
+              "upstream": "mtime",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "link_target",
+              "upstream": "linkTarget",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            }
+          ],
+          "fields_complete": true,
+          "provided": false
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -14449,6 +14590,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -14555,6 +14697,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -14797,6 +14940,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -14860,6 +15004,53 @@
           "description": "Tag given to the built image."
         },
         {
+          "name": "image",
+          "tf_type": "object({...})",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/ImageInspect"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Summary of the image the build produced (GET /images/{id}/json).",
+          "fields": [
+            {
+              "name": "size",
+              "upstream": "Size",
+              "tf_type": "number",
+              "pointer": "#/definitions/ImageInspect/properties/Size"
+            },
+            {
+              "name": "created",
+              "upstream": "Created",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Created"
+            },
+            {
+              "name": "architecture",
+              "upstream": "Architecture",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Architecture"
+            },
+            {
+              "name": "os",
+              "upstream": "Os",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Os"
+            },
+            {
+              "name": "variant",
+              "upstream": "Variant",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Variant"
+            }
+          ],
+          "fields_complete": true,
+          "provided": false
+        },
+        {
           "name": "build_log",
           "tf_type": "string",
           "category": "raw",
@@ -14915,6 +15106,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -14983,6 +15175,35 @@
           "description": "ID of the committed container."
         },
         {
+          "name": "changes",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1{id}~1changes/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "The container filesystem changes the commit captured (GET /containers/{id}/changes just before the commit).",
+          "fields": [
+            {
+              "name": "path",
+              "upstream": "Path",
+              "tf_type": "string",
+              "pointer": "#/definitions/FilesystemChange/properties/Path"
+            },
+            {
+              "name": "kind",
+              "upstream": "Kind",
+              "tf_type": "number",
+              "pointer": "#/definitions/ChangeType"
+            }
+          ],
+          "fields_complete": true,
+          "provided": false
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -15011,6 +15232,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -15067,6 +15289,53 @@
           "description": "Reference the imported image was tagged with."
         },
         {
+          "name": "image",
+          "tf_type": "object({...})",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/ImageInspect"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Summary of the imported image (GET /images/{id}/json).",
+          "fields": [
+            {
+              "name": "size",
+              "upstream": "Size",
+              "tf_type": "number",
+              "pointer": "#/definitions/ImageInspect/properties/Size"
+            },
+            {
+              "name": "created",
+              "upstream": "Created",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Created"
+            },
+            {
+              "name": "architecture",
+              "upstream": "Architecture",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Architecture"
+            },
+            {
+              "name": "os",
+              "upstream": "Os",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Os"
+            },
+            {
+              "name": "variant",
+              "upstream": "Variant",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Variant"
+            }
+          ],
+          "fields_complete": true,
+          "provided": false
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -15095,6 +15364,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -15139,6 +15409,20 @@
           "description": "References or IDs reported as \"Loaded image: ...\" / \"Loaded image ID: ...\" in the POST /images/load stream."
         },
         {
+          "name": "archive_size",
+          "tf_type": "number",
+          "category": "result",
+          "source": {
+            "type": "derived",
+            "from": "read from the input archive for POST /images/load",
+            "how": "byte count of the tar stream"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Bytes in the tar archive the action read.",
+          "provided": false
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -15167,6 +15451,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -15283,6 +15568,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -15360,6 +15646,20 @@
           "description": "sha256 of the written archive."
         },
         {
+          "name": "archive_size",
+          "tf_type": "number",
+          "category": "result",
+          "source": {
+            "type": "derived",
+            "from": "streamed from GET /images/get",
+            "how": "byte count of the tar stream"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Bytes in the tar archive the action streamed.",
+          "provided": false
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -15388,6 +15688,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -15484,6 +15785,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -15541,6 +15843,20 @@
           "description": "ID of the created plugin (GET /plugins/{name}/json after create)."
         },
         {
+          "name": "enabled",
+          "tf_type": "bool",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/Plugin/properties/Enabled"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Whether the plugin is enabled after create (a created plugin starts disabled).",
+          "provided": false
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -15569,6 +15885,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -15625,6 +15942,20 @@
           "description": "Digest reported by the push stream (\"<tag>: digest: sha256:... size: N\")."
         },
         {
+          "name": "push_status",
+          "tf_type": "string",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/PushImageInfo/properties/status"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Last status message of the push stream (\"<tag>: digest: sha256:… size: N\").",
+          "provided": false
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -15653,6 +15984,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -15755,6 +16087,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
+      "uses_cli": false,
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -16170,6 +16503,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: id plus the name/labels/data arguments. Missing: inspect_json, inspect, content_sha256, version_index, engine_api_version, docker_server_version. known_after_apply true: computed by create.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -16464,6 +16798,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: id plus the name/labels/data arguments (data is the sensitive input, not an output). Missing: inspect_json, inspect, content_sha256, version_index, version outputs. The inspect output carries no secret value (the Engine never returns Spec.Data).",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -18167,6 +18502,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: id plus the input spec attributes (some Computed, e.g. endpoint_spec ports, restart_policy). Missing: inspect_json, inspect, content_sha256, version_index, image_digest_ref, published_ports, version outputs. inspect_json is sensitive; inspect is sensitive only at ContainerSpec.Env (field-level); image_digest_ref, replicas and published_ports are non-sensitive copies so consumers need no nonsensitive().",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -18715,6 +19051,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: id, cluster_id, node_id, worker_join_token, manager_join_token, unlock_key, data_path_port, default_addr_pool, subnet_size. Missing: inspect_json, inspect, join_tokens, content_sha256, labels, version_index, version outputs. Today's attribute for the cluster ID is cluster_id; this contract uses id = ClusterInfo.ID (see naming question).",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -19250,6 +19587,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: id, node_id, hostname, role, availability. Missing: inspect_json, inspect, content_sha256, name, labels, version_index, addr, version outputs. Values come from NodeInspect on a manager after SwarmJoin.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -19491,6 +19829,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Type does not exist yet. known_after_apply false (reads an existing object; unknown only when its id/name argument comes from a not-yet-applied resource).",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -19706,6 +20045,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: a list of configs with id/name/labels. Missing: configs_json, full per-object fields, content_sha256, ids/names, version outputs. known_after_apply false.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -20196,6 +20536,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: id, hostname, role, availability, state, addr, labels, engine_version, leader. Missing: inspect_json, inspect, content_sha256, name, version_index, version outputs. known_after_apply false.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -20617,6 +20958,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: nodes list with id, hostname, role, availability, state, addr, labels, engine_version, leader. Missing: nodes_json, full Node fields (Spec/Description/Status/ManagerStatus), content_sha256, ids/names, version outputs. names = Description.Hostname (Spec.Name is usually empty). known_after_apply false.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -20878,6 +21220,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Type does not exist yet. known_after_apply false (see swarm:config-data).",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -21114,6 +21457,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: a list of secrets with id/name/labels. Missing: secrets_json, full per-object fields, content_sha256, ids/names, version outputs. known_after_apply false.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -22784,6 +23128,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Type does not exist yet. known_after_apply false.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -22818,31 +23163,60 @@
           "tf_type": "string",
           "category": "raw",
           "source": {
+            "type": "derived",
+            "from": "log_entries",
+            "how": "one line per entry, \"<timestamp> <stream> <source> <message>\", joined with \\n"
+          },
+          "known_after_apply": false,
+          "sensitive": true,
+          "description": "The log entries as plain text, one line per entry: \"<timestamp> <stream> <source> <message>\". Sensitive: log lines can print secrets.",
+          "provided": false,
+          "serializes": "log_entries"
+        },
+        {
+          "name": "log_entries",
+          "tf_type": "list(object({timestamp=string, stream=string, source=string, message=string}))",
+          "category": "structured",
+          "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/paths/~1services~1{id}~1logs/get/responses/200/schema"
+            "pointer": "#/paths/~1services~1{id}~1logs/get"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "The service logs, demultiplexed (stdout and stderr in arrival order) as one UTF-8 string. Sensitive: logs routinely contain secrets.",
+          "sensitive": false,
+          "description": "One entry per log line in arrival order, read with timestamps=true and bounded by the tail/since inputs; `source` is the service name. Only `message` is sensitive (log lines can print secrets).",
+          "fields": [
+            {
+              "name": "timestamp",
+              "upstream": "timestamps=true line prefix (RFC 3339 nano)",
+              "tf_type": "string",
+              "pointer": "#/paths/~1services~1{id}~1logs/get/parameters"
+            },
+            {
+              "name": "stream",
+              "upstream": "multiplexed frame header stream type: 1 = stdout, 2 = stderr; a TTY stream is not multiplexed (the Engine merges stdout and stderr at the source), so it is \"combined\"",
+              "tf_type": "string",
+              "pointer": "#/paths/~1services~1{id}~1logs/get/responses/200"
+            },
+            {
+              "name": "source",
+              "upstream": "Spec.Name",
+              "tf_type": "string",
+              "pointer": "#/definitions/ServiceSpec/properties/Name"
+            },
+            {
+              "name": "message",
+              "upstream": "log line without the timestamp prefix and trailing newline",
+              "tf_type": "string",
+              "pointer": "#/paths/~1services~1{id}~1logs/get/responses/200",
+              "sensitive": true
+            }
+          ],
+          "fields_complete": true,
           "provided": false
         },
         {
-          "name": "logs_json",
-          "tf_type": "string",
-          "category": "raw",
-          "source": {
-            "type": "derived",
-            "from": "the same stream as logs",
-            "how": "JSON array with one object per log line, in arrival order: {\"timestamp\": RFC 3339 nano from the frame (timestamps=true), \"stream\": \"stdout\"|\"stderr\" from the multiplexed frame header (\"stdout\" for a TTY), \"line\": the text without the trailing newline}"
-          },
-          "known_after_apply": false,
-          "sensitive": true,
-          "description": "The same log lines as a JSON array of {timestamp, stream, line} entries. Sensitive: logs routinely contain secrets.",
-          "provided": false
-        },
-        {
-          "name": "logs_sha256",
+          "name": "content_sha256",
           "tf_type": "string",
           "category": "hash",
           "source": {
@@ -22854,21 +23228,6 @@
           "sensitive": false,
           "hash_of": "logs",
           "description": "sha256 of logs.",
-          "provided": false
-        },
-        {
-          "name": "logs_json_sha256",
-          "tf_type": "string",
-          "category": "hash",
-          "source": {
-            "type": "derived",
-            "from": "logs_json",
-            "how": "hex sha256 of the UTF-8 bytes of logs_json"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "hash_of": "logs_json",
-          "description": "sha256 of logs_json.",
           "provided": false
         },
         {
@@ -22914,9 +23273,35 @@
           "provided": false
         }
       ],
-      "no_structured_reason": "ServiceLogs returns a raw or multiplexed byte stream (type string, format binary), not a JSON schema; there is no upstream object to mirror.",
       "outputs_status": "missing",
       "outputs_note": "Type does not exist yet. Sensitive by default (log content). known_after_apply false.",
+      "inputs": [
+        {
+          "name": "tail",
+          "tf_type": "number",
+          "default": 1000,
+          "upstream": "tail",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1services~1{id}~1logs/get/parameters"
+          },
+          "description": "Lines to keep from the end of the logs per service (Engine `tail`); default 1000 so state cannot grow without bound. 0 reads none; there is no \"all\"."
+        },
+        {
+          "name": "since",
+          "tf_type": "string",
+          "default": null,
+          "upstream": "since",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1services~1{id}~1logs/get/parameters"
+          },
+          "description": "Only lines at or after this time: RFC 3339, or a duration before now such as \"42m\" (sent as the Engine's UNIX-timestamp `since`). Combined with tail when both are set."
+        }
+      ],
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -24486,6 +24871,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: a list of services with id/name/labels. Missing: services_json, the full spec chain, content_sha256, ids/names, version outputs. services_json sensitive; services only at ContainerSpec.Env (field-level); ids/names are not. known_after_apply false.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -24970,6 +25356,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today only data.docker_swarm_tokens (id, worker, manager) and ephemeral.docker_swarm_tokens. Missing: inspect_json, inspect, join_tokens, content_sha256, labels, version_index, version outputs. Tokens read by a data source land in state (sensitive); the ephemeral resource stays the preferred way to get them. known_after_apply false.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -26564,6 +26951,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Type does not exist yet. known_after_apply false.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -26598,31 +26986,60 @@
           "tf_type": "string",
           "category": "raw",
           "source": {
+            "type": "derived",
+            "from": "log_entries",
+            "how": "one line per entry, \"<timestamp> <stream> <source> <message>\", joined with \\n"
+          },
+          "known_after_apply": false,
+          "sensitive": true,
+          "description": "The log entries as plain text, one line per entry: \"<timestamp> <stream> <source> <message>\". Sensitive: log lines can print secrets.",
+          "provided": false,
+          "serializes": "log_entries"
+        },
+        {
+          "name": "log_entries",
+          "tf_type": "list(object({timestamp=string, stream=string, source=string, message=string}))",
+          "category": "structured",
+          "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/paths/~1tasks~1{id}~1logs/get/responses/200/schema"
+            "pointer": "#/paths/~1tasks~1{id}~1logs/get"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "The task logs, demultiplexed (stdout and stderr in arrival order) as one UTF-8 string. Sensitive: logs routinely contain secrets.",
+          "sensitive": false,
+          "description": "One entry per log line in arrival order, read with timestamps=true and bounded by the tail/since inputs; `source` is the task ID. Only `message` is sensitive (log lines can print secrets).",
+          "fields": [
+            {
+              "name": "timestamp",
+              "upstream": "timestamps=true line prefix (RFC 3339 nano)",
+              "tf_type": "string",
+              "pointer": "#/paths/~1tasks~1{id}~1logs/get/parameters"
+            },
+            {
+              "name": "stream",
+              "upstream": "multiplexed frame header stream type: 1 = stdout, 2 = stderr; a TTY stream is not multiplexed (the Engine merges stdout and stderr at the source), so it is \"combined\"",
+              "tf_type": "string",
+              "pointer": "#/paths/~1tasks~1{id}~1logs/get/responses/200"
+            },
+            {
+              "name": "source",
+              "upstream": "ID",
+              "tf_type": "string",
+              "pointer": "#/definitions/Task/properties/ID"
+            },
+            {
+              "name": "message",
+              "upstream": "log line without the timestamp prefix and trailing newline",
+              "tf_type": "string",
+              "pointer": "#/paths/~1tasks~1{id}~1logs/get/responses/200",
+              "sensitive": true
+            }
+          ],
+          "fields_complete": true,
           "provided": false
         },
         {
-          "name": "logs_json",
-          "tf_type": "string",
-          "category": "raw",
-          "source": {
-            "type": "derived",
-            "from": "the same stream as logs",
-            "how": "JSON array with one object per log line, in arrival order: {\"timestamp\": RFC 3339 nano from the frame (timestamps=true), \"stream\": \"stdout\"|\"stderr\" from the multiplexed frame header (\"stdout\" for a TTY), \"line\": the text without the trailing newline}"
-          },
-          "known_after_apply": false,
-          "sensitive": true,
-          "description": "The same log lines as a JSON array of {timestamp, stream, line} entries. Sensitive: logs routinely contain secrets.",
-          "provided": false
-        },
-        {
-          "name": "logs_sha256",
+          "name": "content_sha256",
           "tf_type": "string",
           "category": "hash",
           "source": {
@@ -26634,21 +27051,6 @@
           "sensitive": false,
           "hash_of": "logs",
           "description": "sha256 of logs.",
-          "provided": false
-        },
-        {
-          "name": "logs_json_sha256",
-          "tf_type": "string",
-          "category": "hash",
-          "source": {
-            "type": "derived",
-            "from": "logs_json",
-            "how": "hex sha256 of the UTF-8 bytes of logs_json"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "hash_of": "logs_json",
-          "description": "sha256 of logs_json.",
           "provided": false
         },
         {
@@ -26694,9 +27096,35 @@
           "provided": false
         }
       ],
-      "no_structured_reason": "TaskLogs returns a raw or multiplexed byte stream (type string, format binary), not a JSON schema; there is no upstream object to mirror.",
       "outputs_status": "missing",
       "outputs_note": "Type does not exist yet. Sensitive by default (log content). known_after_apply false.",
+      "inputs": [
+        {
+          "name": "tail",
+          "tf_type": "number",
+          "default": 1000,
+          "upstream": "tail",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1tasks~1{id}~1logs/get/parameters"
+          },
+          "description": "Lines to keep from the end of the logs per task (Engine `tail`); default 1000 so state cannot grow without bound. 0 reads none; there is no \"all\"."
+        },
+        {
+          "name": "since",
+          "tf_type": "string",
+          "default": null,
+          "upstream": "since",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1tasks~1{id}~1logs/get/parameters"
+          },
+          "description": "Only lines at or after this time: RFC 3339, or a duration before now such as \"42m\" (sent as the Engine's UNIX-timestamp `since`). Combined with tail when both are set."
+        }
+      ],
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -28218,6 +28646,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Type does not exist yet. tasks_json sensitive; tasks only at ContainerSpec.Env (field-level); ids/names are not. known_after_apply false.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -28357,6 +28786,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Action exists; actions return no attributes today. Changed value: Spec.Availability = active.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -28497,6 +28927,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No action yet (role is an argument of docker_swarm_node). Changed value: Spec.Role = worker.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -28636,6 +29067,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Action exists; actions return no attributes today. Changed value: Spec.Availability = drain.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -28776,6 +29208,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No action yet (role is an argument of docker_swarm_node). Changed value: Spec.Role = manager.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -28950,6 +29383,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Action exists; returns no attributes today. Changed value: TaskTemplate.ForceUpdate.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -29124,6 +29558,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Action exists; returns no attributes today. Rollback is ServiceUpdate with rollback=previous; the whole spec reverts.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -29381,6 +29816,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Action exists; returns no attributes today. Changed value: Spec.Mode.Replicated.Replicas.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -29512,6 +29948,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No action yet. SwarmUpdate with Spec.CAConfig.ForceRotate incremented; a supplied signing key is a sensitive input and never returned.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -29654,6 +30091,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Action exists; returns no attributes today (new tokens are read with ephemeral.docker_swarm_tokens). Token outputs must stay sensitive.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -29721,6 +30159,20 @@
           "description": "New unlock key (GET /swarm/unlockkey after rotation). Sensitive."
         },
         {
+          "name": "autolock_managers",
+          "tf_type": "bool",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SwarmSpec/properties/EncryptionConfig/properties/AutoLockManagers"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Whether autolock is on after the rotation (the new key only matters when it is).",
+          "provided": false
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -29751,6 +30203,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No action yet. SwarmUpdate with rotateManagerUnlockKey=true, then SwarmUnlockkey.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -29870,6 +30323,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No action yet. SwarmUnlock returns no body; outputs come from GET /info afterwards. The unlock key is a sensitive input, never an output.",
+      "uses_cli": false,
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -30040,6 +30494,7 @@
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -30170,6 +30625,7 @@
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -31233,6 +31689,7 @@
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -31368,6 +31825,7 @@
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -33984,6 +34442,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: id, project_name and spec_hash (a digest of the parsed project, not of compose_yaml). Missing: compose_yaml, content_sha256, project, labels, config_files and all version outputs.",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -34204,6 +34663,7 @@
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
       "outputs_status": "partial",
       "outputs_note": "Today: `networks` (key -> ID). Missing: project.networks, network_names, versions.",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -34379,6 +34839,7 @@
       ],
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -35724,6 +36185,7 @@
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
       "outputs_status": "partial",
       "outputs_note": "Today: `services` (name -> container IDs / service ID). Missing: project.services, container_names, image_refs, versions.",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -35882,6 +36344,7 @@
       "no_raw_reason": "Facet of docker_compose: the raw output is `compose_yaml` on compose:name (the item that represents the whole project); this facet's slice is serialized inside it, not separately.",
       "outputs_status": "partial",
       "outputs_note": "Today: `volumes` (key -> name). Missing: project.volumes, versions.",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -36226,6 +36689,7 @@
         }
       ],
       "no_raw_reason": "The build section is serialized inside compose_yaml (compose:name); docker_image's own inspect_json belongs to the engine image item.",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -36558,6 +37022,7 @@
         }
       ],
       "no_raw_reason": "The deploy section is serialized inside compose_yaml (compose:name); docker_service's own inspect_json belongs to the swarm service item.",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -39124,6 +39589,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -39394,6 +39860,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -39611,6 +40078,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -39646,58 +40114,17 @@
           "category": "raw",
           "source": {
             "type": "derived",
-            "from": "entries",
-            "how": "one line per entry, as `docker compose logs` prints it without color: \"<container_name>  | <line>\", joined with \n"
+            "from": "log_entries",
+            "how": "one line per entry, \"<timestamp> <stream> <source> <message>\", joined with \\n"
           },
           "known_after_apply": true,
           "sensitive": true,
-          "description": "The log lines as plain text, prefixed with the container name like `docker compose logs`. Sensitive: application output can print secrets."
+          "description": "The log entries as plain text, one line per entry: \"<timestamp> <stream> <source> <message>\". Sensitive: log lines can print secrets.",
+          "serializes": "log_entries"
         },
         {
-          "name": "logs_json",
-          "tf_type": "string",
-          "category": "raw",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/paths/~1containers~1{id}~1logs/get"
-          },
-          "known_after_apply": true,
-          "sensitive": true,
-          "description": "JSON array of the log entries (serialization of `entries`). Sensitive: application output can print secrets.",
-          "serializes": "entries"
-        },
-        {
-          "name": "logs_sha256",
-          "tf_type": "string",
-          "category": "hash",
-          "source": {
-            "type": "derived",
-            "from": "logs",
-            "how": "hex sha256 of the UTF-8 bytes of logs"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "hash_of": "logs",
-          "description": "sha256 of logs."
-        },
-        {
-          "name": "logs_json_sha256",
-          "tf_type": "string",
-          "category": "hash",
-          "source": {
-            "type": "derived",
-            "from": "logs_json",
-            "how": "hex sha256 of the UTF-8 bytes of logs_json"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "hash_of": "logs_json",
-          "description": "sha256 of logs_json."
-        },
-        {
-          "name": "entries",
-          "tf_type": "list(object({...}))",
+          "name": "log_entries",
+          "tf_type": "list(object({timestamp=string, stream=string, source=string, message=string}))",
           "category": "structured",
           "source": {
             "type": "swagger",
@@ -39706,47 +40133,49 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "Log lines of the selected service containers, in time order.",
+          "description": "One entry per log line in arrival order, read with timestamps=true and bounded by the tail/since inputs; `source` is \"<compose service>.<container name>\". Only `message` is sensitive (log lines can print secrets).",
           "fields": [
             {
-              "name": "service",
-              "upstream": "Labels[com.docker.compose.service]",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Labels"
-            },
-            {
-              "name": "container_id",
-              "upstream": "Id",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Id"
-            },
-            {
-              "name": "container_name",
-              "upstream": "Names",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Names"
-            },
-            {
-              "name": "stream",
-              "upstream": "stdout|stderr (multiplexed stream header)",
-              "tf_type": "string",
-              "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200"
-            },
-            {
               "name": "timestamp",
-              "upstream": "timestamps=true prefix",
+              "upstream": "timestamps=true line prefix (RFC 3339 nano)",
               "tf_type": "string",
               "pointer": "#/paths/~1containers~1{id}~1logs/get/parameters"
             },
             {
-              "name": "line",
-              "upstream": "log line",
+              "name": "stream",
+              "upstream": "multiplexed frame header stream type: 1 = stdout, 2 = stderr; a TTY stream is not multiplexed (the Engine merges stdout and stderr at the source), so it is \"combined\"",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200"
+            },
+            {
+              "name": "source",
+              "upstream": "Labels[com.docker.compose.service] + \".\" + Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "message",
+              "upstream": "log line without the timestamp prefix and trailing newline",
               "tf_type": "string",
               "pointer": "#/paths/~1containers~1{id}~1logs/get/responses/200",
               "sensitive": true
             }
           ],
           "fields_complete": true
+        },
+        {
+          "name": "content_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "logs",
+            "how": "hex sha256 of the UTF-8 bytes of logs"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "hash_of": "logs",
+          "description": "sha256 of logs."
         },
         {
           "name": "name",
@@ -39802,6 +40231,35 @@
         }
       ],
       "outputs_status": "missing",
+      "inputs": [
+        {
+          "name": "tail",
+          "tf_type": "number",
+          "default": 1000,
+          "upstream": "tail",
+          "source": {
+            "type": "cli",
+            "command": "docker compose logs",
+            "flag": "--tail",
+            "file": "upstream/compose-cli/docs/reference/compose_logs.md"
+          },
+          "description": "Lines to keep from the end of the logs per container (Engine `tail`); default 1000 so state cannot grow without bound. 0 reads none; there is no \"all\"."
+        },
+        {
+          "name": "since",
+          "tf_type": "string",
+          "default": null,
+          "upstream": "since",
+          "source": {
+            "type": "cli",
+            "command": "docker compose logs",
+            "flag": "--since",
+            "file": "upstream/compose-cli/docs/reference/compose_logs.md"
+          },
+          "description": "Only lines at or after this time: RFC 3339, or a duration before now such as \"42m\" (sent as the Engine's UNIX-timestamp `since`). Combined with tail when both are set."
+        }
+      ],
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -39925,6 +40383,7 @@
       ],
       "outputs_status": "missing",
       "no_raw_reason": "The answer is one port binding; `bindings` is the whole result and has no separate serialized form upstream.",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -40060,6 +40519,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -40202,6 +40662,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -40392,6 +40853,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -40474,6 +40936,52 @@
           "description": "Service name -> built image ID."
         },
         {
+          "name": "built_images",
+          "tf_type": "map(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/ImageInspect"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Service name -> summary of the image built for it (GET /images/{id}/json).",
+          "fields": [
+            {
+              "name": "size",
+              "upstream": "Size",
+              "tf_type": "number",
+              "pointer": "#/definitions/ImageInspect/properties/Size"
+            },
+            {
+              "name": "created",
+              "upstream": "Created",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Created"
+            },
+            {
+              "name": "architecture",
+              "upstream": "Architecture",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Architecture"
+            },
+            {
+              "name": "os",
+              "upstream": "Os",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Os"
+            },
+            {
+              "name": "variant",
+              "upstream": "Variant",
+              "tf_type": "string",
+              "pointer": "#/definitions/ImageInspect/properties/Variant"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "compose_spec_version",
           "tf_type": "string",
           "category": "version",
@@ -40512,6 +41020,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -40591,6 +41100,34 @@
           "description": "repo:tag given to the new image (empty when untagged)."
         },
         {
+          "name": "changes",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1{id}~1changes/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "The container filesystem changes the commit captured (GET /containers/{id}/changes just before the commit).",
+          "fields": [
+            {
+              "name": "path",
+              "upstream": "Path",
+              "tf_type": "string",
+              "pointer": "#/definitions/FilesystemChange/properties/Path"
+            },
+            {
+              "name": "kind",
+              "upstream": "Kind",
+              "tf_type": "number",
+              "pointer": "#/definitions/ChangeType"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -40605,6 +41142,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -40674,6 +41212,52 @@
           "description": "Path inside the container that was written or read."
         },
         {
+          "name": "path_stat",
+          "tf_type": "object({...})",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Stat of the container-side path after the copy (HEAD /containers/{id}/archive).",
+          "fields": [
+            {
+              "name": "name",
+              "upstream": "name",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "size",
+              "upstream": "size",
+              "tf_type": "number",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "mode",
+              "upstream": "mode",
+              "tf_type": "number",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "mtime",
+              "upstream": "mtime",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            },
+            {
+              "name": "link_target",
+              "upstream": "linkTarget",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -40688,6 +41272,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -40783,6 +41368,46 @@
           "description": "Images removed (with rmi)."
         },
         {
+          "name": "removed_counts",
+          "tf_type": "object({...})",
+          "category": "result",
+          "source": {
+            "type": "derived",
+            "from": "removed_*",
+            "how": "length of each removed_* list"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "How many containers, networks, volumes and images `down` removed.",
+          "fields": [
+            {
+              "name": "containers",
+              "upstream": "len(removed_container_ids)",
+              "tf_type": "number",
+              "pointer": "#/paths/~1containers~1{id}/delete"
+            },
+            {
+              "name": "networks",
+              "upstream": "len(removed_network_ids)",
+              "tf_type": "number",
+              "pointer": "#/paths/~1networks~1{id}/delete"
+            },
+            {
+              "name": "volumes",
+              "upstream": "len(removed_volume_names)",
+              "tf_type": "number",
+              "pointer": "#/paths/~1volumes~1{id}/delete"
+            },
+            {
+              "name": "images",
+              "upstream": "len(removed_image_ids)",
+              "tf_type": "number",
+              "pointer": "#/paths/~1images~1{id}/delete"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -40810,6 +41435,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -40930,6 +41556,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -40999,6 +41626,19 @@
           "description": "Local tar file written."
         },
         {
+          "name": "archive_size",
+          "tf_type": "number",
+          "category": "result",
+          "source": {
+            "type": "derived",
+            "from": "streamed from GET /containers/{id}/export",
+            "how": "byte count of the tar stream"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Bytes in the tar archive the action streamed."
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -41013,6 +41653,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -41080,6 +41721,52 @@
           "description": "Service name -> IDs of the containers signalled."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -41094,6 +41781,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -41161,6 +41849,52 @@
           "description": "Service name -> IDs of the containers paused."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -41175,6 +41909,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -41255,6 +41990,40 @@
           "description": "Manifest digest of the published artifact."
         },
         {
+          "name": "layers",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "cli",
+            "command": "docker compose publish",
+            "file": "upstream/compose-cli/docs/reference/compose_publish.md"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "OCI descriptors of the layers pushed in the published artifact (compose files, env files).",
+          "fields": [
+            {
+              "name": "media_type",
+              "upstream": "mediaType",
+              "tf_type": "string",
+              "pointer": "OCI image-spec descriptor mediaType"
+            },
+            {
+              "name": "digest",
+              "upstream": "digest",
+              "tf_type": "string",
+              "pointer": "OCI image-spec descriptor digest"
+            },
+            {
+              "name": "size",
+              "upstream": "size",
+              "tf_type": "number",
+              "pointer": "OCI image-spec descriptor size"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "compose_spec_version",
           "tf_type": "string",
           "category": "version",
@@ -41280,6 +42049,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -41363,6 +42133,19 @@
           "description": "Service name -> local image ID."
         },
         {
+          "name": "pull_status",
+          "tf_type": "map(string)",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/CreateImageInfo/properties/status"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Service name -> last status of the pull stream (\"Image is up to date for …\" or \"Downloaded newer image for …\")."
+        },
+        {
           "name": "compose_go_version",
           "tf_type": "string",
           "category": "version",
@@ -41389,6 +42172,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -41471,6 +42255,19 @@
           "description": "Service name -> repo@sha256:... the registry returned."
         },
         {
+          "name": "push_status",
+          "tf_type": "map(string)",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/PushImageInfo/properties/status"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Service name -> last status of the push stream (\"<tag>: digest: sha256:… size: N\")."
+        },
+        {
           "name": "compose_go_version",
           "tf_type": "string",
           "category": "version",
@@ -41497,6 +42294,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -41564,6 +42362,52 @@
           "description": "Service name -> IDs of the containers restarted."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -41578,6 +42422,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -41707,6 +42552,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -41778,6 +42624,52 @@
           "description": "Service name -> replica count set."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -41792,6 +42684,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -41859,6 +42752,52 @@
           "description": "Service name -> IDs of the containers started."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -41873,6 +42812,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -41940,6 +42880,52 @@
           "description": "Service name -> IDs of the containers stopped."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -41954,6 +42940,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -42021,6 +43008,52 @@
           "description": "Service name -> IDs of the containers unpaused."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -42035,6 +43068,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -42131,6 +43165,52 @@
           "description": "Volume key -> volume name."
         },
         {
+          "name": "container_states",
+          "tf_type": "list(object({...}))",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "Id",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Id"
+            },
+            {
+              "name": "name",
+              "upstream": "Names[0] (leading \"/\" removed)",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Names"
+            },
+            {
+              "name": "service",
+              "upstream": "Labels[com.docker.compose.service]",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Labels"
+            },
+            {
+              "name": "state",
+              "upstream": "State",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/State"
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "string",
+              "pointer": "#/definitions/ContainerSummary/properties/Status"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
           "name": "compose_spec_version",
           "tf_type": "string",
           "category": "version",
@@ -42182,6 +43262,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -42280,6 +43361,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "C",
       "lane": "Z2"
     },
@@ -43731,6 +44813,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "The data source does not exist (no docker_dockerfile in internal/provider).",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "D"
     },
@@ -44003,6 +45086,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -44220,6 +45304,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -44384,6 +45469,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -44686,6 +45772,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -45034,6 +46121,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet; directives would be top-level attributes of data.docker_dockerfile.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -45149,6 +46237,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet; directives would be top-level attributes of data.docker_dockerfile.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -45261,6 +46350,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet; directives would be top-level attributes of data.docker_dockerfile.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -45418,6 +46508,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -45562,6 +46653,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -45719,6 +46811,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -45922,6 +47015,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -46163,6 +47257,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -46299,6 +47394,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -46434,6 +47530,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -46608,6 +47705,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -47258,6 +48356,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -47394,6 +48493,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -47531,6 +48631,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -47673,6 +48774,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -47819,6 +48921,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -47957,6 +49060,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No Dockerfile composer exists yet (see data.docker_dockerfile); docker_image only takes a Dockerfile path.",
+      "uses_cli": false,
       "outputs_lane": "D",
       "lane": "Z4"
     },
@@ -48330,6 +49434,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: id, name, driver, endpoint, tcp_address, container_name, volume_name, buildkit_version, platforms (first node). Missing: inspect_json, builder (nodes, driver_opts, status, flags, labels, gc_policy, last_activity), labels, the three version outputs. Gaps vs `buildx inspect`: the '*' marker for manually pinned platforms and the --debug extra view.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -48699,6 +49804,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today docker_image exposes id, image_id, repo_digest (= image_digest_ref), context_digest. Missing: metadata_json/build_metadata, dockerfile text, digest, platforms, labels, build_ref, the version outputs. Image inspect outputs (inspect_json) belong to the engine image item, not here.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -49061,6 +50167,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No data source today. Builders not created by Terraform are discoverable only as buildx_buildkit_* containers (buildx's client-side store is not read), so last_activity may be empty for them.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -49342,6 +50449,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No data source today. The current-builder '*' marker of `buildx ls` is client-side state (~/.docker/buildx) and has no output.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -49594,6 +50702,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No data source today (docker_system_df / Z1 may expose the daemon BuildCache section). Mutable and Reclaimable are buildx terms; the Engine BuildCache model has InUse instead.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -49750,6 +50859,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -50084,6 +51194,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "No data source today. Gap: attachment content (provenance/SBOM bodies, `docker buildx history inspect attachment`) is not an output; only attachment digests/types. Config holds more keys than ImageResolveMode in practice (fields_complete false).",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -50635,6 +51746,7 @@
       ],
       "outputs_status": "partial",
       "outputs_note": "Today: digest, media_type, manifests (flattened: digest, media_type, size, os, architecture, variant, os_version). Missing: manifest_json, image_config_json/image_config, provenance_json, sbom_json, image_ref, image_digest_ref, platforms, buildx_version; manifests[] lacks annotations, urls, artifact_type, os.features. Same Terraform type as cli-only:manifest-inspect, same outputs. Existing `name` is the input reference, so the normalized ref is `image_ref`.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -51243,6 +52355,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "Action does not exist yet. variable/function blocks are inputs only (Terraform variables replace them) and do not appear in --print output.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -51354,6 +52467,7 @@
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -51461,6 +52575,7 @@
       ],
       "outputs_status": "missing",
       "outputs_note": "docker_system_prune reports the daemon build-cache prune today; nothing for docker-container builders.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -52315,22 +53430,11 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx."
-        },
-        {
-          "name": "docker_cli_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "docker_cli"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "Type does not exist yet. Talks to the registry v2 HTTP API, so neither engine_api_version nor docker_server_version applies; buildx_version records the `imagetools create` semantics it mirrors.",
+      "outputs_note": "Type does not exist yet. Talks to the registry v2 HTTP API, so neither engine_api_version nor docker_server_version applies; buildx_version records the `imagetools create` semantics it mirrors. uses_cli false: assembles the index and pushes it through the registry v2 HTTP API, not `docker manifest`; so no docker_cli_version.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -53283,22 +54387,11 @@
           "known_after_apply": true,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
-        },
-        {
-          "name": "docker_cli_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "docker_cli"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Today only id and name (plus the configured blocks). Missing: stack_yaml, stack (compose-spec shaped), service_status, namespace, labels, *_ids maps, versions. stack_yaml is the docker_stack -> compose direction (cli-only:stack-config is skipped as a type, it is only an output here). A whole-namespace Engine inspect_json was dropped to keep one raw (content_sha256); per-object inspect stays with docker_service/docker_network data sources.",
+      "outputs_note": "Today only id and name (plus the configured blocks). Missing: stack_yaml, stack (compose-spec shaped), service_status, namespace, labels, *_ids maps, versions. stack_yaml is the docker_stack -> compose direction (cli-only:stack-config is skipped as a type, it is only an output here). A whole-namespace Engine inspect_json was dropped to keep one raw (content_sha256); per-object inspect stays with docker_service/docker_network data sources. uses_cli false: deploys through the Engine API (NetworkCreate, ServiceCreate/Update/Delete, secret and config create) with the namespace label; it mirrors `docker stack deploy` but never runs it; so no docker_cli_version.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -53861,22 +54954,11 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx."
-        },
-        {
-          "name": "docker_cli_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "docker_cli"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Same type and outputs as buildx:imagetools-inspect (docker_registry_image_manifests). Gap vs `docker manifest inspect --verbose`: for a list, the verbose view also expands every child manifest (its config and layers); the data source only reads the top-level document. The type reads the registry v2 API directly; DistributionInspect (GET /distribution/{name}/json) would give Descriptor+Platforms only.",
+      "outputs_note": "Same type and outputs as buildx:imagetools-inspect (docker_registry_image_manifests). Gap vs `docker manifest inspect --verbose`: for a list, the verbose view also expands every child manifest (its config and layers); the data source only reads the top-level document. The type reads the registry v2 API directly; DistributionInspect (GET /distribution/{name}/json) would give Descriptor+Platforms only. uses_cli false: reads the manifest from the registry v2 HTTP API, not `docker manifest inspect`; so no docker_cli_version.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -54166,22 +55248,11 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
-        },
-        {
-          "name": "docker_cli_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "docker_cli"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "docker_services with a label filter returns services today but no replica counts, no tasks, no raw JSON.",
+      "outputs_note": "docker_services with a label filter returns services today but no replica counts, no tasks, no raw JSON. uses_cli false: GET /services and GET /tasks filtered by the namespace label; no `docker stack services`; so no docker_cli_version.",
+      "uses_cli": false,
       "outputs_lane": "E",
       "lane": "Z3"
     },
@@ -54326,21 +55397,11 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
-        },
-        {
-          "name": "docker_cli_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "docker_cli"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "missing",
+      "uses_cli": false,
+      "outputs_note": "uses_cli false: groups GET /services by the com.docker.stack.namespace label; no `docker stack ls`; so no docker_cli_version.",
       "outputs_lane": "E",
       "lane": "Z3"
     },
