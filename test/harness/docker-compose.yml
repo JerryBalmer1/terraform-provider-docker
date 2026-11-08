@@ -1,6 +1,6 @@
 # Test harness ONLY: a Docker-in-Docker swarm (one manager, three workers),
 # a registry:2, and a TLS-enabled standalone dind daemon, used by `make e2e`,
-# build.ps1 -Task testacc and the TestAcc* acceptance tests. This is the only
+# Invoke-Build TestAcc and the TestAcc* acceptance tests. This is the only
 # compose file in the repository; the provider itself never uses compose or
 # the docker CLI.
 #

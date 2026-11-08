@@ -1,0 +1,2857 @@
+{
+  "lane": "Z1",
+  "notes": [
+    "Coverage self-check: 108 operations, 108 covered, 0 uncovered (each with exactly one `primary: true` swagger source); duplicates-as-primary: 0; unknown operationIds: 0.",
+    "Source: upstream/engine-api/api/swagger.yaml (Engine API 1.56), parsed with PyYAML; 108 operations across tags Container, Image, System, Exec, Volume, Network, Plugin, Node, Swarm, Service, Task, Secret, Config, Distribution, Session.",
+    "Schema extension: swagger source entries carry `primary: true` on the one item that is the operation's home; other items that also use the op list it without `primary` (e.g. ContainerInspect in docker_container resource vs data source, SwarmUpdate in rotate actions). Swagger sources also carry `min_api` where the CHANGELOG states the endpoint was added.",
+    "min_api: the swagger descriptions carry no version text (only Session's deprecation). Values come from upstream/engine-api/api/docs/CHANGELOG.md endpoint-added lines: archive 1.20, volumes 1.21, container update 1.22, prune/plugins/secrets 1.25, plugin upgrade 1.26, distribution 1.30, session 1.31, VolumeUpdate 1.42, image attestations 1.55, _ping GET 1.11 / HEAD 1.40. Swarm/node/service/task/config/network/exec/image core endpoints predate CHANGELOG 'added' lines: null. Item-level min_api is the stated min of the item's create/primary op.",
+    "Status was judged by grepping internal/provider/*.go (non-test) for moby client calls: unused in provider code are ContainerStop/Restart/Kill/Pause/Unpause/Wait/Top/Stats/Diff/Commit/StatPath/CopyFromContainer, ImageHistory/Search/Attestations, NetworkDisconnect, VolumeUpdate, PluginUpgrade/Push/Create/List, SwarmUnlock, SecretUpdate, ConfigUpdate, TaskInspect, Service/Task logs, Events, DiskUsage, RegistryLogin(/auth).",
+    "docker_system_prune covers ContainerPrune, NetworkPrune, VolumePrune and BuildPrune through boolean switches, so the dedicated per-kind prune actions are marked partial rather than missing.",
+    "client.PluginInstall calls GetPluginPrivileges + PluginPull, client.ImagePull calls ImageCreate; both counted as used by the existing resources.",
+    "docker_stack, docker_compose and compose2stack have no Engine endpoint of their own (client-side); out of scope for this engine lane.",
+    "ImageDelete is shared by docker_image (primary) and docker_tag (untag on destroy)."
+  ],
+  "naming_questions": [
+    "NetworkConnect/NetworkDisconnect: add a standalone `docker_network_attachment` resource (container x network pair), or make docker_container `networks` connect/disconnect in place instead of forcing replacement? (or both, with a conflict warning)",
+    "Build cache prune action name: `docker_builder_prune` (matches `docker builder prune`) or `docker_build_cache_prune` (avoids confusion with docker_buildx_builder)?",
+    "Standalone build: add an action `docker_image_build`, or keep builds only in docker_image's `build` block? If added, is the name too close to docker_image?",
+    "Managing an already-joined swarm node (labels/availability/role via NodeUpdate) that Terraform did not join: extend docker_swarm_node with an adopt mode, or add a separate `docker_node` resource (name matches existing data.docker_node)?",
+    "Node role actions: `docker_node_promote` / `docker_node_demote` (CLI words, matching docker_node_drain/activate) or one `docker_node_role` action with role = manager|worker?",
+    "Logs: separate `docker_service_logs` and `docker_task_logs` data sources, or extend data.docker_logs with service_id / task_id arguments?",
+    "SystemAuth (/auth) returns an identity token: model as an ephemeral resource (e.g. `docker_registry_login`) next to ephemeral docker_registry_token, or skip it?",
+    "PluginCreate: action `docker_plugin_create` (one-shot) or a resource (it has PluginDelete) with a different name to avoid confusion with docker_plugin (install from registry)?",
+    "Container one-off read of files: data source `docker_container_file` (GET archive) vs an action; and copy-in at any time: action `docker_container_upload` or `docker_container_cp`?",
+    "Swarm rotation actions: separate `docker_swarm_rotate_unlock_key` and `docker_swarm_ca_rotate`, or one `docker_swarm_rotate` action with what = worker_token|manager_token|unlock_key|ca (absorbing docker_swarm_rotate_tokens)?"
+  ],
+  "items": [
+    {
+      "id": "engine:container",
+      "layer": "engine",
+      "kind": "resource",
+      "name": "docker_container",
+      "update": "in_place",
+      "summary": "Container lifecycle: create (+connect networks, upload files), start, in-place update of resources/restart policy and rename, remove.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerCreate",
+          "method": "POST",
+          "path": "/containers/create",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ContainerInspect",
+          "method": "GET",
+          "path": "/containers/{id}/json"
+        },
+        {
+          "type": "swagger",
+          "operationId": "ContainerUpdate",
+          "method": "POST",
+          "path": "/containers/{id}/update",
+          "min_api": "1.22",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ContainerRename",
+          "method": "POST",
+          "path": "/containers/{id}/rename",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ContainerDelete",
+          "method": "DELETE",
+          "path": "/containers/{id}",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "PutContainerArchive",
+          "method": "PUT",
+          "path": "/containers/{id}/archive",
+          "min_api": "1.20",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ContainerStart",
+          "method": "POST",
+          "path": "/containers/{id}/start"
+        },
+        {
+          "type": "swagger",
+          "operationId": "NetworkConnect",
+          "method": "POST",
+          "path": "/networks/{id}/connect"
+        },
+        {
+          "type": "cli",
+          "command": "docker container create",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_create.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker container run",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_run.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker container update",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_update.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker container rename",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_rename.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker container rm",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_rm.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker container cp (into a container)",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_cp.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_container (resource)",
+        "list.docker_container (list resource)"
+      ],
+      "status_note": "Covers ContainerCreate/Update/Rename/Delete; PutContainerArchive only through `upload` blocks before first start; networks connected only at create (NetworkConnect), never connected/disconnected in place.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-data",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_container",
+      "summary": "Look up one container (inspect) that Terraform does not manage.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerInspect",
+          "method": "GET",
+          "path": "/containers/{id}/json",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container inspect",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_inspect.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker inspect",
+          "file": "upstream/docker-cli/docs/reference/commandline/inspect.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:containers",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_containers",
+      "summary": "List containers with filters.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerList",
+          "method": "GET",
+          "path": "/containers/json",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container ls",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_ls.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker ps",
+          "file": "upstream/docker-cli/docs/reference/commandline/ps.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "data.docker_containers (data source)",
+        "list.docker_container (list resource)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-logs",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_logs",
+      "summary": "Read a container's logs (non-follow snapshot).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerLogs",
+          "method": "GET",
+          "path": "/containers/{id}/logs",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container logs",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_logs.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "data.docker_logs (data source)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-top",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_container_top",
+      "summary": "Processes running in a container.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerTop",
+          "method": "GET",
+          "path": "/containers/{id}/top",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container top",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_top.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-changes",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_container_changes",
+      "summary": "Filesystem changes of a container against its image.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerChanges",
+          "method": "GET",
+          "path": "/containers/{id}/changes",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container diff",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_diff.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-stats",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_container_stats",
+      "summary": "One-shot resource usage sample (stream=false, one-shot=true).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerStats",
+          "method": "GET",
+          "path": "/containers/{id}/stats",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container stats --no-stream",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_stats.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-file",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_container_file",
+      "summary": "Read a file/directory stat and content out of a container (HEAD + GET archive).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerArchiveInfo",
+          "method": "HEAD",
+          "path": "/containers/{id}/archive",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ContainerArchive",
+          "method": "GET",
+          "path": "/containers/{id}/archive",
+          "min_api": "1.20",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container cp (out of a container)",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_cp.md"
+        }
+      ],
+      "min_api": "1.20",
+      "status": "missing",
+      "existing": [],
+      "cli_only": false,
+      "collision": "Confusable with docker_container `upload` blocks (the write direction); also consider an action instead if large archives are expected."
+    },
+    {
+      "id": "engine:container-upload",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_container_upload",
+      "summary": "Copy files into an existing (running) container at any time, not only before first start.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "PutContainerArchive",
+          "method": "PUT",
+          "path": "/containers/{id}/archive",
+          "min_api": "1.20"
+        },
+        {
+          "type": "cli",
+          "command": "docker container cp",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_cp.md"
+        }
+      ],
+      "min_api": "1.20",
+      "status": "partial",
+      "existing": [
+        "docker_container (resource)"
+      ],
+      "status_note": "Only docker_container `upload` blocks (before first start) use PutContainerArchive.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-export",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_container_export",
+      "summary": "Export a container filesystem as a tar.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerExport",
+          "method": "GET",
+          "path": "/containers/{id}/export",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container export",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_export.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "action.docker_container_export (action)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-start",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_container_start",
+      "summary": "Start a stopped container (docker_container starts it only at create via must_run).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerStart",
+          "method": "POST",
+          "path": "/containers/{id}/start",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container start",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_start.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-stop",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_container_stop",
+      "summary": "Stop a running container.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerStop",
+          "method": "POST",
+          "path": "/containers/{id}/stop",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container stop",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_stop.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-restart",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_container_restart",
+      "summary": "Restart a container.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerRestart",
+          "method": "POST",
+          "path": "/containers/{id}/restart",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container restart",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_restart.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-kill",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_container_kill",
+      "summary": "Send a signal (default SIGKILL) to a container.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerKill",
+          "method": "POST",
+          "path": "/containers/{id}/kill",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container kill",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_kill.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-pause",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_container_pause",
+      "summary": "Freeze all processes of a container.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerPause",
+          "method": "POST",
+          "path": "/containers/{id}/pause",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container pause",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_pause.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-unpause",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_container_unpause",
+      "summary": "Resume a paused container.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerUnpause",
+          "method": "POST",
+          "path": "/containers/{id}/unpause",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container unpause",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_unpause.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-wait",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_container_wait",
+      "summary": "Block until a container reaches a condition (not-running/next-exit/removed) and report its exit code.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerWait",
+          "method": "POST",
+          "path": "/containers/{id}/wait",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container wait",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_wait.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:container-prune",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_container_prune",
+      "summary": "Remove stopped containers.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerPrune",
+          "method": "POST",
+          "path": "/containers/prune",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container prune",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_prune.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "partial",
+      "existing": [
+        "action.docker_system_prune (action)"
+      ],
+      "status_note": "Only through docker_system_prune with containers=true (and other kinds switched off); no dedicated action.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:exec",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_exec",
+      "summary": "Run a command inside a running container.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerExec",
+          "method": "POST",
+          "path": "/containers/{id}/exec",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ExecStart",
+          "method": "POST",
+          "path": "/exec/{id}/start",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ExecInspect",
+          "method": "GET",
+          "path": "/exec/{id}/json",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container exec",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_exec.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "action.docker_exec (action)",
+        "ephemeral.docker_exec_output (ephemeral resource)"
+      ],
+      "status_note": "ephemeral docker_exec_output uses the same three ops to return stdout as an ephemeral value.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:image",
+      "layer": "engine",
+      "kind": "resource",
+      "name": "docker_image",
+      "update": "replace",
+      "summary": "Local image: pull (ImageCreate fromImage) or build, inspect, remove.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageCreate",
+          "method": "POST",
+          "path": "/images/create",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ImageBuild",
+          "method": "POST",
+          "path": "/build",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ImageInspect",
+          "method": "GET",
+          "path": "/images/{name}/json"
+        },
+        {
+          "type": "swagger",
+          "operationId": "ImageDelete",
+          "method": "DELETE",
+          "path": "/images/{name}",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker image pull",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_pull.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker image build",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_build.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker image rm",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_rm.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_image (resource)",
+        "list.docker_image (list resource)"
+      ],
+      "status_note": "ImageCreate fromSrc (import) lives in action docker_image_import.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:image-build",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_image_build",
+      "summary": "One-shot image build without a managed image object (e.g. build-and-push pipelines).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageBuild",
+          "method": "POST",
+          "path": "/build"
+        },
+        {
+          "type": "cli",
+          "command": "docker image build",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_build.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker build",
+          "file": "upstream/docker-cli/docs/reference/commandline/build.md"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_image (resource)"
+      ],
+      "status_note": "Builds exist only as the docker_image `build` block (legacy builder and BuildKit via /session).",
+      "cli_only": false,
+      "collision": "Confusable with docker_image (resource whose `build` block already calls ImageBuild) and with docker_buildx_builder."
+    },
+    {
+      "id": "engine:image-data",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_image",
+      "summary": "Inspect a local image.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageInspect",
+          "method": "GET",
+          "path": "/images/{name}/json",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker image inspect",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_inspect.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "data.docker_image (data source)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:images",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_images",
+      "summary": "List local images with filters.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageList",
+          "method": "GET",
+          "path": "/images/json",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker image ls",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_ls.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker images",
+          "file": "upstream/docker-cli/docs/reference/commandline/images.md"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "list.docker_image (list resource)"
+      ],
+      "status_note": "Only as a list resource for `terraform query`; no plural data source.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:image-history",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_image_history",
+      "summary": "Layer history of a local image.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageHistory",
+          "method": "GET",
+          "path": "/images/{name}/history",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker image history",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_history.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:image-attestations",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_image_attestations",
+      "summary": "In-toto attestations (SBOM, provenance) stored with a local image.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageAttestations",
+          "method": "GET",
+          "path": "/images/{name}/attestations",
+          "min_api": "1.55",
+          "primary": true
+        }
+      ],
+      "min_api": "1.55",
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:image-search",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_image_search",
+      "summary": "Search Docker Hub through the daemon.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageSearch",
+          "method": "GET",
+          "path": "/images/search",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker search",
+          "file": "upstream/docker-cli/docs/reference/commandline/search.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:tag",
+      "layer": "engine",
+      "kind": "resource",
+      "name": "docker_tag",
+      "update": "replace",
+      "summary": "Tag a local image with an extra reference.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageTag",
+          "method": "POST",
+          "path": "/images/{name}/tag",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker image tag",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_tag.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_tag (resource)"
+      ],
+      "status_note": "Untag on destroy reuses ImageDelete (primary home engine:image).",
+      "cli_only": false
+    },
+    {
+      "id": "engine:registry-image",
+      "layer": "engine",
+      "kind": "resource",
+      "name": "docker_registry_image",
+      "update": "replace",
+      "summary": "Push a local image to a registry and track its digest.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImagePush",
+          "method": "POST",
+          "path": "/images/{name}/push",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "DistributionInspect",
+          "method": "GET",
+          "path": "/distribution/{name}/json",
+          "min_api": "1.30"
+        },
+        {
+          "type": "cli",
+          "command": "docker image push",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_push.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_registry_image (resource)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:registry-image-data",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_registry_image",
+      "summary": "Resolve an image reference's digest and platforms from the registry via the daemon.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "DistributionInspect",
+          "method": "GET",
+          "path": "/distribution/{name}/json",
+          "min_api": "1.30",
+          "primary": true
+        }
+      ],
+      "min_api": "1.30",
+      "status": "exists",
+      "existing": [
+        "data.docker_registry_image (data source)"
+      ],
+      "status_note": "No docker CLI command calls this endpoint directly (docker manifest/buildx imagetools talk to the registry client-side).",
+      "cli_only": false
+    },
+    {
+      "id": "engine:image-commit",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_image_commit",
+      "summary": "Create an image from a container's changes.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageCommit",
+          "method": "POST",
+          "path": "/commit",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container commit",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_commit.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:image-save",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_image_save",
+      "summary": "Export one or more images to a tar.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageGet",
+          "method": "GET",
+          "path": "/images/{name}/get",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ImageGetAll",
+          "method": "GET",
+          "path": "/images/get",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker image save",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_save.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "action.docker_image_save (action)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:image-load",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_image_load",
+      "summary": "Load images from a tar.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageLoad",
+          "method": "POST",
+          "path": "/images/load",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker image load",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_load.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "action.docker_image_load (action)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:image-import",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_image_import",
+      "summary": "Create an image from a filesystem tarball (ImageCreate fromSrc).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImageCreate",
+          "method": "POST",
+          "path": "/images/create"
+        },
+        {
+          "type": "cli",
+          "command": "docker image import",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_import.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "action.docker_image_import (action)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:image-prune",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_image_prune",
+      "summary": "Remove dangling or unused images.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ImagePrune",
+          "method": "POST",
+          "path": "/images/prune",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker image prune",
+          "file": "upstream/docker-cli/docs/reference/commandline/image_prune.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "exists",
+      "existing": [
+        "action.docker_image_prune (action)",
+        "action.docker_system_prune (action)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:build-prune",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_builder_prune",
+      "summary": "Remove build cache.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "BuildPrune",
+          "method": "POST",
+          "path": "/build/prune",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker builder prune",
+          "file": "upstream/docker-cli/docs/reference/commandline/builder_prune.md"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "action.docker_system_prune (action)"
+      ],
+      "status_note": "Only through docker_system_prune build_cache=true; no dedicated action with keep/reserved-space options.",
+      "cli_only": false,
+      "collision": "docker_builder_prune (Engine build cache) is easy to confuse with docker_buildx_builder (a BuildKit builder container); docker_build_cache_prune avoids it."
+    },
+    {
+      "id": "engine:registry-auth",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_registry_auth",
+      "summary": "Validate registry credentials through the daemon and return an identity token when the registry issues one.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SystemAuth",
+          "method": "POST",
+          "path": "/auth",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker login",
+          "file": "upstream/docker-cli/docs/reference/commandline/login.md"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "ephemeral.docker_registry_token (ephemeral resource)"
+      ],
+      "status_note": "docker_registry_token gets a bearer token straight from the registry; nothing calls /auth. Should be ephemeral (returns a secret), which this schema has no kind for.",
+      "cli_only": false,
+      "collision": "Confusable with ephemeral docker_registry_token and with provider registry_auth blocks."
+    },
+    {
+      "id": "engine:info",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_info",
+      "summary": "Daemon and host information (docker info).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SystemInfo",
+          "method": "GET",
+          "path": "/info",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker system info",
+          "file": "upstream/docker-cli/docs/reference/commandline/system_info.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker info",
+          "file": "upstream/docker-cli/docs/reference/commandline/info.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "Provider calls Info internally (swarm state, OS) but exposes no data source.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:version",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_version",
+      "summary": "Engine version, API version and components.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SystemVersion",
+          "method": "GET",
+          "path": "/version",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker version",
+          "file": "upstream/docker-cli/docs/reference/commandline/version.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:system-df",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_system_df",
+      "summary": "Disk usage by images, containers, volumes and build cache.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SystemDataUsage",
+          "method": "GET",
+          "path": "/system/df",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker system df",
+          "file": "upstream/docker-cli/docs/reference/commandline/system_df.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:events",
+      "layer": "engine",
+      "kind": "skip",
+      "name": null,
+      "summary": "Daemon event stream.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SystemEvents",
+          "method": "GET",
+          "path": "/events",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker system events",
+          "file": "upstream/docker-cli/docs/reference/commandline/system_events.md"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": false,
+      "skip_reason": "Unbounded streaming endpoint; no Terraform lifecycle fits (a bounded since/until snapshot data source is possible later)."
+    },
+    {
+      "id": "engine:ping",
+      "layer": "engine",
+      "kind": "skip",
+      "name": null,
+      "summary": "Daemon liveness and API version negotiation.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SystemPing",
+          "method": "GET",
+          "path": "/_ping",
+          "min_api": "1.11",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "SystemPingHead",
+          "method": "HEAD",
+          "path": "/_ping",
+          "min_api": "1.40",
+          "primary": true
+        }
+      ],
+      "min_api": "1.11",
+      "status": "n/a",
+      "existing": [],
+      "cli_only": false,
+      "skip_reason": "Used internally by provider configure for API version negotiation; no user-facing object."
+    },
+    {
+      "id": "engine:attach",
+      "layer": "engine",
+      "kind": "skip",
+      "name": null,
+      "summary": "Attach to a container's stdio.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerAttach",
+          "method": "POST",
+          "path": "/containers/{id}/attach",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ContainerAttachWebsocket",
+          "method": "GET",
+          "path": "/containers/{id}/attach/ws",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker container attach",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_attach.md"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": false,
+      "skip_reason": "Interactive hijacked/websocket stream."
+    },
+    {
+      "id": "engine:resize",
+      "layer": "engine",
+      "kind": "skip",
+      "name": null,
+      "summary": "Resize a container or exec TTY.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerResize",
+          "method": "POST",
+          "path": "/containers/{id}/resize",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ExecResize",
+          "method": "POST",
+          "path": "/exec/{id}/resize",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": false,
+      "skip_reason": "Only meaningful for an interactive TTY session."
+    },
+    {
+      "id": "engine:session",
+      "layer": "engine",
+      "kind": "skip",
+      "name": null,
+      "summary": "Hijacked gRPC session for BuildKit.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "Session",
+          "method": "POST",
+          "path": "/session",
+          "min_api": "1.31",
+          "primary": true
+        }
+      ],
+      "min_api": "1.31",
+      "status": "n/a",
+      "existing": [],
+      "cli_only": false,
+      "skip_reason": "Deprecated (API 1.53) transport; used internally by the docker_image BuildKit build path, not a user-facing object."
+    },
+    {
+      "id": "engine:volume",
+      "layer": "engine",
+      "kind": "resource",
+      "name": "docker_volume",
+      "update": "in_place",
+      "summary": "Named volume: create, inspect, remove; cluster (CSI) volumes update in place.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "VolumeCreate",
+          "method": "POST",
+          "path": "/volumes/create",
+          "min_api": "1.21",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "VolumeInspect",
+          "method": "GET",
+          "path": "/volumes/{name}",
+          "min_api": "1.21"
+        },
+        {
+          "type": "swagger",
+          "operationId": "VolumeUpdate",
+          "method": "PUT",
+          "path": "/volumes/{name}",
+          "min_api": "1.42",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "VolumeDelete",
+          "method": "DELETE",
+          "path": "/volumes/{name}",
+          "min_api": "1.21",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker volume create",
+          "file": "upstream/docker-cli/docs/reference/commandline/volume_create.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker volume update",
+          "file": "upstream/docker-cli/docs/reference/commandline/volume_update.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker volume rm",
+          "file": "upstream/docker-cli/docs/reference/commandline/volume_rm.md"
+        }
+      ],
+      "min_api": "1.21",
+      "status": "partial",
+      "existing": [
+        "docker_volume (resource)",
+        "list.docker_volume (list resource)"
+      ],
+      "status_note": "Local volumes complete; no ClusterVolumeSpec (swarm CSI volumes) and VolumeUpdate (1.42, cluster volumes only) is unused.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:volume-data",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_volume",
+      "summary": "Inspect a volume.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "VolumeInspect",
+          "method": "GET",
+          "path": "/volumes/{name}",
+          "min_api": "1.21",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker volume inspect",
+          "file": "upstream/docker-cli/docs/reference/commandline/volume_inspect.md"
+        }
+      ],
+      "min_api": "1.21",
+      "status": "exists",
+      "existing": [
+        "data.docker_volume (data source)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:volumes",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_volumes",
+      "summary": "List volumes with filters.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "VolumeList",
+          "method": "GET",
+          "path": "/volumes",
+          "min_api": "1.21",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker volume ls",
+          "file": "upstream/docker-cli/docs/reference/commandline/volume_ls.md"
+        }
+      ],
+      "min_api": "1.21",
+      "status": "partial",
+      "existing": [
+        "list.docker_volume (list resource)"
+      ],
+      "status_note": "Only as a list resource; no plural data source.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:volume-prune",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_volume_prune",
+      "summary": "Remove unused volumes.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "VolumePrune",
+          "method": "POST",
+          "path": "/volumes/prune",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker volume prune",
+          "file": "upstream/docker-cli/docs/reference/commandline/volume_prune.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "partial",
+      "existing": [
+        "action.docker_system_prune (action)"
+      ],
+      "status_note": "Only through docker_system_prune volumes=true.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:network",
+      "layer": "engine",
+      "kind": "resource",
+      "name": "docker_network",
+      "update": "replace",
+      "summary": "Network: create, inspect, remove (all settings force replacement).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NetworkCreate",
+          "method": "POST",
+          "path": "/networks/create",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "NetworkInspect",
+          "method": "GET",
+          "path": "/networks/{id}"
+        },
+        {
+          "type": "swagger",
+          "operationId": "NetworkDelete",
+          "method": "DELETE",
+          "path": "/networks/{id}",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker network create",
+          "file": "upstream/docker-cli/docs/reference/commandline/network_create.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker network rm",
+          "file": "upstream/docker-cli/docs/reference/commandline/network_rm.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_network (resource)",
+        "list.docker_network (list resource)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:network-data",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_network",
+      "summary": "Inspect a network.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NetworkInspect",
+          "method": "GET",
+          "path": "/networks/{id}",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker network inspect",
+          "file": "upstream/docker-cli/docs/reference/commandline/network_inspect.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "data.docker_network (data source)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:networks",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_networks",
+      "summary": "List networks with filters.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NetworkList",
+          "method": "GET",
+          "path": "/networks",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker network ls",
+          "file": "upstream/docker-cli/docs/reference/commandline/network_ls.md"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "list.docker_network (list resource)"
+      ],
+      "status_note": "Only as a list resource; no plural data source.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:network-attachment",
+      "layer": "engine",
+      "kind": "resource",
+      "name": "docker_network_attachment",
+      "update": "replace",
+      "summary": "Connect an existing container to a network (create) and disconnect it (destroy), independent of the container's lifecycle.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NetworkConnect",
+          "method": "POST",
+          "path": "/networks/{id}/connect",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "NetworkDisconnect",
+          "method": "POST",
+          "path": "/networks/{id}/disconnect",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker network connect",
+          "file": "upstream/docker-cli/docs/reference/commandline/network_connect.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker network disconnect",
+          "file": "upstream/docker-cli/docs/reference/commandline/network_disconnect.md"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_container (resource)"
+      ],
+      "status_note": "docker_container connects its `networks` at create only; NetworkDisconnect is never called and there is no standalone attachment.",
+      "cli_only": false,
+      "collision": "Overlaps docker_container `networks`; managing the same pair in both would fight."
+    },
+    {
+      "id": "engine:network-prune",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_network_prune",
+      "summary": "Remove unused networks.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NetworkPrune",
+          "method": "POST",
+          "path": "/networks/prune",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker network prune",
+          "file": "upstream/docker-cli/docs/reference/commandline/network_prune.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "partial",
+      "existing": [
+        "action.docker_system_prune (action)"
+      ],
+      "status_note": "Only through docker_system_prune networks=true.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:plugin",
+      "layer": "engine",
+      "kind": "resource",
+      "name": "docker_plugin",
+      "update": "in_place",
+      "summary": "Managed plugin: privileges + pull (install), enable/disable, set settings, upgrade, remove.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "GetPluginPrivileges",
+          "method": "GET",
+          "path": "/plugins/privileges",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "PluginPull",
+          "method": "POST",
+          "path": "/plugins/pull",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "PluginInspect",
+          "method": "GET",
+          "path": "/plugins/{name}/json",
+          "min_api": "1.25"
+        },
+        {
+          "type": "swagger",
+          "operationId": "PluginEnable",
+          "method": "POST",
+          "path": "/plugins/{name}/enable",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "PluginDisable",
+          "method": "POST",
+          "path": "/plugins/{name}/disable",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "PluginSet",
+          "method": "POST",
+          "path": "/plugins/{name}/set",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "PluginUpgrade",
+          "method": "POST",
+          "path": "/plugins/{name}/upgrade",
+          "min_api": "1.26",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "PluginDelete",
+          "method": "DELETE",
+          "path": "/plugins/{name}",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker plugin install",
+          "file": "upstream/docker-cli/docs/reference/commandline/plugin_install.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker plugin enable",
+          "file": "upstream/docker-cli/docs/reference/commandline/plugin_enable.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker plugin disable",
+          "file": "upstream/docker-cli/docs/reference/commandline/plugin_disable.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker plugin set",
+          "file": "upstream/docker-cli/docs/reference/commandline/plugin_set.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker plugin upgrade",
+          "file": "upstream/docker-cli/docs/reference/commandline/plugin_upgrade.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker plugin rm",
+          "file": "upstream/docker-cli/docs/reference/commandline/plugin_rm.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "partial",
+      "existing": [
+        "docker_plugin (resource)"
+      ],
+      "status_note": "PluginUpgrade (1.26) is never used: a changed remote reference forces replacement instead of an in-place upgrade.",
+      "cli_only": false
+    },
+    {
+      "id": "engine:plugin-data",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_plugin",
+      "summary": "Inspect an installed plugin.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "PluginInspect",
+          "method": "GET",
+          "path": "/plugins/{name}/json",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker plugin inspect",
+          "file": "upstream/docker-cli/docs/reference/commandline/plugin_inspect.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "exists",
+      "existing": [
+        "data.docker_plugin (data source)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "engine:plugins",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_plugins",
+      "summary": "List installed plugins.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "PluginList",
+          "method": "GET",
+          "path": "/plugins",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker plugin ls",
+          "file": "upstream/docker-cli/docs/reference/commandline/plugin_ls.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "engine:plugin-create",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_plugin_create",
+      "summary": "Create a plugin from a rootfs + config.json tarball.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "PluginCreate",
+          "method": "POST",
+          "path": "/plugins/create",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker plugin create",
+          "file": "upstream/docker-cli/docs/reference/commandline/plugin_create.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "missing",
+      "existing": [],
+      "cli_only": false,
+      "collision": "Confusable with docker_plugin (install from a registry). PluginCreate has a delete counterpart, so it could also be a resource."
+    },
+    {
+      "id": "engine:plugin-push",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_plugin_push",
+      "summary": "Push a locally created plugin to a registry.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "PluginPush",
+          "method": "POST",
+          "path": "/plugins/{name}/push",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker plugin push",
+          "file": "upstream/docker-cli/docs/reference/commandline/plugin_push.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:swarm-init",
+      "layer": "swarm",
+      "kind": "resource",
+      "name": "docker_swarm_init",
+      "update": "in_place",
+      "summary": "Initialise a swarm on the provider host; update spec (autolock, CA, raft, dispatcher) in place; read the unlock key; leave on destroy.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SwarmInit",
+          "method": "POST",
+          "path": "/swarm/init",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "SwarmInspect",
+          "method": "GET",
+          "path": "/swarm"
+        },
+        {
+          "type": "swagger",
+          "operationId": "SwarmUpdate",
+          "method": "POST",
+          "path": "/swarm/update",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "SwarmUnlockkey",
+          "method": "GET",
+          "path": "/swarm/unlockkey",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "SwarmLeave",
+          "method": "POST",
+          "path": "/swarm/leave"
+        },
+        {
+          "type": "cli",
+          "command": "docker swarm init",
+          "file": "upstream/docker-cli/docs/reference/commandline/swarm_init.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker swarm update",
+          "file": "upstream/docker-cli/docs/reference/commandline/swarm_update.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker swarm unlock-key",
+          "file": "upstream/docker-cli/docs/reference/commandline/swarm_unlock-key.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_swarm_init (resource)"
+      ],
+      "status_note": "SwarmUpdate is used for autolock in place; other spec fields' in-place coverage not audited here.",
+      "cli_only": false
+    },
+    {
+      "id": "swarm:swarm-data",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_swarm",
+      "summary": "Inspect the swarm (ID, spec, join tokens, CA, data path port).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SwarmInspect",
+          "method": "GET",
+          "path": "/swarm",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker swarm join-token",
+          "file": "upstream/docker-cli/docs/reference/commandline/swarm_join-token.md"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "data.docker_swarm_tokens (data source)",
+        "ephemeral.docker_swarm_tokens (ephemeral resource)"
+      ],
+      "status_note": "Only join tokens and ID are exposed; spec/CA/TLS info has no data source.",
+      "cli_only": false
+    },
+    {
+      "id": "swarm:swarm-node",
+      "layer": "swarm",
+      "kind": "resource",
+      "name": "docker_swarm_node",
+      "update": "in_place",
+      "summary": "Join a host to the swarm (via its own daemon), manage its role/availability/labels through the manager, leave and remove on destroy.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SwarmJoin",
+          "method": "POST",
+          "path": "/swarm/join",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "SwarmLeave",
+          "method": "POST",
+          "path": "/swarm/leave",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "NodeUpdate",
+          "method": "POST",
+          "path": "/nodes/{id}/update",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "NodeInspect",
+          "method": "GET",
+          "path": "/nodes/{id}"
+        },
+        {
+          "type": "swagger",
+          "operationId": "NodeDelete",
+          "method": "DELETE",
+          "path": "/nodes/{id}",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker swarm join",
+          "file": "upstream/docker-cli/docs/reference/commandline/swarm_join.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker swarm leave",
+          "file": "upstream/docker-cli/docs/reference/commandline/swarm_leave.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker node update",
+          "file": "upstream/docker-cli/docs/reference/commandline/node_update.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker node rm",
+          "file": "upstream/docker-cli/docs/reference/commandline/node_rm.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_swarm_node (resource)",
+        "list.docker_swarm_node (list resource)"
+      ],
+      "cli_only": false,
+      "collision": "docker_swarm_node is a *join* resource; a user expecting it to manage an already-joined node (labels/availability only, NodeUpdate) would need a separate type, e.g. docker_node."
+    },
+    {
+      "id": "swarm:swarm-unlock",
+      "layer": "swarm",
+      "kind": "action",
+      "name": "docker_swarm_unlock",
+      "summary": "Unlock a locked (autolock) manager after a daemon restart.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SwarmUnlock",
+          "method": "POST",
+          "path": "/swarm/unlock",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker swarm unlock",
+          "file": "upstream/docker-cli/docs/reference/commandline/swarm_unlock.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "docker_swarm_init only detects the locked state and asks the user to unlock.",
+      "cli_only": false
+    },
+    {
+      "id": "swarm:swarm-rotate-tokens",
+      "layer": "swarm",
+      "kind": "action",
+      "name": "docker_swarm_rotate_tokens",
+      "summary": "Rotate worker/manager join tokens.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SwarmUpdate",
+          "method": "POST",
+          "path": "/swarm/update"
+        },
+        {
+          "type": "cli",
+          "command": "docker swarm join-token --rotate",
+          "file": "upstream/docker-cli/docs/reference/commandline/swarm_join-token.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "action.docker_swarm_rotate_tokens (action)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:swarm-rotate-unlock-key",
+      "layer": "swarm",
+      "kind": "action",
+      "name": "docker_swarm_rotate_unlock_key",
+      "summary": "Rotate the manager unlock key.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SwarmUpdate",
+          "method": "POST",
+          "path": "/swarm/update"
+        },
+        {
+          "type": "cli",
+          "command": "docker swarm unlock-key --rotate",
+          "file": "upstream/docker-cli/docs/reference/commandline/swarm_unlock-key.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:swarm-ca-rotate",
+      "layer": "swarm",
+      "kind": "action",
+      "name": "docker_swarm_ca_rotate",
+      "summary": "Rotate the swarm root CA (or install an external one).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SwarmUpdate",
+          "method": "POST",
+          "path": "/swarm/update"
+        },
+        {
+          "type": "cli",
+          "command": "docker swarm ca --rotate",
+          "file": "upstream/docker-cli/docs/reference/commandline/swarm_ca.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:node-data",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_node",
+      "summary": "Inspect a swarm node.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NodeInspect",
+          "method": "GET",
+          "path": "/nodes/{id}",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker node inspect",
+          "file": "upstream/docker-cli/docs/reference/commandline/node_inspect.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "data.docker_node (data source)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:nodes",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_nodes",
+      "summary": "List swarm nodes.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NodeList",
+          "method": "GET",
+          "path": "/nodes",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker node ls",
+          "file": "upstream/docker-cli/docs/reference/commandline/node_ls.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "data.docker_nodes (data source)",
+        "list.docker_swarm_node (list resource)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:node-drain",
+      "layer": "swarm",
+      "kind": "action",
+      "name": "docker_node_drain",
+      "summary": "Set a node's availability to drain.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NodeUpdate",
+          "method": "POST",
+          "path": "/nodes/{id}/update"
+        },
+        {
+          "type": "cli",
+          "command": "docker node update --availability drain",
+          "file": "upstream/docker-cli/docs/reference/commandline/node_update.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "action.docker_node_drain (action)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:node-activate",
+      "layer": "swarm",
+      "kind": "action",
+      "name": "docker_node_activate",
+      "summary": "Set a node's availability to active.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NodeUpdate",
+          "method": "POST",
+          "path": "/nodes/{id}/update"
+        },
+        {
+          "type": "cli",
+          "command": "docker node update --availability active",
+          "file": "upstream/docker-cli/docs/reference/commandline/node_update.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "action.docker_node_activate (action)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:node-promote",
+      "layer": "swarm",
+      "kind": "action",
+      "name": "docker_node_promote",
+      "summary": "Promote a worker to manager.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NodeUpdate",
+          "method": "POST",
+          "path": "/nodes/{id}/update"
+        },
+        {
+          "type": "cli",
+          "command": "docker node promote",
+          "file": "upstream/docker-cli/docs/reference/commandline/node_promote.md"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_swarm_node (resource)"
+      ],
+      "status_note": "Only as docker_swarm_node `role` for nodes Terraform joined; no imperative action.",
+      "cli_only": false
+    },
+    {
+      "id": "swarm:node-demote",
+      "layer": "swarm",
+      "kind": "action",
+      "name": "docker_node_demote",
+      "summary": "Demote a manager to worker.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NodeUpdate",
+          "method": "POST",
+          "path": "/nodes/{id}/update"
+        },
+        {
+          "type": "cli",
+          "command": "docker node demote",
+          "file": "upstream/docker-cli/docs/reference/commandline/node_demote.md"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_swarm_node (resource)"
+      ],
+      "status_note": "Only as docker_swarm_node `role` for nodes Terraform joined; no imperative action.",
+      "cli_only": false
+    },
+    {
+      "id": "swarm:service",
+      "layer": "swarm",
+      "kind": "resource",
+      "name": "docker_service",
+      "update": "in_place",
+      "summary": "Swarm service: create, update in place, remove.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ServiceCreate",
+          "method": "POST",
+          "path": "/services/create",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ServiceInspect",
+          "method": "GET",
+          "path": "/services/{id}"
+        },
+        {
+          "type": "swagger",
+          "operationId": "ServiceUpdate",
+          "method": "POST",
+          "path": "/services/{id}/update",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ServiceDelete",
+          "method": "DELETE",
+          "path": "/services/{id}",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker service create",
+          "file": "upstream/docker-cli/docs/reference/commandline/service_create.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker service update",
+          "file": "upstream/docker-cli/docs/reference/commandline/service_update.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker service rm",
+          "file": "upstream/docker-cli/docs/reference/commandline/service_rm.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_service (resource)",
+        "list.docker_service (list resource)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:service-data",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_service",
+      "summary": "Inspect one service.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ServiceInspect",
+          "method": "GET",
+          "path": "/services/{id}",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker service inspect",
+          "file": "upstream/docker-cli/docs/reference/commandline/service_inspect.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "Only the plural data.docker_services exists.",
+      "cli_only": false
+    },
+    {
+      "id": "swarm:services",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_services",
+      "summary": "List services.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ServiceList",
+          "method": "GET",
+          "path": "/services",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker service ls",
+          "file": "upstream/docker-cli/docs/reference/commandline/service_ls.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "data.docker_services (data source)",
+        "list.docker_service (list resource)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:service-logs",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_service_logs",
+      "summary": "Snapshot of a service's aggregated task logs.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ServiceLogs",
+          "method": "GET",
+          "path": "/services/{id}/logs",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker service logs",
+          "file": "upstream/docker-cli/docs/reference/commandline/service_logs.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false,
+      "collision": "Could instead extend data.docker_logs with a service_id/task_id argument."
+    },
+    {
+      "id": "swarm:service-scale",
+      "layer": "swarm",
+      "kind": "action",
+      "name": "docker_service_scale",
+      "summary": "Set replicas of a replicated service.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ServiceUpdate",
+          "method": "POST",
+          "path": "/services/{id}/update"
+        },
+        {
+          "type": "cli",
+          "command": "docker service scale",
+          "file": "upstream/docker-cli/docs/reference/commandline/service_scale.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "action.docker_service_scale (action)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:service-rollback",
+      "layer": "swarm",
+      "kind": "action",
+      "name": "docker_service_rollback",
+      "summary": "Roll a service back to its previous spec.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ServiceUpdate",
+          "method": "POST",
+          "path": "/services/{id}/update"
+        },
+        {
+          "type": "cli",
+          "command": "docker service rollback",
+          "file": "upstream/docker-cli/docs/reference/commandline/service_rollback.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "action.docker_service_rollback (action)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:service-force-update",
+      "layer": "swarm",
+      "kind": "action",
+      "name": "docker_service_force_update",
+      "summary": "Force a rolling restart of a service's tasks.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ServiceUpdate",
+          "method": "POST",
+          "path": "/services/{id}/update"
+        },
+        {
+          "type": "cli",
+          "command": "docker service update --force",
+          "file": "upstream/docker-cli/docs/reference/commandline/service_update.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "action.docker_service_force_update (action)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:tasks",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_tasks",
+      "summary": "List swarm tasks (filter by service, node, desired-state).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "TaskList",
+          "method": "GET",
+          "path": "/tasks",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker service ps",
+          "file": "upstream/docker-cli/docs/reference/commandline/service_ps.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker node ps",
+          "file": "upstream/docker-cli/docs/reference/commandline/node_ps.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker stack ps",
+          "file": "upstream/docker-cli/docs/reference/commandline/stack_ps.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "TaskList is used internally (service convergence, stack, actions) but not exposed.",
+      "cli_only": false
+    },
+    {
+      "id": "swarm:task-data",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_task",
+      "summary": "Inspect one swarm task.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "TaskInspect",
+          "method": "GET",
+          "path": "/tasks/{id}",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker inspect",
+          "file": "upstream/docker-cli/docs/reference/commandline/inspect.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:task-logs",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_task_logs",
+      "summary": "Snapshot of one task's logs.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "TaskLogs",
+          "method": "GET",
+          "path": "/tasks/{id}/logs",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker service logs <task-id>",
+          "file": "upstream/docker-cli/docs/reference/commandline/service_logs.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false,
+      "collision": "Could merge with docker_service_logs or data.docker_logs."
+    },
+    {
+      "id": "swarm:secret",
+      "layer": "swarm",
+      "kind": "resource",
+      "name": "docker_secret",
+      "update": "in_place",
+      "summary": "Swarm secret: create, remove; labels updatable in place via SecretUpdate.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SecretCreate",
+          "method": "POST",
+          "path": "/secrets/create",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "SecretInspect",
+          "method": "GET",
+          "path": "/secrets/{id}",
+          "min_api": "1.25"
+        },
+        {
+          "type": "swagger",
+          "operationId": "SecretUpdate",
+          "method": "POST",
+          "path": "/secrets/{id}/update",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "SecretDelete",
+          "method": "DELETE",
+          "path": "/secrets/{id}",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker secret create",
+          "file": "upstream/docker-cli/docs/reference/commandline/secret_create.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker secret rm",
+          "file": "upstream/docker-cli/docs/reference/commandline/secret_rm.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "exists",
+      "existing": [
+        "docker_secret (resource)",
+        "list.docker_secret (list resource)"
+      ],
+      "status_note": "SecretUpdate (labels only) is unused: label changes force replacement today.",
+      "cli_only": false
+    },
+    {
+      "id": "swarm:secret-data",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_secret",
+      "summary": "Inspect one secret's metadata.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SecretInspect",
+          "method": "GET",
+          "path": "/secrets/{id}",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker secret inspect",
+          "file": "upstream/docker-cli/docs/reference/commandline/secret_inspect.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "missing",
+      "existing": [],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:secrets",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_secrets",
+      "summary": "List secrets.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SecretList",
+          "method": "GET",
+          "path": "/secrets",
+          "min_api": "1.25",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker secret ls",
+          "file": "upstream/docker-cli/docs/reference/commandline/secret_ls.md"
+        }
+      ],
+      "min_api": "1.25",
+      "status": "exists",
+      "existing": [
+        "data.docker_secrets (data source)",
+        "list.docker_secret (list resource)"
+      ],
+      "cli_only": false
+    },
+    {
+      "id": "swarm:config",
+      "layer": "swarm",
+      "kind": "resource",
+      "name": "docker_config",
+      "update": "in_place",
+      "summary": "Swarm config: create, remove; labels updatable in place via ConfigUpdate.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ConfigCreate",
+          "method": "POST",
+          "path": "/configs/create",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ConfigInspect",
+          "method": "GET",
+          "path": "/configs/{id}"
+        },
+        {
+          "type": "swagger",
+          "operationId": "ConfigUpdate",
+          "method": "POST",
+          "path": "/configs/{id}/update",
+          "primary": true
+        },
+        {
+          "type": "swagger",
+          "operationId": "ConfigDelete",
+          "method": "DELETE",
+          "path": "/configs/{id}",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker config create",
+          "file": "upstream/docker-cli/docs/reference/commandline/config_create.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker config rm",
+          "file": "upstream/docker-cli/docs/reference/commandline/config_rm.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_config (resource)",
+        "list.docker_config (list resource)"
+      ],
+      "status_note": "ConfigUpdate (labels only) is unused: label changes force replacement today.",
+      "cli_only": false,
+      "collision": "docker_config (swarm config object) vs compose top-level `configs` and the provider's own configuration block."
+    },
+    {
+      "id": "swarm:config-data",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_config",
+      "summary": "Inspect one swarm config.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ConfigInspect",
+          "method": "GET",
+          "path": "/configs/{id}",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker config inspect",
+          "file": "upstream/docker-cli/docs/reference/commandline/config_inspect.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": false,
+      "collision": "Same confusion as docker_config resource (swarm config vs compose configs)."
+    },
+    {
+      "id": "swarm:configs",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_configs",
+      "summary": "List swarm configs.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ConfigList",
+          "method": "GET",
+          "path": "/configs",
+          "primary": true
+        },
+        {
+          "type": "cli",
+          "command": "docker config ls",
+          "file": "upstream/docker-cli/docs/reference/commandline/config_ls.md"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "data.docker_configs (data source)",
+        "list.docker_config (list resource)"
+      ],
+      "cli_only": false
+    }
+  ]
+}

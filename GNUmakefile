@@ -4,9 +4,9 @@ GO ?= go
 SHELL := /bin/bash
 TFPLUGINDOCS := $(GO) run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
 
-# Windows without make: ./build.ps1 -Task <target> runs the same commands
-# (build, vet, test, docs, skill, check, testacc, e2e, fmt, install,
-# compose2stack -In/-Out/-Mode, parity).
+# Windows without make: Invoke-Build <Task> (terraform-provider-docker.build.ps1)
+# runs the same commands (Build, Vet, Test, Docs, GenSkill, Check, TestAcc, E2E,
+# Fmt, Install, Compose2Stack -In/-Out/-Mode, Parity, ApiWatch; Invoke-Build ? lists them).
 
 # compose2stack: make compose2stack IN=docker-compose.yml OUT=stack.tf MODE=swarm
 IN ?= docker-compose.yml

@@ -1,0 +1,1256 @@
+{
+  "lane": "Z4",
+  "notes": [
+    "Source: Dockerfile frontend 1.28.0 reference.md. syntax.md and experimental.md are redirect stubs ('This page has moved to reference.md'); no labs-only instructions or flags are documented in this snapshot, so no flag carries \"labs\": true.",
+    "min_syntax comes from the 'Minimum Dockerfile version' tables (RUN, ADD, COPY) and inline 'since Dockerfile v1.x' text; blank table cells (COPY --from, COPY/ADD --chown) get no min_syntax. Sub-option versions (secret env 1.10, chmod symbolic 1.14, SOURCE_DATE_EPOCH 1.5) are noted inside options.",
+    "RUN --device also needs BuildKit 0.20.0; HEALTHCHECK --start-interval needs Docker Engine 25.0; RUN --network=host, --security=insecure and --device need buildkitd entitlements (noted on the flag).",
+    "Shell form, exec form and heredoc are flag entries on the instructions that accept them; heredocs are documented for RUN and COPY only.",
+    "check directive flags = skip, error, then one flag per build-check rule (21 rules from rules/*.md; InvalidDefinitionDescription is experimental). Rule anchors are rules/<file>.md paths.",
+    "MAINTAINER kept as a dockerfile_block (not skip): it still parses in 1.28 and appears in existing Dockerfiles; status_note marks it deprecated.",
+    "Not itemised: .dockerignore (context-side file, not an instruction), environment replacement rules (cross-cutting syntax), comments.",
+    "All '#' anchors verified against GitHub-style slugs of reference.md headings by z4_gen.py; rules files verified to exist.",
+    "Status 'missing' for every block: the provider has no Dockerfile composer. Related: docker_image (resource) build block takes context + dockerfile path and builds via the Engine API / BuildKit session."
+  ],
+  "naming_questions": [
+    "Shape: (a) one type per instruction (docker_dockerfile_run, docker_dockerfile_from, ...) vs (b) a single data source data.docker_dockerfile with ordered nested blocks (stage { from, run, copy ... }) rendering Dockerfile text vs (c) a provider function. (b) recommended: ordering and stages fit nested blocks; 21 trivial types would bloat the registry.",
+    "Directives: docker_dockerfile_directive_syntax/escape/check types vs top-level attributes syntax, escape, check { skip = [...], error = bool } on data.docker_dockerfile (recommended).",
+    "Include MAINTAINER (deprecated) at all, or omit and steer users to LABEL org.opencontainers.image.authors?",
+    "ONBUILD: separate block nesting an instruction vs an `onbuild = true` attribute on each instruction block?",
+    "Stages: model FROM ... AS name as a `stage` block with `name` (recommended) rather than a FROM flag?",
+    "check rule names: validate against a pinned list (21 rules at frontend 1.28) or accept free strings?"
+  ],
+  "items": [
+    {
+      "id": "dockerfile:FROM",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_from",
+      "summary": "Start a build stage from a base image (or scratch / a previous stage).",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#from"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "--platform",
+          "options": [
+            "<os>/<arch>[/<variant>]",
+            "$BUILDPLATFORM",
+            "$TARGETPLATFORM"
+          ],
+          "anchor": "#from"
+        },
+        {
+          "name": "image",
+          "options": [
+            "<image>",
+            "<image>:<tag>",
+            "<image>@<digest>",
+            "scratch",
+            "<stage name>"
+          ],
+          "anchor": "#from"
+        },
+        {
+          "name": "AS name",
+          "options": [
+            "<stage name>"
+          ],
+          "anchor": "#from"
+        },
+        {
+          "name": "global ARG substitution",
+          "options": [
+            "ARG before first FROM"
+          ],
+          "anchor": "#understand-how-arg-and-from-interact"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:RUN",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_run",
+      "summary": "Execute a command at build time and commit the result as a new layer.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#run"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "shell form",
+          "options": [
+            "<command> ..."
+          ],
+          "anchor": "#shell-form"
+        },
+        {
+          "name": "exec form",
+          "options": [
+            "[\"<executable>\", \"<param>\", ...]"
+          ],
+          "anchor": "#exec-form"
+        },
+        {
+          "name": "heredoc",
+          "options": [
+            "<<EOF",
+            "<<-EOF (strip leading tabs)",
+            "<<\"EOF\" (no expansion)",
+            "multiple heredocs per instruction"
+          ],
+          "anchor": "#here-documents"
+        },
+        {
+          "name": "--device",
+          "options": [
+            "<cdi name>",
+            "vendor/device",
+            "vendor/device=name",
+            "vendor/device=*",
+            "<class>",
+            "required"
+          ],
+          "anchor": "#run---device",
+          "min_syntax": "dockerfile:1.27",
+          "note": "Needs BuildKit 0.20.0+ and the device entitlement."
+        },
+        {
+          "name": "--mount",
+          "options": [
+            "type=bind|cache|tmpfs|secret|ssh (default bind)"
+          ],
+          "anchor": "#run---mount",
+          "min_syntax": "dockerfile:1.2"
+        },
+        {
+          "name": "--mount=type=bind",
+          "options": [
+            "target|dst|destination (required)",
+            "source",
+            "from",
+            "rw|readwrite"
+          ],
+          "anchor": "#run---mounttypebind",
+          "min_syntax": "dockerfile:1.2"
+        },
+        {
+          "name": "--mount=type=cache",
+          "options": [
+            "id",
+            "target|dst|destination (required)",
+            "ro|readonly",
+            "sharing=shared|private|locked",
+            "from",
+            "source",
+            "mode (default 0755)",
+            "uid (default 0)",
+            "gid (default 0)"
+          ],
+          "anchor": "#run---mounttypecache",
+          "min_syntax": "dockerfile:1.2"
+        },
+        {
+          "name": "--mount=type=tmpfs",
+          "options": [
+            "target|dst|destination (required)",
+            "size"
+          ],
+          "anchor": "#run---mounttypetmpfs",
+          "min_syntax": "dockerfile:1.2"
+        },
+        {
+          "name": "--mount=type=secret",
+          "options": [
+            "id",
+            "target|dst|destination",
+            "env (Dockerfile 1.10)",
+            "required (default false)",
+            "mode (default 0400)",
+            "uid (default 0)",
+            "gid (default 0)"
+          ],
+          "anchor": "#run---mounttypesecret",
+          "min_syntax": "dockerfile:1.2"
+        },
+        {
+          "name": "--mount=type=ssh",
+          "options": [
+            "id (default \"default\")",
+            "target|dst|destination",
+            "required (default false)",
+            "mode (default 0600)",
+            "uid (default 0)",
+            "gid (default 0)"
+          ],
+          "anchor": "#run---mounttypessh",
+          "min_syntax": "dockerfile:1.2"
+        },
+        {
+          "name": "--network",
+          "options": [
+            "default",
+            "none",
+            "host"
+          ],
+          "anchor": "#run---network",
+          "min_syntax": "dockerfile:1.3"
+        },
+        {
+          "name": "--network=default",
+          "options": [],
+          "anchor": "#run---networkdefault",
+          "min_syntax": "dockerfile:1.3"
+        },
+        {
+          "name": "--network=none",
+          "options": [],
+          "anchor": "#run---networknone",
+          "min_syntax": "dockerfile:1.3"
+        },
+        {
+          "name": "--network=host",
+          "options": [],
+          "anchor": "#run---networkhost",
+          "min_syntax": "dockerfile:1.3",
+          "note": "Needs the network.host entitlement."
+        },
+        {
+          "name": "--security",
+          "options": [
+            "sandbox (default)",
+            "insecure"
+          ],
+          "anchor": "#run---security",
+          "min_syntax": "dockerfile:1.20",
+          "note": "insecure needs the security.insecure entitlement."
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:CMD",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_cmd",
+      "summary": "Set the default command (or default ENTRYPOINT arguments) for containers from the image.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#cmd"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "exec form",
+          "options": [
+            "[\"<executable>\", \"<param>\", ...]"
+          ],
+          "anchor": "#exec-form"
+        },
+        {
+          "name": "exec form (params to ENTRYPOINT)",
+          "options": [
+            "[\"<param>\", ...]"
+          ],
+          "anchor": "#cmd"
+        },
+        {
+          "name": "shell form",
+          "options": [
+            "<command> ..."
+          ],
+          "anchor": "#shell-form"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:LABEL",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_label",
+      "summary": "Add key=value metadata labels to the image.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#label"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "<key>=<value>",
+          "options": [
+            "repeatable",
+            "quoted values"
+          ],
+          "anchor": "#label"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:MAINTAINER",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_maintainer",
+      "summary": "Deprecated: set the image author field; use LABEL org.opencontainers.image.authors instead.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#maintainer-deprecated"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "Deprecated instruction (build check MaintainerDeprecated). Kept as a block for parse/round-trip completeness; a generator should emit LABEL org.opencontainers.image.authors instead. No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "<name>",
+          "options": [
+            "<name>"
+          ],
+          "anchor": "#maintainer-deprecated"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:EXPOSE",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_expose",
+      "summary": "Document the ports the container listens on.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#expose"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "<port>[/<protocol>]",
+          "options": [
+            "<port>",
+            "<port>/tcp (default)",
+            "<port>/udp",
+            "repeatable"
+          ],
+          "anchor": "#expose"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:ENV",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_env",
+      "summary": "Set environment variables for later instructions and the running container.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#env"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "<key>=<value>",
+          "options": [
+            "repeatable",
+            "quoted values",
+            "legacy ENV <key> <value> form"
+          ],
+          "anchor": "#env"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:ADD",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_add",
+      "summary": "Add files from the build context, a URL, or a Git repository (with optional unpacking) to the image.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#add"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "sources/destination",
+          "options": [
+            "<src> ... <dest>",
+            "[\"<src>\", ... \"<dest>\"] (paths with whitespace)",
+            "context path / pattern",
+            "local tar archive",
+            "URL",
+            "Git repository URL"
+          ],
+          "anchor": "#add"
+        },
+        {
+          "name": "--keep-git-dir",
+          "options": [
+            "true",
+            "false"
+          ],
+          "anchor": "#add---keep-git-dir",
+          "min_syntax": "dockerfile:1.1"
+        },
+        {
+          "name": "--checksum",
+          "options": [
+            "<git commit sha or prefix>",
+            "sha256:<hash>"
+          ],
+          "anchor": "#add---checksum",
+          "min_syntax": "dockerfile:1.6"
+        },
+        {
+          "name": "--chmod",
+          "options": [
+            "<octal perms>",
+            "symbolic notation (+x, u=rwX,go=rX, g=u) (Dockerfile 1.14)",
+            "$VAR"
+          ],
+          "anchor": "#add---chmod",
+          "min_syntax": "dockerfile:1.2"
+        },
+        {
+          "name": "--chown",
+          "options": [
+            "<user>",
+            "<user>:<group>",
+            "<uid>",
+            "<uid>:<gid>",
+            "<user>:"
+          ],
+          "anchor": "#add---chown"
+        },
+        {
+          "name": "--link",
+          "options": [
+            "true",
+            "false"
+          ],
+          "anchor": "#add---link",
+          "min_syntax": "dockerfile:1.4"
+        },
+        {
+          "name": "--unpack",
+          "options": [
+            "true",
+            "false"
+          ],
+          "anchor": "#add---unpack",
+          "min_syntax": "dockerfile:1.17"
+        },
+        {
+          "name": "--exclude",
+          "options": [
+            "<path pattern> (repeatable)"
+          ],
+          "anchor": "#add---exclude",
+          "min_syntax": "dockerfile:1.19"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:COPY",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_copy",
+      "summary": "Copy files from the build context, a build stage, a named context, or an image into the image.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#copy"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "sources/destination",
+          "options": [
+            "<src> ... <dest>",
+            "[\"<src>\", ... \"<dest>\"] (paths with whitespace)"
+          ],
+          "anchor": "#copy"
+        },
+        {
+          "name": "heredoc",
+          "options": [
+            "<<EOF",
+            "<<-EOF (strip leading tabs)",
+            "<<\"EOF\" (no expansion)",
+            "multiple heredocs per instruction"
+          ],
+          "anchor": "#here-documents"
+        },
+        {
+          "name": "--from",
+          "options": [
+            "<stage name>",
+            "<image>",
+            "<named context>"
+          ],
+          "anchor": "#copy---from"
+        },
+        {
+          "name": "--chmod",
+          "options": [
+            "<octal perms>",
+            "symbolic notation (+x, u=rwX,go=rX, g=u) (Dockerfile 1.14)",
+            "$VAR"
+          ],
+          "anchor": "#copy---chmod",
+          "min_syntax": "dockerfile:1.2"
+        },
+        {
+          "name": "--chown",
+          "options": [
+            "<user>",
+            "<user>:<group>",
+            "<uid>",
+            "<uid>:<gid>",
+            "<user>:"
+          ],
+          "anchor": "#copy---chown"
+        },
+        {
+          "name": "--link",
+          "options": [
+            "true",
+            "false"
+          ],
+          "anchor": "#copy---link",
+          "min_syntax": "dockerfile:1.4"
+        },
+        {
+          "name": "--parents",
+          "options": [
+            "true",
+            "false",
+            "./ pivot in source path"
+          ],
+          "anchor": "#copy---parents",
+          "min_syntax": "dockerfile:1.20"
+        },
+        {
+          "name": "--exclude",
+          "options": [
+            "<path pattern> (repeatable)"
+          ],
+          "anchor": "#copy---exclude",
+          "min_syntax": "dockerfile:1.19"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:ENTRYPOINT",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_entrypoint",
+      "summary": "Configure the executable the container runs.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#entrypoint"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "exec form",
+          "options": [
+            "[\"<executable>\", \"<param>\", ...]"
+          ],
+          "anchor": "#exec-form"
+        },
+        {
+          "name": "shell form",
+          "options": [
+            "<command> ..."
+          ],
+          "anchor": "#shell-form"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:VOLUME",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_volume",
+      "summary": "Declare mount points for externally mounted volumes.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#volume"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "paths",
+          "options": [
+            "[\"<path>\", ...] (JSON array)",
+            "<path> <path> ... (plain string)"
+          ],
+          "anchor": "#volume"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:USER",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_user",
+      "summary": "Set the user (and optionally group) for later instructions and the running container.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#user"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "user",
+          "options": [
+            "<user>[:<group>]",
+            "<UID>[:<GID>]"
+          ],
+          "anchor": "#user"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:WORKDIR",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_workdir",
+      "summary": "Set the working directory for later instructions and the running container.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#workdir"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "path",
+          "options": [
+            "<absolute path>",
+            "<relative path> (relative to previous WORKDIR)",
+            "$VAR"
+          ],
+          "anchor": "#workdir"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:ARG",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_arg",
+      "summary": "Declare build-time variables (with optional defaults).",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#arg"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "<name>[=<default>]",
+          "options": [
+            "repeatable"
+          ],
+          "anchor": "#arg"
+        },
+        {
+          "name": "predefined ARGs",
+          "options": [
+            "HTTP_PROXY",
+            "http_proxy",
+            "HTTPS_PROXY",
+            "https_proxy",
+            "FTP_PROXY",
+            "ftp_proxy",
+            "NO_PROXY",
+            "no_proxy",
+            "ALL_PROXY",
+            "all_proxy"
+          ],
+          "anchor": "#predefined-args"
+        },
+        {
+          "name": "automatic platform ARGs",
+          "options": [
+            "TARGETPLATFORM",
+            "TARGETOS",
+            "TARGETARCH",
+            "TARGETVARIANT",
+            "BUILDPLATFORM",
+            "BUILDOS",
+            "BUILDARCH",
+            "BUILDVARIANT"
+          ],
+          "anchor": "#automatic-platform-args-in-the-global-scope"
+        },
+        {
+          "name": "BuildKit built-in build args",
+          "options": [
+            "BUILDKIT_BUILD_NAME",
+            "BUILDKIT_CACHE_MOUNT_NS",
+            "BUILDKIT_CONTEXT_KEEP_GIT_DIR",
+            "BUILDKIT_GIT_ADVICE",
+            "BUILDKIT_INLINE_CACHE",
+            "BUILDKIT_MULTI_PLATFORM",
+            "BUILDKIT_SANDBOX_HOSTNAME",
+            "BUILDKIT_SYNTAX",
+            "SOURCE_DATE_EPOCH (Dockerfile 1.5, BuildKit 0.11)"
+          ],
+          "anchor": "#buildkit-built-in-build-args"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:ONBUILD",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_onbuild",
+      "summary": "Register a trigger instruction that runs when the image is used as a base for another build.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#onbuild"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "trigger",
+          "options": [
+            "<INSTRUCTION> (any except ONBUILD, FROM, MAINTAINER)"
+          ],
+          "anchor": "#onbuild"
+        },
+        {
+          "name": "trigger with --from / --mount from",
+          "options": [
+            "COPY --from=<stage|image|context>",
+            "RUN --mount=from=<...>"
+          ],
+          "anchor": "#copy-or-mount-from-stage-image-or-context",
+          "min_syntax": "dockerfile:1.11"
+        }
+      ],
+      "collision": "Nests another instruction block; could instead be an `onbuild` attribute on each docker_dockerfile_* block."
+    },
+    {
+      "id": "dockerfile:STOPSIGNAL",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_stopsignal",
+      "summary": "Set the signal sent to stop the container.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#stopsignal"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "signal",
+          "options": [
+            "SIG<NAME>",
+            "<unsigned number>"
+          ],
+          "anchor": "#stopsignal"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:HEALTHCHECK",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_healthcheck",
+      "summary": "Define (or disable with NONE) the container health check.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#healthcheck"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "CMD",
+          "options": [
+            "shell form command",
+            "exec form array"
+          ],
+          "anchor": "#healthcheck"
+        },
+        {
+          "name": "NONE",
+          "options": [],
+          "anchor": "#healthcheck"
+        },
+        {
+          "name": "--interval",
+          "options": [
+            "DURATION (default 30s)"
+          ],
+          "anchor": "#healthcheck"
+        },
+        {
+          "name": "--timeout",
+          "options": [
+            "DURATION (default 30s)"
+          ],
+          "anchor": "#healthcheck"
+        },
+        {
+          "name": "--start-period",
+          "options": [
+            "DURATION (default 0s)"
+          ],
+          "anchor": "#healthcheck"
+        },
+        {
+          "name": "--start-interval",
+          "options": [
+            "DURATION (default 5s)"
+          ],
+          "anchor": "#healthcheck",
+          "note": "Needs Docker Engine 25.0+."
+        },
+        {
+          "name": "--retries",
+          "options": [
+            "N (default 3)"
+          ],
+          "anchor": "#healthcheck"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:SHELL",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_shell",
+      "summary": "Override the default shell used by shell-form instructions.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#shell"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "exec form",
+          "options": [
+            "[\"executable\", \"parameters\"] (JSON array only)"
+          ],
+          "anchor": "#shell"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:directive-syntax",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_directive_syntax",
+      "summary": "Parser directive selecting the Dockerfile frontend image/version.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#syntax"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) builds from an existing Dockerfile file only.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "syntax",
+          "options": [
+            "docker/dockerfile:1",
+            "docker/dockerfile:1.x",
+            "<custom frontend image>"
+          ],
+          "anchor": "#syntax"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:directive-escape",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_directive_escape",
+      "summary": "Parser directive setting the escape character.",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#escape"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) builds from an existing Dockerfile file only.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "escape",
+          "options": [
+            "\\ (default)",
+            "`"
+          ],
+          "anchor": "#escape"
+        }
+      ]
+    },
+    {
+      "id": "dockerfile:directive-check",
+      "layer": "dockerfile",
+      "kind": "dockerfile_block",
+      "name": "docker_dockerfile_directive_check",
+      "summary": "Parser directive configuring build checks (skip list, error on warnings).",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+          "anchor": "#check"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/consistent-instruction-casing.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/copy-ignored-file.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/duplicate-stage-name.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/expose-invalid-format.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/expose-proto-casing.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/from-as-casing.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/from-platform-flag-const-disallowed.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/invalid-default-arg-in-from.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/invalid-definition-description.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/json-args-recommended.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/legacy-key-value-format.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/maintainer-deprecated.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/multiple-instructions-disallowed.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/no-empty-continuation.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/redundant-target-platform.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/reserved-stage-name.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/secrets-used-in-arg-or-env.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/stage-name-casing.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/undefined-arg-in-from.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/undefined-var.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/workdir-relative-path.md"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/dockerfile/frontend/dockerfile/docs/rules/_index.md"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "No Dockerfile composer in the provider; docker_image (resource) builds from an existing Dockerfile file only.",
+      "cli_only": false,
+      "flags": [
+        {
+          "name": "skip",
+          "options": [
+            "<check name>[,<check name>...]",
+            "all"
+          ],
+          "anchor": "#check",
+          "min_syntax": "dockerfile:1.8"
+        },
+        {
+          "name": "error",
+          "options": [
+            "true",
+            "false"
+          ],
+          "anchor": "#check",
+          "min_syntax": "dockerfile:1.8"
+        },
+        {
+          "name": "ConsistentInstructionCasing",
+          "options": [],
+          "anchor": "rules/consistent-instruction-casing.md"
+        },
+        {
+          "name": "CopyIgnoredFile",
+          "options": [],
+          "anchor": "rules/copy-ignored-file.md"
+        },
+        {
+          "name": "DuplicateStageName",
+          "options": [],
+          "anchor": "rules/duplicate-stage-name.md"
+        },
+        {
+          "name": "ExposeInvalidFormat",
+          "options": [],
+          "anchor": "rules/expose-invalid-format.md"
+        },
+        {
+          "name": "ExposeProtoCasing",
+          "options": [],
+          "anchor": "rules/expose-proto-casing.md"
+        },
+        {
+          "name": "FromAsCasing",
+          "options": [],
+          "anchor": "rules/from-as-casing.md"
+        },
+        {
+          "name": "FromPlatformFlagConstDisallowed",
+          "options": [],
+          "anchor": "rules/from-platform-flag-const-disallowed.md"
+        },
+        {
+          "name": "InvalidDefaultArgInFrom",
+          "options": [],
+          "anchor": "rules/invalid-default-arg-in-from.md"
+        },
+        {
+          "name": "InvalidDefinitionDescription",
+          "options": [],
+          "anchor": "rules/invalid-definition-description.md",
+          "experimental": true,
+          "note": "Experimental check, not enabled by default."
+        },
+        {
+          "name": "JSONArgsRecommended",
+          "options": [],
+          "anchor": "rules/json-args-recommended.md"
+        },
+        {
+          "name": "LegacyKeyValueFormat",
+          "options": [],
+          "anchor": "rules/legacy-key-value-format.md"
+        },
+        {
+          "name": "MaintainerDeprecated",
+          "options": [],
+          "anchor": "rules/maintainer-deprecated.md"
+        },
+        {
+          "name": "MultipleInstructionsDisallowed",
+          "options": [],
+          "anchor": "rules/multiple-instructions-disallowed.md"
+        },
+        {
+          "name": "NoEmptyContinuation",
+          "options": [],
+          "anchor": "rules/no-empty-continuation.md"
+        },
+        {
+          "name": "RedundantTargetPlatform",
+          "options": [],
+          "anchor": "rules/redundant-target-platform.md"
+        },
+        {
+          "name": "ReservedStageName",
+          "options": [],
+          "anchor": "rules/reserved-stage-name.md"
+        },
+        {
+          "name": "SecretsUsedInArgOrEnv",
+          "options": [],
+          "anchor": "rules/secrets-used-in-arg-or-env.md"
+        },
+        {
+          "name": "StageNameCasing",
+          "options": [],
+          "anchor": "rules/stage-name-casing.md"
+        },
+        {
+          "name": "UndefinedArgInFrom",
+          "options": [],
+          "anchor": "rules/undefined-arg-in-from.md"
+        },
+        {
+          "name": "UndefinedVar",
+          "options": [],
+          "anchor": "rules/undefined-var.md"
+        },
+        {
+          "name": "WorkdirRelativePath",
+          "options": [],
+          "anchor": "rules/workdir-relative-path.md"
+        }
+      ]
+    }
+  ]
+}

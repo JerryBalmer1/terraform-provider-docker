@@ -30,7 +30,7 @@ of the spec bytes, and the byte-exact copy under `tools/apiwatch/spec/`.
 ## How to run it
 
 ```
-pwsh -File build.ps1 -Task apiwatch          # or: make apiwatch / go run ./tools/apiwatch
+Invoke-Build ApiWatch                        # or: make apiwatch / go run ./tools/apiwatch
 go run ./tools/apiwatch -check               # what CI runs; exit 1 = newer spec published
 go run ./tools/apiwatch -from 1.51 -to 1.56  # any two versions (both downloaded)
 go run ./tools/apiwatch -todo -tag P5-0      # the same diff as BUILD_REPORT.md lines

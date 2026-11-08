@@ -136,12 +136,12 @@ From the repository root:
 # the image -> service chain (same as `make e2e`)
 pwsh -NoProfile -File test/harness/Invoke-E2E.ps1
 
-# every acceptance test, both passes (what build.ps1 -Task testacc runs)
+# every acceptance test, both passes (what Invoke-Build TestAcc runs)
 pwsh -NoProfile -File test/harness/Invoke-E2E.ps1 -Run TestAcc -Timeout 120m -Log test/harness/last-acc.log
 pwsh -NoProfile -File test/harness/Invoke-E2E.ps1 -SwarmInit -Run 'TestAcc(Service|Stack|Secret|DockerConfig|SwarmTokens|Node_|Nodes_|SwarmNode)' -Timeout 120m -Log test/harness/last-acc-swarm.log
 ```
 
-`build.ps1 -Task e2e` and `build.ps1 -Task testacc` at the repository root
+`Invoke-Build E2E` and `Invoke-Build TestAcc` at the repository root
 call this script with those arguments.
 
 Manual sequence (the harness stays up between runs):

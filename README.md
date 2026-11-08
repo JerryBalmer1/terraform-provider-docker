@@ -26,7 +26,7 @@ modifiers), write-only `*_wo` arguments, when to use actions, ephemeral
 resources, provider functions and list resources, and two worked examples:
 a cold start to a three-replica service across two nodes, and a compose file
 converted with `tools/compose2stack` into a `docker_stack` that is seeded and
-scaled with actions. `make skill` / `./build.ps1 -Task skill` regenerates it
+scaled with actions. `make skill` / `Invoke-Build GenSkill` regenerates it
 together with README_resources.md, and `docs` runs `skill` first.
 
 ## Migrating a compose file
@@ -37,12 +37,12 @@ the generated `.tf` is the source of truth afterwards:
 ```sh
 go run ./tools/compose2stack -in docker-compose.yml -out stack.tf -mode swarm
 make compose2stack IN=docker-compose.yml OUT=stack.tf MODE=swarm
-./build.ps1 -Task compose2stack -In docker-compose.yml -Out stack.tf -Mode swarm
+Invoke-Build Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm
 ```
 
 ## Parity with kreuzwerker/docker
 
-`go run ./tools/parity` (`make parity`, `./build.ps1 -Task parity`) prints
+`go run ./tools/parity` (`make parity`, `Invoke-Build Parity`) prints
 every kreuzwerker/docker v4.6.0 type and whether this provider has it, has it
 partially or is missing it, plus the types only this provider has. The list
 is maintained by hand in [tools/parity/parity.go](tools/parity/parity.go).
@@ -68,28 +68,36 @@ provider "docker" {
 }
 ```
 
-## Build on Windows (build.ps1)
+## Build on Windows (Invoke-Build)
 
-`make` is not needed on Windows. [build.ps1](build.ps1) (PowerShell 7) runs the
-same commands as the GNUmakefile from any working directory. Tasks run in the
-order given, comma separated:
+`make` is not needed on Windows.
+[terraform-provider-docker.build.ps1](terraform-provider-docker.build.ps1) is an
+[Invoke-Build](https://github.com/nightroman/Invoke-Build) script with the same
+commands as the GNUmakefile. Install the module once
+(`Install-Module InvokeBuild -Scope CurrentUser`), then run tasks from the
+repository root, comma separated:
 
 ```powershell
-./build.ps1                                   # build (default): provider binary in the repo root
-./build.ps1 -Task build,vet,test              # build, go vet, unit tests (no daemon)
-./build.ps1 -Task skill                       # regenerate the skill and README_resources.md
-./build.ps1 -Task docs                        # skill, then tfplugindocs generate + validate
-./build.ps1 -Task check                       # gofmt, vet, genskill -check, genskill -strict, tfplugindocs validate
-./build.ps1 -Task fmt                         # gofmt -w .
-./build.ps1 -Task install                     # go install (dev_overrides path)
-./build.ps1 -Task e2e                         # test/harness/Invoke-E2E.ps1: dind manager + 2 workers, TestAccE2E
-./build.ps1 -Task testacc                     # every TestAcc* against the same harness (60m timeout)
-./build.ps1 -Task parity                      # kreuzwerker v4.6.0 parity table
-./build.ps1 -Task compose2stack -In docker-compose.yml -Out stack.tf -Mode swarm
-pwsh -NoProfile -File build.ps1 -Task check   # from cmd.exe or another shell
+Invoke-Build ?                                # list every task with its synopsis
+Invoke-Build                                  # default: Build, Vet, Test, GenSkillCheck, InventoryCheck
+Invoke-Build Build, Vet, Test                 # build + provider binary, go vet, unit tests (-short, no daemon)
+Invoke-Build Tools                            # unit tests of tools/ only
+Invoke-Build GenSkill                         # regenerate the skill and README_resources.md
+Invoke-Build Docs                             # GenSkill, then tfplugindocs generate + validate
+Invoke-Build Check                            # gofmt, vet, genskill -check, genskill -strict, tfplugindocs validate
+Invoke-Build Fmt                              # gofmt -w .
+Invoke-Build Install                          # go install (dev_overrides path)
+Invoke-Build E2E                              # test/harness/Invoke-E2E.ps1: dind manager + 2 workers, TestAccE2E
+Invoke-Build TestAcc                          # every TestAcc* on the harness: plain pass, then -SwarmInit pass
+Invoke-Build Parity                           # kreuzwerker v4.6.0 parity table
+Invoke-Build ApiWatch                         # Engine API drift vs tools/apiwatch/pinned.json
+Invoke-Build Inventory                        # reference/inventory.json + INVENTORY.md from reference/_gen/fragments
+Invoke-Build ReferenceVerify                  # re-hash reference/upstream against the pinned upstream commits
+Invoke-Build Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm
+Invoke-Build Clean                            # provider binary, harness logs, ReferenceVerify cache
 ```
 
-`e2e` and `testacc` need Docker Desktop (or another Docker host) running with
+`E2E` and `TestAcc` need Docker Desktop (or another Docker host) running with
 privileged containers allowed; see [test/harness/README.md](test/harness/README.md).
 
 ## Build on Linux/macOS (make)

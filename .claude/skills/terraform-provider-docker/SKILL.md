@@ -590,8 +590,8 @@ secrets:
 ```
 
 Step 2, convert it (from the provider repository; `make compose2stack
-IN=docker-compose.yml OUT=stack.tf MODE=swarm` and `./build.ps1 -Task
-compose2stack -In docker-compose.yml -Out stack.tf -Mode swarm` run the same):
+IN=docker-compose.yml OUT=stack.tf MODE=swarm` and `Invoke-Build
+Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm` run the same):
 
 ```shell
 go run ./tools/compose2stack -in docker-compose.yml -out stack.tf -mode swarm

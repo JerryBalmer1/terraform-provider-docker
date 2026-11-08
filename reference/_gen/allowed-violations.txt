@@ -1,0 +1,4 @@
+# Outputs-contract violations that Invoke-Build InventoryValidate accepts (rules V1-V4, see SCHEMA.md / ../CONTRACT.md).
+# One per line: <item id><TAB><rule><TAB><reason>. Lines starting with # are ignored.
+# An entry that matches no current violation fails the check (STALE), so this list cannot drift.
+# Pass 4.5: lanes A-E proposed no entries; every item meets V1-V4.

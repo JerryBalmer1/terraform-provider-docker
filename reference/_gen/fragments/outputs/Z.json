@@ -1,0 +1,14 @@
+{
+  "lane": "Z",
+  "notes": [
+    "Lane Z (merge/contract) owns no items. It carries cross-lane questions raised while merging lanes A-E; per-lane questions stay in each lane's file.",
+    "Lane Z fix: removed schema=compose-go-embedded from the 7 build.shm_size fields in C.json (Lane C reported it as a generator mistake). build.shm_size is integer|string in both compose-spec.json and compose-go-embedded.json (#/$defs/workload_spec/properties/build/oneOf/1/properties/shm_size); only container_spec.shm_size differs."
+  ],
+  "naming_questions": [
+    "Cross-lane: one raw logs output for container, service, task and compose logs? Lanes proposed `logs`/`logs_text` (A, B, plain text) and `logs_json` (C, JSON entries). Options: `logs` text everywhere | `logs_json` everywhere | both.",
+    "Cross-lane: add a sixth category (e.g. `result`) for action results and descriptive values (`space_reclaimed`, `exit_code`, `fidelity`, `reconstructed`, `created`) that lanes filed under identity or structured? Options: add `result` | keep five categories.",
+    "Cross-lane: whole-object sensitivity. Lanes mark whole `inspect`/`project`/`stack` outputs sensitive when any nested field can carry a secret, which hides harmless fields (image, ports) in plans. Options: keep whole-object sensitive | redacted structured output + sensitive raw | split secret-bearing fields into their own sensitive outputs.",
+    "Cross-lane: version names beyond the six (Lane E asked about `buildkit_version`, `docker_cli_version`). Options: extend the V3 list | keep six and file them as identity."
+  ],
+  "items": {}
+}

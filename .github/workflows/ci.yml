@@ -1,7 +1,7 @@
 # Build, unit tests and every static check (gofmt, vet, skill / README_resources.md drift,
 # genskill -strict, tfplugindocs validate), the kreuzwerker parity check, then the dind
 # end-to-end run (required once test/harness/CI_GREEN_RUNS >= 2). No secrets needed.
-# On Windows the same steps are ./build.ps1 -Task build,test,check.
+# On Windows the same steps are Invoke-Build Build, Test, Check.
 name: CI
 
 on:

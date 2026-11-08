@@ -1,0 +1,2389 @@
+{
+ "lane": "Z3",
+ "notes": [
+  "handled_by: engine = has a swagger.yaml (API 1.56) endpoint, item made by lane Z1; group = management-command doc page with no operation of its own; cli-only:*/buildx:*/plugin:* = item id in z3-cli.json.",
+  "Help capture is from Docker Desktop 4.78 (CLI 29.5.3) with the daemon NOT a swarm manager, so node/service/secret/config/stack and most swarm subcommands are hidden from --help: their absence is environmental, not a docs/CLI mismatch.",
+  "checkpoint is experimental (hidden without experimental CLI); trust lives in the separate docker-trust plugin (cmd/docker-trust), not installed; system dial-stdio is hidden.",
+  "`docker builder` help resolved to `docker buildx`, so `builder build` / `builder prune` children were not walked.",
+  "`docker swarm init --help` resolved to the docker-init plugin (help-capture oddity).",
+  "login has POST /auth but it only validates credentials; mapped to item cli-only:login (engine_api kept)."
+ ],
+ "summary": {
+  "core_commands_total": 190,
+  "core_doc_files": 191,
+  "core_help_commands": 131,
+  "engine": 136,
+  "cli_only_items": 34,
+  "groups": 20,
+  "unmapped": [],
+  "docs_missing_from_help": [
+   "docker builder build",
+   "docker builder prune",
+   "docker checkpoint",
+   "docker checkpoint create",
+   "docker checkpoint ls",
+   "docker checkpoint rm",
+   "docker config",
+   "docker config create",
+   "docker config inspect",
+   "docker config ls",
+   "docker config rm",
+   "docker node",
+   "docker node demote",
+   "docker node inspect",
+   "docker node ls",
+   "docker node promote",
+   "docker node ps",
+   "docker node rm",
+   "docker node update",
+   "docker secret",
+   "docker secret create",
+   "docker secret inspect",
+   "docker secret ls",
+   "docker secret rm",
+   "docker service",
+   "docker service create",
+   "docker service inspect",
+   "docker service logs",
+   "docker service ls",
+   "docker service ps",
+   "docker service rm",
+   "docker service rollback",
+   "docker service scale",
+   "docker service update",
+   "docker stack",
+   "docker stack config",
+   "docker stack deploy",
+   "docker stack ls",
+   "docker stack ps",
+   "docker stack rm",
+   "docker stack services",
+   "docker swarm ca",
+   "docker swarm join-token",
+   "docker swarm leave",
+   "docker swarm unlock-key",
+   "docker swarm unlock",
+   "docker swarm update",
+   "docker system dial-stdio",
+   "docker volume update",
+   "docker trust",
+   "docker trust inspect",
+   "docker trust key",
+   "docker trust key generate",
+   "docker trust key load",
+   "docker trust revoke",
+   "docker trust sign",
+   "docker trust signer",
+   "docker trust signer add",
+   "docker trust signer remove"
+  ],
+  "help_missing_from_docs": [],
+  "buildx_doc_files": 36,
+  "buildx_help_files": 31,
+  "buildx_docs_newer_than_installed_v0.34.1": [
+   "docker buildx debug",
+   "docker buildx debug build",
+   "docker buildx policy json-schema",
+   "docker buildx replay",
+   "docker buildx replay build"
+  ],
+  "buildx_help_only": []
+ },
+ "commands": [
+  {
+   "cli": "docker attach",
+   "file": "upstream/docker-cli/docs/reference/commandline/attach.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/attach",
+    "GET /containers/{id}/attach/ws"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_attach.txt"
+  },
+  {
+   "cli": "docker bake",
+   "file": "upstream/docker-cli/docs/reference/commandline/bake.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:bake",
+   "help_file": "upstream/help/docker_bake.txt"
+  },
+  {
+   "cli": "docker build",
+   "file": "upstream/docker-cli/docs/reference/commandline/build.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /build",
+    "POST /session"
+   ],
+   "handled_by": "engine",
+   "note": "In CLI v29 `docker build` is an alias of `docker buildx build` (help resolves to buildx); the classic path is POST /build, BuildKit uses POST /session + the undocumented /grpc upgrade.",
+   "help_file": "upstream/help/docker_build.txt"
+  },
+  {
+   "cli": "docker builder",
+   "file": "upstream/docker-cli/docs/reference/commandline/builder.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "help_file": "upstream/help/docker_builder.txt"
+  },
+  {
+   "cli": "docker builder build",
+   "file": "upstream/docker-cli/docs/reference/commandline/builder_build.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /build",
+    "POST /session"
+   ],
+   "handled_by": "engine",
+   "note": "Alias of `docker buildx build` in CLI v29; help for `docker builder` resolved to `docker buildx`, so children were not walked."
+  },
+  {
+   "cli": "docker builder prune",
+   "file": "upstream/docker-cli/docs/reference/commandline/builder_prune.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /build/prune"
+   ],
+   "handled_by": "engine",
+   "note": "Not in the help capture: `docker builder` resolved to buildx (help shows `docker buildx prune`)."
+  },
+  {
+   "cli": "docker checkpoint",
+   "file": "upstream/docker-cli/docs/reference/commandline/checkpoint.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "group"
+  },
+  {
+   "cli": "docker checkpoint create",
+   "file": "upstream/docker-cli/docs/reference/commandline/checkpoint_create.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:checkpoint",
+   "note": "Daemon has experimental, undocumented /containers/{id}/checkpoints endpoints not in swagger.yaml."
+  },
+  {
+   "cli": "docker checkpoint ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/checkpoint_ls.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:checkpoint",
+   "note": "Daemon has experimental, undocumented /containers/{id}/checkpoints endpoints not in swagger.yaml."
+  },
+  {
+   "cli": "docker checkpoint rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/checkpoint_rm.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:checkpoint",
+   "note": "Daemon has experimental, undocumented /containers/{id}/checkpoints/{checkpoint} endpoint not in swagger.yaml."
+  },
+  {
+   "cli": "docker commit",
+   "file": "upstream/docker-cli/docs/reference/commandline/commit.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /commit"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_commit.txt"
+  },
+  {
+   "cli": "docker config",
+   "file": "upstream/docker-cli/docs/reference/commandline/config.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "group"
+  },
+  {
+   "cli": "docker config create",
+   "file": "upstream/docker-cli/docs/reference/commandline/config_create.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /configs/create"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker config inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/config_inspect.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /configs/{id}"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker config ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/config_ls.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /configs"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker config rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/config_rm.md",
+   "in_help": false,
+   "engine_api": [
+    "DELETE /configs/{id}"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker container",
+   "file": "upstream/docker-cli/docs/reference/commandline/container.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "help_file": "upstream/help/docker_container.txt"
+  },
+  {
+   "cli": "docker container attach",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_attach.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/attach",
+    "GET /containers/{id}/attach/ws"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_attach.txt"
+  },
+  {
+   "cli": "docker container commit",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_commit.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /commit"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_commit.txt"
+  },
+  {
+   "cli": "docker container cp",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_cp.md",
+   "in_help": true,
+   "engine_api": [
+    "HEAD /containers/{id}/archive",
+    "GET /containers/{id}/archive",
+    "PUT /containers/{id}/archive"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_cp.txt"
+  },
+  {
+   "cli": "docker container create",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_create.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/create",
+    "POST /images/create"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_create.txt"
+  },
+  {
+   "cli": "docker container diff",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_diff.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/changes"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_diff.txt"
+  },
+  {
+   "cli": "docker container exec",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_exec.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/exec",
+    "POST /exec/{id}/start",
+    "POST /exec/{id}/resize",
+    "GET /exec/{id}/json"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_exec.txt"
+  },
+  {
+   "cli": "docker container export",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_export.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/export"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_export.txt"
+  },
+  {
+   "cli": "docker container inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_inspect.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/json"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_inspect.txt"
+  },
+  {
+   "cli": "docker container kill",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_kill.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/kill"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_kill.txt"
+  },
+  {
+   "cli": "docker container logs",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_logs.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/logs"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_logs.txt"
+  },
+  {
+   "cli": "docker container ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_ls.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/json"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_ls.txt"
+  },
+  {
+   "cli": "docker container pause",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_pause.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/pause"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_pause.txt"
+  },
+  {
+   "cli": "docker container port",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_port.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/json"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_port.txt"
+  },
+  {
+   "cli": "docker container prune",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_prune.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/prune"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_prune.txt"
+  },
+  {
+   "cli": "docker container rename",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_rename.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/rename"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_rename.txt"
+  },
+  {
+   "cli": "docker container restart",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_restart.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/restart"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_restart.txt"
+  },
+  {
+   "cli": "docker container rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_rm.md",
+   "in_help": true,
+   "engine_api": [
+    "DELETE /containers/{id}"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_rm.txt"
+  },
+  {
+   "cli": "docker container run",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_run.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/create",
+    "POST /containers/{id}/start",
+    "POST /containers/{id}/attach",
+    "POST /containers/{id}/wait",
+    "POST /containers/{id}/resize"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_run.txt"
+  },
+  {
+   "cli": "docker container start",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_start.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/start"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_start.txt"
+  },
+  {
+   "cli": "docker container stats",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_stats.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/stats"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_stats.txt"
+  },
+  {
+   "cli": "docker container stop",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_stop.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/stop"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_stop.txt"
+  },
+  {
+   "cli": "docker container top",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_top.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/top"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_top.txt"
+  },
+  {
+   "cli": "docker container unpause",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_unpause.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/unpause"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_unpause.txt"
+  },
+  {
+   "cli": "docker container update",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_update.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/update"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_update.txt"
+  },
+  {
+   "cli": "docker container wait",
+   "file": "upstream/docker-cli/docs/reference/commandline/container_wait.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/wait"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_container_wait.txt"
+  },
+  {
+   "cli": "docker context",
+   "file": "upstream/docker-cli/docs/reference/commandline/context.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "help_file": "upstream/help/docker_context.txt"
+  },
+  {
+   "cli": "docker context create",
+   "file": "upstream/docker-cli/docs/reference/commandline/context_create.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:context",
+   "help_file": "upstream/help/docker_context_create.txt"
+  },
+  {
+   "cli": "docker context export",
+   "file": "upstream/docker-cli/docs/reference/commandline/context_export.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:context",
+   "help_file": "upstream/help/docker_context_export.txt"
+  },
+  {
+   "cli": "docker context import",
+   "file": "upstream/docker-cli/docs/reference/commandline/context_import.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:context",
+   "help_file": "upstream/help/docker_context_import.txt"
+  },
+  {
+   "cli": "docker context inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/context_inspect.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:context",
+   "help_file": "upstream/help/docker_context_inspect.txt"
+  },
+  {
+   "cli": "docker context ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/context_ls.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:context",
+   "help_file": "upstream/help/docker_context_ls.txt"
+  },
+  {
+   "cli": "docker context rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/context_rm.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:context",
+   "help_file": "upstream/help/docker_context_rm.txt"
+  },
+  {
+   "cli": "docker context show",
+   "file": "upstream/docker-cli/docs/reference/commandline/context_show.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:context",
+   "help_file": "upstream/help/docker_context_show.txt"
+  },
+  {
+   "cli": "docker context update",
+   "file": "upstream/docker-cli/docs/reference/commandline/context_update.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:context",
+   "help_file": "upstream/help/docker_context_update.txt"
+  },
+  {
+   "cli": "docker context use",
+   "file": "upstream/docker-cli/docs/reference/commandline/context_use.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:context",
+   "help_file": "upstream/help/docker_context_use.txt"
+  },
+  {
+   "cli": "docker cp",
+   "file": "upstream/docker-cli/docs/reference/commandline/cp.md",
+   "in_help": true,
+   "engine_api": [
+    "HEAD /containers/{id}/archive",
+    "GET /containers/{id}/archive",
+    "PUT /containers/{id}/archive"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container cp",
+   "help_file": "upstream/help/docker_cp.txt"
+  },
+  {
+   "cli": "docker create",
+   "file": "upstream/docker-cli/docs/reference/commandline/create.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/create",
+    "POST /images/create"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container create",
+   "help_file": "upstream/help/docker_create.txt"
+  },
+  {
+   "cli": "docker diff",
+   "file": "upstream/docker-cli/docs/reference/commandline/diff.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/changes"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container diff",
+   "help_file": "upstream/help/docker_diff.txt"
+  },
+  {
+   "cli": "docker",
+   "file": "upstream/docker-cli/docs/reference/commandline/docker.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "help_file": "upstream/help/docker.txt"
+  },
+  {
+   "cli": "docker events",
+   "file": "upstream/docker-cli/docs/reference/commandline/events.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /events"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_events.txt"
+  },
+  {
+   "cli": "docker exec",
+   "file": "upstream/docker-cli/docs/reference/commandline/exec.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/exec",
+    "POST /exec/{id}/start",
+    "POST /exec/{id}/resize",
+    "GET /exec/{id}/json"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container exec",
+   "help_file": "upstream/help/docker_exec.txt"
+  },
+  {
+   "cli": "docker export",
+   "file": "upstream/docker-cli/docs/reference/commandline/export.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/export"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container export",
+   "help_file": "upstream/help/docker_export.txt"
+  },
+  {
+   "cli": "docker history",
+   "file": "upstream/docker-cli/docs/reference/commandline/history.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /images/{name}/history"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker image history",
+   "help_file": "upstream/help/docker_history.txt"
+  },
+  {
+   "cli": "docker image",
+   "file": "upstream/docker-cli/docs/reference/commandline/image.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "help_file": "upstream/help/docker_image.txt"
+  },
+  {
+   "cli": "docker image build",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_build.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /build",
+    "POST /session"
+   ],
+   "handled_by": "engine",
+   "note": "Alias of `docker buildx build` in CLI v29 (see build).",
+   "help_file": "upstream/help/docker_image_build.txt"
+  },
+  {
+   "cli": "docker image history",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_history.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /images/{name}/history"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_image_history.txt"
+  },
+  {
+   "cli": "docker image import",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_import.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /images/create"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_image_import.txt"
+  },
+  {
+   "cli": "docker image inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_inspect.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /images/{name}/json"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_image_inspect.txt"
+  },
+  {
+   "cli": "docker image load",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_load.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /images/load"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_image_load.txt"
+  },
+  {
+   "cli": "docker image ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_ls.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /images/json"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_image_ls.txt"
+  },
+  {
+   "cli": "docker image prune",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_prune.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /images/prune"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_image_prune.txt"
+  },
+  {
+   "cli": "docker image pull",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_pull.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /images/create"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_image_pull.txt"
+  },
+  {
+   "cli": "docker image push",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_push.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /images/{name}/push"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_image_push.txt"
+  },
+  {
+   "cli": "docker image rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_rm.md",
+   "in_help": true,
+   "engine_api": [
+    "DELETE /images/{name}"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_image_rm.txt"
+  },
+  {
+   "cli": "docker image save",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_save.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /images/{name}/get",
+    "GET /images/get"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_image_save.txt"
+  },
+  {
+   "cli": "docker image tag",
+   "file": "upstream/docker-cli/docs/reference/commandline/image_tag.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /images/{name}/tag"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_image_tag.txt"
+  },
+  {
+   "cli": "docker images",
+   "file": "upstream/docker-cli/docs/reference/commandline/images.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /images/json"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker image ls",
+   "help_file": "upstream/help/docker_images.txt"
+  },
+  {
+   "cli": "docker import",
+   "file": "upstream/docker-cli/docs/reference/commandline/import.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /images/create"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker image import",
+   "help_file": "upstream/help/docker_import.txt"
+  },
+  {
+   "cli": null,
+   "file": "upstream/docker-cli/docs/reference/commandline/index.md",
+   "in_help": null,
+   "engine_api": [],
+   "handled_by": "not-a-command",
+   "note": "Reference index page, not a command."
+  },
+  {
+   "cli": "docker info",
+   "file": "upstream/docker-cli/docs/reference/commandline/info.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /info"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_info.txt"
+  },
+  {
+   "cli": "docker inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/inspect.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/json",
+    "GET /images/{name}/json",
+    "GET /networks/{id}",
+    "GET /volumes/{name}",
+    "GET /nodes/{id}",
+    "GET /services/{id}",
+    "GET /tasks/{id}",
+    "GET /secrets/{id}",
+    "GET /configs/{id}",
+    "GET /plugins/{name}/json"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_inspect.txt"
+  },
+  {
+   "cli": "docker kill",
+   "file": "upstream/docker-cli/docs/reference/commandline/kill.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/kill"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container kill",
+   "help_file": "upstream/help/docker_kill.txt"
+  },
+  {
+   "cli": "docker load",
+   "file": "upstream/docker-cli/docs/reference/commandline/load.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /images/load"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker image load",
+   "help_file": "upstream/help/docker_load.txt"
+  },
+  {
+   "cli": "docker login",
+   "file": "upstream/docker-cli/docs/reference/commandline/login.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /auth"
+   ],
+   "handled_by": "cli-only:login",
+   "note": "POST /auth only validates credentials; storing them is client-side (config.json / credential helper). Item cli-only:login documents the client part.",
+   "help_file": "upstream/help/docker_login.txt"
+  },
+  {
+   "cli": "docker logout",
+   "file": "upstream/docker-cli/docs/reference/commandline/logout.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:logout",
+   "help_file": "upstream/help/docker_logout.txt"
+  },
+  {
+   "cli": "docker logs",
+   "file": "upstream/docker-cli/docs/reference/commandline/logs.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/logs"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container logs",
+   "help_file": "upstream/help/docker_logs.txt"
+  },
+  {
+   "cli": "docker manifest",
+   "file": "upstream/docker-cli/docs/reference/commandline/manifest.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "help_file": "upstream/help/docker_manifest.txt"
+  },
+  {
+   "cli": "docker manifest annotate",
+   "file": "upstream/docker-cli/docs/reference/commandline/manifest_annotate.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:manifest-list",
+   "help_file": "upstream/help/docker_manifest_annotate.txt"
+  },
+  {
+   "cli": "docker manifest create",
+   "file": "upstream/docker-cli/docs/reference/commandline/manifest_create.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:manifest-list",
+   "help_file": "upstream/help/docker_manifest_create.txt"
+  },
+  {
+   "cli": "docker manifest inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/manifest_inspect.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:manifest-inspect",
+   "note": "Talks to the registry directly (GET /distribution/{name}/json gives only the descriptor + platforms).",
+   "help_file": "upstream/help/docker_manifest_inspect.txt"
+  },
+  {
+   "cli": "docker manifest push",
+   "file": "upstream/docker-cli/docs/reference/commandline/manifest_push.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:manifest-list",
+   "help_file": "upstream/help/docker_manifest_push.txt"
+  },
+  {
+   "cli": "docker manifest rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/manifest_rm.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "cli-only:manifest-list",
+   "help_file": "upstream/help/docker_manifest_rm.txt"
+  },
+  {
+   "cli": "docker network",
+   "file": "upstream/docker-cli/docs/reference/commandline/network.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "help_file": "upstream/help/docker_network.txt"
+  },
+  {
+   "cli": "docker network connect",
+   "file": "upstream/docker-cli/docs/reference/commandline/network_connect.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /networks/{id}/connect"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_network_connect.txt"
+  },
+  {
+   "cli": "docker network create",
+   "file": "upstream/docker-cli/docs/reference/commandline/network_create.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /networks/create"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_network_create.txt"
+  },
+  {
+   "cli": "docker network disconnect",
+   "file": "upstream/docker-cli/docs/reference/commandline/network_disconnect.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /networks/{id}/disconnect"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_network_disconnect.txt"
+  },
+  {
+   "cli": "docker network inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/network_inspect.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /networks/{id}"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_network_inspect.txt"
+  },
+  {
+   "cli": "docker network ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/network_ls.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /networks"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_network_ls.txt"
+  },
+  {
+   "cli": "docker network prune",
+   "file": "upstream/docker-cli/docs/reference/commandline/network_prune.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /networks/prune"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_network_prune.txt"
+  },
+  {
+   "cli": "docker network rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/network_rm.md",
+   "in_help": true,
+   "engine_api": [
+    "DELETE /networks/{id}"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_network_rm.txt"
+  },
+  {
+   "cli": "docker node",
+   "file": "upstream/docker-cli/docs/reference/commandline/node.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "group"
+  },
+  {
+   "cli": "docker node demote",
+   "file": "upstream/docker-cli/docs/reference/commandline/node_demote.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /nodes/{id}/update"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker node inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/node_inspect.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /nodes/{id}"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker node ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/node_ls.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /nodes"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker node promote",
+   "file": "upstream/docker-cli/docs/reference/commandline/node_promote.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /nodes/{id}/update"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker node ps",
+   "file": "upstream/docker-cli/docs/reference/commandline/node_ps.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /tasks"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker node rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/node_rm.md",
+   "in_help": false,
+   "engine_api": [
+    "DELETE /nodes/{id}"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker node update",
+   "file": "upstream/docker-cli/docs/reference/commandline/node_update.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /nodes/{id}/update"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker pause",
+   "file": "upstream/docker-cli/docs/reference/commandline/pause.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/pause"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container pause",
+   "help_file": "upstream/help/docker_pause.txt"
+  },
+  {
+   "cli": "docker plugin",
+   "file": "upstream/docker-cli/docs/reference/commandline/plugin.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "help_file": "upstream/help/docker_plugin.txt"
+  },
+  {
+   "cli": "docker plugin create",
+   "file": "upstream/docker-cli/docs/reference/commandline/plugin_create.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /plugins/create"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_plugin_create.txt"
+  },
+  {
+   "cli": "docker plugin disable",
+   "file": "upstream/docker-cli/docs/reference/commandline/plugin_disable.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /plugins/{name}/disable"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_plugin_disable.txt"
+  },
+  {
+   "cli": "docker plugin enable",
+   "file": "upstream/docker-cli/docs/reference/commandline/plugin_enable.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /plugins/{name}/enable"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_plugin_enable.txt"
+  },
+  {
+   "cli": "docker plugin inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/plugin_inspect.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /plugins/{name}/json"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_plugin_inspect.txt"
+  },
+  {
+   "cli": "docker plugin install",
+   "file": "upstream/docker-cli/docs/reference/commandline/plugin_install.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /plugins/privileges",
+    "POST /plugins/pull"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_plugin_install.txt"
+  },
+  {
+   "cli": "docker plugin ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/plugin_ls.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /plugins"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_plugin_ls.txt"
+  },
+  {
+   "cli": "docker plugin push",
+   "file": "upstream/docker-cli/docs/reference/commandline/plugin_push.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /plugins/{name}/push"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_plugin_push.txt"
+  },
+  {
+   "cli": "docker plugin rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/plugin_rm.md",
+   "in_help": true,
+   "engine_api": [
+    "DELETE /plugins/{name}"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_plugin_rm.txt"
+  },
+  {
+   "cli": "docker plugin set",
+   "file": "upstream/docker-cli/docs/reference/commandline/plugin_set.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /plugins/{name}/set"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_plugin_set.txt"
+  },
+  {
+   "cli": "docker plugin upgrade",
+   "file": "upstream/docker-cli/docs/reference/commandline/plugin_upgrade.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /plugins/privileges",
+    "POST /plugins/{name}/upgrade"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_plugin_upgrade.txt"
+  },
+  {
+   "cli": "docker port",
+   "file": "upstream/docker-cli/docs/reference/commandline/port.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/json"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container port",
+   "help_file": "upstream/help/docker_port.txt"
+  },
+  {
+   "cli": "docker ps",
+   "file": "upstream/docker-cli/docs/reference/commandline/ps.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/json"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container ls",
+   "help_file": "upstream/help/docker_ps.txt"
+  },
+  {
+   "cli": "docker pull",
+   "file": "upstream/docker-cli/docs/reference/commandline/pull.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /images/create"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker image pull",
+   "help_file": "upstream/help/docker_pull.txt"
+  },
+  {
+   "cli": "docker push",
+   "file": "upstream/docker-cli/docs/reference/commandline/push.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /images/{name}/push"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker image push",
+   "help_file": "upstream/help/docker_push.txt"
+  },
+  {
+   "cli": "docker rename",
+   "file": "upstream/docker-cli/docs/reference/commandline/rename.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/rename"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container rename",
+   "help_file": "upstream/help/docker_rename.txt"
+  },
+  {
+   "cli": "docker restart",
+   "file": "upstream/docker-cli/docs/reference/commandline/restart.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/restart"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container restart",
+   "help_file": "upstream/help/docker_restart.txt"
+  },
+  {
+   "cli": "docker rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/rm.md",
+   "in_help": true,
+   "engine_api": [
+    "DELETE /containers/{id}"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container rm",
+   "help_file": "upstream/help/docker_rm.txt"
+  },
+  {
+   "cli": "docker rmi",
+   "file": "upstream/docker-cli/docs/reference/commandline/rmi.md",
+   "in_help": true,
+   "engine_api": [
+    "DELETE /images/{name}"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker image rm",
+   "help_file": "upstream/help/docker_rmi.txt"
+  },
+  {
+   "cli": "docker run",
+   "file": "upstream/docker-cli/docs/reference/commandline/run.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/create",
+    "POST /containers/{id}/start",
+    "POST /containers/{id}/attach",
+    "POST /containers/{id}/wait",
+    "POST /containers/{id}/resize"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container run",
+   "help_file": "upstream/help/docker_run.txt"
+  },
+  {
+   "cli": "docker save",
+   "file": "upstream/docker-cli/docs/reference/commandline/save.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /images/{name}/get",
+    "GET /images/get"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker image save",
+   "help_file": "upstream/help/docker_save.txt"
+  },
+  {
+   "cli": "docker search",
+   "file": "upstream/docker-cli/docs/reference/commandline/search.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /images/search"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_search.txt"
+  },
+  {
+   "cli": "docker secret",
+   "file": "upstream/docker-cli/docs/reference/commandline/secret.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "group"
+  },
+  {
+   "cli": "docker secret create",
+   "file": "upstream/docker-cli/docs/reference/commandline/secret_create.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /secrets/create"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker secret inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/secret_inspect.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /secrets/{id}"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker secret ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/secret_ls.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /secrets"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker secret rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/secret_rm.md",
+   "in_help": false,
+   "engine_api": [
+    "DELETE /secrets/{id}"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker service",
+   "file": "upstream/docker-cli/docs/reference/commandline/service.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "group"
+  },
+  {
+   "cli": "docker service create",
+   "file": "upstream/docker-cli/docs/reference/commandline/service_create.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /services/create"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker service inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/service_inspect.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /services/{id}"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker service logs",
+   "file": "upstream/docker-cli/docs/reference/commandline/service_logs.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /services/{id}/logs",
+    "GET /tasks/{id}/logs"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker service ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/service_ls.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /services"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker service ps",
+   "file": "upstream/docker-cli/docs/reference/commandline/service_ps.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /tasks"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker service rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/service_rm.md",
+   "in_help": false,
+   "engine_api": [
+    "DELETE /services/{id}"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker service rollback",
+   "file": "upstream/docker-cli/docs/reference/commandline/service_rollback.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /services/{id}/update"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker service scale",
+   "file": "upstream/docker-cli/docs/reference/commandline/service_scale.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /services/{id}/update"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker service update",
+   "file": "upstream/docker-cli/docs/reference/commandline/service_update.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /services/{id}/update"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker stack",
+   "file": "upstream/docker-cli/docs/reference/commandline/stack.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "group"
+  },
+  {
+   "cli": "docker stack config",
+   "file": "upstream/docker-cli/docs/reference/commandline/stack_config.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:stack-config"
+  },
+  {
+   "cli": "docker stack deploy",
+   "file": "upstream/docker-cli/docs/reference/commandline/stack_deploy.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:stack"
+  },
+  {
+   "cli": "docker stack ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/stack_ls.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:stacks"
+  },
+  {
+   "cli": "docker stack ps",
+   "file": "upstream/docker-cli/docs/reference/commandline/stack_ps.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:stack-ps"
+  },
+  {
+   "cli": "docker stack rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/stack_rm.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:stack"
+  },
+  {
+   "cli": "docker stack services",
+   "file": "upstream/docker-cli/docs/reference/commandline/stack_services.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:stack-services"
+  },
+  {
+   "cli": "docker start",
+   "file": "upstream/docker-cli/docs/reference/commandline/start.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/start"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container start",
+   "help_file": "upstream/help/docker_start.txt"
+  },
+  {
+   "cli": "docker stats",
+   "file": "upstream/docker-cli/docs/reference/commandline/stats.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/stats"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container stats",
+   "help_file": "upstream/help/docker_stats.txt"
+  },
+  {
+   "cli": "docker stop",
+   "file": "upstream/docker-cli/docs/reference/commandline/stop.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/stop"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container stop",
+   "help_file": "upstream/help/docker_stop.txt"
+  },
+  {
+   "cli": "docker swarm",
+   "file": "upstream/docker-cli/docs/reference/commandline/swarm.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "help_file": "upstream/help/docker_swarm.txt"
+  },
+  {
+   "cli": "docker swarm ca",
+   "file": "upstream/docker-cli/docs/reference/commandline/swarm_ca.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /swarm",
+    "POST /swarm/update"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker swarm init",
+   "file": "upstream/docker-cli/docs/reference/commandline/swarm_init.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /swarm/init"
+   ],
+   "handled_by": "engine",
+   "note": "Help capture oddity: `docker swarm init --help` resolved to the docker-init plugin.",
+   "help_file": "upstream/help/docker_swarm_init.txt"
+  },
+  {
+   "cli": "docker swarm join-token",
+   "file": "upstream/docker-cli/docs/reference/commandline/swarm_join-token.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /swarm",
+    "POST /swarm/update"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker swarm join",
+   "file": "upstream/docker-cli/docs/reference/commandline/swarm_join.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /swarm/join"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_swarm_join.txt"
+  },
+  {
+   "cli": "docker swarm leave",
+   "file": "upstream/docker-cli/docs/reference/commandline/swarm_leave.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /swarm/leave"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker swarm unlock-key",
+   "file": "upstream/docker-cli/docs/reference/commandline/swarm_unlock-key.md",
+   "in_help": false,
+   "engine_api": [
+    "GET /swarm/unlockkey",
+    "POST /swarm/update"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker swarm unlock",
+   "file": "upstream/docker-cli/docs/reference/commandline/swarm_unlock.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /swarm/unlock"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker swarm update",
+   "file": "upstream/docker-cli/docs/reference/commandline/swarm_update.md",
+   "in_help": false,
+   "engine_api": [
+    "POST /swarm/update"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker system",
+   "file": "upstream/docker-cli/docs/reference/commandline/system.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "help_file": "upstream/help/docker_system.txt"
+  },
+  {
+   "cli": "docker system df",
+   "file": "upstream/docker-cli/docs/reference/commandline/system_df.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /system/df"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_system_df.txt"
+  },
+  {
+   "cli": "docker system dial-stdio",
+   "file": "upstream/docker-cli/docs/reference/commandline/system_dial-stdio.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:system-dial-stdio",
+   "note": "Proxies stdio to the daemon socket; no endpoint of its own."
+  },
+  {
+   "cli": "docker system events",
+   "file": "upstream/docker-cli/docs/reference/commandline/system_events.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /events"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_system_events.txt"
+  },
+  {
+   "cli": "docker system info",
+   "file": "upstream/docker-cli/docs/reference/commandline/system_info.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /info"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_system_info.txt"
+  },
+  {
+   "cli": "docker system prune",
+   "file": "upstream/docker-cli/docs/reference/commandline/system_prune.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/prune",
+    "POST /networks/prune",
+    "POST /images/prune",
+    "POST /build/prune",
+    "POST /volumes/prune"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_system_prune.txt"
+  },
+  {
+   "cli": "docker tag",
+   "file": "upstream/docker-cli/docs/reference/commandline/tag.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /images/{name}/tag"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker image tag",
+   "help_file": "upstream/help/docker_tag.txt"
+  },
+  {
+   "cli": "docker top",
+   "file": "upstream/docker-cli/docs/reference/commandline/top.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /containers/{id}/top"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container top",
+   "help_file": "upstream/help/docker_top.txt"
+  },
+  {
+   "cli": "docker unpause",
+   "file": "upstream/docker-cli/docs/reference/commandline/unpause.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/unpause"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container unpause",
+   "help_file": "upstream/help/docker_unpause.txt"
+  },
+  {
+   "cli": "docker update",
+   "file": "upstream/docker-cli/docs/reference/commandline/update.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/update"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container update",
+   "help_file": "upstream/help/docker_update.txt"
+  },
+  {
+   "cli": "docker version",
+   "file": "upstream/docker-cli/docs/reference/commandline/version.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /version"
+   ],
+   "handled_by": "engine",
+   "note": "Server part is GET /version; the client part is local build info (nothing to model).",
+   "help_file": "upstream/help/docker_version.txt"
+  },
+  {
+   "cli": "docker volume",
+   "file": "upstream/docker-cli/docs/reference/commandline/volume.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "help_file": "upstream/help/docker_volume.txt"
+  },
+  {
+   "cli": "docker volume create",
+   "file": "upstream/docker-cli/docs/reference/commandline/volume_create.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /volumes/create"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_volume_create.txt"
+  },
+  {
+   "cli": "docker volume inspect",
+   "file": "upstream/docker-cli/docs/reference/commandline/volume_inspect.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /volumes/{name}"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_volume_inspect.txt"
+  },
+  {
+   "cli": "docker volume ls",
+   "file": "upstream/docker-cli/docs/reference/commandline/volume_ls.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /volumes"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_volume_ls.txt"
+  },
+  {
+   "cli": "docker volume prune",
+   "file": "upstream/docker-cli/docs/reference/commandline/volume_prune.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /volumes/prune"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_volume_prune.txt"
+  },
+  {
+   "cli": "docker volume rm",
+   "file": "upstream/docker-cli/docs/reference/commandline/volume_rm.md",
+   "in_help": true,
+   "engine_api": [
+    "DELETE /volumes/{name}"
+   ],
+   "handled_by": "engine",
+   "help_file": "upstream/help/docker_volume_rm.txt"
+  },
+  {
+   "cli": "docker volume update",
+   "file": "upstream/docker-cli/docs/reference/commandline/volume_update.md",
+   "in_help": false,
+   "engine_api": [
+    "PUT /volumes/{name}"
+   ],
+   "handled_by": "engine"
+  },
+  {
+   "cli": "docker wait",
+   "file": "upstream/docker-cli/docs/reference/commandline/wait.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /containers/{id}/wait"
+   ],
+   "handled_by": "engine",
+   "alias_of": "docker container wait",
+   "help_file": "upstream/help/docker_wait.txt"
+  },
+  {
+   "cli": "docker trust",
+   "file": "upstream/docker-cli/cmd/docker-trust/docs/reference/trust.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "group"
+  },
+  {
+   "cli": "docker trust inspect",
+   "file": "upstream/docker-cli/cmd/docker-trust/docs/reference/trust_inspect.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:trust"
+  },
+  {
+   "cli": "docker trust key",
+   "file": "upstream/docker-cli/cmd/docker-trust/docs/reference/trust_key.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "group"
+  },
+  {
+   "cli": "docker trust key generate",
+   "file": "upstream/docker-cli/cmd/docker-trust/docs/reference/trust_key_generate.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:trust"
+  },
+  {
+   "cli": "docker trust key load",
+   "file": "upstream/docker-cli/cmd/docker-trust/docs/reference/trust_key_load.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:trust"
+  },
+  {
+   "cli": "docker trust revoke",
+   "file": "upstream/docker-cli/cmd/docker-trust/docs/reference/trust_revoke.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:trust"
+  },
+  {
+   "cli": "docker trust sign",
+   "file": "upstream/docker-cli/cmd/docker-trust/docs/reference/trust_sign.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:trust"
+  },
+  {
+   "cli": "docker trust signer",
+   "file": "upstream/docker-cli/cmd/docker-trust/docs/reference/trust_signer.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "group"
+  },
+  {
+   "cli": "docker trust signer add",
+   "file": "upstream/docker-cli/cmd/docker-trust/docs/reference/trust_signer_add.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:trust"
+  },
+  {
+   "cli": "docker trust signer remove",
+   "file": "upstream/docker-cli/cmd/docker-trust/docs/reference/trust_signer_remove.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "cli-only:trust"
+  }
+ ],
+ "buildx_commands": [
+  {
+   "cli": "docker buildx",
+   "file": "upstream/buildx/docs/reference/buildx.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx.txt"
+  },
+  {
+   "cli": "docker buildx bake",
+   "file": "upstream/buildx/docs/reference/buildx_bake.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:bake",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_bake.txt"
+  },
+  {
+   "cli": "docker buildx build",
+   "file": "upstream/buildx/docs/reference/buildx_build.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /session"
+   ],
+   "handled_by": "buildx:build",
+   "group": "buildx",
+   "note": "BuildKit gRPC is the real channel; with the `docker` driver the daemon serves it via POST /session + /grpc, and the listed endpoint is the docker-driver fallback.",
+   "help_file": "upstream/help/docker_buildx_build.txt"
+  },
+  {
+   "cli": "docker buildx create",
+   "file": "upstream/buildx/docs/reference/buildx_create.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:builder",
+   "group": "buildx",
+   "note": "BuildKit gRPC is the real channel; with the `docker` driver the daemon serves it via POST /session + /grpc, and the listed endpoint is the docker-driver fallback.",
+   "help_file": "upstream/help/docker_buildx_create.txt"
+  },
+  {
+   "cli": "docker buildx dap",
+   "file": "upstream/buildx/docs/reference/buildx_dap.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_dap.txt"
+  },
+  {
+   "cli": "docker buildx dap build",
+   "file": "upstream/buildx/docs/reference/buildx_dap_build.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:dap-build",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_dap_build.txt"
+  },
+  {
+   "cli": "docker buildx debug",
+   "file": "upstream/buildx/docs/reference/buildx_debug.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "group",
+   "group": "buildx"
+  },
+  {
+   "cli": "docker buildx debug build",
+   "file": "upstream/buildx/docs/reference/buildx_debug_build.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "buildx:debug-build",
+   "group": "buildx"
+  },
+  {
+   "cli": "docker buildx dial-stdio",
+   "file": "upstream/buildx/docs/reference/buildx_dial-stdio.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:dial-stdio",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_dial-stdio.txt"
+  },
+  {
+   "cli": "docker buildx du",
+   "file": "upstream/buildx/docs/reference/buildx_du.md",
+   "in_help": true,
+   "engine_api": [
+    "GET /system/df"
+   ],
+   "handled_by": "buildx:du",
+   "group": "buildx",
+   "note": "BuildKit gRPC is the real channel; with the `docker` driver the daemon serves it via POST /session + /grpc, and the listed endpoint is the docker-driver fallback.",
+   "help_file": "upstream/help/docker_buildx_du.txt"
+  },
+  {
+   "cli": "docker buildx history",
+   "file": "upstream/buildx/docs/reference/buildx_history.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_history.txt"
+  },
+  {
+   "cli": "docker buildx history export",
+   "file": "upstream/buildx/docs/reference/buildx_history_export.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:history-export",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_history_export.txt"
+  },
+  {
+   "cli": "docker buildx history import",
+   "file": "upstream/buildx/docs/reference/buildx_history_import.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:history-import",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_history_import.txt"
+  },
+  {
+   "cli": "docker buildx history inspect",
+   "file": "upstream/buildx/docs/reference/buildx_history_inspect.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:history-inspect",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_history_inspect.txt"
+  },
+  {
+   "cli": "docker buildx history inspect attachment",
+   "file": "upstream/buildx/docs/reference/buildx_history_inspect_attachment.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:history-inspect-attachment",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_history_inspect_attachment.txt"
+  },
+  {
+   "cli": "docker buildx history logs",
+   "file": "upstream/buildx/docs/reference/buildx_history_logs.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:history-logs",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_history_logs.txt"
+  },
+  {
+   "cli": "docker buildx history ls",
+   "file": "upstream/buildx/docs/reference/buildx_history_ls.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:history-ls",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_history_ls.txt"
+  },
+  {
+   "cli": "docker buildx history open",
+   "file": "upstream/buildx/docs/reference/buildx_history_open.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:history-open",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_history_open.txt"
+  },
+  {
+   "cli": "docker buildx history rm",
+   "file": "upstream/buildx/docs/reference/buildx_history_rm.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:history-rm",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_history_rm.txt"
+  },
+  {
+   "cli": "docker buildx history trace",
+   "file": "upstream/buildx/docs/reference/buildx_history_trace.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:history-trace",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_history_trace.txt"
+  },
+  {
+   "cli": "docker buildx imagetools",
+   "file": "upstream/buildx/docs/reference/buildx_imagetools.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_imagetools.txt"
+  },
+  {
+   "cli": "docker buildx imagetools create",
+   "file": "upstream/buildx/docs/reference/buildx_imagetools_create.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:imagetools-create",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_imagetools_create.txt"
+  },
+  {
+   "cli": "docker buildx imagetools inspect",
+   "file": "upstream/buildx/docs/reference/buildx_imagetools_inspect.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:imagetools-inspect",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_imagetools_inspect.txt"
+  },
+  {
+   "cli": "docker buildx inspect",
+   "file": "upstream/buildx/docs/reference/buildx_inspect.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:builder-inspect",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_inspect.txt"
+  },
+  {
+   "cli": "docker buildx ls",
+   "file": "upstream/buildx/docs/reference/buildx_ls.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:builders",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_ls.txt"
+  },
+  {
+   "cli": "docker buildx policy",
+   "file": "upstream/buildx/docs/reference/buildx_policy.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "group",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_policy.txt"
+  },
+  {
+   "cli": "docker buildx policy eval",
+   "file": "upstream/buildx/docs/reference/buildx_policy_eval.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:policy-eval",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_policy_eval.txt"
+  },
+  {
+   "cli": "docker buildx policy json-schema",
+   "file": "upstream/buildx/docs/reference/buildx_policy_json-schema.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "buildx:policy-json-schema",
+   "group": "buildx"
+  },
+  {
+   "cli": "docker buildx policy test",
+   "file": "upstream/buildx/docs/reference/buildx_policy_test.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:policy-test",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_policy_test.txt"
+  },
+  {
+   "cli": "docker buildx prune",
+   "file": "upstream/buildx/docs/reference/buildx_prune.md",
+   "in_help": true,
+   "engine_api": [
+    "POST /build/prune"
+   ],
+   "handled_by": "buildx:prune",
+   "group": "buildx",
+   "note": "BuildKit gRPC is the real channel; with the `docker` driver the daemon serves it via POST /session + /grpc, and the listed endpoint is the docker-driver fallback.",
+   "help_file": "upstream/help/docker_buildx_prune.txt"
+  },
+  {
+   "cli": "docker buildx replay",
+   "file": "upstream/buildx/docs/reference/buildx_replay.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "group",
+   "group": "buildx"
+  },
+  {
+   "cli": "docker buildx replay build",
+   "file": "upstream/buildx/docs/reference/buildx_replay_build.md",
+   "in_help": false,
+   "engine_api": [],
+   "handled_by": "buildx:replay-build",
+   "group": "buildx"
+  },
+  {
+   "cli": "docker buildx rm",
+   "file": "upstream/buildx/docs/reference/buildx_rm.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:builder",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_rm.txt"
+  },
+  {
+   "cli": "docker buildx stop",
+   "file": "upstream/buildx/docs/reference/buildx_stop.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:stop",
+   "group": "buildx",
+   "note": "BuildKit gRPC is the real channel; with the `docker` driver the daemon serves it via POST /session + /grpc, and the listed endpoint is the docker-driver fallback.",
+   "help_file": "upstream/help/docker_buildx_stop.txt"
+  },
+  {
+   "cli": "docker buildx use",
+   "file": "upstream/buildx/docs/reference/buildx_use.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:use",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_use.txt"
+  },
+  {
+   "cli": "docker buildx version",
+   "file": "upstream/buildx/docs/reference/buildx_version.md",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "buildx:version",
+   "group": "buildx",
+   "help_file": "upstream/help/docker_buildx_version.txt"
+  }
+ ],
+ "plugin_commands": [
+  {
+   "cli": "docker agent",
+   "file": null,
+   "help_file": "upstream/help/docker_agent.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:agent",
+   "group": "plugin",
+   "subcommand_help_files": 23
+  },
+  {
+   "cli": "docker ai",
+   "file": null,
+   "help_file": "upstream/help/docker_ai.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:ai",
+   "group": "plugin",
+   "subcommand_help_files": 1
+  },
+  {
+   "cli": "docker debug",
+   "file": null,
+   "help_file": "upstream/help/docker_debug.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:debug",
+   "group": "plugin",
+   "subcommand_help_files": 0
+  },
+  {
+   "cli": "docker desktop",
+   "file": null,
+   "help_file": "upstream/help/docker_desktop.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:desktop",
+   "group": "plugin",
+   "subcommand_help_files": 16
+  },
+  {
+   "cli": "docker dhi",
+   "file": null,
+   "help_file": "upstream/help/docker_dhi.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:dhi",
+   "group": "plugin",
+   "subcommand_help_files": 14
+  },
+  {
+   "cli": "docker extension",
+   "file": null,
+   "help_file": "upstream/help/docker_extension.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:extension",
+   "group": "plugin",
+   "subcommand_help_files": 12
+  },
+  {
+   "cli": "docker init",
+   "file": null,
+   "help_file": "upstream/help/docker_init.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:init",
+   "group": "plugin",
+   "subcommand_help_files": 0
+  },
+  {
+   "cli": "docker mcp",
+   "file": null,
+   "help_file": "upstream/help/docker_mcp.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:mcp",
+   "group": "plugin",
+   "subcommand_help_files": 57
+  },
+  {
+   "cli": "docker model",
+   "file": null,
+   "help_file": "upstream/help/docker_model.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:model",
+   "group": "plugin",
+   "subcommand_help_files": 32
+  },
+  {
+   "cli": "docker offload",
+   "file": null,
+   "help_file": "upstream/help/docker_offload.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:offload",
+   "group": "plugin",
+   "subcommand_help_files": 4
+  },
+  {
+   "cli": "docker pass",
+   "file": null,
+   "help_file": "upstream/help/docker_pass.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:pass",
+   "group": "plugin",
+   "subcommand_help_files": 12
+  },
+  {
+   "cli": "docker sandbox",
+   "file": null,
+   "help_file": "upstream/help/docker_sandbox.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:sandbox",
+   "group": "plugin",
+   "subcommand_help_files": 20
+  },
+  {
+   "cli": "docker scout",
+   "file": null,
+   "help_file": "upstream/help/docker_scout.txt",
+   "in_help": true,
+   "engine_api": [],
+   "handled_by": "plugin:scout",
+   "group": "plugin",
+   "subcommand_help_files": 28
+  }
+ ]
+}

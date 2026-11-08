@@ -1,0 +1,1850 @@
+{
+  "lane": "Z2",
+  "notes": [
+    "All CLI items are client-side (cli_only=true): `docker compose` composes Engine API calls selected by com.docker.compose.* labels; summaries name the calls.",
+    "The provider pins compose-go v2.16.2. Its embedded schema (upstream/compose-spec/compose-go-embedded.json) differs from compose-spec main only in: container_spec mem_limit, memswap_limit, shm_size typed number|string (spec: integer|string), and no jobs.*.extends (Compose NEXT). It already has jobs, models, include, schedule.",
+    "Spec items handled by docker_compose use name docker_compose (kind resource) rather than inventing per-element types; splitting is a naming question.",
+    "docker_compose silently ignores top-level jobs (no warning) and warns on models; worth a TODO even without new types.",
+    "docker_stack is HCL-native (service blocks), not compose-file driven; docker_compose mode=swarm is the compose-file path to a stack. tools/compose2stack is a one-shot converter, not a Terraform type.",
+    "compose_convert has only a yaml (no .md) in compose-cli v5.1.4 docs; it is an alias of config. docker_compose.yaml is the root command.",
+    "climap compose rows: up, down, ps, up --scale -> docker_compose; exec -> docker_exec; logs -> docker_logs; pull -> docker_image; config/convert -> tools/compose2stack; build, run/watch/alpha -> none."
+  ],
+  "naming_questions": [
+    "Imperative compose actions beside the docker_compose resource: name them docker_compose_up/down (CLI-shaped), docker_compose_apply/destroy, or skip up/down since the resource covers them?",
+    "`compose config` render: data source docker_compose_config (visually collides with docker_config and top-level `configs`), docker_compose_project / docker_compose_model, or a provider function compose_render?",
+    "`compose ps` / `compose ls`: docker_compose_ps + docker_compose_ls (CLI names) or docker_compose_containers + docker_compose_projects (noun convention like docker_containers)?",
+    "`compose volumes`: add a docker_compose_volumes data source, or document data.docker_volume/list.docker_volume with a project label filter (avoids the docker_volume clash)?",
+    "Per-container verbs (start/stop/restart/kill/pause/unpause): separate docker_compose_* actions, or one set of docker_container_* actions with an optional project/service selector?",
+    "`compose scale` vs existing docker_service_scale: new docker_compose_scale action, or extend docker_service_scale to compose local projects?",
+    "Compose top-level elements: keep all inside docker_compose, or split docker_compose_service/network/volume (confusable with docker_service/docker_network/docker_volume)?",
+    "jobs: support in docker_compose (run once on apply) plus docker_compose_run for manual triggers, or leave unsupported but add a warning?"
+  ],
+  "items": [
+    {
+      "id": "compose:services",
+      "layer": "compose",
+      "kind": "resource",
+      "name": "docker_compose",
+      "update": "in_place",
+      "summary": "services: long-running containers (local) or Swarm services (swarm), managed as part of the docker_compose project.",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/properties/services"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/properties/services"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/service"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/service"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/05-services.md",
+          "anchor": "#services-top-level-element"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/container_spec.md",
+          "anchor": "#container-specification"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/workload_spec.md",
+          "anchor": "#workload-specification"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_compose (resource)",
+        "docker_stack (resource)",
+        "docker_service (resource)",
+        "docker_container (resource)"
+      ],
+      "status_note": "docker_compose loads services with compose-go and creates containers (local) or Swarm services (swarm). Ignored with a warning: build (no image is an error, pull_policy build errors), develop, pre_start/post_start/pre_stop hooks, models, provider, credential_spec, blkio_config, use_api_socket, external_links, attach (local); swarm mode also ignores container_name, depends_on, network_mode, privileged, devices, ipc/pid/userns/uts/cgroup_parent, security_opt, shm_size, volumes_from, gpus, links, tmpfs, pull_policy other than missing/always.",
+      "collision": "A per-service type named docker_compose_service would be confusable with docker_service (swarm). Keep services inside docker_compose.",
+      "cli_only": false
+    },
+    {
+      "id": "compose:networks",
+      "layer": "compose",
+      "kind": "resource",
+      "name": "docker_compose",
+      "update": "in_place",
+      "summary": "networks: project networks created and labelled by docker_compose (bridge locally, overlay in swarm); external networks are referenced only.",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/properties/networks"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/properties/networks"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/network"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/network"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/06-networks.md",
+          "anchor": "#networks-top-level-element"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_compose (resource)",
+        "docker_network (resource)"
+      ],
+      "collision": "docker_compose_network would be confusable with docker_network.",
+      "cli_only": false
+    },
+    {
+      "id": "compose:volumes",
+      "layer": "compose",
+      "kind": "resource",
+      "name": "docker_compose",
+      "update": "in_place",
+      "summary": "volumes: named project volumes created by docker_compose (removed on destroy unless keep_volumes); external volumes referenced only.",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/properties/volumes"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/properties/volumes"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/volume"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/volume"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/07-volumes.md",
+          "anchor": "#volumes-top-level-element"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_compose (resource)",
+        "docker_volume (resource)"
+      ],
+      "collision": "docker_compose_volume(s) would be confusable with docker_volume and with the proposed docker_compose_volumes data source (CLI `compose volumes`).",
+      "cli_only": false
+    },
+    {
+      "id": "compose:configs",
+      "layer": "compose",
+      "kind": "resource",
+      "name": "docker_compose",
+      "update": "in_place",
+      "summary": "configs: file/environment/content-sourced config objects; copied into containers locally, created as Swarm configs in swarm mode.",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/properties/configs"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/properties/configs"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/config"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/config"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/08-configs.md",
+          "anchor": "#configs-top-level-element"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_compose (resource)",
+        "docker_config (resource)"
+      ],
+      "status_note": "Local mode copies the content into the container (no bind mount); swarm mode creates Swarm configs but ignores driver and template_driver with a warning.",
+      "collision": "Top-level `configs` vs docker_config (Swarm config resource) vs the proposed docker_compose_config data source (CLI `compose config`, rendered model).",
+      "cli_only": false
+    },
+    {
+      "id": "compose:secrets",
+      "layer": "compose",
+      "kind": "resource",
+      "name": "docker_compose",
+      "update": "in_place",
+      "summary": "secrets: file/environment-sourced secrets; copied to /run/secrets locally, created as Swarm secrets in swarm mode.",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/properties/secrets"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/properties/secrets"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/secret"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/secret"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/09-secrets.md",
+          "anchor": "#secrets-top-level-element"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_compose (resource)",
+        "docker_secret (resource)"
+      ],
+      "status_note": "Local mode copies content into the container (no bind mount as compose does); swarm mode ignores driver and template_driver with a warning.",
+      "collision": "docker_compose_secret would be confusable with docker_secret.",
+      "cli_only": false
+    },
+    {
+      "id": "compose:models",
+      "layer": "compose",
+      "kind": "resource",
+      "name": "docker_compose",
+      "update": "in_place",
+      "summary": "models: AI models (Docker Model Runner) that services bind to via endpoint/model env vars.",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/properties/models"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/properties/models"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/model"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/model"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/models.md",
+          "anchor": "#models-top-level-element"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [
+        "docker_compose (resource)"
+      ],
+      "status_note": "Parsed by compose-go but ignored: service `models` gets a warning in local mode; the top-level element is never acted on. Model Runner is not part of the Docker Engine API, so support needs a separate client.",
+      "cli_only": false
+    },
+    {
+      "id": "compose:jobs",
+      "layer": "compose",
+      "kind": "resource",
+      "name": "docker_compose",
+      "update": "in_place",
+      "summary": "jobs: run-to-completion containers with manual or scheduled triggers (Compose NEXT).",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/properties/jobs"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/properties/jobs"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/job"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/job"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/schedule"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/schedule"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/jobs.md",
+          "anchor": "#jobs-top-level-element"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/jobs.md",
+          "anchor": "#triggers"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [
+        "docker_compose (resource)"
+      ],
+      "status_note": "compose-go v2.16.2 parses jobs (Project.Jobs) but docker_compose never reads them: silently ignored, not even warned. Scheduled triggers need a scheduler outside Terraform; manual runs map to the proposed docker_compose_run action. The embedded compose-go schema lacks jobs.*.extends.",
+      "cli_only": false
+    },
+    {
+      "id": "compose:include",
+      "layer": "compose",
+      "kind": "resource",
+      "name": "docker_compose",
+      "update": "in_place",
+      "summary": "include: pull other compose files (with own project_directory/env_file) into the model.",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/properties/include"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/properties/include"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/include"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/include"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/14-include.md",
+          "anchor": "#include"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_compose (resource)"
+      ],
+      "status_note": "Local-path includes are resolved by the compose-go loader; remote (git/oci) includes are disabled by design (compose_parse.go).",
+      "cli_only": false
+    },
+    {
+      "id": "compose:name",
+      "layer": "compose",
+      "kind": "resource",
+      "name": "docker_compose",
+      "update": "in_place",
+      "summary": "name: project name used to prefix and label every object.",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/properties/name"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/properties/name"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/04-version-and-name.md",
+          "anchor": "#name-top-level-element"
+        }
+      ],
+      "min_api": null,
+      "status": "exists",
+      "existing": [
+        "docker_compose (resource)"
+      ],
+      "status_note": "docker_compose.project_name defaults to the file's top-level name.",
+      "cli_only": false
+    },
+    {
+      "id": "compose:version",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "version: obsolete top-level element, informational only.",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/properties/version"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/properties/version"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/04-version-and-name.md",
+          "anchor": "#version-top-level-element-obsolete"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "skip_reason": "obsolete; Compose ignores it (warns) and so does the loader",
+      "cli_only": false
+    },
+    {
+      "id": "compose:service-build",
+      "layer": "compose",
+      "kind": "resource",
+      "name": "docker_image",
+      "update": "in_place",
+      "summary": "service.build: build the service image (context, dockerfile, args, secrets, cache, platforms...).",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/service/properties/build"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/service/properties/build"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/build.md",
+          "anchor": "#compose-build-specification"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_image (resource)",
+        "docker_buildx_builder (resource)"
+      ],
+      "status_note": "docker_compose does not build (warns; errors when image is unset); docker_image covers the build as a separate resource. A build action would be docker_compose_build.",
+      "cli_only": false
+    },
+    {
+      "id": "compose:service-deploy",
+      "layer": "compose",
+      "kind": "resource",
+      "name": "docker_service",
+      "update": "in_place",
+      "summary": "service.deploy: replicas, mode, resources, restart/update/rollback policy, placement, labels.",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/service/properties/deploy"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/service/properties/deploy"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/deployment"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/deployment"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/deploy.md",
+          "anchor": "#compose-deploy-specification"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_compose (resource)",
+        "docker_service (resource)",
+        "docker_stack (resource)"
+      ],
+      "status_note": "docker_compose swarm mode maps deploy to the Swarm service spec; local mode uses replicas (scale), global mode and resources. Not its own Terraform type: it is the docker_service spec.",
+      "cli_only": false
+    },
+    {
+      "id": "compose:service-develop",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "service.develop: watch rules (sync/rebuild/restart) used by `compose watch`.",
+      "sources": [
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/service/properties/develop"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/service/properties/develop"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/schema/compose-spec.json",
+          "pointer": "#/$defs/development"
+        },
+        {
+          "type": "schema",
+          "file": "upstream/compose-spec/compose-go-embedded.json",
+          "pointer": "#/$defs/development"
+        },
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/develop.md",
+          "anchor": "#compose-develop-specification"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "skip_reason": "developer inner-loop file watching; not declarative (docker_compose warns and ignores it)",
+      "cli_only": false
+    },
+    {
+      "id": "compose:fragments",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "fragments: compose file-format mechanic (YAML anchors/aliases).",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/10-fragments.md",
+          "anchor": "#fragments"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "skip_reason": "file-format mechanic, handled by the compose loader",
+      "cli_only": false
+    },
+    {
+      "id": "compose:extensions",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "extensions: compose file-format mechanic (x-* keys; ignored by docker_compose).",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/11-extension.md",
+          "anchor": "#extension"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "skip_reason": "file-format mechanic, handled by the compose loader",
+      "cli_only": false
+    },
+    {
+      "id": "compose:interpolation",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "interpolation: compose file-format mechanic (fed by docker_compose env / env_file and the compose_env function).",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/12-interpolation.md",
+          "anchor": "#interpolation"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "skip_reason": "file-format mechanic, handled by the compose loader",
+      "cli_only": false
+    },
+    {
+      "id": "compose:merge",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "merge: compose file-format mechanic (docker_compose.files merges in order like repeated -f).",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/13-merge.md",
+          "anchor": "#merge-and-override"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "skip_reason": "file-format mechanic, handled by the compose loader",
+      "cli_only": false
+    },
+    {
+      "id": "compose:profiles",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "profiles: compose file-format mechanic (docker_compose.profiles selects them).",
+      "sources": [
+        {
+          "type": "doc",
+          "file": "upstream/compose-spec/15-profiles.md",
+          "anchor": "#profiles"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "skip_reason": "file-format mechanic, handled by the compose loader",
+      "cli_only": false
+    },
+    {
+      "id": "compose:cli-root",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Root `docker compose` command group.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose",
+          "file": "upstream/compose-cli/docs/reference/compose.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose",
+          "file": "upstream/compose-cli/docs/reference/docker_compose.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "command group only; global flags (-f, -p, --profile, --env-file) are docker_compose attributes"
+    },
+    {
+      "id": "compose:cli-up",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_up",
+      "summary": "Create/recreate and start the project. Engine: network/volume create, image pull, container create/start (+ wait).",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose up",
+          "file": "upstream/compose-cli/docs/reference/compose_up.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose up",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_up.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_compose (resource)"
+      ],
+      "status_note": "The docker_compose resource does up on create/update; climap maps `compose up` to it. A standalone action would serve projects not managed by Terraform.",
+      "cli_only": true,
+      "collision": "docker_compose (resource) already means up; an action docker_compose_up beside it invites confusion."
+    },
+    {
+      "id": "compose:cli-down",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_down",
+      "summary": "Stop and remove the project's containers and networks (optionally volumes, images). Engine: container stop/delete, network delete, volume delete.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose down",
+          "file": "upstream/compose-cli/docs/reference/compose_down.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose down",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_down.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_compose (resource)"
+      ],
+      "status_note": "Destroying docker_compose (keep_volumes) is down; no action for projects outside Terraform.",
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-start",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_start",
+      "summary": "Start existing service containers, selected by project/service labels. Engine: GET /containers/json (label filter) + POST /containers/{id}/start.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose start",
+          "file": "upstream/compose-cli/docs/reference/compose_start.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose start",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_start.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": true,
+      "collision": "Would mirror single-container docker_container_start actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+    },
+    {
+      "id": "compose:cli-stop",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_stop",
+      "summary": "Stop service containers, selected by project/service labels. Engine: GET /containers/json (label filter) + POST /containers/{id}/stop.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose stop",
+          "file": "upstream/compose-cli/docs/reference/compose_stop.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose stop",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_stop.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": true,
+      "collision": "Would mirror single-container docker_container_stop actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+    },
+    {
+      "id": "compose:cli-restart",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_restart",
+      "summary": "Restart service containers, selected by project/service labels. Engine: GET /containers/json (label filter) + POST /containers/{id}/restart.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose restart",
+          "file": "upstream/compose-cli/docs/reference/compose_restart.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose restart",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_restart.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": true,
+      "collision": "Would mirror single-container docker_container_restart actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+    },
+    {
+      "id": "compose:cli-kill",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_kill",
+      "summary": "Send a signal to service containers, selected by project/service labels. Engine: GET /containers/json (label filter) + POST /containers/{id}/kill.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose kill",
+          "file": "upstream/compose-cli/docs/reference/compose_kill.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose kill",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_kill.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": true,
+      "collision": "Would mirror single-container docker_container_kill actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+    },
+    {
+      "id": "compose:cli-pause",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_pause",
+      "summary": "Pause service containers, selected by project/service labels. Engine: GET /containers/json (label filter) + POST /containers/{id}/pause.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose pause",
+          "file": "upstream/compose-cli/docs/reference/compose_pause.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose pause",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_pause.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": true,
+      "collision": "Would mirror single-container docker_container_pause actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+    },
+    {
+      "id": "compose:cli-unpause",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_unpause",
+      "summary": "Unpause service containers, selected by project/service labels. Engine: GET /containers/json (label filter) + POST /containers/{id}/unpause.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose unpause",
+          "file": "upstream/compose-cli/docs/reference/compose_unpause.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose unpause",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_unpause.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": true,
+      "collision": "Would mirror single-container docker_container_unpause actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+    },
+    {
+      "id": "compose:cli-create",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Create service containers without starting them.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose create",
+          "file": "upstream/compose-cli/docs/reference/compose_create.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose create",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_create.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "half of `up`; the docker_compose resource owns container creation"
+    },
+    {
+      "id": "compose:cli-rm",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Remove stopped service containers.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose rm",
+          "file": "upstream/compose-cli/docs/reference/compose_rm.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose rm",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_rm.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "docker_compose reconciles and removes its own containers; one-off cleanup is docker_system_prune"
+    },
+    {
+      "id": "compose:cli-build",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_build",
+      "summary": "Build every service with a `build:` section. Engine: POST /build or BuildKit session.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose build",
+          "file": "upstream/compose-cli/docs/reference/compose_build.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose build",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_build.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_image (resource)"
+      ],
+      "status_note": "docker_compose ignores build: and climap says no equivalent; docker_image builds one image per resource.",
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-pull",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_pull",
+      "summary": "Pull all service images. Engine: POST /images/create.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose pull",
+          "file": "upstream/compose-cli/docs/reference/compose_pull.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose pull",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_pull.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_image (resource)",
+        "docker_compose (resource)"
+      ],
+      "status_note": "docker_compose pulls missing images during apply; climap maps it to docker_image.",
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-push",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_push",
+      "summary": "Push all service images. Engine: POST /images/{name}/push.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose push",
+          "file": "upstream/compose-cli/docs/reference/compose_push.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose push",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_push.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_registry_image (resource)"
+      ],
+      "status_note": "docker_registry_image pushes one image per resource; no project-wide push.",
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-run",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_run",
+      "summary": "Run a one-off container for a service or job. Engine: container create/start/wait/delete.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose run",
+          "file": "upstream/compose-cli/docs/reference/compose_run.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose run",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_run.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "climap: no equivalent. Also the natural manual trigger for compose `jobs`.",
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-exec",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_exec",
+      "summary": "Exec a command in a service container. Engine: POST /containers/{id}/exec + /exec/{id}/start.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose exec",
+          "file": "upstream/compose-cli/docs/reference/compose_exec.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose exec",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_exec.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_exec (action)",
+        "docker_exec_output (ephemeral resource)"
+      ],
+      "status_note": "climap maps it to docker_exec with the <project>-<service>-<n> container name; no service selector.",
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-cp",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_cp",
+      "summary": "Copy files between a service container and the local filesystem. Engine: PUT/GET /containers/{id}/archive.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose cp",
+          "file": "upstream/compose-cli/docs/reference/compose_cp.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose cp",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_cp.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_container (resource)"
+      ],
+      "status_note": "docker_container has upload blocks for containers it manages; nothing for compose containers or for copying out.",
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-commit",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_commit",
+      "summary": "Create an image from a service container. Engine: POST /commit.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose commit",
+          "file": "upstream/compose-cli/docs/reference/compose_commit.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose commit",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_commit.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-export",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_export",
+      "summary": "Export a service container filesystem as a tar. Engine: GET /containers/{id}/export.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose export",
+          "file": "upstream/compose-cli/docs/reference/compose_export.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose export",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_export.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_container_export (action)"
+      ],
+      "status_note": "docker_container_export takes a container, not a project/service.",
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-scale",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_scale",
+      "summary": "Set the replica count of services. Engine: container create/start/stop/delete (local).",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose scale",
+          "file": "upstream/compose-cli/docs/reference/compose_scale.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose scale",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_scale.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_compose (resource)",
+        "docker_service_scale (action)"
+      ],
+      "status_note": "Declaratively via deploy.replicas in docker_compose content; docker_service_scale covers swarm services.",
+      "cli_only": true,
+      "collision": "docker_service_scale (swarm action) already exists; docker_compose_scale is near-identical in purpose."
+    },
+    {
+      "id": "compose:cli-wait",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_wait",
+      "summary": "Block until service containers stop. Engine: POST /containers/{id}/wait.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose wait",
+          "file": "upstream/compose-cli/docs/reference/compose_wait.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose wait",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_wait.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_compose (resource)"
+      ],
+      "status_note": "docker_compose has wait/wait_timeout for readiness after apply, not for exit.",
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-publish",
+      "layer": "compose",
+      "kind": "action",
+      "name": "docker_compose_publish",
+      "summary": "Publish the compose application as an OCI artifact to a registry.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose publish",
+          "file": "upstream/compose-cli/docs/reference/compose_publish.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose publish",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_publish.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "Registry (OCI distribution) API, not Engine API.",
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-watch",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Watch build context and sync/rebuild/restart on change.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose watch",
+          "file": "upstream/compose-cli/docs/reference/compose_watch.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose watch",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_watch.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "interactive, long-running file watcher"
+    },
+    {
+      "id": "compose:cli-attach",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Attach stdio to a service container.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose attach",
+          "file": "upstream/compose-cli/docs/reference/compose_attach.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose attach",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_attach.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "interactive attach stream"
+    },
+    {
+      "id": "compose:cli-events",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Stream real-time container events.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose events",
+          "file": "upstream/compose-cli/docs/reference/compose_events.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose events",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_events.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "streaming"
+    },
+    {
+      "id": "compose:cli-stats",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Live stream of container resource usage.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose stats",
+          "file": "upstream/compose-cli/docs/reference/compose_stats.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose stats",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_stats.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "streaming (a --no-stream snapshot could be a data source later)"
+    },
+    {
+      "id": "compose:cli-version",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Show compose version.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose version",
+          "file": "upstream/compose-cli/docs/reference/compose_version.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose version",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_version.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "client version only; provider embeds compose-go v2.16.2"
+    },
+    {
+      "id": "compose:cli-ps",
+      "layer": "compose",
+      "kind": "data_source",
+      "name": "docker_compose_containers",
+      "summary": "List containers of a project. Engine: GET /containers/json with com.docker.compose.project label filter.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose ps",
+          "file": "upstream/compose-cli/docs/reference/compose_ps.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose ps",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_ps.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_compose (resource)",
+        "data.docker_containers (data source)",
+        "list.docker_container (list resource)"
+      ],
+      "status_note": "docker_compose.services gives container IDs for managed projects; docker_containers can filter by label for others.",
+      "cli_only": true,
+      "collision": "Name options: docker_compose_ps (CLI-shaped) vs docker_compose_containers (plural-noun convention beside docker_containers)."
+    },
+    {
+      "id": "compose:cli-ls",
+      "layer": "compose",
+      "kind": "data_source",
+      "name": "docker_compose_projects",
+      "summary": "List compose projects on the host. Engine: GET /containers/json grouped by project label.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose ls",
+          "file": "upstream/compose-cli/docs/reference/compose_ls.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose ls",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_ls.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": true,
+      "collision": "docker_compose_ls (CLI-shaped) vs docker_compose_projects (noun)."
+    },
+    {
+      "id": "compose:cli-config",
+      "layer": "compose",
+      "kind": "data_source",
+      "name": "docker_compose_config",
+      "summary": "Parse, interpolate, merge and render the compose model in canonical form (no Engine call).",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose config",
+          "file": "upstream/compose-cli/docs/reference/compose_config.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose config",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_config.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "status_note": "tools/compose2stack converts once at authoring time (a tool, not a type); compose_env only builds env. No type renders the model.",
+      "cli_only": true,
+      "collision": "Confusable with top-level compose `configs` and docker_config (swarm config resource). Alternatives: docker_compose_project, docker_compose_model, or function compose_render."
+    },
+    {
+      "id": "compose:cli-convert",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Alias of `compose config`.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose convert",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_convert.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "alias of config"
+    },
+    {
+      "id": "compose:cli-images",
+      "layer": "compose",
+      "kind": "data_source",
+      "name": "docker_compose_images",
+      "summary": "List images used by project containers. Engine: GET /containers/json + /images/{id}/json.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose images",
+          "file": "upstream/compose-cli/docs/reference/compose_images.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose images",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_images.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": true,
+      "collision": "Beside data.docker_image (singular) and list.docker_image."
+    },
+    {
+      "id": "compose:cli-volumes",
+      "layer": "compose",
+      "kind": "data_source",
+      "name": "docker_compose_volumes",
+      "summary": "List volumes of a project. Engine: GET /volumes with project label filter.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose volumes",
+          "file": "upstream/compose-cli/docs/reference/compose_volumes.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose volumes",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_volumes.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "docker_compose (resource)",
+        "data.docker_volume (data source)",
+        "list.docker_volume (list resource)"
+      ],
+      "status_note": "docker_compose.volumes lists managed project volumes; no lookup for others.",
+      "cli_only": true,
+      "collision": "docker_compose_volumes vs docker_volume / top-level compose `volumes`."
+    },
+    {
+      "id": "compose:cli-logs",
+      "layer": "compose",
+      "kind": "data_source",
+      "name": "docker_compose_logs",
+      "summary": "Read logs of service containers. Engine: GET /containers/{id}/logs.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose logs",
+          "file": "upstream/compose-cli/docs/reference/compose_logs.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose logs",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_logs.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "partial",
+      "existing": [
+        "data.docker_logs (data source)"
+      ],
+      "status_note": "climap maps it to docker_logs per container; no project/service selector.",
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-top",
+      "layer": "compose",
+      "kind": "data_source",
+      "name": "docker_compose_top",
+      "summary": "Processes running in service containers. Engine: GET /containers/{id}/top.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose top",
+          "file": "upstream/compose-cli/docs/reference/compose_top.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose top",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_top.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": true
+    },
+    {
+      "id": "compose:cli-port",
+      "layer": "compose",
+      "kind": "data_source",
+      "name": "docker_compose_port",
+      "summary": "Public port for a service port binding. Engine: GET /containers/{id}/json NetworkSettings.Ports.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose port",
+          "file": "upstream/compose-cli/docs/reference/compose_port.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose port",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_port.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "missing",
+      "existing": [],
+      "cli_only": true,
+      "collision": "Confusable with the port_spec function."
+    },
+    {
+      "id": "compose:cli-alpha",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Experimental command group.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose alpha",
+          "file": "upstream/compose-cli/docs/reference/compose_alpha.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose alpha",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_alpha.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "command group only"
+    },
+    {
+      "id": "compose:cli-alpha-dry-run",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Dry-run mode for commands.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose alpha dry-run",
+          "file": "upstream/compose-cli/docs/reference/compose_alpha_dry-run.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose alpha dry-run",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_alpha_dry-run.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "Terraform plan already is the dry run"
+    },
+    {
+      "id": "compose:cli-alpha-generate",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Generate a compose file from existing containers.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose alpha generate",
+          "file": "upstream/compose-cli/docs/reference/compose_alpha_generate.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose alpha generate",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_alpha_generate.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "experimental authoring helper; output is a file, not infra (terraform query + list resources cover discovery)"
+    },
+    {
+      "id": "compose:cli-alpha-publish",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Experimental alias of publish.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose alpha publish",
+          "file": "upstream/compose-cli/docs/reference/compose_alpha_publish.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose alpha publish",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_alpha_publish.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "duplicate of docker_compose_publish"
+    },
+    {
+      "id": "compose:cli-alpha-scale",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Experimental alias of scale.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose alpha scale",
+          "file": "upstream/compose-cli/docs/reference/compose_alpha_scale.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose alpha scale",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_alpha_scale.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "duplicate of docker_compose_scale"
+    },
+    {
+      "id": "compose:cli-alpha-viz",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Render a graphviz graph of the compose file.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose alpha viz",
+          "file": "upstream/compose-cli/docs/reference/compose_alpha_viz.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose alpha viz",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_alpha_viz.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "visualisation only; terraform graph covers it"
+    },
+    {
+      "id": "compose:cli-alpha-watch",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Experimental alias of watch.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose alpha watch",
+          "file": "upstream/compose-cli/docs/reference/compose_alpha_watch.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose alpha watch",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_alpha_watch.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "interactive file watcher"
+    },
+    {
+      "id": "compose:cli-bridge",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Convert compose files into another model (Kubernetes/Helm).",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose bridge",
+          "file": "upstream/compose-cli/docs/reference/compose_bridge.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose bridge",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_bridge.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "command group; targets non-Docker platforms"
+    },
+    {
+      "id": "compose:cli-bridge-convert",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Convert compose to Kubernetes manifests / Helm via transformation images.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose bridge convert",
+          "file": "upstream/compose-cli/docs/reference/compose_bridge_convert.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose bridge convert",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_bridge_convert.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "out of scope (Kubernetes output)"
+    },
+    {
+      "id": "compose:cli-bridge-transformations",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Manage bridge transformation images.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose bridge transformations",
+          "file": "upstream/compose-cli/docs/reference/compose_bridge_transformations.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose bridge transformations",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_bridge_transformations.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "command group"
+    },
+    {
+      "id": "compose:cli-bridge-transformations-create",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "Create a transformation image.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose bridge transformations create",
+          "file": "upstream/compose-cli/docs/reference/compose_bridge_transformations_create.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose bridge transformations create",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_bridge_transformations_create.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "out of scope (compose-bridge tooling)"
+    },
+    {
+      "id": "compose:cli-bridge-transformations-list",
+      "layer": "compose",
+      "kind": "skip",
+      "name": null,
+      "summary": "List transformation images.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker compose bridge transformations list",
+          "file": "upstream/compose-cli/docs/reference/compose_bridge_transformations_list.md"
+        },
+        {
+          "type": "cli",
+          "command": "docker compose bridge transformations list",
+          "file": "upstream/compose-cli/docs/reference/docker_compose_bridge_transformations_list.yaml"
+        }
+      ],
+      "min_api": null,
+      "status": "n/a",
+      "existing": [],
+      "cli_only": true,
+      "skip_reason": "out of scope (compose-bridge tooling)"
+    }
+  ]
+}

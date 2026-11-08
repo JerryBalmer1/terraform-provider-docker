@@ -1,0 +1,126 @@
+# Inventory fragment schema
+
+Every file in `reference/_gen/fragments/` (except `z3-cli-map.json`, the CLI coverage map) follows this schema.
+`merge.py` validates it; see README.md in this folder.
+
+Harvested sources: `reference/upstream/` (see `reference/SOURCES.md`).
+Existing provider types: the types the provider registers (`internal/provider/register_*.go`; README_resources.md lists them).
+  `existing` entries are written `<type> (<kind>)`, kind being resource | data source | action | ephemeral resource | list resource | function.
+  Read internal/provider/*.go to judge "partial" (e.g. grep which Engine API client calls / attributes a type uses).
+
+A fragment is ONE JSON file (UTF-8, LF), shaped:
+
+{
+  "lane": "Z1",
+  "notes": ["free-text caveats"],
+  "naming_questions": ["one-line question for the user, with the options"],
+  "items": [ ITEM, ... ]
+}
+
+ITEM:
+{
+  "id": "<layer>:<stable-slug>",            // unique, e.g. "engine:container", "swarm:service-rollback", "dockerfile:RUN"
+  "layer": "engine|swarm|compose|dockerfile|buildx|cli-only",
+  "kind": "resource|data_source|action|dockerfile_block|skip",
+  "name": "docker_...",                     // proposed Terraform type name; null only for skip
+  "update": "in_place|replace",             // resources only: in_place if an update endpoint/mechanism exists, else replace. Omit otherwise.
+  "summary": "one line",
+  "sources": [                              // every source reference this item came from
+    {"type": "swagger", "operationId": "ContainerCreate", "method": "POST", "path": "/containers/create"},
+    {"type": "schema", "file": "upstream/compose-spec/schema/compose-spec.json", "pointer": "#/properties/services"},
+    {"type": "cli", "command": "docker container create", "file": "upstream/docker-cli/docs/reference/commandline/container_create.md"},
+    {"type": "doc", "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md", "anchor": "#run---mount"}
+  ],
+  "min_api": "1.41",                        // only where a source states it (swagger text, api/docs/CHANGELOG.md); else null
+  "status": "exists|partial|missing|n/a",   // n/a for skip
+  "existing": ["docker_container (resource)"],  // provider types that cover it (fully or partly); [] if none
+  "status_note": "why partial / what is missing",  // required when partial
+  "cli_only": false,                        // true when it appears in a CLI but has NO Engine API endpoint (client-side: compose, stack deploy, context, trust, manifest, buildx bake...)
+  "skip_reason": "one line",                // required for skip
+  "collision": "text if the proposed name collides or is confusable with another name (existing or proposed)",  // optional
+  "flags": [ {"name": "--mount=type=cache", "options": ["id","target","sharing","..."], "anchor": "#run---mounttypecache"} ]  // dockerfile_block only (optional elsewhere)
+}
+
+Path strings in sources are relative to reference/ (start with "upstream/").
+
+Rules:
+- resource = has a create AND a delete/remove path. Group all ops of one object (create, inspect, update, delete, plus sub-ops that edit the same object) into ONE resource item; list sources for each op.
+- data_source = read-only inspect/list with no lifecycle. A list endpoint becomes a plural data source (docker_containers); a single-object inspect without lifecycle becomes a singular data source. If an object has a resource, its inspect op still usually deserves a singular data source item (looking up objects not managed by TF) — make it a separate data_source item.
+- action = imperative op outside CRUD (restart, kill, pause/unpause, exec, prune, push, pull, tag, commit, swarm init/join/leave/unlock, node promote/demote, service rollback/scale, compose up/down/restart, build). Terraform plugin framework "actions".
+- skip = deprecated, session/streaming-only, attach/websocket, interactive, pure-client UI etc. One-line reason.
+- Naming prefixes: docker_*, docker_swarm_*, docker_compose_*, docker_dockerfile_*, docker_buildx_*. Prefer existing names where the type already exists. Don't invent a new name for something that exists.
+- status: exists = a registered type of the same kind covers it; partial = covered only in part or by a different kind (ephemeral/list resource/attribute of another type/different name); missing = nothing.
+- Propose names only. Do not write code.
+
+# Outputs schema (`fragments/outputs/<lane>.json`)
+
+The outputs contract ([../CONTRACT.md](../CONTRACT.md)) gives every non-skipped item an `outputs` array.
+Each lane owns one file in `fragments/outputs/`. merge.py joins it onto the items by id and exits 1 when:
+an id is unknown or skipped; one id appears in two outputs files; an output is missing a required field, has a bad
+category, `tf_type` or source type, or is not snake_case; two outputs of one item share a name; a raw output has no
+hash output; a `hash_of` does not name a raw output of the same item; an item-level key is not in the list below.
+
+```
+{
+  "lane": "A",
+  "notes": ["free-text caveats"],
+  "naming_questions": ["one-line question, with the options"],   // appended to INVENTORY.md after the existing ones
+  "allowed_violations": [ {"id": "<item id>", "rule": "V1|V2|V3|V4", "reason": "why"} ],  // proposals; Lane Z copies accepted ones into allowed-violations.txt
+  "items": {
+    "<item id>": {
+      "outputs": [ OUTPUT, ... ],
+      "no_raw_reason": "why there is no raw output",               // optional; satisfies V2 for raw
+      "no_structured_reason": "why there is no structured output", // optional; satisfies V2 for structured
+      "outputs_status": "exists|partial|missing",                  // optional: do today's provider attributes cover these outputs?
+      "outputs_note": "what exists today / what is missing"        // optional
+    }
+  }
+}
+
+OUTPUT:
+{
+  "name": "inspect_json",                 // snake_case; the Terraform attribute name
+  "tf_type": "string",                    // string | number | bool | dynamic | list(T) | set(T) | map(T) | object({...})
+  "category": "raw|structured|identity|version|hash",
+  "source": SOURCE,
+  "known_after_apply": true,              // unknown at plan time (computed by create/update or by a read that depends on unknown inputs)
+  "sensitive": false,                     // true when a secret value could leak through it (env, secret data, auth, build args...)
+  "description": "one line",              // optional
+  "serializes": "inspect",                // raw only, optional: the structured output this raw output is the serialization of
+  "hash_of": "inspect_json",              // hash only, required: the raw output it hashes
+  "fields": [ FIELD, ... ],               // structured only, required (V4): the upstream -> snake_case mapping
+  "fields_complete": true,                // structured only: false when nested levels below `fields` are left to the mechanical rule
+  "provided": false                       // optional: true when the provider exposes this attribute today
+}
+
+FIELD:
+{ "name": "host_config", "upstream": "HostConfig", "tf_type": "object({...})", "pointer": "#/definitions/HostConfig",
+  "fields": [ FIELD, ... ] }              // nested fields optional; tf_type "object({...})" / "list(object({...}))" / "map(object({...}))" means "see fields"
+
+SOURCE (paths relative to reference/):
+  {"type": "swagger", "file": "upstream/engine-api/api/swagger.yaml", "pointer": "#/definitions/ContainerInspectResponse"}
+  {"type": "schema",  "file": "upstream/compose-spec/schema/compose-spec.json", "pointer": "#/definitions/service"}
+  {"type": "doc",     "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md", "anchor": "#from"}
+  {"type": "cli",     "command": "docker buildx inspect", "format_field": "{{.Name}}", "file": "upstream/..."}  // a CLI --format / inspect field
+  {"type": "sources_md", "pin": "compose_spec"}       // a pin from SOURCES.md / inventory.json "pins"
+  {"type": "derived", "from": "inspect_json", "how": "sha256 of the UTF-8 bytes"}
+```
+
+Naming rules:
+- snake_case from the upstream name: `HostConfig` -> `host_config`, `IPAddress` -> `ip_address`, `Id`/`ID` -> `id`,
+  `EnableIPv6` -> `enable_ipv6`; compose keys are already snake_case (hyphens become `_`); Dockerfile flags drop the
+  dashes (`--keep-git-dir` -> `keep_git_dir`). `fields` always records both names, so no mapping is implicit.
+- raw outputs: `dockerfile`, `compose_yaml`, `stack_yaml`, `inspect_json`, `bake_hcl`, `bake_json`, or `<thing>_json`.
+- hash outputs: `content_sha256` when the item has one raw output, else `<raw name>_sha256`.
+- version outputs use exactly these names: `engine_api_version` (negotiated), `docker_server_version`,
+  `compose_spec_version` (pinned commit), `compose_go_version`, `dockerfile_syntax` (the `# syntax=` value or the
+  default frontend), `buildx_version`.
+- identity outputs: `id`, `name`, `image_ref` (repo:tag), `image_digest_ref` (repo@sha256:...), `digest`, `platforms`,
+  `labels`, or another stable handoff value.
+
+Contract rules (checked by `Invoke-Build InventoryValidate`, reference/_gen/validate.py; exceptions only through
+`reference/_gen/allowed-violations.txt`, one `<id><TAB><rule><TAB><reason>` per line):
+- V1: every non-skipped item has at least one identity output and at least one version output.
+- V2: every resource and data source has a raw and a structured output, or `no_raw_reason` / `no_structured_reason`.
+- V3: every version output name is one of the six version names above.
+- V4: every structured output has a non-empty `fields` list.

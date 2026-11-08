@@ -48,9 +48,9 @@ README_resources.md (generated) lists every type by layer.
   - Location: `C:\__Code\tpd-wt\lane<X>`, detached at HEAD plus the Lane 0 changes copied in.
   - Lanes never share files. Each lane owns an explicit file list, and cross-lane needs are logged as TODO lines with the exact change.
   - The orchestrator merges by copying each lane's owned files back into the main tree. Diff with CRs ignored, because the checkout uses autocrlf.
-- **Acceptance runs go through `test/harness/Invoke-E2E.ps1`** (or `build.ps1 -Task testacc`, which wraps it), never against the Docker Desktop daemon directly.
+- **Acceptance runs go through `test/harness/Invoke-E2E.ps1`** (or `Invoke-Build TestAcc`, which wraps it), never against the Docker Desktop daemon directly.
   - Only one lane or agent runs the harness at a time.
-  - Swarm-manager tests need the `-SwarmInit` pass; see the regex in build.ps1.
+  - Swarm-manager tests need the `-SwarmInit` pass; see `$SwarmAccRegex` in terraform-provider-docker.build.ps1.
 - **BUILD_REPORT.md is append-only.** Each pass gets a `## Pass N` section: a log, then a summary.
   - Log lines are `[P<pass>-<lane>] [TAG] text`, with TAG one of BUILD, TEST, VERIFIED, FIXED, ASSUMED, TODO, or `[BLOCKED] <lane> <what> <why> <what was tried>`.
   - A blocked item never stops a lane, and a blocked lane never stops the pass: log it, leave the code compiling (stub with a clear error and a TODO), and move on.
@@ -68,19 +68,27 @@ README_resources.md (generated) lists every type by layer.
 
 ## Build and test
 
-PowerShell (Windows; no make needed):
+PowerShell (Windows; no make needed). [terraform-provider-docker.build.ps1](terraform-provider-docker.build.ps1)
+is an [Invoke-Build](https://github.com/nightroman/Invoke-Build) script; run it from the repo root
+(`Install-Module InvokeBuild -Scope CurrentUser` once):
 
 ```
-pwsh -File build.ps1                      # go build ./... + provider binary
-pwsh -File build.ps1 -Task build,vet,test # unit tests; TestAcc* skip
-pwsh -File build.ps1 -Task skill          # regenerate .claude/skills + README_resources.md
-pwsh -File build.ps1 -Task docs           # skill, then tfplugindocs generate + validate
-pwsh -File build.ps1 -Task check          # gofmt, vet, genskill -check/-strict, tfplugindocs validate
-pwsh -File build.ps1 -Task testacc        # dind harness: plain pass, then -SwarmInit pass
-pwsh -File build.ps1 -Task parity         # kreuzwerker parity table
-pwsh -File build.ps1 -Task apiwatch       # Engine API drift vs tools/apiwatch/pinned.json
-pwsh -File build.ps1 -Task compose2stack -In docker-compose.yml -Out stack.tf -Mode swarm
+Invoke-Build ?                   # list tasks
+Invoke-Build                     # default: Build, Vet, Test, GenSkillCheck, InventoryCheck
+Invoke-Build Build, Vet, Test    # go build + provider binary, go vet, unit tests (-short, TF_ACC unset)
+Invoke-Build Tools               # unit tests of tools/ only
+Invoke-Build GenSkill            # regenerate .claude/skills + README_resources.md (GenSkillCheck: -check)
+Invoke-Build Docs                # GenSkill, then tfplugindocs generate + validate
+Invoke-Build Check               # gofmt, vet, genskill -check/-strict, tfplugindocs validate
+Invoke-Build TestAcc             # dind harness: plain pass, then -SwarmInit pass (TF_ACC=1)
+Invoke-Build Parity              # kreuzwerker parity table
+Invoke-Build ApiWatch            # Engine API drift vs tools/apiwatch/pinned.json
+Invoke-Build Inventory           # reference/inventory.json + INVENTORY.md from reference/_gen/fragments (InventoryCheck: diff must be empty)
+Invoke-Build ReferenceVerify     # re-hash reference/upstream against the SHAs pinned in reference/SOURCES.md
+Invoke-Build Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm
 ```
+
+Nobody hand-edits `reference/inventory.json` or `INVENTORY.md`: edit `reference/_gen/fragments/*.json`, then `Invoke-Build Inventory`.
 
 bash (Linux/macOS/CI):
 
