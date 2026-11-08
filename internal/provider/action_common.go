@@ -6,21 +6,19 @@ package provider
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
-	"time"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	units "github.com/docker/go-units"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/moby/moby/client"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
 )
 
 // actPollInterval is how often waiting actions poll the daemon. A var so
@@ -121,9 +119,9 @@ func actValidatePruneFilters(ctx context.Context, m types.Map, diags *diag.Diagn
 	return f
 }
 
-// actPruneFilters builds filters.Args with only the keys in allowed.
-func actPruneFilters(f map[string]string, allowed ...string) filters.Args {
-	args := filters.NewArgs()
+// actPruneFilters builds client.Filters with only the keys in allowed.
+func actPruneFilters(f map[string]string, allowed ...string) client.Filters {
+	args := client.Filters{}
 	for k, v := range f {
 		if swarmContains(allowed, k) {
 			args.Add(k, v)

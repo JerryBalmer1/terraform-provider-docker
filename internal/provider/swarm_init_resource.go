@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -21,6 +19,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 // swarmInitErrLocked marks a swarm manager that is locked by autolock.
@@ -136,16 +136,20 @@ func (r *swarmInitResource) Configure(_ context.Context, req resource.ConfigureR
 	r.pd = providerDataFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-// swarmInitBuildRequest turns the plan into an InitRequest.
-func swarmInitBuildRequest(ctx context.Context, m swarmInitModel, diags *diag.Diagnostics) swarm.InitRequest {
-	req := swarm.InitRequest{
+// swarmInitBuildRequest turns the plan into SwarmInit options.
+func swarmInitBuildRequest(ctx context.Context, m swarmInitModel, diags *diag.Diagnostics) client.SwarmInitOptions {
+	req := client.SwarmInitOptions{
 		ListenAddr:    m.ListenAddr.ValueString(),
 		AdvertiseAddr: m.AdvertiseAddr.ValueString(),
 	}
 	if req.ListenAddr == "" {
 		req.ListenAddr = swarmDefaultListenAddr
 	}
-	req.DefaultAddrPool = stringListFrom(ctx, m.DefaultAddrPool, diags)
+	pools, err := parsePrefixes("default_addr_pool", stringListFrom(ctx, m.DefaultAddrPool, diags))
+	if err != nil {
+		diags.AddAttributeError(path.Root("default_addr_pool"), "Invalid default_addr_pool", err.Error())
+	}
+	req.DefaultAddrPool = pools
 	if v, ok := knownInt64(m.SubnetSize); ok {
 		req.SubnetSize = uint32(v)
 	}
@@ -171,7 +175,7 @@ func swarmInitFlatten(m *swarmInitModel, nodeID string, sw swarm.Swarm, unlockKe
 	m.NodeID = types.StringValue(nodeID)
 	m.ManagerJoinToken = types.StringValue(sw.JoinTokens.Manager)
 	m.WorkerJoinToken = types.StringValue(sw.JoinTokens.Worker)
-	m.DefaultAddrPool = stringListValue(sw.DefaultAddrPool, false)
+	m.DefaultAddrPool = stringListValue(prefixStrings(sw.DefaultAddrPool), false)
 	m.SubnetSize = types.Int64Value(int64(sw.SubnetSize))
 	m.DataPathPort = types.Int64Value(int64(sw.DataPathPort))
 	m.Autolock = types.BoolValue(sw.Spec.EncryptionConfig.AutoLockManagers)
@@ -193,20 +197,22 @@ func swarmInitFlatten(m *swarmInitModel, nodeID string, sw swarm.Swarm, unlockKe
 // (autolock after restart) is reported present with m left unchanged and
 // swarmInitErrLocked.
 func swarmInitRefresh(ctx context.Context, c *client.Client, m *swarmInitModel) (bool, error) {
-	info, err := c.Info(ctx)
+	infoRes, err := c.Info(ctx, client.InfoOptions{})
 	if err != nil {
 		return false, fmt.Errorf("reading daemon info: %w", err)
 	}
+	info := infoRes.Info
 	if info.Swarm.LocalNodeState == swarm.LocalNodeStateLocked {
 		return true, swarmInitErrLocked
 	}
 	if info.Swarm.LocalNodeState != swarm.LocalNodeStateActive {
 		return false, nil
 	}
-	sw, err := c.SwarmInspect(ctx)
+	swRes, err := c.SwarmInspect(ctx, client.SwarmInspectOptions{})
 	if err != nil {
 		return false, fmt.Errorf("inspecting swarm: %w", err)
 	}
+	sw := swRes.Swarm
 	if id, ok := knownString(m.ID); ok && id != "" && id != sw.ID {
 		return false, nil
 	}
@@ -216,7 +222,7 @@ func swarmInitRefresh(ctx context.Context, c *client.Client, m *swarmInitModel) 
 		if err != nil {
 			return false, fmt.Errorf("reading unlock key: %w", err)
 		}
-		unlock = k.UnlockKey
+		unlock = k.Key
 	}
 	swarmInitFlatten(m, info.Swarm.NodeID, sw, unlock)
 	return true, nil
@@ -280,15 +286,16 @@ func (r *swarmInitResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 	want, _ := knownBool(plan.Autolock)
-	sw, err := r.pd.Client.SwarmInspect(ctx)
+	swRes, err := r.pd.Client.SwarmInspect(ctx, client.SwarmInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect swarm", err.Error())
 		return
 	}
+	sw := swRes.Swarm
 	if sw.Spec.EncryptionConfig.AutoLockManagers != want {
 		spec := sw.Spec
 		spec.EncryptionConfig.AutoLockManagers = want
-		if err := r.pd.Client.SwarmUpdate(ctx, sw.Version, spec, swarm.UpdateFlags{}); err != nil {
+		if _, err := r.pd.Client.SwarmUpdate(ctx, client.SwarmUpdateOptions{Version: sw.Version, Spec: spec}); err != nil {
 			resp.Diagnostics.AddError("Cannot update swarm autolock", err.Error())
 			return
 		}
@@ -319,11 +326,12 @@ func (r *swarmInitResource) ImportState(ctx context.Context, req resource.Import
 		resp.Diagnostics.AddError("Provider not configured", "docker_swarm_init import needs a configured provider.")
 		return
 	}
-	sw, err := r.pd.Client.SwarmInspect(ctx)
+	swRes, err := r.pd.Client.SwarmInspect(ctx, client.SwarmInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect swarm", fmt.Sprintf("the provider's host must be a swarm manager to import docker_swarm_init: %v", err))
 		return
 	}
+	sw := swRes.Swarm
 	if sw.ID != req.ID {
 		resp.Diagnostics.AddError("Swarm ID mismatch",
 			fmt.Sprintf("import ID %q does not match the cluster ID %q of the provider's Docker host.", req.ID, sw.ID))

@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/container"
 )
 
 type containerDeviceModel struct {

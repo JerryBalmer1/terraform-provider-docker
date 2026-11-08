@@ -1,0 +1,9 @@
+# Source: examples/resources/docker_compose/resource.tf, docker_compose.stack
+services:
+  web:
+    image: nginx:1.27-alpine
+    ports: ["8081:80"]
+    deploy:
+      replicas: 2
+      placement:
+        constraints: ["node.role==worker"]

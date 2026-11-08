@@ -10,13 +10,13 @@ import (
 	"fmt"
 
 	"github.com/distribution/reference"
-	"github.com/docker/docker/api/types/image"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -121,7 +121,7 @@ func (r *tagResource) Create(ctx context.Context, req resource.CreateRequest, re
 		resp.Diagnostics.AddAttributeError(path.Root("source_image"), "Cannot find source image", fmt.Sprintf("%s: %v", src, err))
 		return
 	}
-	if err := r.pd.Client.ImageTag(ctx, insp.ID, tgt); err != nil {
+	if _, err := r.pd.Client.ImageTag(ctx, client.ImageTagOptions{Source: insp.ID, Target: tgt}); err != nil {
 		resp.Diagnostics.AddError("Cannot tag image", fmt.Sprintf("%s -> %s: %v", src, tgt, err))
 		return
 	}
@@ -215,7 +215,7 @@ func tagRemove(ctx context.Context, pd *providerData, m tagResourceModel) (kept 
 	if !tagHasOtherTag(insp.RepoTags, tgt) {
 		return true, nil
 	}
-	_, err = pd.Client.ImageRemove(ctx, tgt, image.RemoveOptions{Force: false, PruneChildren: false})
+	_, err = pd.Client.ImageRemove(ctx, tgt, client.ImageRemoveOptions{Force: false, PruneChildren: false})
 	if err != nil && !isNotFound(err) {
 		return false, fmt.Errorf("%s: %w", tgt, err)
 	}

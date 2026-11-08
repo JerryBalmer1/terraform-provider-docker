@@ -7,14 +7,14 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 )
 
 // containerP2Model is a plan using every Pass 2 attribute.
@@ -71,10 +71,9 @@ func containerP2Inspect(m containerResourceModel, cfg *container.Config, hc *con
 	}
 	hc.LogConfig.Type = "json-file"
 	return container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID: m.ID.ValueString(), Name: "/" + m.Name.ValueString(), Image: "sha256:img",
-			State: &container.State{Running: true}, HostConfig: hc,
-		},
+
+		ID: m.ID.ValueString(), Name: "/" + m.Name.ValueString(), Image: "sha256:img",
+		State: &container.State{Running: true}, HostConfig: hc,
 		Config:          cfg,
 		NetworkSettings: &container.NetworkSettings{Networks: eps},
 	}
@@ -91,7 +90,7 @@ func TestContainerP2ExpandFlattenRoundTrip(t *testing.T) {
 	if cfg.Hostname != "box" || !cfg.Tty || !cfg.OpenStdin || cfg.StopSignal != "SIGQUIT" || cfg.StopTimeout == nil || *cfg.StopTimeout != 30 {
 		t.Errorf("config: %+v", cfg)
 	}
-	if !reflect.DeepEqual(hc.DNS, []string{"1.1.1.1", "8.8.8.8"}) || hc.DNSSearch[0] != "corp.local" || len(hc.ExtraHosts) != 2 ||
+	if !reflect.DeepEqual(addrStrings(hc.DNS), []string{"1.1.1.1", "8.8.8.8"}) || hc.DNSSearch[0] != "corp.local" || len(hc.ExtraHosts) != 2 ||
 		hc.Sysctls["net.core.somaxconn"] != "1024" || len(hc.SecurityOpt) != 2 || !hc.ReadonlyRootfs {
 		t.Errorf("host config: %+v", hc)
 	}
@@ -103,7 +102,7 @@ func TestContainerP2ExpandFlattenRoundTrip(t *testing.T) {
 		!reflect.DeepEqual(hc.DeviceRequests[0].Capabilities, [][]string{{"gpu"}}) {
 		t.Errorf("device requests = %+v", hc.DeviceRequests)
 	}
-	if ep := netCfg.EndpointsConfig["v6net"]; ep.IPAMConfig == nil || ep.IPAMConfig.IPv6Address != "fd00::10" || ep.IPAMConfig.IPv4Address != "" {
+	if ep := netCfg.EndpointsConfig["v6net"]; ep.IPAMConfig == nil || addrString(ep.IPAMConfig.IPv6Address) != "fd00::10" || addrString(ep.IPAMConfig.IPv4Address) != "" {
 		t.Errorf("endpoint = %+v", ep)
 	}
 

@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 const (
@@ -121,15 +121,16 @@ func swarmStringMapsEqual(a, b map[string]string) bool {
 func swarmUpdateNode(ctx context.Context, c *client.Client, nodeID string, change swarmNodeSpecChange) error {
 	var lastErr error
 	for attempt := 0; attempt < swarmNodeUpdateAttempts; attempt++ {
-		n, _, err := c.NodeInspectWithRaw(ctx, nodeID)
+		res, err := c.NodeInspect(ctx, nodeID, client.NodeInspectOptions{})
 		if err != nil {
 			return fmt.Errorf("inspecting node %s: %w", nodeID, err)
 		}
+		n := res.Node
 		spec, changed := swarmApplyNodeSpec(n.Spec, change)
 		if !changed {
 			return nil
 		}
-		err = c.NodeUpdate(ctx, nodeID, n.Version, spec)
+		_, err = c.NodeUpdate(ctx, nodeID, client.NodeUpdateOptions{Version: n.Version, Spec: spec})
 		if err == nil {
 			return nil
 		}
@@ -155,11 +156,11 @@ func swarmUpdateNode(ctx context.Context, c *client.Client, nodeID string, chang
 
 // swarmBuildJoinRequest builds the JoinRequest docker_swarm_node sends to
 // the joining node's own daemon.
-func swarmBuildJoinRequest(managerAddr, token, advertiseAddr, listenAddr string) swarm.JoinRequest {
+func swarmBuildJoinRequest(managerAddr, token, advertiseAddr, listenAddr string) client.SwarmJoinOptions {
 	if listenAddr == "" {
 		listenAddr = swarmDefaultListenAddr
 	}
-	return swarm.JoinRequest{
+	return client.SwarmJoinOptions{
 		ListenAddr:    listenAddr,
 		AdvertiseAddr: advertiseAddr,
 		RemoteAddrs:   []string{managerAddr},
@@ -170,26 +171,28 @@ func swarmBuildJoinRequest(managerAddr, token, advertiseAddr, listenAddr string)
 // swarmJoinNode makes the daemon behind nodeClient join the swarm and
 // returns its node ID once the manager can see it. A daemon that is already
 // an active member that the manager knows is adopted instead of re-joined.
-func swarmJoinNode(ctx context.Context, nodeClient, manager *client.Client, req swarm.JoinRequest, timeout time.Duration) (string, error) {
-	info, err := nodeClient.Info(ctx)
+func swarmJoinNode(ctx context.Context, nodeClient, manager *client.Client, req client.SwarmJoinOptions, timeout time.Duration) (string, error) {
+	infoRes, err := nodeClient.Info(ctx, client.InfoOptions{})
 	if err != nil {
 		return "", fmt.Errorf("reading info from joining node: %w", err)
 	}
+	info := infoRes.Info
 	if info.Swarm.LocalNodeState == swarm.LocalNodeStateActive && info.Swarm.NodeID != "" {
-		if _, _, err := manager.NodeInspectWithRaw(ctx, info.Swarm.NodeID); err == nil {
+		if _, err := manager.NodeInspect(ctx, info.Swarm.NodeID, client.NodeInspectOptions{}); err == nil {
 			return info.Swarm.NodeID, nil
 		}
 		return "", fmt.Errorf("node %s is already part of a different swarm; leave it first", info.Swarm.NodeID)
 	}
-	if err := nodeClient.SwarmJoin(ctx, req); err != nil {
+	if _, err := nodeClient.SwarmJoin(ctx, req); err != nil {
 		return "", fmt.Errorf("joining swarm via %v: %w", req.RemoteAddrs, err)
 	}
 	var nodeID string
 	err = waitFor(ctx, timeout, swarmPollInterval, func(ctx context.Context) (bool, error) {
-		info, err := nodeClient.Info(ctx)
+		infoRes, err := nodeClient.Info(ctx, client.InfoOptions{})
 		if err != nil {
 			return false, err
 		}
+		info := infoRes.Info
 		if info.Swarm.LocalNodeState == swarm.LocalNodeStateError {
 			return false, fmt.Errorf("node reports swarm error: %s", info.Swarm.Error)
 		}
@@ -197,7 +200,7 @@ func swarmJoinNode(ctx context.Context, nodeClient, manager *client.Client, req 
 			return false, nil
 		}
 		nodeID = info.Swarm.NodeID
-		_, _, err = manager.NodeInspectWithRaw(ctx, nodeID)
+		_, err = manager.NodeInspect(ctx, nodeID, client.NodeInspectOptions{})
 		if isNotFound(err) {
 			return false, nil
 		}
@@ -215,10 +218,11 @@ func swarmJoinNode(ctx context.Context, nodeClient, manager *client.Client, req 
 // A node daemon that cannot be reached is skipped (the manager will mark it
 // down); a node already gone from the manager is success.
 func swarmLeaveAndRemove(ctx context.Context, nodeClient, manager *client.Client, nodeID string, timeout time.Duration) error {
-	n, _, err := manager.NodeInspectWithRaw(ctx, nodeID)
+	nres, err := manager.NodeInspect(ctx, nodeID, client.NodeInspectOptions{})
+	n := nres.Node
 	if isNotFound(err) {
 		if nodeClient != nil {
-			if lerr := nodeClient.SwarmLeave(ctx, true); lerr != nil && !swarmIsNotInSwarm(lerr) && !client.IsErrConnectionFailed(lerr) {
+			if _, lerr := nodeClient.SwarmLeave(ctx, client.SwarmLeaveOptions{Force: true}); lerr != nil && !swarmIsNotInSwarm(lerr) && !client.IsErrConnectionFailed(lerr) {
 				return fmt.Errorf("leaving swarm: %w", lerr)
 			}
 		}
@@ -234,24 +238,24 @@ func swarmLeaveAndRemove(ctx context.Context, nodeClient, manager *client.Client
 		}
 	}
 	if nodeClient != nil {
-		if err := nodeClient.SwarmLeave(ctx, true); err != nil && !swarmIsNotInSwarm(err) && !client.IsErrConnectionFailed(err) {
+		if _, err := nodeClient.SwarmLeave(ctx, client.SwarmLeaveOptions{Force: true}); err != nil && !swarmIsNotInSwarm(err) && !client.IsErrConnectionFailed(err) {
 			return fmt.Errorf("leaving swarm: %w", err)
 		}
 	}
 	err = waitFor(ctx, timeout, swarmPollInterval, func(ctx context.Context) (bool, error) {
-		n, _, err := manager.NodeInspectWithRaw(ctx, nodeID)
+		res, err := manager.NodeInspect(ctx, nodeID, client.NodeInspectOptions{})
 		if isNotFound(err) {
 			return true, nil
 		}
 		if err != nil {
 			return false, err
 		}
-		return n.Status.State == swarm.NodeStateDown, nil
+		return res.Node.Status.State == swarm.NodeStateDown, nil
 	})
 	if err != nil {
 		return fmt.Errorf("waiting for manager to see node %s down: %w", nodeID, err)
 	}
-	if err := manager.NodeRemove(ctx, nodeID, swarm.NodeRemoveOptions{Force: true}); err != nil && !isNotFound(err) {
+	if _, err := manager.NodeRemove(ctx, nodeID, client.NodeRemoveOptions{Force: true}); err != nil && !isNotFound(err) {
 		return fmt.Errorf("removing node %s: %w", nodeID, err)
 	}
 	return nil
@@ -259,7 +263,7 @@ func swarmLeaveAndRemove(ctx context.Context, nodeClient, manager *client.Client
 
 // swarmLeave makes c's daemon leave its swarm; not being in a swarm is fine.
 func swarmLeave(ctx context.Context, c *client.Client) error {
-	if err := c.SwarmLeave(ctx, true); err != nil && !swarmIsNotInSwarm(err) {
+	if _, err := c.SwarmLeave(ctx, client.SwarmLeaveOptions{Force: true}); err != nil && !swarmIsNotInSwarm(err) {
 		return err
 	}
 	return nil
@@ -347,10 +351,11 @@ func swarmLabelsValue(prior types.Map, got map[string]string) types.Map {
 // swarmRequireManager returns an error unless the daemon behind c is an
 // active swarm manager.
 func swarmRequireManager(ctx context.Context, c *client.Client) error {
-	info, err := c.Info(ctx)
+	infoRes, err := c.Info(ctx, client.InfoOptions{})
 	if err != nil {
 		return err
 	}
+	info := infoRes.Info
 	if info.Swarm.LocalNodeState != swarm.LocalNodeStateActive {
 		return errors.New("the provider's Docker host is not part of an active swarm")
 	}

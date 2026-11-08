@@ -1,0 +1,6 @@
+# Source: TestComposeLoadProfilesAndOrder in internal/provider/compose_parse_test.go
+services:
+  web: {image: nginx, depends_on: [api]}
+  api: {image: api, depends_on: {db: {condition: service_healthy}}}
+  db: {image: postgres}
+  debug: {image: busybox, profiles: [debug], depends_on: [web]}

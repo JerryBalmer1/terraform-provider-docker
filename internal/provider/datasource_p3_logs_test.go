@@ -7,18 +7,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
 )
 
 func p3eLogsFake(t *testing.T, tty bool) (*p3eFake, *providerData) {
 	f, pd := newP3eFake(t)
 	f.json("GET /containers/web/json", container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{ID: "cid1"},
-		Config:            &container.Config{Tty: tty},
+		ID:     "cid1",
+		Config: &container.Config{Tty: tty},
 	})
 	f.on("GET /containers/cid1/logs", func(w http.ResponseWriter, _ *http.Request) {
 		if tty {
@@ -27,9 +27,9 @@ func p3eLogsFake(t *testing.T, tty bool) (*p3eFake, *providerData) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/vnd.docker.multiplexed-stream")
-		_, _ = stdcopy.NewStdWriter(w, stdcopy.Stdout).Write([]byte("out one\n"))
-		_, _ = stdcopy.NewStdWriter(w, stdcopy.Stderr).Write([]byte("err one\n"))
-		_, _ = stdcopy.NewStdWriter(w, stdcopy.Stdout).Write([]byte("out two\n"))
+		_, _ = newTestStdWriter(w, stdcopy.Stdout).Write([]byte("out one\n"))
+		_, _ = newTestStdWriter(w, stdcopy.Stderr).Write([]byte("err one\n"))
+		_, _ = newTestStdWriter(w, stdcopy.Stdout).Write([]byte("out two\n"))
 	})
 	return f, pd
 }

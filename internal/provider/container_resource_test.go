@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 func TestContainerBuildCreate(t *testing.T) {
@@ -64,7 +65,7 @@ func TestContainerBuildCreate(t *testing.T) {
 	if hc.Memory != 64<<20 || hc.MemorySwap != 0 || hc.NanoCPUs != 500000000 || hc.LogConfig.Type != "" {
 		t.Errorf("resources/log: mem=%d swap=%d nano=%d log=%q", hc.Memory, hc.MemorySwap, hc.NanoCPUs, hc.LogConfig.Type)
 	}
-	if string(hc.NetworkMode) != "front" || netCfg.EndpointsConfig["front"].IPAMConfig.IPv4Address != "10.0.0.9" ||
+	if string(hc.NetworkMode) != "front" || addrString(netCfg.EndpointsConfig["front"].IPAMConfig.IPv4Address) != "10.0.0.9" ||
 		netCfg.EndpointsConfig["front"].Aliases[0] != "www" || len(extra) != 1 || extra[0].Name.ValueString() != "back" {
 		t.Errorf("networks: mode=%s cfg=%+v extra=%+v", hc.NetworkMode, netCfg, extra)
 	}
@@ -148,7 +149,7 @@ resource "docker_container" "test" {
 				if rs.Type != "docker_container" {
 					continue
 				}
-				if _, err := c.ContainerInspect(context.Background(), rs.Primary.ID); !isNotFound(err) {
+				if _, err := c.ContainerInspect(context.Background(), rs.Primary.ID, client.ContainerInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("container %s still exists (%v)", rs.Primary.ID, err)
 				}
 			}

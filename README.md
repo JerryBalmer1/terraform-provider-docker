@@ -79,7 +79,7 @@ repository root, comma separated:
 
 ```powershell
 Invoke-Build ?                                # list every task with its synopsis
-Invoke-Build                                  # default: Build, Vet, Test, GenSkillCheck, InventoryCheck
+Invoke-Build                                  # default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate
 Invoke-Build Build, Vet, Test                 # build + provider binary, go vet, unit tests (-short, no daemon)
 Invoke-Build Tools                            # unit tests of tools/ only
 Invoke-Build GenSkill                         # regenerate the skill and README_resources.md

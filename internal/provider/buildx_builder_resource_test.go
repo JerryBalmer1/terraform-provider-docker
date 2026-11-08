@@ -16,17 +16,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	bkclient "github.com/moby/buildkit/client"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/client"
 )
 
 func bxbTestModel() bxbModel {
@@ -61,7 +62,7 @@ func TestBxbBuildCreate(t *testing.T) {
 	if len(hc.Mounts) != 1 || hc.Mounts[0].Source != "buildx_buildkit_ci0_state" || hc.Mounts[0].Target != bxbStateDir {
 		t.Errorf("mounts: %+v", hc.Mounts)
 	}
-	if b := hc.PortBindings["1234/tcp"]; len(b) != 1 || b[0].HostPort != "11234" {
+	if b := hc.PortBindings[network.MustParsePort("1234/tcp")]; len(b) != 1 || b[0].HostPort != "11234" {
 		t.Errorf("ports: %+v", hc.PortBindings)
 	}
 
@@ -118,8 +119,8 @@ func TestBxbDemux(t *testing.T) {
 	a, b := net.Pipe()
 	defer a.Close()
 	go func() {
-		out := stdcopy.NewStdWriter(b, stdcopy.Stdout)
-		errw := stdcopy.NewStdWriter(b, stdcopy.Stderr)
+		out := newTestStdWriter(b, stdcopy.Stdout)
+		errw := newTestStdWriter(b, stdcopy.Stderr)
 		_, _ = out.Write([]byte("hello "))
 		_, _ = errw.Write([]byte("noise"))
 		_, _ = out.Write([]byte("world"))
@@ -197,9 +198,8 @@ func (f *bxbFakeEngine) handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(container.InspectResponse{
-			ContainerJSONBase: &container.ContainerJSONBase{
-				ID: "bk0123456789", Name: "/" + f.name, State: &container.State{Running: f.running}, HostConfig: f.created.HostConfig,
-			},
+
+			ID: "bk0123456789", Name: "/" + f.name, State: &container.State{Running: f.running}, HostConfig: f.created.HostConfig,
 			Config: f.created.Config, NetworkSettings: &container.NetworkSettings{Networks: map[string]*network.EndpointSettings{}},
 		})
 	case r.Method == http.MethodDelete && strings.HasPrefix(p, "/containers/"):
@@ -266,8 +266,8 @@ func TestBuildxBuilderFakeEngine(t *testing.T) {
 		t.Errorf("read: %v %+v", rresp.Diagnostics, after)
 	}
 	imp := bxbModel{ID: st.ID}
-	bxbFromInspect(&imp, container.InspectResponse{ContainerJSONBase: &container.ContainerJSONBase{ID: "bk0123456789", Name: "/buildx_buildkit_ci0",
-		HostConfig: f.created.HostConfig}, Config: f.created.Config}, host)
+	bxbFromInspect(&imp, container.InspectResponse{ID: "bk0123456789", Name: "/buildx_buildkit_ci0",
+		HostConfig: f.created.HostConfig, Config: f.created.Config}, host)
 	if imp.Name.ValueString() != "ci" || imp.VolumeName.ValueString() != "buildx_buildkit_ci0_state" {
 		t.Errorf("import: %+v", imp)
 	}
@@ -293,10 +293,10 @@ func TestAccBuildxBuilder_basic(t *testing.T) {
 	tfresource.Test(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(*terraform.State) error {
-			if _, err := c.ContainerInspect(context.Background(), "buildx_buildkit_tfacc0"); !isNotFound(err) {
+			if _, err := c.ContainerInspect(context.Background(), "buildx_buildkit_tfacc0", client.ContainerInspectOptions{}); !isNotFound(err) {
 				return fmt.Errorf("builder container still exists (%v)", err)
 			}
-			if _, err := c.VolumeInspect(context.Background(), "buildx_buildkit_tfacc0_state"); !isNotFound(err) {
+			if _, err := c.VolumeInspect(context.Background(), "buildx_buildkit_tfacc0_state", client.VolumeInspectOptions{}); !isNotFound(err) {
 				return fmt.Errorf("builder state volume still exists (%v)", err)
 			}
 			return nil

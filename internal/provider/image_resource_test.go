@@ -13,13 +13,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
 )
 
 func TestImageResourceSchemas(t *testing.T) {
@@ -64,8 +64,8 @@ func TestImageBuildOptions(t *testing.T) {
 	if len(o.Tags) != 1 || o.Tags[0] != "app:1" || o.Dockerfile != "Dockerfile.prod" || o.Target != "prod" {
 		t.Errorf("basic fields: %+v", o)
 	}
-	if o.Platform != "linux/amd64" {
-		t.Errorf("platform should fall back to top-level: %q", o.Platform)
+	if platformsString(o.Platforms) != "linux/amd64" {
+		t.Errorf("platform should fall back to top-level: %q", platformsString(o.Platforms))
 	}
 	if o.BuildArgs["A"] == nil || *o.BuildArgs["A"] != "1" || o.BuildArgs["B"] == nil || *o.BuildArgs["B"] != "" {
 		t.Errorf("build args: %v", o.BuildArgs)
@@ -77,8 +77,8 @@ func TestImageBuildOptions(t *testing.T) {
 		t.Errorf("flags: %+v", o)
 	}
 	plan.Build.Platform = types.StringValue("linux/arm64")
-	if o := imgBuildOptions(ctx, plan, "Dockerfile", &diags); o.Platform != "linux/arm64" {
-		t.Errorf("build.platform should win: %q", o.Platform)
+	if o := imgBuildOptions(ctx, plan, "Dockerfile", &diags); platformsString(o.Platforms) != "linux/arm64" {
+		t.Errorf("build.platform should win: %q", platformsString(o.Platforms))
 	}
 }
 

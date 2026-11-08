@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/docker/api/types/image"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
+	"github.com/moby/moby/api/types/image"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"

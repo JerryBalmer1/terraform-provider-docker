@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -103,11 +104,12 @@ func (d *nodeDSDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		resp.Diagnostics.AddAttributeError(path.Root(attrName), "Cannot find swarm node", err.Error())
 		return
 	}
-	n, _, err := d.pd.Client.NodeInspectWithRaw(ctx, id)
+	nRes, err := d.pd.Client.NodeInspect(ctx, id, client.NodeInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect swarm node", err.Error())
 		return
 	}
+	n := nRes.Node
 	m := nodeDSFromInfo(swarmFlattenNode(n))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

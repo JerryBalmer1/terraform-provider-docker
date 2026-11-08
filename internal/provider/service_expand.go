@@ -16,15 +16,15 @@ import (
 	"time"
 
 	"github.com/distribution/reference"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 // ---------------------------------------------------------------------------
@@ -41,24 +41,27 @@ type svcLookup struct {
 
 func svcLoadLookup(ctx context.Context, c *client.Client, stackPrefix string) (*svcLookup, error) {
 	lk := &svcLookup{stackPrefix: stackPrefix}
-	nets, err := c.NetworkList(ctx, network.ListOptions{})
+	netsRes, err := c.NetworkList(ctx, client.NetworkListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("listing networks: %w", err)
 	}
+	nets := netsRes.Items
 	for _, n := range nets {
 		lk.networks = append(lk.networks, namedObject{ID: n.ID, Name: n.Name})
 	}
-	secs, err := c.SecretList(ctx, swarm.SecretListOptions{})
+	secsRes, err := c.SecretList(ctx, client.SecretListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("listing secrets: %w", err)
 	}
+	secs := secsRes.Items
 	for _, s := range secs {
 		lk.secrets = append(lk.secrets, namedObject{ID: s.ID, Name: s.Spec.Name})
 	}
-	cfgs, err := c.ConfigList(ctx, swarm.ConfigListOptions{})
+	cfgsRes, err := c.ConfigList(ctx, client.ConfigListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("listing configs: %w", err)
 	}
+	cfgs := cfgsRes.Items
 	for _, s := range cfgs {
 		lk.configs = append(lk.configs, namedObject{ID: s.ID, Name: s.Spec.Name})
 	}
@@ -253,7 +256,7 @@ func svcExpand(ctx context.Context, m *svcSpecModel, lk *svcLookup, o svcExpandO
 			es.Ports = append(es.Ports, swarm.PortConfig{
 				TargetPort:    uint32(p.TargetPort.ValueInt64()),
 				PublishedPort: uint32(p.PublishedPort.ValueInt64()),
-				Protocol:      swarm.PortConfigProtocol(svcStrOr(p.Protocol, "tcp")),
+				Protocol:      network.IPProtocol(svcStrOr(p.Protocol, "tcp")),
 				PublishMode:   swarm.PortConfigPublishMode(svcStrOr(p.PublishMode, "ingress")),
 			})
 		}
@@ -328,8 +331,8 @@ func svcExpandUpdate(u *svcUpdateModel, attr string, diags *diag.Diagnostics) *s
 	}
 	uc := &swarm.UpdateConfig{
 		Parallelism:   1,
-		FailureAction: svcStrOr(u.FailureAction, "pause"),
-		Order:         svcStrOr(u.Order, "stop-first"),
+		FailureAction: swarm.FailureAction(svcStrOr(u.FailureAction, "pause")),
+		Order:         swarm.UpdateOrder(svcStrOr(u.Order, "stop-first")),
 	}
 	if v, ok := knownInt64(u.Parallelism); ok {
 		uc.Parallelism = uint64(v)
@@ -624,9 +627,9 @@ func svcFlattenUpdate(uc *swarm.UpdateConfig, p *svcUpdateModel) *svcUpdateModel
 	out := &svcUpdateModel{
 		Parallelism:   types.Int64Value(int64(uc.Parallelism)),
 		Delay:         svcDurValue(p.Delay, uc.Delay),
-		FailureAction: types.StringValue(svcOr(uc.FailureAction, "pause")),
+		FailureAction: types.StringValue(svcOr(string(uc.FailureAction), "pause")),
 		Monitor:       svcDurValue(p.Monitor, uc.Monitor),
-		Order:         types.StringValue(svcOr(uc.Order, "stop-first")),
+		Order:         types.StringValue(svcOr(string(uc.Order), "stop-first")),
 	}
 	switch {
 	case !p.MaxFailureRatio.IsNull() && !p.MaxFailureRatio.IsUnknown() && float32(p.MaxFailureRatio.ValueFloat64()) == uc.MaxFailureRatio:

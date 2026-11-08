@@ -16,11 +16,10 @@ import (
 	"time"
 
 	ctypes "github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 // Labels docker compose sets; docker_compose sets the same ones so
@@ -59,7 +58,7 @@ type composeLocalNetwork struct {
 	Key      string
 	Name     string
 	External bool
-	Create   network.CreateOptions
+	Create   client.NetworkCreateOptions
 	Hash     string
 }
 
@@ -67,7 +66,7 @@ type composeLocalVolume struct {
 	Key      string
 	Name     string
 	External bool
-	Create   volume.CreateOptions
+	Create   client.VolumeCreateOptions
 	Hash     string
 }
 
@@ -108,7 +107,7 @@ func composeLocalExpand(p *ctypes.Project) (*composeLocalPlan, error) {
 		n := p.Networks[key]
 		ln := composeLocalNetwork{Key: key, Name: n.Name, External: bool(n.External)}
 		if !ln.External {
-			opts := network.CreateOptions{
+			opts := client.NetworkCreateOptions{
 				Driver:     n.Driver,
 				Internal:   n.Internal,
 				Attachable: n.Attachable,
@@ -123,11 +122,15 @@ func composeLocalExpand(p *ctypes.Project) (*composeLocalPlan, error) {
 					if c == nil {
 						continue
 					}
-					ipam.Config = append(ipam.Config, network.IPAMConfig{Subnet: c.Subnet, IPRange: c.IPRange, Gateway: c.Gateway, AuxAddress: map[string]string(c.AuxiliaryAddresses)})
+					pool, err := ipamConfigFrom(c.Subnet, c.IPRange, c.Gateway, map[string]string(c.AuxiliaryAddresses))
+					if err != nil {
+						return nil, fmt.Errorf("network %s ipam: %w", key, err)
+					}
+					ipam.Config = append(ipam.Config, pool)
 				}
 				opts.IPAM = ipam
 			}
-			ln.Hash = composeHash(opts)
+			ln.Hash = composeNetworkHash(opts)
 			opts.Labels[composeLabelConfigHash] = ln.Hash
 			ln.Create = opts
 		}
@@ -138,13 +141,13 @@ func composeLocalExpand(p *ctypes.Project) (*composeLocalPlan, error) {
 		v := p.Volumes[key]
 		lv := composeLocalVolume{Key: key, Name: v.Name, External: bool(v.External)}
 		if !lv.External {
-			opts := volume.CreateOptions{
+			opts := client.VolumeCreateOptions{
 				Name:       v.Name,
 				Driver:     v.Driver,
 				DriverOpts: map[string]string(v.DriverOpts),
 				Labels:     mergeLabels(v.Labels, projLabels, map[string]string{composeLabelVolume: key}),
 			}
-			lv.Hash = composeHash(opts)
+			lv.Hash = composeVolumeHash(opts)
 			opts.Labels[composeLabelConfigHash] = lv.Hash
 			lv.Create = opts
 		}
@@ -256,7 +259,7 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 		OpenStdin:    svc.StdinOpen,
 		StopSignal:   svc.StopSignal,
 		Env:          composeEnvList(svc.Environment),
-		ExposedPorts: nat.PortSet{},
+		ExposedPorts: network.PortSet{},
 	}
 	if svc.Command != nil {
 		cfg.Cmd = []string(svc.Command)
@@ -272,12 +275,16 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 		cfg.Healthcheck = hc
 	}
 
+	dns, err := parseAddrs("dns", []string(svc.DNS))
+	if err != nil {
+		return nil, fmt.Errorf("service %s: %w", svc.Name, err)
+	}
 	hc := &container.HostConfig{
 		Privileged:     svc.Privileged,
 		ReadonlyRootfs: svc.ReadOnly,
 		CapAdd:         svc.CapAdd,
 		CapDrop:        svc.CapDrop,
-		DNS:            []string(svc.DNS),
+		DNS:            dns,
 		DNSSearch:      []string(svc.DNSSearch),
 		DNSOptions:     svc.DNSOpts,
 		GroupAdd:       svc.GroupAdd,
@@ -294,7 +301,7 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 		StorageOpt:     svc.StorageOpt,
 		Annotations:    map[string]string(svc.Annotations),
 		Init:           svc.Init,
-		PortBindings:   nat.PortMap{},
+		PortBindings:   network.PortMap{},
 	}
 	if len(svc.ExtraHosts) > 0 {
 		hc.ExtraHosts = svc.ExtraHosts.AsList(":")
@@ -380,20 +387,25 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 
 	// Ports
 	for _, e := range svc.Expose {
-		proto, num := nat.SplitProtoPort(e)
-		port, err := nat.NewPort(proto, num)
+		ports, err := exposedPorts(e)
 		if err != nil {
 			return nil, fmt.Errorf("expose %q: %w", e, err)
 		}
-		cfg.ExposedPorts[port] = struct{}{}
+		for _, port := range ports {
+			cfg.ExposedPorts[port] = struct{}{}
+		}
 	}
 	for _, pc := range svc.Ports {
-		port, err := nat.NewPort(composeProto(pc.Protocol), strconv.FormatUint(uint64(pc.Target), 10))
+		port, ok := network.PortFrom(uint16(pc.Target), network.IPProtocol(composeProto(pc.Protocol)))
+		if !ok || pc.Target > 65535 {
+			return nil, fmt.Errorf("port %d: not a valid %s port", pc.Target, composeProto(pc.Protocol))
+		}
+		hostIP, err := parseOptAddr("host_ip", pc.HostIP)
 		if err != nil {
 			return nil, fmt.Errorf("port %d: %w", pc.Target, err)
 		}
 		cfg.ExposedPorts[port] = struct{}{}
-		hc.PortBindings[port] = append(hc.PortBindings[port], nat.PortBinding{HostIP: pc.HostIP, HostPort: pc.Published})
+		hc.PortBindings[port] = append(hc.PortBindings[port], network.PortBinding{HostIP: hostIP, HostPort: pc.Published})
 	}
 
 	// Mounts
@@ -487,12 +499,12 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 			Pull: svc.PullPolicy, DependsOn: deps,
 		}
 		lc.Hash = composeHash(struct {
-			Config   *container.Config
+			Config   composeHashConfig
 			Host     *container.HostConfig
 			Networks []composeEndpoint
 			Copies   []composeCopy
 			Platform string
-		}{lc.Config, lc.Host, lc.Networks, lc.Copies, lc.Platform})
+		}{composeHashConfig{lc.Config}, lc.Host, lc.Networks, lc.Copies, lc.Platform})
 		c.Labels[composeLabelConfigHash] = lc.Hash
 		out = append(out, lc)
 	}

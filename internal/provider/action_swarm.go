@@ -6,16 +6,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
-	"strings"
-	"time"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
+	"sort"
+	"strings"
+	"time"
 )
 
 var (
@@ -76,15 +74,17 @@ func (a *swarmRotateTokensAction) Invoke(ctx context.Context, req action.InvokeR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	flags := swarm.UpdateFlags{RotateWorkerToken: actBool(m.Worker, true), RotateManagerToken: actBool(m.Manager, false)}
+	flags := client.SwarmUpdateOptions{RotateWorkerToken: actBool(m.Worker, true), RotateManagerToken: actBool(m.Manager, false)}
 	var lastErr error
 	for attempt := 0; attempt < swarmNodeUpdateAttempts; attempt++ {
-		sw, err := c.SwarmInspect(ctx)
+		swRes, err := c.SwarmInspect(ctx, client.SwarmInspectOptions{})
 		if err != nil {
 			resp.Diagnostics.AddError("docker_swarm_rotate_tokens failed", fmt.Sprintf("inspecting swarm (the provider's host must be a swarm manager): %v", err))
 			return
 		}
-		err = c.SwarmUpdate(ctx, sw.Version, sw.Spec, flags)
+		sw := swRes.Swarm
+		flags.Version, flags.Spec = sw.Version, sw.Spec
+		_, err = c.SwarmUpdate(ctx, flags)
 		if err == nil {
 			var which []string
 			if flags.RotateWorkerToken {
@@ -157,10 +157,11 @@ func actTaskActive(t swarm.Task) bool {
 
 // actNodeActiveTasks returns the IDs of tasks still active on node id.
 func actNodeActiveTasks(ctx context.Context, c *client.Client, id string) ([]string, error) {
-	tasks, err := c.TaskList(ctx, swarm.TaskListOptions{Filters: filters.NewArgs(filters.Arg("node", id))})
+	tasksRes, err := c.TaskList(ctx, client.TaskListOptions{Filters: client.Filters{}.Add("node", id)})
 	if err != nil {
 		return nil, err
 	}
+	tasks := tasksRes.Items
 	var out []string
 	for _, t := range tasks {
 		if t.NodeID == id && actTaskActive(t) {

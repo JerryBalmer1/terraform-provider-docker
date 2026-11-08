@@ -3,18 +3,17 @@ package provider
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/hashicorp/terraform-plugin-testing/plancheck"
-	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestStackPlanObjects(t *testing.T) {
@@ -385,10 +384,11 @@ resource "docker_stack" "test" {
 		}},
 		CheckDestroy: func(*terraform.State) error {
 			c := testAccDockerClient(t)
-			svcs, err := c.ServiceList(context.Background(), swarm.ServiceListOptions{Filters: filters.NewArgs(filters.Arg("label", labelStackNamespace+"=tfacc"))})
+			svcsRes, err := c.ServiceList(context.Background(), client.ServiceListOptions{Filters: client.Filters{}.Add("label", labelStackNamespace+"=tfacc")})
 			if err != nil {
 				return err
 			}
+			svcs := svcsRes.Items
 			if len(svcs) != 0 {
 				return fmt.Errorf("%d stack services left", len(svcs))
 			}

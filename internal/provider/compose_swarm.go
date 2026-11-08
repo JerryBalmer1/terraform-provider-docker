@@ -16,18 +16,18 @@ import (
 	"time"
 
 	ctypes "github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 type composeSwarmNetwork struct {
 	Key, Name string
 	External  bool
-	Create    network.CreateOptions
+	Create    client.NetworkCreateOptions
 	Hash      string
 }
 
@@ -77,7 +77,7 @@ func composeSwarmExpand(p *ctypes.Project) (*composeSwarmPlan, error) {
 		n := p.Networks[key]
 		sn := composeSwarmNetwork{Key: key, Name: n.Name, External: bool(n.External)}
 		if !sn.External {
-			opts := network.CreateOptions{
+			opts := client.NetworkCreateOptions{
 				Driver:     svcOr(n.Driver, "overlay"),
 				Scope:      "swarm",
 				Internal:   n.Internal,
@@ -91,12 +91,16 @@ func composeSwarmExpand(p *ctypes.Project) (*composeSwarmPlan, error) {
 				ipam := &network.IPAM{Driver: n.Ipam.Driver, Options: map[string]string(n.Ipam.Options)}
 				for _, c := range n.Ipam.Config {
 					if c != nil {
-						ipam.Config = append(ipam.Config, network.IPAMConfig{Subnet: c.Subnet, IPRange: c.IPRange, Gateway: c.Gateway, AuxAddress: map[string]string(c.AuxiliaryAddresses)})
+						pool, err := ipamConfigFrom(c.Subnet, c.IPRange, c.Gateway, map[string]string(c.AuxiliaryAddresses))
+						if err != nil {
+							return nil, fmt.Errorf("network %s ipam: %w", key, err)
+						}
+						ipam.Config = append(ipam.Config, pool)
 					}
 				}
 				opts.IPAM = ipam
 			}
-			sn.Hash = composeHash(opts)
+			sn.Hash = composeNetworkHash(opts)
 			opts.Labels[composeLabelConfigHash] = sn.Hash
 			sn.Create = opts
 		}
@@ -248,7 +252,11 @@ func composeSwarmServiceSpec(p *ctypes.Project, plan *composeSwarmPlan, svc ctyp
 		}
 	}
 	if len(svc.DNS)+len(svc.DNSSearch)+len(svc.DNSOpts) > 0 {
-		cs.DNSConfig = &swarm.DNSConfig{Nameservers: []string(svc.DNS), Search: []string(svc.DNSSearch), Options: svc.DNSOpts}
+		ns, err := parseAddrs("dns", []string(svc.DNS))
+		if err != nil {
+			return out, fmt.Errorf("service %s: %w", svc.Name, err)
+		}
+		cs.DNSConfig = &swarm.DNSConfig{Nameservers: ns, Search: []string(svc.DNSSearch), Options: svc.DNSOpts}
 	}
 	for _, name := range composeSortedKeys(svc.Ulimits) {
 		u := svc.Ulimits[name]
@@ -490,7 +498,7 @@ func composeSwarmServiceSpec(p *ctypes.Project, plan *composeSwarmPlan, svc ctyp
 			es.Mode = swarm.ResolutionMode(svc.Deploy.EndpointMode)
 		}
 		for _, pc := range svc.Ports {
-			pp := swarm.PortConfig{Name: pc.Name, TargetPort: pc.Target, Protocol: swarm.PortConfigProtocol(composeProto(pc.Protocol)), PublishMode: swarm.PortConfigPublishMode(pc.Mode)}
+			pp := swarm.PortConfig{Name: pc.Name, TargetPort: pc.Target, Protocol: network.IPProtocol(composeProto(pc.Protocol)), PublishMode: swarm.PortConfigPublishMode(pc.Mode)}
 			if pc.Published != "" {
 				n, err := strconv.ParseUint(pc.Published, 10, 32)
 				if err != nil {
@@ -519,10 +527,10 @@ func composeSwarmUpdate(u *ctypes.UpdateConfig) *swarm.UpdateConfig {
 	out := &swarm.UpdateConfig{
 		Parallelism:     1,
 		Delay:           time.Duration(u.Delay),
-		FailureAction:   u.FailureAction,
+		FailureAction:   swarm.FailureAction(u.FailureAction),
 		Monitor:         time.Duration(u.Monitor),
 		MaxFailureRatio: u.MaxFailureRatio,
-		Order:           u.Order,
+		Order:           swarm.UpdateOrder(u.Order),
 	}
 	if u.Parallelism != nil {
 		out.Parallelism = *u.Parallelism
@@ -784,19 +792,28 @@ func composeSwarmApply(ctx context.Context, pd *providerData, plan *composeSwarm
 	}
 	for _, n := range append(append([]string{}, cfgPlan.Replace...), cfgPlan.Remove...) {
 		id := ex.configs[n].ID
-		if err := stackRemoveRetry(ctx, "config "+n, func(ctx context.Context) error { return c.ConfigRemove(ctx, id) }); err != nil {
+		if err := stackRemoveRetry(ctx, "config "+n, func(ctx context.Context) error {
+			_, err := c.ConfigRemove(ctx, id, client.ConfigRemoveOptions{})
+			return err
+		}); err != nil {
 			return err
 		}
 	}
 	for _, n := range append(append([]string{}, secPlan.Replace...), secPlan.Remove...) {
 		id := ex.secrets[n].ID
-		if err := stackRemoveRetry(ctx, "secret "+n, func(ctx context.Context) error { return c.SecretRemove(ctx, id) }); err != nil {
+		if err := stackRemoveRetry(ctx, "secret "+n, func(ctx context.Context) error {
+			_, err := c.SecretRemove(ctx, id, client.SecretRemoveOptions{})
+			return err
+		}); err != nil {
 			return err
 		}
 	}
 	for _, n := range append(append([]string{}, netPlan.Replace...), netPlan.Remove...) {
 		id := ex.networks[n].ID
-		if err := stackRemoveRetry(ctx, "network "+n, func(ctx context.Context) error { return c.NetworkRemove(ctx, id) }); err != nil {
+		if err := stackRemoveRetry(ctx, "network "+n, func(ctx context.Context) error {
+			_, err := c.NetworkRemove(ctx, id, client.NetworkRemoveOptions{})
+			return err
+		}); err != nil {
 			return err
 		}
 	}
@@ -821,7 +838,7 @@ func composeSwarmApply(ctx context.Context, pd *providerData, plan *composeSwarm
 		if !createS[b.Name] {
 			continue
 		}
-		if _, err := c.SecretCreate(ctx, swarm.SecretSpec{Annotations: swarm.Annotations{Name: b.Name, Labels: b.Labels}, Data: b.Data}); err != nil {
+		if _, err := c.SecretCreate(ctx, client.SecretCreateOptions{Spec: swarm.SecretSpec{Annotations: swarm.Annotations{Name: b.Name, Labels: b.Labels}, Data: b.Data}}); err != nil {
 			return fmt.Errorf("creating secret %s: %w", b.Name, err)
 		}
 	}
@@ -829,7 +846,7 @@ func composeSwarmApply(ctx context.Context, pd *providerData, plan *composeSwarm
 		if !createC[b.Name] {
 			continue
 		}
-		if _, err := c.ConfigCreate(ctx, swarm.ConfigSpec{Annotations: swarm.Annotations{Name: b.Name, Labels: b.Labels}, Data: b.Data}); err != nil {
+		if _, err := c.ConfigCreate(ctx, client.ConfigCreateOptions{Spec: swarm.ConfigSpec{Annotations: swarm.Annotations{Name: b.Name, Labels: b.Labels}, Data: b.Data}}); err != nil {
 			return fmt.Errorf("creating config %s: %w", b.Name, err)
 		}
 	}
@@ -863,7 +880,7 @@ func composeSwarmApply(ctx context.Context, pd *providerData, plan *composeSwarm
 		if err != nil {
 			return fmt.Errorf("service %s: %w", s.Name, err)
 		}
-		resp, err := c.ServiceCreate(ctx, spec, swarm.ServiceCreateOptions{EncodedRegistryAuth: auth, QueryRegistry: true})
+		resp, err := c.ServiceCreate(ctx, client.ServiceCreateOptions{Spec: spec, EncodedRegistryAuth: auth, QueryRegistry: true})
 		if err != nil {
 			return fmt.Errorf("creating service %s: %w", s.Name, err)
 		}
@@ -897,13 +914,14 @@ func composeSwarmDestroy(ctx context.Context, pd *providerData, ns string, keepV
 	if keepVolumes {
 		return nil
 	}
-	vs, err := pd.Client.VolumeList(ctx, volume.ListOptions{Filters: labelFilter(map[string]string{labelStackNamespace: ns})})
+	vsRes, err := pd.Client.VolumeList(ctx, client.VolumeListOptions{Filters: labelFilter(map[string]string{labelStackNamespace: ns})})
 	if err != nil {
 		warn("Cannot list stack volumes", err.Error())
 		return nil
 	}
-	for _, v := range vs.Volumes {
-		if err := pd.Client.VolumeRemove(ctx, v.Name, false); err != nil && !isNotFound(err) {
+	vs := vsRes.Items
+	for _, v := range vs {
+		if _, err := pd.Client.VolumeRemove(ctx, v.Name, client.VolumeRemoveOptions{Force: false}); err != nil && !isNotFound(err) {
 			warn("Cannot remove stack volume", fmt.Sprintf("%s: %v (volumes on other nodes are not removed)", v.Name, err))
 		}
 	}

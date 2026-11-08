@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/client"
 )
 
 var _ action.ActionWithConfigure = (*containerExportAction)(nil)
@@ -47,7 +48,7 @@ func (a *containerExportAction) Invoke(ctx context.Context, req action.InvokeReq
 		return
 	}
 	ctr, p := m.Container.ValueString(), m.Path.ValueString()
-	rc, err := c.ContainerExport(ctx, ctr)
+	rc, err := c.ContainerExport(ctx, ctr, client.ContainerExportOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("docker_container_export failed", fmt.Sprintf("container %q: %v", ctr, err))
 		return

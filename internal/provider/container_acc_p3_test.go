@@ -11,13 +11,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 func ctrP3CheckDestroy(t *testing.T) resource.TestCheckFunc {
@@ -26,11 +26,11 @@ func ctrP3CheckDestroy(t *testing.T) resource.TestCheckFunc {
 		for _, rs := range s.RootModule().Resources {
 			switch rs.Type {
 			case "docker_container":
-				if _, err := c.ContainerInspect(context.Background(), rs.Primary.ID); !isNotFound(err) {
+				if _, err := c.ContainerInspect(context.Background(), rs.Primary.ID, client.ContainerInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("container %s still exists (%v)", rs.Primary.ID, err)
 				}
 			case "docker_network":
-				if _, err := c.NetworkInspect(context.Background(), rs.Primary.ID, network.InspectOptions{}); !isNotFound(err) {
+				if _, err := c.NetworkInspect(context.Background(), rs.Primary.ID, client.NetworkInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("network %s still exists (%v)", rs.Primary.ID, err)
 				}
 			}
@@ -44,7 +44,8 @@ func ctrP3Inspect(t *testing.T, s *terraform.State, addr string) (container.Insp
 	if err != nil {
 		return container.InspectResponse{}, err
 	}
-	return testAccDockerClient(t).ContainerInspect(context.Background(), id)
+	res, err := testAccDockerClient(t).ContainerInspect(context.Background(), id, client.ContainerInspectOptions{})
+	return res.Container, err
 }
 
 var ctrP3Ignore = []string{"wait", "wait_timeout", "must_run"}
@@ -212,7 +213,7 @@ resource "docker_container" "c" {
 			{
 				PreConfig: func() {
 					timeout := 1
-					if err := testAccDockerClient(t).ContainerStop(context.Background(), id, container.StopOptions{Timeout: &timeout}); err != nil {
+					if _, err := testAccDockerClient(t).ContainerStop(context.Background(), id, client.ContainerStopOptions{Timeout: &timeout}); err != nil {
 						t.Fatalf("stopping container out of band: %v", err)
 					}
 				},
@@ -295,7 +296,7 @@ resource "docker_container" "c" {
 					if cfg.Hostname != "tfacc-ctr" || !cfg.Tty || !cfg.OpenStdin || cfg.StopSignal != "SIGUSR1" || cfg.StopTimeout == nil || *cfg.StopTimeout != 5 {
 						errs = append(errs, fmt.Sprintf("Config hostname=%q tty=%v stdin=%v stopsignal=%q stoptimeout=%v", cfg.Hostname, cfg.Tty, cfg.OpenStdin, cfg.StopSignal, cfg.StopTimeout))
 					}
-					if strings.Join(hc.DNS, ",") != "10.0.0.53" || strings.Join(hc.DNSSearch, ",") != "example.internal" {
+					if strings.Join(addrStrings(hc.DNS), ",") != "10.0.0.53" || strings.Join(hc.DNSSearch, ",") != "example.internal" {
 						errs = append(errs, fmt.Sprintf("DNS %v DNSSearch %v", hc.DNS, hc.DNSSearch))
 					}
 					if strings.Join(hc.ExtraHosts, ",") != "db.local:10.0.0.5,host.docker.internal:host-gateway" {
@@ -312,7 +313,7 @@ resource "docker_container" "c" {
 						errs = append(errs, fmt.Sprintf("Devices %+v", hc.Devices))
 					}
 					if !insp.State.Running {
-						errs = append(errs, "not running: "+insp.State.Status)
+						errs = append(errs, "not running: "+string(insp.State.Status))
 					}
 					if len(errs) > 0 {
 						return fmt.Errorf("live container mismatch: %s", strings.Join(errs, "; "))
@@ -400,11 +401,11 @@ func TestAccContainerP3_ipv6Address(t *testing.T) {
 	c := testAccDockerClient(t)
 	probe := acctest.RandomWithPrefix("tfacc-v6probe")
 	enable := true
-	resp, err := c.NetworkCreate(ctx, probe, network.CreateOptions{EnableIPv6: &enable, IPAM: &network.IPAM{Config: []network.IPAMConfig{{Subnet: "fd00:7f::/64"}}}})
+	resp, err := c.NetworkCreate(ctx, probe, client.NetworkCreateOptions{EnableIPv6: &enable, IPAM: &network.IPAM{Config: []network.IPAMConfig{{Subnet: mustPrefix("fd00:7f::/64")}}}})
 	if err != nil {
 		t.Skipf("daemon cannot create an IPv6 network: %v", err)
 	}
-	_ = c.NetworkRemove(ctx, resp.ID)
+	_, _ = c.NetworkRemove(ctx, resp.ID, client.NetworkRemoveOptions{})
 	name := acctest.RandomWithPrefix("tfacc-v6")
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -443,7 +444,7 @@ resource "docker_container" "c" {
 						return err
 					}
 					for _, ep := range insp.NetworkSettings.Networks {
-						if ep.GlobalIPv6Address == "fd00:77::10" && ep.IPAddress == "10.77.0.10" {
+						if addrString(ep.GlobalIPv6Address) == "fd00:77::10" && addrString(ep.IPAddress) == "10.77.0.10" {
 							return nil
 						}
 					}
@@ -462,17 +463,18 @@ func TestAccVolumeP3_refusesExistingName(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-volex")
 	c := testAccDockerClient(t)
-	if _, err := c.VolumeCreate(context.Background(), volume.CreateOptions{Name: name, Labels: map[string]string{"owner": "out-of-band"}}); err != nil {
+	if _, err := c.VolumeCreate(context.Background(), client.VolumeCreateOptions{Name: name, Labels: map[string]string{"owner": "out-of-band"}}); err != nil {
 		t.Fatalf("pre-creating volume: %v", err)
 	}
-	t.Cleanup(func() { _ = c.VolumeRemove(context.Background(), name, true) })
+	t.Cleanup(func() { _, _ = c.VolumeRemove(context.Background(), name, client.VolumeRemoveOptions{Force: true}) })
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(*terraform.State) error {
-			v, err := c.VolumeInspect(context.Background(), name)
+			vRes, err := c.VolumeInspect(context.Background(), name, client.VolumeInspectOptions{})
 			if err != nil {
 				return fmt.Errorf("pre-existing volume was removed: %v", err)
 			}
+			v := vRes.Volume
 			if v.Labels["owner"] != "out-of-band" {
 				return fmt.Errorf("pre-existing volume changed: %v", v.Labels)
 			}

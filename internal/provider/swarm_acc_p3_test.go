@@ -14,11 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 func swarmP3CheckInactive(t *testing.T, ep endpointConfig) resource.TestCheckFunc {
@@ -28,10 +29,11 @@ func swarmP3CheckInactive(t *testing.T, ep endpointConfig) resource.TestCheckFun
 			return err
 		}
 		defer c.Close()
-		info, err := c.Info(context.Background())
+		infoRes, err := c.Info(context.Background(), client.InfoOptions{})
 		if err != nil {
 			return err
 		}
+		info := infoRes.Info
 		if info.Swarm.LocalNodeState != swarm.LocalNodeStateInactive {
 			return fmt.Errorf("%s still in swarm: %s", ep.Host, info.Swarm.LocalNodeState)
 		}
@@ -44,10 +46,11 @@ func swarmP3CheckInactive(t *testing.T, ep endpointConfig) resource.TestCheckFun
 func swarmP3AutolockCheck(t *testing.T, want bool) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		c := testAccDockerClient(t)
-		sw, err := c.SwarmInspect(context.Background())
+		swRes, err := c.SwarmInspect(context.Background(), client.SwarmInspectOptions{})
 		if err != nil {
 			return err
 		}
+		sw := swRes.Swarm
 		if sw.Spec.EncryptionConfig.AutoLockManagers != want {
 			return fmt.Errorf("daemon AutoLockManagers=%v, want %v", sw.Spec.EncryptionConfig.AutoLockManagers, want)
 		}
@@ -62,7 +65,7 @@ func swarmP3AutolockCheck(t *testing.T, want bool) resource.TestCheckFunc {
 		if err != nil {
 			return err
 		}
-		if key == "" || key != uk.UnlockKey {
+		if key == "" || key != uk.Key {
 			return fmt.Errorf("unlock_key in state does not match SwarmGetUnlockKey")
 		}
 		return nil
@@ -186,11 +189,11 @@ resource "docker_swarm_init" "locked" {
 		}
 		defer c.Close()
 		ctx := context.Background()
-		if info, err := c.Info(ctx); err == nil && info.Swarm.LocalNodeState == swarm.LocalNodeStateLocked && unlockKey != "" {
-			_ = c.SwarmUnlock(ctx, swarm.UnlockRequest{UnlockKey: unlockKey})
+		if res, err := c.Info(ctx, client.InfoOptions{}); err == nil && res.Info.Swarm.LocalNodeState == swarm.LocalNodeStateLocked && unlockKey != "" {
+			_, _ = c.SwarmUnlock(ctx, client.SwarmUnlockOptions{Key: unlockKey})
 		}
-		if info, err := c.Info(ctx); err == nil && info.Swarm.LocalNodeState != swarm.LocalNodeStateInactive {
-			_ = c.SwarmLeave(ctx, true)
+		if res, err := c.Info(ctx, client.InfoOptions{}); err == nil && res.Info.Swarm.LocalNodeState != swarm.LocalNodeStateInactive {
+			_, _ = c.SwarmLeave(ctx, client.SwarmLeaveOptions{Force: true})
 		}
 	})
 	isState := func(want swarm.LocalNodeState) func(swarm.LocalNodeState) bool {
@@ -230,7 +233,7 @@ resource "docker_swarm_init" "locked" {
 						t.Fatal(err)
 					}
 					defer c.Close()
-					if err := c.SwarmUnlock(context.Background(), swarm.UnlockRequest{UnlockKey: unlockKey}); err != nil {
+					if _, err := c.SwarmUnlock(context.Background(), client.SwarmUnlockOptions{Key: unlockKey}); err != nil {
 						t.Fatalf("unlock with the key from state: %v", err)
 					}
 					if err := p3WaitDaemon(ep, 2*time.Minute, isState(swarm.LocalNodeStateActive)); err != nil {
@@ -247,10 +250,11 @@ resource "docker_swarm_init" "locked" {
 // p3RequireNodeInactiveEP is p3RequireNodeInactive for an endpoint with TLS.
 func p3RequireNodeInactiveEP(t *testing.T, ep endpointConfig) {
 	t.Helper()
-	info, err := p3Client(t, ep).Info(context.Background())
+	res, err := p3Client(t, ep).Info(context.Background(), client.InfoOptions{})
 	if err != nil {
 		t.Skipf("cannot reach %s: %v", ep.Host, err)
 	}
+	info := res.Info
 	if info.Swarm.LocalNodeState != swarm.LocalNodeStateInactive {
 		t.Skipf("%s is already part of a swarm (%s)", ep.Host, info.Swarm.LocalNodeState)
 	}
@@ -405,10 +409,11 @@ resource "docker_service" "gpu" {
 				ctx := context.Background()
 				c := testAccDockerClient(t)
 				nodeID, _ := p3Attr(s, "docker_swarm_node.gpu", "node_id")
-				n, _, err := c.NodeInspectWithRaw(ctx, nodeID)
+				nRes, err := c.NodeInspect(ctx, nodeID, client.NodeInspectOptions{})
 				if err != nil {
 					return err
 				}
+				n := nRes.Node
 				if n.Description.Engine.Labels["gpu"] != "nvidia" {
 					return fmt.Errorf("worker3 engine labels %v lack gpu=nvidia", n.Description.Engine.Labels)
 				}

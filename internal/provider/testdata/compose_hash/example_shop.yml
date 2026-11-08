@@ -1,0 +1,29 @@
+# Source: examples/resources/docker_compose/resource.tf, docker_compose.shop
+# ($${...} in the HCL heredoc is ${...} in the YAML Terraform passes).
+services:
+  web:
+    image: nginx:${WEB_TAG}
+    ports: ["8080:80"]
+    configs:
+      - source: site
+        target: /etc/nginx/conf.d/default.conf
+    depends_on:
+      db: {condition: service_healthy}
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+volumes:
+  pgdata: {}
+secrets:
+  db_password:
+    environment: DB_PASSWORD
+configs:
+  site:
+    content: |
+      server { listen 80; location / { return 200 "ok"; } }

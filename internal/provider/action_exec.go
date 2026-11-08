@@ -8,16 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -119,7 +117,7 @@ func (a *execAction) Invoke(ctx context.Context, req action.InvokeRequest, resp 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	created, err := c.ContainerExecCreate(ctx, ctr, container.ExecOptions{
+	created, err := c.ExecCreate(ctx, ctr, client.ExecCreateOptions{
 		User:         m.User.ValueString(),
 		Privileged:   actBool(m.Privileged, false),
 		AttachStdout: true,
@@ -133,7 +131,7 @@ func (a *execAction) Invoke(ctx context.Context, req action.InvokeRequest, resp 
 		return
 	}
 	actProgress(ctx, resp, "exec %s in %s: %s", svcShortID(created.ID), ctr, strings.Join(cmd, " "))
-	hj, err := c.ContainerExecAttach(ctx, created.ID, container.ExecAttachOptions{})
+	hj, err := c.ExecAttach(ctx, created.ID, client.ExecAttachOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("docker_exec: cannot start exec", fmt.Sprintf("container %q: %v", ctr, err))
 		return
@@ -167,10 +165,10 @@ func (a *execAction) Invoke(ctx context.Context, req action.InvokeRequest, resp 
 
 	// The stream ends when the process exits; the exit code can lag a
 	// moment behind, so poll until Running is false.
-	var insp container.ExecInspect
+	var insp client.ExecInspectResult
 	werr := waitFor(ctx, timeout, 100*time.Millisecond, func(ctx context.Context) (bool, error) {
 		var err error
-		insp, err = c.ContainerExecInspect(ctx, created.ID)
+		insp, err = c.ExecInspect(ctx, created.ID, client.ExecInspectOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -202,14 +200,12 @@ func actExecTail(tail []string) string {
 // on the provider's daemon (lowest name first, so repeated runs hit the same
 // task) and returns its ID.
 func actExecServiceContainer(ctx context.Context, c *client.Client, svc string, diags *diag.Diagnostics) string {
-	list, err := c.ContainerList(ctx, container.ListOptions{Filters: filters.NewArgs(
-		filters.Arg("label", "com.docker.swarm.service.name="+svc),
-		filters.Arg("status", "running"),
-	)})
+	listRes, err := c.ContainerList(ctx, client.ContainerListOptions{Filters: client.Filters{}.Add("label", "com.docker.swarm.service.name="+svc).Add("status", "running")})
 	if err != nil {
 		diags.AddError("docker_exec: cannot list service tasks", fmt.Sprintf("service %q: %v", svc, err))
 		return ""
 	}
+	list := listRes.Items
 	if len(list) == 0 {
 		diags.AddError("docker_exec: no running task", fmt.Sprintf("service %q has no running task container on this daemon. "+
 			"Pin it to the provider's node with a placement constraint, or use container.", svc))

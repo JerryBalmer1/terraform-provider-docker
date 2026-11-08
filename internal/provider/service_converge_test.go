@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/swarm"
+	"github.com/moby/moby/api/types/swarm"
 )
 
 func svcTask(id string, desired, state swarm.TaskState, errMsg string) swarm.Task {

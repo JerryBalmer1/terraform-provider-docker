@@ -17,13 +17,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 const actAccImage = "busybox:1.36"
@@ -36,7 +35,7 @@ var actAccVersionChecks = []tfversion.TerraformVersionCheck{tfversion.SkipBelow(
 // the test itself rather than by Terraform).
 func actAccPull(t *testing.T, c *client.Client, img string) {
 	t.Helper()
-	rc, err := c.ImagePull(context.Background(), img, image.PullOptions{})
+	rc, err := c.ImagePull(context.Background(), img, client.ImagePullOptions{})
 	if err != nil {
 		t.Fatalf("pulling %s: %v", img, err)
 	}
@@ -106,12 +105,12 @@ resource "terraform_data" "fail" {
 			{
 				Config: actAccContainer(name, ok),
 				Check: func(*terraform.State) error {
-					st, err := c.ContainerStatPath(context.Background(), name, "/tmp/marker")
+					res, err := c.ContainerStatPath(context.Background(), name, client.ContainerStatPathOptions{Path: "/tmp/marker"})
 					if err != nil {
 						return fmt.Errorf("docker_exec did not create /tmp/marker: %w", err)
 					}
-					if st.Size != int64(len("hello\n")) {
-						return fmt.Errorf("/tmp/marker has %d bytes, want 6 (env not passed?)", st.Size)
+					if res.Stat.Size != int64(len("hello\n")) {
+						return fmt.Errorf("/tmp/marker has %d bytes, want 6 (env not passed?)", res.Stat.Size)
 					}
 					return nil
 				},
@@ -270,7 +269,7 @@ func TestAccActionImageImport_basic(t *testing.T) {
 	repo := acctest.RandomWithPrefix("tfacc-import")
 	src := filepath.ToSlash(actAccRootfsTar(t))
 	c := testAccDockerClient(t)
-	t.Cleanup(func() { _, _ = c.ImageRemove(context.Background(), repo+":v1", image.RemoveOptions{Force: true}) })
+	t.Cleanup(func() { _, _ = c.ImageRemove(context.Background(), repo+":v1", client.ImageRemoveOptions{Force: true}) })
 	resource.Test(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -319,7 +318,7 @@ func TestAccActionImagePrune_basic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rc, err := c.ImageImport(context.Background(), image.ImportSource{Source: f, SourceName: "-"}, label, image.ImportOptions{Tag: "v1", Changes: []string{"LABEL tfacc-prune=" + label}})
+	rc, err := c.ImageImport(context.Background(), client.ImageImportSource{Source: f, SourceName: "-"}, label, client.ImageImportOptions{Tag: "v1", Changes: []string{"LABEL tfacc-prune=" + label}})
 	if err == nil {
 		_, err = imgDecodeStream(rc, nil)
 		rc.Close()
@@ -328,7 +327,7 @@ func TestAccActionImagePrune_basic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seeding image: %v", err)
 	}
-	t.Cleanup(func() { _, _ = c.ImageRemove(context.Background(), ref, image.RemoveOptions{Force: true}) })
+	t.Cleanup(func() { _, _ = c.ImageRemove(context.Background(), ref, client.ImageRemoveOptions{Force: true}) })
 	resource.Test(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -368,11 +367,13 @@ func TestAccActionSystemPrune_basic(t *testing.T) {
 	actAccPull(t, c, actAccImage)
 	// A stopped container carrying the test's label. The filters keep the
 	// prune away from everything else on the daemon.
-	created, err := c.ContainerCreate(context.Background(), &container.Config{Image: actAccImage, Cmd: []string{"true"}, Labels: map[string]string{"tfacc-prune": label}}, nil, nil, nil, label)
+	created, err := c.ContainerCreate(context.Background(), client.ContainerCreateOptions{Config: &container.Config{Image: actAccImage, Cmd: []string{"true"}, Labels: map[string]string{"tfacc-prune": label}}, HostConfig: nil, NetworkingConfig: nil, Platform: nil, Name: label})
 	if err != nil {
 		t.Fatalf("seeding container: %v", err)
 	}
-	t.Cleanup(func() { _ = c.ContainerRemove(context.Background(), created.ID, container.RemoveOptions{Force: true}) })
+	t.Cleanup(func() {
+		_, _ = c.ContainerRemove(context.Background(), created.ID, client.ContainerRemoveOptions{Force: true})
+	})
 	resource.Test(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -400,7 +401,7 @@ resource "terraform_data" "p" {
 }
 `, label),
 			Check: func(*terraform.State) error {
-				if _, err := c.ContainerInspect(context.Background(), created.ID); !isNotFound(err) {
+				if _, err := c.ContainerInspect(context.Background(), created.ID, client.ContainerInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("container %s should be pruned, inspect: %v", label, err)
 				}
 				return nil

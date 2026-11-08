@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/moby/moby/api/types/swarm"
 )
 
 func TestSwarmRotateTokensAction(t *testing.T) {

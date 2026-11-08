@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -14,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/echoprovider"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
+	"github.com/moby/moby/api/types/swarm"
 )
 
 // p3eOpenEphemeral configures e with pd and opens it with cfg.

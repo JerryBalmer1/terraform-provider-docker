@@ -1,0 +1,57 @@
+# Source: composeExpandYAML in internal/provider/compose_parse_test.go
+services:
+  web:
+    image: nginx:1.27
+    command: ["nginx", "-g", "daemon off;"]
+    ports: ["127.0.0.1:8080:80", "9000/udp"]
+    expose: ["3000"]
+    environment: {A: "1", UNSET: null}
+    labels: {team: web}
+    restart: on-failure:3
+    mem_limit: 64m
+    cpus: 0.5
+    healthcheck: {disable: true}
+    volumes:
+      - data:/data
+      - type: tmpfs
+        target: /tmp
+        tmpfs: {size: 1048576}
+    secrets:
+      - source: pw
+        target: custom
+        uid: "100"
+        gid: "101"
+        mode: 0400
+      - file_secret
+    configs: [conf]
+    extra_hosts: ["db.local:10.0.0.2"]
+    networks:
+      front: {aliases: [www], ipv4_address: 172.30.0.10}
+      back: {}
+    deploy: {replicas: 2}
+  sidecar:
+    image: busybox
+    network_mode: service:web
+    volumes_from: [web:ro]
+    deploy:
+      mode: global
+      restart_policy: {condition: none}
+      resources: {limits: {memory: 32m}}
+  job:
+    image: busybox
+    container_name: the-job
+    networks: [ext]
+    deploy:
+      mode: replicated-job
+networks:
+  front:
+    ipam: {config: [{subnet: 172.30.0.0/24}]}
+  back: {internal: true}
+  ext: {external: true, name: traefik_public}
+volumes:
+  data: {driver: local, driver_opts: {type: tmpfs}}
+secrets:
+  pw: {environment: PW}
+  file_secret: {file: ./pw.txt}
+configs:
+  conf: {content: "x=1"}

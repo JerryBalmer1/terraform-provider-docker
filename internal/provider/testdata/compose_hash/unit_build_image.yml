@@ -1,0 +1,3 @@
+# Source: TestComposeLocalExpandErrors ("build + image") in internal/provider/compose_parse_test.go
+services:
+  a: {image: x, build: .}

@@ -3,9 +3,9 @@ package provider
 import (
 	"testing"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/moby/moby/api/types/swarm"
 )
 
 func TestNodeDSFlatten(t *testing.T) {

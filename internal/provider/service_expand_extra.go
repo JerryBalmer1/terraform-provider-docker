@@ -10,12 +10,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/swarm"
 )
 
 // svcModeOf names the mode of a spec the way the mode attribute does.
@@ -179,8 +179,12 @@ func svcExpandP2(ctx context.Context, m *svcSpecModel, spec *swarm.ServiceSpec, 
 		cs.Hosts = append(cs.Hosts, s)
 	}
 	if d := m.DNS; d != nil {
+		ns, err := parseAddrs("dns.nameservers", stringListFrom(ctx, d.Nameservers, diags))
+		if err != nil {
+			diags.AddError("Invalid dns.nameservers", err.Error())
+		}
 		cs.DNSConfig = &swarm.DNSConfig{
-			Nameservers: stringListFrom(ctx, d.Nameservers, diags),
+			Nameservers: ns,
 			Search:      stringListFrom(ctx, d.Search, diags),
 			Options:     stringListFrom(ctx, d.Options, diags),
 		}
@@ -335,7 +339,7 @@ func svcFlattenP2(spec swarm.ServiceSpec, cs *swarm.ContainerSpec, prior svcSpec
 			p = &svcDNSModel{Nameservers: types.ListNull(types.StringType), Search: types.ListNull(types.StringType), Options: types.ListNull(types.StringType)}
 		}
 		m.DNS = &svcDNSModel{
-			Nameservers: svcListValue(p.Nameservers, d.Nameservers),
+			Nameservers: svcListValue(p.Nameservers, addrStrings(d.Nameservers)),
 			Search:      svcListValue(p.Search, d.Search),
 			Options:     svcListValue(p.Options, d.Options),
 		}

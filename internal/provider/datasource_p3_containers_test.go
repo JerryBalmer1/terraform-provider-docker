@@ -5,14 +5,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 )
 
 // p3eReadDS configures d with pd and reads it with cfg.
@@ -37,7 +37,7 @@ func TestP3ContainersDataSource(t *testing.T) {
 	f, pd := newP3eFake(t)
 	f.json("GET /containers/json", []container.Summary{
 		{ID: "c2", Names: []string{"/web"}, Image: "nginx:1.27", State: "running", Labels: map[string]string{"app": "shop"},
-			Ports:           []container.Port{{IP: "0.0.0.0", PrivatePort: 80, PublicPort: 8080, Type: "tcp"}},
+			Ports:           []container.PortSummary{{IP: mustAddr("0.0.0.0"), PrivatePort: 80, PublicPort: 8080, Type: "tcp"}},
 			NetworkSettings: &container.NetworkSettingsSummary{Networks: map[string]*network.EndpointSettings{"front": {}, "back": {}}}},
 		{ID: "c1", Names: []string{"/api"}, Image: "api:2", State: "exited", Created: 1700000000},
 	})
@@ -80,7 +80,7 @@ func TestP3ContainersDataSource(t *testing.T) {
 		t.Errorf("web = %+v", cs[1])
 	}
 	args := p3eFilterArgs(t, f, "GET /containers/json")
-	if !args.ExactMatch("label", "app=shop") {
+	if !filterExactMatch(args, "label", "app=shop") {
 		t.Errorf("filters = %v", args)
 	}
 	for _, s := range f.requests() {

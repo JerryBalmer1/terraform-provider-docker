@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/distribution/reference"
-	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
 )
@@ -304,11 +304,19 @@ const imgStreamTailLines = 20
 // imgDecodeStream reads an Engine JSON message stream to the end. The first
 // errorDetail (or legacy error) message is returned as an error, with the
 // last lines of build output attached. onMsg, when non-nil, sees every message.
-func imgDecodeStream(r io.Reader, onMsg func(jsonmessage.JSONMessage)) (imgStreamResult, error) {
+// imgStreamMessage is one stream message plus the legacy top-level "error"
+// string, which jsonstream.Message (unlike the old jsonmessage.JSONMessage)
+// no longer carries.
+type imgStreamMessage struct {
+	jsonstream.Message
+	ErrorMessage string `json:"error,omitempty"`
+}
+
+func imgDecodeStream(r io.Reader, onMsg func(jsonstream.Message)) (imgStreamResult, error) {
 	var res imgStreamResult
 	dec := json.NewDecoder(r)
 	for {
-		var m jsonmessage.JSONMessage
+		var m imgStreamMessage
 		if err := dec.Decode(&m); err != nil {
 			if errors.Is(err, io.EOF) {
 				return res, nil
@@ -316,7 +324,7 @@ func imgDecodeStream(r io.Reader, onMsg func(jsonmessage.JSONMessage)) (imgStrea
 			return res, fmt.Errorf("decoding daemon output: %w", err)
 		}
 		if onMsg != nil {
-			onMsg(m)
+			onMsg(m.Message)
 		}
 		if m.Error != nil || m.ErrorMessage != "" {
 			msg := m.ErrorMessage

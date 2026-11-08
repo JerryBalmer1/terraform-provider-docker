@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -16,6 +14,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -105,7 +105,7 @@ func (d *p3LogsDS) Read(ctx context.Context, req datasource.ReadRequest, resp *d
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	opts := container.LogsOptions{
+	opts := client.ContainerLogsOptions{
 		ShowStdout: p3BoolOr(m.ShowStdout, true),
 		ShowStderr: p3BoolOr(m.ShowStderr, true),
 		Since:      m.Since.ValueString(),
@@ -118,11 +118,12 @@ func (d *p3LogsDS) Read(ctx context.Context, req datasource.ReadRequest, resp *d
 		resp.Diagnostics.AddAttributeError(path.Root("show_stdout"), "No log stream selected", "At least one of show_stdout and show_stderr must be true.")
 		return
 	}
-	insp, err := d.pd.Client.ContainerInspect(ctx, m.Container.ValueString())
+	inspRes, err := d.pd.Client.ContainerInspect(ctx, m.Container.ValueString(), client.ContainerInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect container", fmt.Sprintf("%s: %v", m.Container.ValueString(), err))
 		return
 	}
+	insp := inspRes.Container
 	rc, err := d.pd.Client.ContainerLogs(ctx, insp.ID, opts)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot read container logs", fmt.Sprintf("%s: %v", m.Container.ValueString(), err))

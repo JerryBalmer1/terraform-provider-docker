@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -17,6 +15,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -304,11 +304,12 @@ func (r *swarmNodeResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, nodeID)...)
 		return
 	}
-	n, _, err := r.pd.Client.NodeInspectWithRaw(ctx, nodeID)
+	nRes, err := r.pd.Client.NodeInspect(ctx, nodeID, client.NodeInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect joined node", err.Error())
 		return
 	}
+	n := nRes.Node
 	swarmNodeFlatten(&plan, n)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
@@ -320,7 +321,8 @@ func (r *swarmNodeResource) Read(ctx context.Context, req resource.ReadRequest, 
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	n, _, err := r.pd.Client.NodeInspectWithRaw(ctx, state.ID.ValueString())
+	nRes, err := r.pd.Client.NodeInspect(ctx, state.ID.ValueString(), client.NodeInspectOptions{})
+	n := nRes.Node
 	if isNotFound(err) {
 		resp.State.RemoveResource(ctx)
 		return
@@ -351,11 +353,12 @@ func (r *swarmNodeResource) Update(ctx context.Context, req resource.UpdateReque
 		resp.Diagnostics.AddError("Cannot update swarm node", err.Error())
 		return
 	}
-	n, _, err := r.pd.Client.NodeInspectWithRaw(ctx, state.ID.ValueString())
+	nRes, err := r.pd.Client.NodeInspect(ctx, state.ID.ValueString(), client.NodeInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect swarm node", err.Error())
 		return
 	}
+	n := nRes.Node
 	swarmNodeFlatten(&plan, n)
 	// Config is now complete; later changes to host etc. replace the node.
 	resp.Diagnostics.Append(resp.Private.SetKey(ctx, swarmNodeImportedKey, nil)...)

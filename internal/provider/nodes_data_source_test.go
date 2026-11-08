@@ -3,16 +3,16 @@ package provider
 import (
 	"testing"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/moby/moby/api/types/swarm"
 )
 
 func TestNodesDSListOptions(t *testing.T) {
-	if got := nodesDSListOptions("").Filters.Len(); got != 0 {
+	if got := len(nodesDSListOptions("").Filters); got != 0 {
 		t.Errorf("no role should give no filter, got %d", got)
 	}
-	if got := nodesDSListOptions("manager").Filters.Get("role"); len(got) != 1 || got[0] != "manager" {
+	if got := filterGet(nodesDSListOptions("manager").Filters, "role"); len(got) != 1 || got[0] != "manager" {
 		t.Errorf("role filter: %v", got)
 	}
 }

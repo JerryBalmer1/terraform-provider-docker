@@ -6,16 +6,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
+	"time"
 )
 
 var (
@@ -51,17 +49,18 @@ func actServiceUpdate(ctx context.Context, pd *providerData, ref string, rollbac
 	}
 	var lastErr error
 	for attempt := 0; attempt < swarmNodeUpdateAttempts; attempt++ {
-		svc, _, err := c.ServiceInspectWithRaw(ctx, id, swarm.ServiceInspectOptions{})
+		svcRes, err := c.ServiceInspect(ctx, id, client.ServiceInspectOptions{})
 		if err != nil {
 			diags.AddError("Cannot inspect service", err.Error())
 			return ""
 		}
+		svc := svcRes.Service
 		if err := mutate(&svc); err != nil {
 			diags.AddError("Cannot update service", err.Error())
 			return ""
 		}
 		img := svc.Spec.TaskTemplate.ContainerSpec
-		opts := swarm.ServiceUpdateOptions{}
+		opts := client.ServiceUpdateOptions{}
 		if img != nil && img.Image != "" {
 			ref := img.Image
 			if rollback && svc.PreviousSpec != nil && svc.PreviousSpec.TaskTemplate.ContainerSpec != nil {
@@ -74,7 +73,8 @@ func actServiceUpdate(ctx context.Context, pd *providerData, ref string, rollbac
 		if rollback {
 			opts.Rollback = "previous"
 		}
-		out, err := c.ServiceUpdate(ctx, id, svc.Version, svc.Spec, opts)
+		opts.Version, opts.Spec = svc.Version, svc.Spec
+		out, err := c.ServiceUpdate(ctx, id, opts)
 		if err == nil {
 			for _, w := range out.Warnings {
 				diags.AddWarning("Docker daemon warning", w)
@@ -121,10 +121,11 @@ func actRolloutStatus(svc swarm.Service) *swarm.UpdateStatus {
 // the old tasks before the update begins.
 func actWaitRolloutStarted(ctx context.Context, c *client.Client, id string) error {
 	for i := 0; i < actRolloutGracePolls; i++ {
-		svc, _, err := c.ServiceInspectWithRaw(ctx, id, swarm.ServiceInspectOptions{})
+		svcRes, err := c.ServiceInspect(ctx, id, client.ServiceInspectOptions{})
 		if err != nil {
 			return err
 		}
+		svc := svcRes.Service
 		if actRolloutStatus(svc) != nil {
 			return nil
 		}
@@ -371,14 +372,16 @@ func (a *serviceRollbackAction) Invoke(ctx context.Context, req action.InvokeReq
 	var running, want int
 	werr := waitFor(ctx, timeout, actPollInterval, func(ctx context.Context) (bool, error) {
 		polls++
-		svc, _, err := c.ServiceInspectWithRaw(ctx, id, swarm.ServiceInspectOptions{})
+		svcRes, err := c.ServiceInspect(ctx, id, client.ServiceInspectOptions{})
 		if err != nil {
 			return false, err
 		}
-		tasks, err := c.TaskList(ctx, swarm.TaskListOptions{Filters: filters.NewArgs(filters.Arg("service", id))})
+		svc := svcRes.Service
+		tasksRes, err := c.TaskList(ctx, client.TaskListOptions{Filters: client.Filters{}.Add("service", id)})
 		if err != nil {
 			return false, err
 		}
+		tasks := tasksRes.Items
 		st := svcConvergeCheck(tasks, actServiceReplicas(svc), nil, time.Time{})
 		running, want = st.Running, st.Want
 		return actRollbackCheck(svc, tasks, polls > actRolloutGracePolls)

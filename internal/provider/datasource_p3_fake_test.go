@@ -13,9 +13,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/moby/moby/client"
 )
 
 // p3eFake is a fake Docker Engine: handlers keyed "METHOD /path" (API version

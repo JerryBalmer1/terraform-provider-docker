@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
+	"net/netip"
 )
 
 func TestSwarmInitBuildRequest(t *testing.T) {
@@ -31,7 +33,7 @@ func TestSwarmInitBuildRequest(t *testing.T) {
 		t.Fatal(diags)
 	}
 	if r.ListenAddr != swarmDefaultListenAddr || r.AdvertiseAddr != "10.0.0.5" || len(r.DefaultAddrPool) != 1 ||
-		r.DefaultAddrPool[0] != "10.20.0.0/16" || r.SubnetSize != 26 || r.DataPathPort != 0 || !r.ForceNewCluster || r.AutoLockManagers {
+		prefixString(r.DefaultAddrPool[0]) != "10.20.0.0/16" || r.SubnetSize != 26 || r.DataPathPort != 0 || !r.ForceNewCluster || r.AutoLockManagers {
 		t.Errorf("unexpected request %+v", r)
 	}
 	m.DefaultAddrPool = types.ListUnknown(types.StringType)
@@ -45,7 +47,7 @@ func TestSwarmInitBuildRequest(t *testing.T) {
 
 func TestSwarmInitFlatten(t *testing.T) {
 	sw := swarm.Swarm{
-		ClusterInfo: swarm.ClusterInfo{ID: "c1", DefaultAddrPool: []string{"10.0.0.0/8"}, SubnetSize: 24, DataPathPort: 4789,
+		ClusterInfo: swarm.ClusterInfo{ID: "c1", DefaultAddrPool: []netip.Prefix{mustPrefix("10.0.0.0/8")}, SubnetSize: 24, DataPathPort: 4789,
 			Spec: swarm.Spec{EncryptionConfig: swarm.EncryptionConfig{AutoLockManagers: true}}},
 		JoinTokens: swarm.JoinTokens{Worker: "w", Manager: "m"},
 	}
@@ -71,7 +73,7 @@ func swarmFakeManager(t *testing.T, state string, clusterID string) *swarmFakeEn
 	})
 	f.handle("GET /swarm", func(w http.ResponseWriter, r *http.Request) {
 		swarmFakeJSON(w, swarm.Swarm{ClusterInfo: swarm.ClusterInfo{ID: clusterID, SubnetSize: 24, DataPathPort: 4789,
-			DefaultAddrPool: []string{"10.0.0.0/8"}}, JoinTokens: swarm.JoinTokens{Worker: "SWMTKN-w", Manager: "SWMTKN-m"}})
+			DefaultAddrPool: []netip.Prefix{mustPrefix("10.0.0.0/8")}}, JoinTokens: swarm.JoinTokens{Worker: "SWMTKN-w", Manager: "SWMTKN-m"}})
 	})
 	return f
 }
@@ -122,10 +124,11 @@ func TestSwarmLeaveToleratesNotInSwarm(t *testing.T) {
 
 func TestAccSwarmInit_basic(t *testing.T) {
 	testAccPreCheck(t)
-	info, err := testAccDockerClient(t).Info(context.Background())
+	infoRes, err := testAccDockerClient(t).Info(context.Background(), client.InfoOptions{})
 	if err != nil {
 		t.Skipf("cannot reach DOCKER_HOST: %v", err)
 	}
+	info := infoRes.Info
 	if info.Swarm.LocalNodeState != swarm.LocalNodeStateInactive {
 		t.Skip("DOCKER_HOST is already part of a swarm; docker_swarm_init needs a daemon outside any swarm")
 	}
@@ -133,10 +136,11 @@ func TestAccSwarmInit_basic(t *testing.T) {
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(*terraform.State) error {
-			info, err := testAccDockerClient(t).Info(context.Background())
+			infoRes, err := testAccDockerClient(t).Info(context.Background(), client.InfoOptions{})
 			if err != nil {
 				return err
 			}
+			info := infoRes.Info
 			if info.Swarm.LocalNodeState != swarm.LocalNodeStateInactive {
 				return fmt.Errorf("daemon still in swarm: %s", info.Swarm.LocalNodeState)
 			}

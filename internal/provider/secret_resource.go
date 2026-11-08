@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -20,6 +18,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -117,7 +117,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		},
 		Data: data,
 	}
-	out, err := r.pd.Client.SecretCreate(ctx, spec)
+	out, err := r.pd.Client.SecretCreate(ctx, client.SecretCreateOptions{Spec: spec})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot create secret", err.Error())
 		return
@@ -133,7 +133,7 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 // read refreshes m from the daemon; it reports gone=true when the secret no
 // longer exists.
 func (r *secretResource) read(ctx context.Context, m *secretResourceModel, diags *diag.Diagnostics, gone *bool) {
-	s, _, err := r.pd.Client.SecretInspectWithRaw(ctx, m.ID.ValueString())
+	sRes, err := r.pd.Client.SecretInspect(ctx, m.ID.ValueString(), client.SecretInspectOptions{})
 	if err != nil {
 		if isNotFound(err) && gone != nil {
 			*gone = true
@@ -142,6 +142,7 @@ func (r *secretResource) read(ctx context.Context, m *secretResourceModel, diags
 		diags.AddError("Cannot read secret", err.Error())
 		return
 	}
+	s := sRes.Secret
 	m.ID = types.StringValue(s.ID)
 	m.Name = types.StringValue(s.Spec.Name)
 	m.Labels = svcMapValue(m.Labels, userLabels(s.Spec.Labels, false))
@@ -266,9 +267,15 @@ func secretPayload(ctx context.Context, cfg tfsdk.Config, data types.String, dia
 // for a while when it is still in use by tasks that are shutting down.
 func secretRemoveWhenFree(ctx context.Context, c *client.Client, id string, isConfig bool) error {
 	if isConfig {
-		return stackRemoveRetry(ctx, "config "+id, func(ctx context.Context) error { return c.ConfigRemove(ctx, id) })
+		return stackRemoveRetry(ctx, "config "+id, func(ctx context.Context) error {
+			_, err := c.ConfigRemove(ctx, id, client.ConfigRemoveOptions{})
+			return err
+		})
 	}
-	return stackRemoveRetry(ctx, "secret "+id, func(ctx context.Context) error { return c.SecretRemove(ctx, id) })
+	return stackRemoveRetry(ctx, "secret "+id, func(ctx context.Context) error {
+		_, err := c.SecretRemove(ctx, id, client.SecretRemoveOptions{})
+		return err
+	})
 }
 
 // secretBase64Validator checks a string is valid standard base64. It is shared

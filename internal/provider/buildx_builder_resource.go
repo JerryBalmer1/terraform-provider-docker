@@ -35,11 +35,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/docker/go-connections/nat"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -56,6 +51,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	bkclient "github.com/moby/buildkit/client"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -347,9 +347,9 @@ func bxbBuildCreate(ctx context.Context, m bxbModel, diags *diag.Diagnostics) (*
 		hc.Memory = v
 	}
 	if p, ok := knownInt64(m.TCPPort); ok {
-		port := nat.Port(fmt.Sprintf("%d/tcp", bxbTCPContainerPort))
-		cfg.ExposedPorts = nat.PortSet{port: {}}
-		hc.PortBindings = nat.PortMap{port: {{HostPort: strconv.FormatInt(p, 10)}}}
+		port, _ := network.PortFrom(bxbTCPContainerPort, network.TCP)
+		cfg.ExposedPorts = network.PortSet{port: {}}
+		hc.PortBindings = network.PortMap{port: {{HostPort: strconv.FormatInt(p, 10)}}}
 	}
 	return cfg, hc
 }
@@ -389,13 +389,13 @@ func bxbDemux(conn net.Conn, src io.Reader) net.Conn {
 // attached stream as a connection to buildkitd, as buildx's docker-container
 // driver does.
 func bxbDialStdio(ctx context.Context, pd *providerData, containerID string) (net.Conn, error) {
-	ex, err := pd.Client.ContainerExecCreate(ctx, containerID, container.ExecOptions{
+	ex, err := pd.Client.ExecCreate(ctx, containerID, client.ExecCreateOptions{
 		Cmd: []string{"buildctl", "dial-stdio"}, AttachStdin: true, AttachStdout: true, AttachStderr: true,
 	})
 	if err != nil {
 		return nil, err
 	}
-	hj, err := pd.Client.ContainerExecAttach(ctx, ex.ID, container.ExecAttachOptions{})
+	hj, err := pd.Client.ExecAttach(ctx, ex.ID, client.ExecAttachOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -411,10 +411,11 @@ func bxbDialStdio(ctx context.Context, pd *providerData, containerID string) (ne
 func bxbListWorkers(ctx context.Context, pd *providerData, containerID string) (*bkclient.WorkerInfo, error) {
 	var info *bkclient.WorkerInfo
 	err := waitFor(ctx, bxbBootstrapTimeout, time.Second, func(ctx context.Context) (bool, error) {
-		insp, err := pd.Client.ContainerInspect(ctx, containerID)
+		inspRes, err := pd.Client.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
 		if err != nil {
 			return false, err
 		}
+		insp := inspRes.Container
 		if insp.State != nil && !insp.State.Running && !insp.State.Restarting && (insp.State.Status == "exited" || insp.State.Status == "dead") {
 			return false, fmt.Errorf("buildkit container exited (code %d): %s", insp.State.ExitCode, insp.State.Error)
 		}
@@ -461,12 +462,12 @@ func (r *buildxBuilderResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 	vol := bxbVolumeName(name)
-	if _, err := r.pd.Client.VolumeCreate(ctx, volume.CreateOptions{Name: vol, Labels: cfg.Labels}); err != nil {
+	if _, err := r.pd.Client.VolumeCreate(ctx, client.VolumeCreateOptions{Name: vol, Labels: cfg.Labels}); err != nil {
 		resp.Diagnostics.AddError("Cannot create BuildKit state volume", fmt.Sprintf("%s: %v", vol, err))
 		return
 	}
 	cname := bxbContainerName(name)
-	created, err := r.pd.Client.ContainerCreate(ctx, cfg, hc, nil, nil, cname)
+	created, err := r.pd.Client.ContainerCreate(ctx, client.ContainerCreateOptions{Config: cfg, HostConfig: hc, NetworkingConfig: nil, Platform: nil, Name: cname})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot create BuildKit container", fmt.Sprintf("%s: %v", cname, err))
 		return
@@ -479,7 +480,7 @@ func (r *buildxBuilderResource) Create(ctx context.Context, req resource.CreateR
 	if cfgBytes != nil {
 		tb, err := bxbConfigTar(cfgBytes, time.Now())
 		if err == nil {
-			err = r.pd.Client.CopyToContainer(ctx, created.ID, "/", bytes.NewReader(tb), container.CopyToContainerOptions{})
+			_, err = r.pd.Client.CopyToContainer(ctx, created.ID, client.CopyToContainerOptions{DestinationPath: "/", Content: bytes.NewReader(tb)})
 		}
 		if err != nil {
 			resp.Diagnostics.AddError("Cannot copy buildkitd.toml into the builder", err.Error())
@@ -498,7 +499,7 @@ func (r *buildxBuilderResource) Create(ctx context.Context, req resource.CreateR
 	plan.Platforms = types.ListValueMust(types.StringType, nil)
 
 	if plan.Bootstrap.ValueBool() {
-		if err := r.pd.Client.ContainerStart(ctx, created.ID, container.StartOptions{}); err != nil {
+		if _, err := r.pd.Client.ContainerStart(ctx, created.ID, client.ContainerStartOptions{}); err != nil {
 			resp.Diagnostics.AddError("Cannot start BuildKit container", err.Error())
 			return
 		}
@@ -534,7 +535,8 @@ func (r *buildxBuilderResource) Read(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	insp, err := r.pd.Client.ContainerInspect(ctx, state.ID.ValueString())
+	inspRes, err := r.pd.Client.ContainerInspect(ctx, state.ID.ValueString(), client.ContainerInspectOptions{})
+	insp := inspRes.Container
 	if isNotFound(err) {
 		resp.State.RemoveResource(ctx)
 		return
@@ -550,7 +552,7 @@ func (r *buildxBuilderResource) Read(ctx context.Context, req resource.ReadReque
 // bxbFromInspect fills computed and (on import) configured values from the
 // container.
 func bxbFromInspect(m *bxbModel, insp container.InspectResponse, dockerHost string) {
-	if insp.ContainerJSONBase == nil {
+	if insp.ID == "" {
 		return
 	}
 	m.ID = types.StringValue(insp.ID)
@@ -609,7 +611,7 @@ func (r *buildxBuilderResource) Delete(ctx context.Context, req resource.DeleteR
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	err := r.pd.Client.ContainerRemove(ctx, state.ID.ValueString(), container.RemoveOptions{Force: true, RemoveVolumes: false})
+	_, err := r.pd.Client.ContainerRemove(ctx, state.ID.ValueString(), client.ContainerRemoveOptions{Force: true, RemoveVolumes: false})
 	if err != nil && !isNotFound(err) {
 		resp.Diagnostics.AddError("Cannot remove BuildKit container", err.Error())
 		return
@@ -621,7 +623,7 @@ func (r *buildxBuilderResource) Delete(ctx context.Context, req resource.DeleteR
 	if vol == "" {
 		vol = bxbVolumeName(state.Name.ValueString())
 	}
-	if err := r.pd.Client.VolumeRemove(ctx, vol, true); err != nil && !isNotFound(err) {
+	if _, err := r.pd.Client.VolumeRemove(ctx, vol, client.VolumeRemoveOptions{Force: true}); err != nil && !isNotFound(err) {
 		resp.Diagnostics.AddError("Cannot remove BuildKit state volume", fmt.Sprintf("%s: %v", vol, err))
 	}
 }
@@ -632,9 +634,11 @@ func (r *buildxBuilderResource) ImportState(ctx context.Context, req resource.Im
 		resp.Diagnostics.AddError("Provider not configured", "Cannot import before the provider is configured.")
 		return
 	}
-	insp, err := r.pd.Client.ContainerInspect(ctx, req.ID)
+	inspRes, err := r.pd.Client.ContainerInspect(ctx, req.ID, client.ContainerInspectOptions{})
+	insp := inspRes.Container
 	if isNotFound(err) {
-		insp, err = r.pd.Client.ContainerInspect(ctx, bxbContainerName(req.ID))
+		inspRes, err = r.pd.Client.ContainerInspect(ctx, bxbContainerName(req.ID), client.ContainerInspectOptions{})
+		insp = inspRes.Container
 	}
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot find BuildKit container", fmt.Sprintf("%q: %v", req.ID, err))

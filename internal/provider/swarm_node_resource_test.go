@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 // ---------------------------------------------------------------------------
@@ -505,10 +505,11 @@ func TestSwarmLeaveThenRemoveUnreachableNode(t *testing.T) {
 // skipping the test unless that host is an active swarm manager.
 func swarmAccManagerAddr(t *testing.T) string {
 	t.Helper()
-	info, err := testAccDockerClient(t).Info(context.Background())
+	infoRes, err := testAccDockerClient(t).Info(context.Background(), client.InfoOptions{})
 	if err != nil {
 		t.Skipf("cannot reach DOCKER_HOST: %v", err)
 	}
+	info := infoRes.Info
 	if info.Swarm.LocalNodeState != swarm.LocalNodeStateActive || !info.Swarm.ControlAvailable {
 		t.Skip("DOCKER_HOST is not a swarm manager")
 	}
@@ -618,7 +619,7 @@ func swarmAccCheckNodesGone(s *terraform.State) error {
 		if rs.Type != "docker_swarm_node" {
 			continue
 		}
-		if _, _, err := c.NodeInspectWithRaw(context.Background(), rs.Primary.ID); !isNotFound(err) {
+		if _, err := c.NodeInspect(context.Background(), rs.Primary.ID, client.NodeInspectOptions{}); !isNotFound(err) {
 			return fmt.Errorf("swarm node %s still present (err=%v)", rs.Primary.ID, err)
 		}
 	}

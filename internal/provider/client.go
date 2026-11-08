@@ -19,11 +19,9 @@ import (
 
 	cerrdefs "github.com/containerd/errdefs"
 	"github.com/distribution/reference"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
+	"github.com/moby/moby/api/pkg/authconfig"
+	"github.com/moby/moby/api/types/registry"
+	"github.com/moby/moby/client"
 )
 
 // ---------------------------------------------------------------------------
@@ -208,7 +206,7 @@ func (pd *providerData) registryAuthFor(imageRef string) (string, error) {
 	if err != nil || !ok {
 		return "", err
 	}
-	return registry.EncodeAuthConfig(cfg)
+	return authconfig.Encode(cfg)
 }
 
 // registryAuthConfigFor returns the matching AuthConfig (for ImageBuild's
@@ -303,10 +301,11 @@ func resolveNameOrID(kind, ref string, objs []namedObject) (string, error) {
 }
 
 func resolveNetworkID(ctx context.Context, c *client.Client, ref string) (string, error) {
-	list, err := c.NetworkList(ctx, network.ListOptions{})
+	res, err := c.NetworkList(ctx, client.NetworkListOptions{})
 	if err != nil {
 		return "", err
 	}
+	list := res.Items
 	objs := make([]namedObject, 0, len(list))
 	for _, n := range list {
 		objs = append(objs, namedObject{ID: n.ID, Name: n.Name})
@@ -315,18 +314,19 @@ func resolveNetworkID(ctx context.Context, c *client.Client, ref string) (string
 }
 
 func resolveVolumeName(ctx context.Context, c *client.Client, ref string) (string, error) {
-	v, err := c.VolumeInspect(ctx, ref)
+	res, err := c.VolumeInspect(ctx, ref, client.VolumeInspectOptions{})
 	if err != nil {
 		return "", err
 	}
-	return v.Name, nil
+	return res.Volume.Name, nil
 }
 
 func resolveSecretID(ctx context.Context, c *client.Client, ref string) (string, error) {
-	list, err := c.SecretList(ctx, swarm.SecretListOptions{})
+	res, err := c.SecretList(ctx, client.SecretListOptions{})
 	if err != nil {
 		return "", err
 	}
+	list := res.Items
 	objs := make([]namedObject, 0, len(list))
 	for _, s := range list {
 		objs = append(objs, namedObject{ID: s.ID, Name: s.Spec.Name})
@@ -335,10 +335,11 @@ func resolveSecretID(ctx context.Context, c *client.Client, ref string) (string,
 }
 
 func resolveConfigID(ctx context.Context, c *client.Client, ref string) (string, error) {
-	list, err := c.ConfigList(ctx, swarm.ConfigListOptions{})
+	res, err := c.ConfigList(ctx, client.ConfigListOptions{})
 	if err != nil {
 		return "", err
 	}
+	list := res.Items
 	objs := make([]namedObject, 0, len(list))
 	for _, s := range list {
 		objs = append(objs, namedObject{ID: s.ID, Name: s.Spec.Name})
@@ -347,10 +348,11 @@ func resolveConfigID(ctx context.Context, c *client.Client, ref string) (string,
 }
 
 func resolveServiceID(ctx context.Context, c *client.Client, ref string) (string, error) {
-	list, err := c.ServiceList(ctx, swarm.ServiceListOptions{})
+	res, err := c.ServiceList(ctx, client.ServiceListOptions{})
 	if err != nil {
 		return "", err
 	}
+	list := res.Items
 	objs := make([]namedObject, 0, len(list))
 	for _, s := range list {
 		objs = append(objs, namedObject{ID: s.ID, Name: s.Spec.Name})
@@ -360,10 +362,11 @@ func resolveServiceID(ctx context.Context, c *client.Client, ref string) (string
 
 // resolveNodeID matches a node ID, hostname or node name.
 func resolveNodeID(ctx context.Context, c *client.Client, ref string) (string, error) {
-	list, err := c.NodeList(ctx, swarm.NodeListOptions{})
+	res, err := c.NodeList(ctx, client.NodeListOptions{})
 	if err != nil {
 		return "", err
 	}
+	list := res.Items
 	objs := make([]namedObject, 0, 2*len(list))
 	for _, n := range list {
 		objs = append(objs, namedObject{ID: n.ID, Name: n.Description.Hostname})
@@ -412,8 +415,8 @@ func userLabels(in map[string]string, stripStack bool) map[string]string {
 }
 
 // labelFilter builds list filters matching every key=value in labels.
-func labelFilter(labels map[string]string) filters.Args {
-	args := filters.NewArgs()
+func labelFilter(labels map[string]string) client.Filters {
+	args := make(client.Filters)
 	keys := make([]string, 0, len(labels))
 	for k := range labels {
 		keys = append(keys, k)
@@ -427,7 +430,7 @@ func labelFilter(labels map[string]string) filters.Args {
 
 // volumeExists is a small convenience for lanes that create volumes.
 func volumeExists(ctx context.Context, c *client.Client, name string) (bool, error) {
-	_, err := c.VolumeInspect(ctx, name)
+	_, err := c.VolumeInspect(ctx, name, client.VolumeInspectOptions{})
 	if isNotFound(err) {
 		return false, nil
 	}

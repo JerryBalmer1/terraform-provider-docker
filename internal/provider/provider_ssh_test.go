@@ -21,6 +21,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/client"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -241,10 +242,10 @@ func sshPingVersion(t *testing.T, sc *sshConfig) (string, error) {
 	defer c.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	if _, err := c.Ping(ctx); err != nil {
+	if _, err := c.Ping(ctx, client.PingOptions{}); err != nil {
 		return "", err
 	}
-	v, err := c.ServerVersion(ctx)
+	v, err := c.ServerVersion(ctx, client.ServerVersionOptions{})
 	return v.Version, err
 }
 

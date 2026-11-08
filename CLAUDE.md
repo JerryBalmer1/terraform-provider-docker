@@ -74,7 +74,7 @@ is an [Invoke-Build](https://github.com/nightroman/Invoke-Build) script; run it 
 
 ```
 Invoke-Build ?                   # list tasks
-Invoke-Build                     # default: Build, Vet, Test, GenSkillCheck, InventoryCheck
+Invoke-Build                     # default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate
 Invoke-Build Build, Vet, Test    # go build + provider binary, go vet, unit tests (-short, TF_ACC unset)
 Invoke-Build Tools               # unit tests of tools/ only
 Invoke-Build GenSkill            # regenerate .claude/skills + README_resources.md (GenSkillCheck: -check)

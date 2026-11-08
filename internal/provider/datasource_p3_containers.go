@@ -6,14 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -125,7 +125,7 @@ func (d *p3ContainersDS) Read(ctx context.Context, req datasource.ReadRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	args := filters.NewArgs()
+	args := client.Filters{}
 	for k, v := range map[string]types.String{"name": m.Name, "status": m.Status, "ancestor": m.Ancestor} {
 		if v.ValueString() != "" {
 			args.Add(k, v.ValueString())
@@ -133,11 +133,12 @@ func (d *p3ContainersDS) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 	p3AddLabelFilters(args, "label", stringMapFrom(ctx, m.Labels, &resp.Diagnostics))
 	all := m.All.IsNull() || m.All.ValueBool()
-	list, err := d.pd.Client.ContainerList(ctx, container.ListOptions{All: all, Filters: args})
+	listRes, err := d.pd.Client.ContainerList(ctx, client.ContainerListOptions{All: all, Filters: args})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot list containers", err.Error())
 		return
 	}
+	list := listRes.Items
 	m.Containers = p3ContainersValue(list)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
@@ -184,7 +185,7 @@ func p3ContainersValue(list []container.Summary) types.List {
 		ports := make([]attr.Value, 0, len(s.Ports))
 		for _, p := range s.Ports {
 			ports = append(ports, types.ObjectValueMust(p3ContainerPortAttrTypes, map[string]attr.Value{
-				"ip":           types.StringValue(p.IP),
+				"ip":           types.StringValue(addrString(p.IP)),
 				"private_port": types.Int64Value(int64(p.PrivatePort)),
 				"public_port":  types.Int64Value(int64(p.PublicPort)),
 				"type":         types.StringValue(p.Type),

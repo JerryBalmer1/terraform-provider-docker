@@ -11,16 +11,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 // p3eFakeExec wires create/start/inspect of one exec into f. start hijacks
 // the connection and writes stdout/stderr multiplexed like the daemon.
-func p3eFakeExec(f *p3eFake, ctr, stdout, stderr string, exitCode int, got *container.ExecOptions) {
+func p3eFakeExec(f *p3eFake, ctr, stdout, stderr string, exitCode int, got *client.ExecCreateOptions) {
 	f.on("POST /containers/"+ctr+"/exec", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(got)
 		p3eWriteJSON(w, http.StatusCreated, container.ExecCreateResponse{ID: "ex1"})
@@ -42,18 +43,18 @@ func p3eFakeExec(f *p3eFake, ctr, stdout, stderr string, exitCode int, got *cont
 			conn.Close()
 		}()
 		fmt.Fprint(buf, "HTTP/1.1 101 UPGRADED\r\nContent-Type: application/vnd.docker.multiplexed-stream\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
-		_, _ = stdcopy.NewStdWriter(buf, stdcopy.Stdout).Write([]byte(stdout))
+		_, _ = newTestStdWriter(buf, stdcopy.Stdout).Write([]byte(stdout))
 		if stderr != "" {
-			_, _ = stdcopy.NewStdWriter(buf, stdcopy.Stderr).Write([]byte(stderr))
+			_, _ = newTestStdWriter(buf, stdcopy.Stderr).Write([]byte(stderr))
 		}
 		_ = buf.Flush()
 	})
-	f.json("GET /exec/ex1/json", container.ExecInspect{ExecID: "ex1", Running: false, ExitCode: exitCode})
+	f.json("GET /exec/ex1/json", client.ExecInspectResult{ID: "ex1", Running: false, ExitCode: exitCode})
 }
 
 func TestExecOutputEphemeralOpen(t *testing.T) {
 	f, pd := newP3eFake(t)
-	var got container.ExecOptions
+	var got client.ExecCreateOptions
 	p3eFakeExec(f, "web", "tok-123\n", "warn: x\n", 0, &got)
 	res, diags := p3eOpenEphemeral(t, NewExecOutputEphemeralResource(), pd, map[string]tftypes.Value{
 		"container": p3eStr("web"),
@@ -76,7 +77,7 @@ func TestExecOutputEphemeralOpen(t *testing.T) {
 
 func TestExecOutputEphemeralNonZeroExit(t *testing.T) {
 	f, pd := newP3eFake(t)
-	var got container.ExecOptions
+	var got client.ExecCreateOptions
 	p3eFakeExec(f, "web", "", "cat: /nope: No such file\n", 1, &got)
 	_, diags := p3eOpenEphemeral(t, NewExecOutputEphemeralResource(), pd, map[string]tftypes.Value{
 		"container": p3eStr("web"),

@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -45,11 +46,12 @@ func (e *swarmTokensEphemeral) Open(ctx context.Context, _ ephemeral.OpenRequest
 		resp.Diagnostics.AddError("Provider not configured", "The docker provider was not configured.")
 		return
 	}
-	sw, err := e.pd.Client.SwarmInspect(ctx)
+	swRes, err := e.pd.Client.SwarmInspect(ctx, client.SwarmInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect swarm", "The provider's Docker host must be a swarm manager: "+err.Error())
 		return
 	}
+	sw := swRes.Swarm
 	resp.Diagnostics.Append(resp.Result.Set(ctx, &swarmTokensModel{
 		ID:      types.StringValue(sw.ID),
 		Worker:  types.StringValue(sw.JoinTokens.Worker),

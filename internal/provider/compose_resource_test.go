@@ -9,13 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 // composeTestYAML is a web+db+cache project with a secret from env, a
@@ -145,7 +143,7 @@ func TestComposeFakeLocalLifecycle(t *testing.T) {
 						if db.Host.Mounts[0].Source != "shop_pgdata" {
 							return fmt.Errorf("db mounts %+v", db.Host.Mounts)
 						}
-						if pb := web.Host.PortBindings["80/tcp"]; len(pb) != 1 || pb[0].HostPort != "8080" {
+						if pb := web.Host.PortBindings[network.MustParsePort("80/tcp")]; len(pb) != 1 || pb[0].HostPort != "8080" {
 							return fmt.Errorf("web ports %v", web.Host.PortBindings)
 						}
 						if c, n, v := f.projectObjects("shop"); c != 4 || n != 2 || v != 1 {
@@ -559,15 +557,17 @@ EOT
 		},
 		CheckDestroy: func(*terraform.State) error {
 			c := testAccDockerClient(t)
-			f := filters.NewArgs(filters.Arg("label", composeLabelProject+"=tfacc-compose"))
-			cs, err := c.ContainerList(context.Background(), container.ListOptions{All: true, Filters: f})
+			f := client.Filters{}.Add("label", composeLabelProject+"=tfacc-compose")
+			csRes, err := c.ContainerList(context.Background(), client.ContainerListOptions{All: true, Filters: f})
 			if err != nil {
 				return err
 			}
-			ns, err := c.NetworkList(context.Background(), network.ListOptions{Filters: f})
+			cs := csRes.Items
+			nsRes, err := c.NetworkList(context.Background(), client.NetworkListOptions{Filters: f})
 			if err != nil {
 				return err
 			}
+			ns := nsRes.Items
 			if len(cs)+len(ns) != 0 {
 				return fmt.Errorf("left behind: %d containers, %d networks", len(cs), len(ns))
 			}
@@ -604,10 +604,11 @@ EOT
 		}},
 		CheckDestroy: func(*terraform.State) error {
 			c := testAccDockerClient(t)
-			svcs, err := c.ServiceList(context.Background(), swarm.ServiceListOptions{Filters: filters.NewArgs(filters.Arg("label", labelStackNamespace+"=tfacccompose"))})
+			svcsRes, err := c.ServiceList(context.Background(), client.ServiceListOptions{Filters: client.Filters{}.Add("label", labelStackNamespace+"=tfacccompose")})
 			if err != nil {
 				return err
 			}
+			svcs := svcsRes.Items
 			if len(svcs) != 0 {
 				return fmt.Errorf("%d services left", len(svcs))
 			}

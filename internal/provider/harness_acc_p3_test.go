@@ -8,17 +8,15 @@ package provider
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
-	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 // p3Env returns the values of names, skipping the test (with the variable
@@ -40,10 +38,11 @@ func p3Env(t *testing.T, names ...string) []string {
 // that run docker_swarm_init themselves; the plain harness pass).
 func p3RequireInactive(t *testing.T) {
 	t.Helper()
-	info, err := testAccDockerClient(t).Info(context.Background())
+	infoRes, err := testAccDockerClient(t).Info(context.Background(), client.InfoOptions{})
 	if err != nil {
 		t.Skipf("cannot reach DOCKER_HOST: %v", err)
 	}
+	info := infoRes.Info
 	if info.Swarm.LocalNodeState != swarm.LocalNodeStateInactive {
 		t.Skip("DOCKER_HOST is already part of a swarm; this test runs docker_swarm_init itself (plain harness pass)")
 	}
@@ -53,10 +52,11 @@ func p3RequireInactive(t *testing.T) {
 func p3RequireNodeInactive(t *testing.T, host string) {
 	t.Helper()
 	c := p3Client(t, endpointConfig{Host: host})
-	info, err := c.Info(context.Background())
+	infoRes, err := c.Info(context.Background(), client.InfoOptions{})
 	if err != nil {
 		t.Skipf("cannot reach %s: %v", host, err)
 	}
+	info := infoRes.Info
 	if info.Swarm.LocalNodeState != swarm.LocalNodeStateInactive {
 		t.Skipf("%s is already part of a swarm (%s); a previous test did not clean up", host, info.Swarm.LocalNodeState)
 	}
@@ -133,11 +133,12 @@ func p3WaitDaemon(ep endpointConfig, timeout time.Duration, cond func(swarm.Loca
 		// the daemon behind it is still starting.
 		cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
-		info, err := c.Info(cctx)
+		infoRes, err := c.Info(cctx, client.InfoOptions{})
 		if err != nil {
 			last = err.Error()
 			return false, nil
 		}
+		info := infoRes.Info
 		last = string(info.Swarm.LocalNodeState)
 		return cond == nil || cond(info.Swarm.LocalNodeState), nil
 	})
@@ -157,8 +158,8 @@ func p3ForceLeave(host string) {
 	defer c.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	if info, err := c.Info(ctx); err == nil && info.Swarm.LocalNodeState != swarm.LocalNodeStateInactive {
-		_ = c.SwarmLeave(ctx, true)
+	if res, err := c.Info(ctx, client.InfoOptions{}); err == nil && res.Info.Swarm.LocalNodeState != swarm.LocalNodeStateInactive {
+		_, _ = c.SwarmLeave(ctx, client.SwarmLeaveOptions{Force: true})
 	}
 }
 
@@ -169,16 +170,17 @@ func p3JoinOutOfBand(t *testing.T, host, mgrAddr string) string {
 	t.Helper()
 	ctx := context.Background()
 	mgr := testAccDockerClient(t)
-	sw, err := mgr.SwarmInspect(ctx)
+	swRes, err := mgr.SwarmInspect(ctx, client.SwarmInspectOptions{})
 	if err != nil {
 		t.Fatalf("swarm inspect: %v", err)
 	}
+	sw := swRes.Swarm
 	nc := p3Client(t, endpointConfig{Host: host})
 	adv := os.Getenv("E2E_ADVERTISE_ADDR")
 	if adv == "" {
 		adv = "eth0"
 	}
-	if err := nc.SwarmJoin(ctx, swarm.JoinRequest{
+	if _, err := nc.SwarmJoin(ctx, client.SwarmJoinOptions{
 		ListenAddr: swarmDefaultListenAddr, AdvertiseAddr: adv,
 		RemoteAddrs: []string{mgrAddr}, JoinToken: sw.JoinTokens.Worker,
 	}); err != nil {
@@ -187,12 +189,13 @@ func p3JoinOutOfBand(t *testing.T, host, mgrAddr string) string {
 	t.Cleanup(func() { p3ForceLeave(host) })
 	var nodeID string
 	err = waitFor(ctx, 2*time.Minute, 2*time.Second, func(ctx context.Context) (bool, error) {
-		info, err := nc.Info(ctx)
+		infoRes, err := nc.Info(ctx, client.InfoOptions{})
+		info := infoRes.Info
 		if err != nil || info.Swarm.LocalNodeState != swarm.LocalNodeStateActive || info.Swarm.NodeID == "" {
 			return false, nil
 		}
 		nodeID = info.Swarm.NodeID
-		_, _, err = mgr.NodeInspectWithRaw(ctx, nodeID)
+		_, err = mgr.NodeInspect(ctx, nodeID, client.NodeInspectOptions{})
 		return err == nil, nil
 	})
 	if err != nil {
@@ -205,7 +208,7 @@ func p3JoinOutOfBand(t *testing.T, host, mgrAddr string) string {
 			return
 		}
 		defer c.Close()
-		_ = c.NodeRemove(context.Background(), nodeID, swarm.NodeRemoveOptions{Force: true})
+		_, _ = c.NodeRemove(context.Background(), nodeID, client.NodeRemoveOptions{Force: true})
 	})
 	return nodeID
 }
@@ -221,7 +224,8 @@ func p3Attr(s *terraform.State, addr, key string) (string, error) {
 
 // p3ServiceTasks lists the tasks of service id (desired state any).
 func p3ServiceTasks(ctx context.Context, c *client.Client, id string) ([]swarm.Task, error) {
-	return c.TaskList(ctx, swarm.TaskListOptions{Filters: filters.NewArgs(filters.Arg("service", id))})
+	res, err := c.TaskList(ctx, client.TaskListOptions{Filters: client.Filters{}.Add("service", id)})
+	return res.Items, err
 }
 
 // p3HCLPath renders a filesystem path for HCL (forward slashes).

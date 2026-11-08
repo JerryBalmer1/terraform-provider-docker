@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -81,14 +82,15 @@ func (d *pluginDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	if ref == "" {
 		ref = m.Alias.ValueString()
 	}
-	p, _, err := d.pd.Client.PluginInspectWithRaw(ctx, ref)
+	pRes, err := d.pd.Client.PluginInspect(ctx, ref, client.PluginInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot find plugin", fmt.Sprintf("%q: %v", ref, err))
 		return
 	}
+	p := pRes.Plugin
 	var rm pluginResourceModel
 	rm.Alias = m.Alias
-	pluginApply(&rm, p)
+	pluginApply(&rm, &p)
 	m.ID, m.Alias, m.Name, m.PluginReference, m.Enabled, m.Env = rm.ID, rm.Alias, rm.Name, rm.PluginReference, rm.Enabled, rm.Env
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

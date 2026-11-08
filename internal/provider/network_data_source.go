@@ -3,11 +3,12 @@ package provider
 import (
 	"context"
 
-	"github.com/docker/docker/api/types/network"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -85,10 +86,10 @@ func networkDataFromInspect(n network.Inspect, name types.String) networkDataSou
 	pools := make([]attr.Value, 0, len(n.IPAM.Config))
 	for _, c := range n.IPAM.Config {
 		pools = append(pools, types.ObjectValueMust(networkDataIPAMAttrTypes, map[string]attr.Value{
-			"subnet":      types.StringValue(c.Subnet),
-			"ip_range":    types.StringValue(c.IPRange),
-			"gateway":     types.StringValue(c.Gateway),
-			"aux_address": stringMapValue(c.AuxAddress, false),
+			"subnet":      types.StringValue(prefixString(c.Subnet)),
+			"ip_range":    types.StringValue(prefixString(c.IPRange)),
+			"gateway":     types.StringValue(addrString(c.Gateway)),
+			"aux_address": stringMapValue(auxAddressStrings(c.AuxAddress), false),
 		}))
 	}
 	return networkDataSourceModel{
@@ -118,11 +119,12 @@ func (d *networkDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		resp.Diagnostics.AddError("Cannot find network", err.Error())
 		return
 	}
-	n, err := d.pd.Client.NetworkInspect(ctx, id, network.InspectOptions{})
+	nRes, err := d.pd.Client.NetworkInspect(ctx, id, client.NetworkInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect network", err.Error())
 		return
 	}
+	n := nRes.Network
 	state := networkDataFromInspect(n, cfg.Name)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

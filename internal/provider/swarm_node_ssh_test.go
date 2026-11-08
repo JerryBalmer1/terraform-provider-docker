@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	rschema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/client"
 )
 
 func TestSwarmNodeSSHSchema(t *testing.T) {
@@ -78,7 +79,7 @@ func TestSwarmNodeClientOverSSH(t *testing.T) {
 	defer nc.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	v, err := nc.ServerVersion(ctx)
+	v, err := nc.ServerVersion(ctx, client.ServerVersionOptions{})
 	if err != nil || v.Version != "ssh-fake-engine" {
 		t.Fatalf("version over ssh: %+v %v", v, err)
 	}
@@ -89,7 +90,7 @@ func TestSwarmNodeClientOverSSH(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer nc2.Close()
-	if _, err := nc2.ServerVersion(ctx); err == nil || !strings.Contains(err.Error(), "no SSH credentials") {
+	if _, err := nc2.ServerVersion(ctx, client.ServerVersionOptions{}); err == nil || !strings.Contains(err.Error(), "no SSH credentials") {
 		t.Fatalf("want missing-credentials error, got %v", err)
 	}
 }

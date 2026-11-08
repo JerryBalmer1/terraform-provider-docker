@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/api/types/volume"
 )
 
 func composeMustLoad(t *testing.T, in composeInputs) *composeDesired {
@@ -234,13 +234,13 @@ func TestComposeLocalExpand(t *testing.T) {
 	if web.Host.Memory != 64<<20 || web.Host.NanoCPUs != 5e8 {
 		t.Errorf("resources %d %d", web.Host.Memory, web.Host.NanoCPUs)
 	}
-	if pb := web.Host.PortBindings["80/tcp"]; len(pb) != 1 || pb[0].HostIP != "127.0.0.1" || pb[0].HostPort != "8080" {
+	if pb := web.Host.PortBindings[network.MustParsePort("80/tcp")]; len(pb) != 1 || addrString(pb[0].HostIP) != "127.0.0.1" || pb[0].HostPort != "8080" {
 		t.Errorf("ports %v", web.Host.PortBindings)
 	}
-	if pb := web.Host.PortBindings["9000/udp"]; len(pb) != 1 || pb[0].HostPort != "" {
+	if pb := web.Host.PortBindings[network.MustParsePort("9000/udp")]; len(pb) != 1 || pb[0].HostPort != "" {
 		t.Errorf("udp ephemeral port %v", web.Host.PortBindings)
 	}
-	if _, ok := web.Config.ExposedPorts["3000/tcp"]; !ok {
+	if _, ok := web.Config.ExposedPorts[network.MustParsePort("3000/tcp")]; !ok {
 		t.Errorf("exposed %v", web.Config.ExposedPorts)
 	}
 	if !reflect.DeepEqual(web.Host.ExtraHosts, []string{"db.local:10.0.0.2"}) {
@@ -288,7 +288,7 @@ func TestComposeLocalExpand(t *testing.T) {
 	if !nets["ext"].External || nets["ext"].Name != "traefik_public" {
 		t.Errorf("external network %+v", nets["ext"])
 	}
-	if f := nets["front"]; f.Create.IPAM == nil || f.Create.IPAM.Config[0].Subnet != "172.30.0.0/24" || f.Create.Labels[composeLabelNetwork] != "front" {
+	if f := nets["front"]; f.Create.IPAM == nil || prefixString(f.Create.IPAM.Config[0].Subnet) != "172.30.0.0/24" || f.Create.Labels[composeLabelNetwork] != "front" {
 		t.Errorf("front %+v", f.Create)
 	}
 	if !nets["back"].Create.Internal {

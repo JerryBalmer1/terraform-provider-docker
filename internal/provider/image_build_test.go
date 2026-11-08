@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/pkg/jsonmessage"
+	"github.com/moby/moby/api/types/jsonstream"
 )
 
 func imgTestWrite(t *testing.T, dir string, files map[string]string) {
@@ -217,7 +217,7 @@ func TestImageDecodeStream(t *testing.T) {
 {"stream":"never read\n"}
 `
 	var seen int
-	_, err = imgDecodeStream(strings.NewReader(bad), func(m jsonmessage.JSONMessage) { seen++ })
+	_, err = imgDecodeStream(strings.NewReader(bad), func(m jsonstream.Message) { seen++ })
 	var se *imgStreamError
 	if !errors.As(err, &se) {
 		t.Fatalf("want imgStreamError, got %v", err)

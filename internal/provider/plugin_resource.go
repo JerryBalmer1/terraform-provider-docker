@@ -17,8 +17,6 @@ import (
 	"strings"
 
 	"github.com/distribution/reference"
-	dtypes "github.com/docker/docker/api/types"
-	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -31,6 +29,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/plugin"
+	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/jsonmessage"
 )
 
 var (
@@ -150,7 +151,7 @@ func (r *pluginResource) Configure(_ context.Context, req resource.ConfigureRequ
 
 // pluginAcceptFunc returns the privilege check PluginInstall calls with the
 // privileges the plugin requests.
-func pluginAcceptFunc(all bool, grants []pluginGrantModel) func(context.Context, dtypes.PluginPrivileges) (bool, error) {
+func pluginAcceptFunc(all bool, grants []pluginGrantModel) func(context.Context, plugin.Privileges) (bool, error) {
 	granted := map[string]map[string]bool{}
 	for _, g := range grants {
 		n := g.Name.ValueString()
@@ -161,7 +162,7 @@ func pluginAcceptFunc(all bool, grants []pluginGrantModel) func(context.Context,
 			granted[n][v] = true
 		}
 	}
-	return func(_ context.Context, privs dtypes.PluginPrivileges) (bool, error) {
+	return func(_ context.Context, privs plugin.Privileges) (bool, error) {
 		if all {
 			return true, nil
 		}
@@ -184,7 +185,7 @@ func pluginAcceptFunc(all bool, grants []pluginGrantModel) func(context.Context,
 	}
 }
 
-func pluginPrivilegesString(privs dtypes.PluginPrivileges) string {
+func pluginPrivilegesString(privs plugin.Privileges) string {
 	parts := make([]string, 0, len(privs))
 	for _, p := range privs {
 		parts = append(parts, fmt.Sprintf("%s=[%s]", p.Name, strings.Join(p.Value, ",")))
@@ -254,7 +255,7 @@ func (r *pluginResource) Create(ctx context.Context, req resource.CreateRequest,
 		env = containerSetStrings(plan.Env)
 	}
 	alias, _ := knownString(plan.Alias)
-	opts := dtypes.PluginInstallOptions{
+	opts := client.PluginInstallOptions{
 		RemoteRef:             ref,
 		RegistryAuth:          auth,
 		Disabled:              true, // enabled below with enable_timeout
@@ -274,15 +275,16 @@ func (r *pluginResource) Create(ctx context.Context, req resource.CreateRequest,
 	if lookup == "" {
 		lookup = ref
 	}
-	p, _, err := r.pd.Client.PluginInspectWithRaw(ctx, lookup)
+	pRes, err := r.pd.Client.PluginInspect(ctx, lookup, client.PluginInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect installed plugin", fmt.Sprintf("%s: %v", lookup, err))
 		return
 	}
+	p := pRes.Plugin
 	plan.ID = types.StringValue(p.ID)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), plan.ID)...)
 	if plan.Enabled.ValueBool() {
-		if err := r.pd.Client.PluginEnable(ctx, p.ID, dtypes.PluginEnableOptions{Timeout: int(plan.EnableTimeout.ValueInt64())}); err != nil {
+		if _, err := r.pd.Client.PluginEnable(ctx, p.ID, client.PluginEnableOptions{Timeout: int(plan.EnableTimeout.ValueInt64())}); err != nil {
 			resp.Diagnostics.AddError("Cannot enable plugin", fmt.Sprintf("%s: %v", ref, err))
 			return
 		}
@@ -297,7 +299,8 @@ func (r *pluginResource) Create(ctx context.Context, req resource.CreateRequest,
 // readInto refreshes m from PluginInspectWithRaw. It returns false when the
 // plugin is gone.
 func (r *pluginResource) readInto(ctx context.Context, m *pluginResourceModel, diags *diag.Diagnostics) bool {
-	p, _, err := r.pd.Client.PluginInspectWithRaw(ctx, m.ID.ValueString())
+	pRes, err := r.pd.Client.PluginInspect(ctx, m.ID.ValueString(), client.PluginInspectOptions{})
+	p := pRes.Plugin
 	if isNotFound(err) {
 		return false
 	}
@@ -305,12 +308,12 @@ func (r *pluginResource) readInto(ctx context.Context, m *pluginResourceModel, d
 		diags.AddError("Cannot inspect plugin", err.Error())
 		return false
 	}
-	pluginApply(m, p)
+	pluginApply(m, &p)
 	return true
 }
 
 // pluginApply maps an inspected plugin onto m.
-func pluginApply(m *pluginResourceModel, p *dtypes.Plugin) {
+func pluginApply(m *pluginResourceModel, p *plugin.Plugin) {
 	m.ID = types.StringValue(p.ID)
 	// The daemon stores an alias with the default tag ("sshfs" -> "sshfs:latest").
 	if a, ok := knownString(m.Alias); !ok || pluginFamiliar(a) != pluginFamiliar(p.Name) {
@@ -365,25 +368,25 @@ func (r *pluginResource) Update(ctx context.Context, req resource.UpdateRequest,
 	envChanged := containerKnown(plan.Env) && !plan.Env.Equal(state.Env)
 	if envChanged {
 		if enabled {
-			if err := r.pd.Client.PluginDisable(ctx, id, dtypes.PluginDisableOptions{Force: plan.ForceDisable.ValueBool()}); err != nil {
+			if _, err := r.pd.Client.PluginDisable(ctx, id, client.PluginDisableOptions{Force: plan.ForceDisable.ValueBool()}); err != nil {
 				resp.Diagnostics.AddError("Cannot disable plugin for update", err.Error())
 				return
 			}
 			enabled = false
 		}
-		if err := r.pd.Client.PluginSet(ctx, id, containerSetStrings(plan.Env)); err != nil {
+		if _, err := r.pd.Client.PluginSet(ctx, id, client.PluginSetOptions{Args: containerSetStrings(plan.Env)}); err != nil {
 			resp.Diagnostics.AddAttributeError(path.Root("env"), "Cannot set plugin env", err.Error())
 			return
 		}
 	}
 	switch want := plan.Enabled.ValueBool(); {
 	case want && !enabled:
-		if err := r.pd.Client.PluginEnable(ctx, id, dtypes.PluginEnableOptions{Timeout: int(plan.EnableTimeout.ValueInt64())}); err != nil {
+		if _, err := r.pd.Client.PluginEnable(ctx, id, client.PluginEnableOptions{Timeout: int(plan.EnableTimeout.ValueInt64())}); err != nil {
 			resp.Diagnostics.AddError("Cannot enable plugin", err.Error())
 			return
 		}
 	case !want && enabled:
-		if err := r.pd.Client.PluginDisable(ctx, id, dtypes.PluginDisableOptions{Force: plan.ForceDisable.ValueBool()}); err != nil {
+		if _, err := r.pd.Client.PluginDisable(ctx, id, client.PluginDisableOptions{Force: plan.ForceDisable.ValueBool()}); err != nil {
 			resp.Diagnostics.AddError("Cannot disable plugin", err.Error())
 			return
 		}
@@ -411,7 +414,8 @@ func (r *pluginResource) Delete(ctx context.Context, req resource.DeleteRequest,
 // pluginRemove disables (unless force_destroy) and removes the plugin.
 func pluginRemove(ctx context.Context, pd *providerData, m pluginResourceModel) error {
 	id := m.ID.ValueString()
-	p, _, err := pd.Client.PluginInspectWithRaw(ctx, id)
+	pRes, err := pd.Client.PluginInspect(ctx, id, client.PluginInspectOptions{})
+	p := pRes.Plugin
 	if isNotFound(err) {
 		return nil
 	}
@@ -420,11 +424,11 @@ func pluginRemove(ctx context.Context, pd *providerData, m pluginResourceModel) 
 	}
 	force := m.ForceDestroy.ValueBool()
 	if p.Enabled && !force {
-		if err := pd.Client.PluginDisable(ctx, id, dtypes.PluginDisableOptions{Force: m.ForceDisable.ValueBool()}); err != nil && !isNotFound(err) {
+		if _, err := pd.Client.PluginDisable(ctx, id, client.PluginDisableOptions{Force: m.ForceDisable.ValueBool()}); err != nil && !isNotFound(err) {
 			return fmt.Errorf("disabling %s: %w", p.Name, err)
 		}
 	}
-	err = pd.Client.PluginRemove(ctx, id, dtypes.PluginRemoveOptions{Force: force})
+	_, err = pd.Client.PluginRemove(ctx, id, client.PluginRemoveOptions{Force: force})
 	if err != nil && !isNotFound(err) {
 		return fmt.Errorf("removing %s: %w", p.Name, err)
 	}
@@ -436,10 +440,11 @@ func (r *pluginResource) ImportState(ctx context.Context, req resource.ImportSta
 		resp.Diagnostics.AddError("Provider not configured", "Cannot import before the provider is configured.")
 		return
 	}
-	p, _, err := r.pd.Client.PluginInspectWithRaw(ctx, req.ID)
+	pRes, err := r.pd.Client.PluginInspect(ctx, req.ID, client.PluginInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot find plugin", fmt.Sprintf("%q: %v", req.ID, err))
 		return
 	}
+	p := pRes.Plugin
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), p.ID)...)
 }

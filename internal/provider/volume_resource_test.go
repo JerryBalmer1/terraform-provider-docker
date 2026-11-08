@@ -9,11 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/volume"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 )
 
 func TestVolumeFromInspect(t *testing.T) {
@@ -62,14 +63,14 @@ func TestVolumeFakeDaemon(t *testing.T) {
 	if err != nil || name != "data" {
 		t.Fatalf("resolve: %q %v", name, err)
 	}
-	if _, err := c.VolumeInspect(ctx, "gone"); !isNotFound(err) {
+	if _, err := c.VolumeInspect(ctx, "gone", client.VolumeInspectOptions{}); !isNotFound(err) {
 		t.Errorf("missing volume should be not-found, got %v", err)
 	}
 	if ok, err := volumeExists(ctx, c, "gone"); ok || err != nil {
 		t.Errorf("volumeExists(gone) = %v, %v", ok, err)
 	}
-	v, _ := c.VolumeInspect(ctx, "data")
-	ds := volumeDataFromInspect(v)
+	v, _ := c.VolumeInspect(ctx, "data", client.VolumeInspectOptions{})
+	ds := volumeDataFromInspect(v.Volume)
 	if ds.Mountpoint.ValueString() != "/m" || ds.Scope.ValueString() != "local" || ds.DriverOpts.IsNull() {
 		t.Errorf("data source model: %+v", ds)
 	}
@@ -86,7 +87,7 @@ func TestAccVolume_basic(t *testing.T) {
 				if rs.Type != "docker_volume" {
 					continue
 				}
-				if _, err := c.VolumeInspect(context.Background(), rs.Primary.ID); !isNotFound(err) {
+				if _, err := c.VolumeInspect(context.Background(), rs.Primary.ID, client.VolumeInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("volume %s still exists (%v)", rs.Primary.ID, err)
 				}
 			}

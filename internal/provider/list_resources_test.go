@@ -6,12 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/hashicorp/terraform-plugin-framework/list"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -21,6 +15,12 @@ import (
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/querycheck"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 )
 
 type p3eListRun struct {
@@ -81,13 +81,13 @@ func p3eRunList(t *testing.T, l list.ListResource, newRes func() resource.Resour
 	return run
 }
 
-func p3eFilterArgs(t *testing.T, f *p3eFake, prefix string) filters.Args {
+func p3eFilterArgs(t *testing.T, f *p3eFake, prefix string) client.Filters {
 	t.Helper()
 	for _, s := range f.requests() {
 		if strings.HasPrefix(s, prefix+"?") {
 			q := s[len(prefix)+1:]
 			r, _ := http.NewRequest(http.MethodGet, "http://x/?"+q, nil)
-			args, err := filters.FromJSON(r.URL.Query().Get("filters"))
+			args, err := testParseFilters(r.URL.Query().Get("filters"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -95,7 +95,7 @@ func p3eFilterArgs(t *testing.T, f *p3eFake, prefix string) filters.Args {
 		}
 	}
 	t.Fatalf("no request %s in %v", prefix, f.requests())
-	return filters.Args{}
+	return client.Filters{}
 }
 
 func TestListResourcesMetadataAndSchemas(t *testing.T) {
@@ -139,7 +139,7 @@ func TestListContainerFiltersAndIdentity(t *testing.T) {
 		t.Fatalf("results = %v", got)
 	}
 	args := p3eFilterArgs(t, f, "GET /containers/json")
-	if !args.ExactMatch("status", "running") || !args.ExactMatch("label", "app=shop") || !args.ExactMatch("label", "tier") {
+	if !filterExactMatch(args, "status", "running") || !filterExactMatch(args, "label", "app=shop") || !filterExactMatch(args, "label", "tier") {
 		t.Errorf("filters = %v", args)
 	}
 	var all bool
@@ -173,7 +173,7 @@ func TestListImageUsesTag(t *testing.T) {
 	if len(got) != 2 || got[0] != "sha256:"+strings.Repeat("d", 64)+"|dddddddddddd" || got[1] != "sha256:"+strings.Repeat("c", 64)+"|nginx:1.27" {
 		t.Fatalf("results = %v", got)
 	}
-	if args := p3eFilterArgs(t, f, "GET /images/json"); !args.ExactMatch("dangling", "false") {
+	if args := p3eFilterArgs(t, f, "GET /images/json"); !filterExactMatch(args, "dangling", "false") {
 		t.Errorf("filters = %v", args)
 	}
 }
@@ -189,7 +189,7 @@ func TestListSwarmNodeLabelFilter(t *testing.T) {
 		t.Fatalf("results = %v", got)
 	}
 	args := p3eFilterArgs(t, f, "GET /nodes")
-	if !args.ExactMatch("node.label", "zone=a") || !args.ExactMatch("role", "manager") {
+	if !filterExactMatch(args, "node.label", "zone=a") || !filterExactMatch(args, "role", "manager") {
 		t.Errorf("filters = %v", args)
 	}
 }
@@ -197,11 +197,11 @@ func TestListSwarmNodeLabelFilter(t *testing.T) {
 func TestListServiceAndVolume(t *testing.T) {
 	f, pd := newP3eFake(t)
 	f.json("GET /services", []swarm.Service{{ID: "svc1", Spec: swarm.ServiceSpec{Annotations: swarm.Annotations{Name: "web"}}}})
-	f.json("GET /volumes", volume.ListResponse{Volumes: []*volume.Volume{{Name: "data"}, nil}})
+	f.json("GET /volumes", volume.ListResponse{Volumes: []volume.Volume{{Name: "data"}}})
 	if got := p3eRunList(t, NewServiceListResource(), NewServiceResource, pd, map[string]tftypes.Value{"mode": p3eStr("global")}, false, 0).ids(t); len(got) != 1 || got[0] != "svc1|web" {
 		t.Fatalf("services = %v", got)
 	}
-	if args := p3eFilterArgs(t, f, "GET /services"); !args.ExactMatch("mode", "global") {
+	if args := p3eFilterArgs(t, f, "GET /services"); !filterExactMatch(args, "mode", "global") {
 		t.Errorf("filters = %v", args)
 	}
 	if got := p3eRunList(t, NewVolumeListResource(), NewVolumeResource, pd, nil, false, 0).ids(t); len(got) != 1 || got[0] != "data|data" {

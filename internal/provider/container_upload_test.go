@@ -18,14 +18,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 )
 
 func ctrUpload(file string) containerUploadModel {
@@ -228,10 +228,9 @@ func (f *ctrFakeEngine) handler(w http.ResponseWriter, r *http.Request) {
 			hc = &container.HostConfig{}
 		}
 		_ = json.NewEncoder(w).Encode(container.InspectResponse{
-			ContainerJSONBase: &container.ContainerJSONBase{
-				ID: "c0ffee0123456789", Name: "/up", Image: "sha256:img",
-				State: &container.State{Running: f.running, Status: map[bool]string{true: "running", false: "created"}[f.running]}, HostConfig: hc,
-			},
+
+			ID: "c0ffee0123456789", Name: "/up", Image: "sha256:img",
+			State: &container.State{Running: f.running, Status: map[bool]container.ContainerState{true: "running", false: "created"}[f.running]}, HostConfig: hc,
 			Config:          f.created.Config,
 			NetworkSettings: &container.NetworkSettings{Networks: map[string]*network.EndpointSettings{}},
 		})

@@ -2,15 +2,14 @@ package provider
 
 import (
 	"context"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -70,12 +69,12 @@ func (d *nodesDSDataSource) Configure(_ context.Context, req datasource.Configur
 }
 
 // nodesDSListOptions builds the NodeList filter for an optional role.
-func nodesDSListOptions(role string) swarm.NodeListOptions {
-	args := filters.NewArgs()
+func nodesDSListOptions(role string) client.NodeListOptions {
+	args := client.Filters{}
 	if role != "" {
 		args.Add("role", role)
 	}
-	return swarm.NodeListOptions{Filters: args}
+	return client.NodeListOptions{Filters: args}
 }
 
 // nodesDSListValue converts nodes to the `nodes` list value.
@@ -94,11 +93,12 @@ func (d *nodesDSDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	if resp.Diagnostics.HasError() || d.pd == nil {
 		return
 	}
-	nodes, err := d.pd.Client.NodeList(ctx, nodesDSListOptions(cfg.Role.ValueString()))
+	nodesRes, err := d.pd.Client.NodeList(ctx, nodesDSListOptions(cfg.Role.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot list swarm nodes", "The provider's Docker host must be a swarm manager: "+err.Error())
 		return
 	}
+	nodes := nodesRes.Items
 	cfg.Nodes = nodesDSListValue(nodes)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &cfg)...)
 }

@@ -13,7 +13,6 @@ import (
 	"sync"
 	"testing"
 
-	dtypes "github.com/docker/docker/api/types"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -21,19 +20,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/plugin"
+	"github.com/moby/moby/client"
 )
 
 // pluginFakeEngine serves the /plugins endpoints PluginInstall and friends use.
 type pluginFakeEngine struct {
 	mu      sync.Mutex
-	privs   dtypes.PluginPrivileges
-	plugins map[string]*dtypes.Plugin // by ID
+	privs   plugin.Privileges
+	plugins map[string]*plugin.Plugin // by ID
 	calls   []string
-	granted dtypes.PluginPrivileges
+	granted plugin.Privileges
 	timeout string
 }
 
-func (f *pluginFakeEngine) find(ref string) *dtypes.Plugin {
+func (f *pluginFakeEngine) find(ref string) *plugin.Plugin {
 	for _, p := range f.plugins {
 		if p.ID == ref || p.Name == ref || pluginFamiliar(p.Name) == pluginFamiliar(ref) {
 			return p
@@ -67,8 +68,8 @@ func (f *pluginFakeEngine) handler(w http.ResponseWriter, r *http.Request) {
 		} else if !strings.Contains(name, ":") {
 			name += ":latest"
 		}
-		f.plugins["pid1"] = &dtypes.Plugin{ID: "pid1", Name: name, PluginReference: "docker.io/" + pluginFamiliar(q.Get("remote")),
-			Settings: dtypes.PluginSettings{Env: []string{"DEBUG=0", "MODE=a"}}}
+		f.plugins["pid1"] = &plugin.Plugin{ID: "pid1", Name: name, PluginReference: "docker.io/" + pluginFamiliar(q.Get("remote")),
+			Settings: plugin.Settings{Env: []string{"DEBUG=0", "MODE=a"}}}
 		w.Header().Set("Docker-Plugin-Name", name)
 		_, _ = io.WriteString(w, `{"status":"Pulling"}`+"\n"+`{"status":"Download complete"}`+"\n")
 	case strings.HasSuffix(p, "/json") && r.Method == http.MethodGet:
@@ -135,7 +136,7 @@ func (f *pluginFakeEngine) handler(w http.ResponseWriter, r *http.Request) {
 
 func pluginFake(t *testing.T) (*pluginFakeEngine, *providerData) {
 	t.Helper()
-	f := &pluginFakeEngine{plugins: map[string]*dtypes.Plugin{}, privs: dtypes.PluginPrivileges{
+	f := &pluginFakeEngine{plugins: map[string]*plugin.Plugin{}, privs: plugin.Privileges{
 		{Name: "network", Value: []string{"host"}}, {Name: "capabilities", Value: []string{"CAP_SYS_ADMIN"}},
 	}}
 	srv := httptest.NewServer(http.HandlerFunc(f.handler))
@@ -162,7 +163,7 @@ func pluginGrant(name string, values ...string) pluginGrantModel {
 
 func TestPluginAcceptFunc(t *testing.T) {
 	ctx := context.Background()
-	privs := dtypes.PluginPrivileges{{Name: "network", Value: []string{"host"}}, {Name: "mount", Value: []string{"/a", "/b"}}}
+	privs := plugin.Privileges{{Name: "network", Value: []string{"host"}}, {Name: "mount", Value: []string{"/a", "/b"}}}
 	if ok, err := pluginAcceptFunc(true, nil)(ctx, privs); !ok || err != nil {
 		t.Errorf("grant all: %v %v", ok, err)
 	}
@@ -325,7 +326,7 @@ data "docker_plugin" "by_alias" {
 	tfresource.Test(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(*terraform.State) error {
-			if _, _, err := c.PluginInspectWithRaw(context.Background(), "tfacc-sshfs"); !isNotFound(err) {
+			if _, err := c.PluginInspect(context.Background(), "tfacc-sshfs", client.PluginInspectOptions{}); !isNotFound(err) {
 				return fmt.Errorf("plugin still installed (%v)", err)
 			}
 			return nil

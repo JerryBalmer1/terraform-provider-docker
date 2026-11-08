@@ -5,11 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/api/types/build"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -23,6 +18,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/moby/moby/api/types/build"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/jsonstream"
+	"github.com/moby/moby/api/types/registry"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -333,7 +333,7 @@ func (r *imageResource) Create(ctx context.Context, req resource.CreateRequest, 
 		resp.Diagnostics.AddError("Cannot inspect image", fmt.Sprintf("%s: %v", ref, err))
 		return
 	}
-	imgApplyInspect(&plan, insp)
+	imgApplyInspect(&plan, insp.InspectResponse)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
@@ -347,7 +347,7 @@ func (r *imageResource) pull(ctx context.Context, name, platform string) diag.Di
 		return diags
 	}
 	tflog.Info(ctx, "pulling image", map[string]any{"name": name, "platform": platform})
-	rc, err := r.pd.Client.ImagePull(ctx, name, image.PullOptions{RegistryAuth: auth, Platform: platform})
+	rc, err := r.pd.Client.ImagePull(ctx, name, client.ImagePullOptions{RegistryAuth: auth, Platforms: platformsFromString(platform)})
 	if err != nil {
 		diags.AddError("Cannot pull image", fmt.Sprintf("%s: %v", name, err))
 		return diags
@@ -406,7 +406,7 @@ func (r *imageResource) build(ctx context.Context, plan *imageResourceModel) (st
 }
 
 // imgBuildOptions maps the plan to ImageBuildOptions (no auth, no context).
-func imgBuildOptions(ctx context.Context, plan *imageResourceModel, dockerfile string, diags *diag.Diagnostics) build.ImageBuildOptions {
+func imgBuildOptions(ctx context.Context, plan *imageResourceModel, dockerfile string, diags *diag.Diagnostics) client.ImageBuildOptions {
 	b := plan.Build
 	platform := b.Platform.ValueString()
 	if platform == "" {
@@ -416,12 +416,12 @@ func imgBuildOptions(ctx context.Context, plan *imageResourceModel, dockerfile s
 	for k, v := range stringMapFrom(ctx, b.Args, diags) {
 		args[k] = &v
 	}
-	return build.ImageBuildOptions{
+	return client.ImageBuildOptions{
 		Tags:        []string{plan.Name.ValueString()},
 		Dockerfile:  dockerfile,
 		BuildArgs:   args,
 		Target:      b.Target.ValueString(),
-		Platform:    platform,
+		Platforms:   platformsFromString(platform),
 		Labels:      mergeLabels(stringMapFrom(ctx, b.Labels, diags), map[string]string{labelManagedBy: labelManagedByValue}),
 		NoCache:     b.NoCache.ValueBool(),
 		PullParent:  b.Pull.ValueBool(),
@@ -449,8 +449,8 @@ func imgAuthConfigs(creds []registryCredential) map[string]registry.AuthConfig {
 }
 
 // imgLogMessage forwards daemon progress to tflog at debug level.
-func imgLogMessage(ctx context.Context) func(jsonmessage.JSONMessage) {
-	return func(m jsonmessage.JSONMessage) {
+func imgLogMessage(ctx context.Context) func(jsonstream.Message) {
+	return func(m jsonstream.Message) {
 		if s := strings.TrimSpace(m.Stream); s != "" {
 			tflog.Debug(ctx, s)
 		} else if m.Status != "" && m.Progress == nil {
@@ -506,7 +506,7 @@ func (r *imageResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		// Imported by name: keep the reference the user gave.
 		st.Name = types.StringValue(ref)
 	}
-	imgApplyInspect(&st, insp)
+	imgApplyInspect(&st, insp.InspectResponse)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &st)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, st.ID.ValueString())...)
 }
@@ -554,7 +554,7 @@ func imgRemove(ctx context.Context, c *client.Client, name, imageID string, forc
 	if target == "" {
 		return nil
 	}
-	_, err := c.ImageRemove(ctx, target, image.RemoveOptions{Force: force, PruneChildren: true})
+	_, err := c.ImageRemove(ctx, target, client.ImageRemoveOptions{Force: force, PruneChildren: true})
 	if err != nil && !isNotFound(err) {
 		return fmt.Errorf("%s: %w", target, err)
 	}

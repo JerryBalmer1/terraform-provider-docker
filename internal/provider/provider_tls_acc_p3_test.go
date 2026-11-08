@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/client"
 )
 
 func tlsP3VolumeCheck(t *testing.T, ep endpointConfig, name string, want bool) resource.TestCheckFunc {
@@ -21,7 +22,7 @@ func tlsP3VolumeCheck(t *testing.T, ep endpointConfig, name string, want bool) r
 			return err
 		}
 		defer c.Close()
-		_, err = c.VolumeInspect(context.Background(), name)
+		_, err = c.VolumeInspect(context.Background(), name, client.VolumeInspectOptions{})
 		switch {
 		case want && err != nil:
 			return fmt.Errorf("volume %s not on the TLS daemon: %v", name, err)
@@ -78,7 +79,7 @@ resource "docker_volume" "v" {
 					tlsP3VolumeCheck(t, ep, name, true),
 					func(*terraform.State) error {
 						// And not on the plain manager DOCKER_HOST points at.
-						if _, err := testAccDockerClient(t).VolumeInspect(context.Background(), name); !isNotFound(err) {
+						if _, err := testAccDockerClient(t).VolumeInspect(context.Background(), name, client.VolumeInspectOptions{}); !isNotFound(err) {
 							return fmt.Errorf("volume %s unexpectedly on DOCKER_HOST (err=%v)", name, err)
 						}
 						return nil

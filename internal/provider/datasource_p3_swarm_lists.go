@@ -6,12 +6,6 @@ package provider
 import (
 	"context"
 	"encoding/base64"
-	"sort"
-	"time"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -19,6 +13,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
+	"sort"
+	"time"
 )
 
 // p3SwarmListDS is a plural swarm data source: filters in, a sorted list of
@@ -31,7 +29,7 @@ type p3SwarmListDS struct {
 	itemAttrs   map[string]schema.Attribute
 	itemTypes   map[string]attr.Type
 	// fetch lists objects; it returns each as (sort key, attribute values).
-	fetch func(ctx context.Context, c *client.Client, args filters.Args) ([]p3SwarmRow, error)
+	fetch func(ctx context.Context, c *client.Client, args client.Filters) ([]p3SwarmRow, error)
 	pd    *providerData
 }
 
@@ -74,7 +72,7 @@ func (d *p3SwarmListDS) Read(ctx context.Context, req datasource.ReadRequest, re
 		resp.Diagnostics.AddError("Provider not configured", "The docker provider was not configured.")
 		return
 	}
-	args := filters.NewArgs()
+	args := client.Filters{}
 	var name types.String
 	var labels types.Map
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("name"), &name)...)
@@ -177,11 +175,12 @@ func NewP3ServicesDataSource() datasource.DataSource {
 		},
 		itemAttrs: attrs,
 		itemTypes: typs,
-		fetch: func(ctx context.Context, c *client.Client, args filters.Args) ([]p3SwarmRow, error) {
-			ss, err := c.ServiceList(ctx, swarm.ServiceListOptions{Filters: args})
+		fetch: func(ctx context.Context, c *client.Client, args client.Filters) ([]p3SwarmRow, error) {
+			ssRes, err := c.ServiceList(ctx, client.ServiceListOptions{Filters: args})
 			if err != nil {
 				return nil, err
 			}
+			ss := ssRes.Items
 			rows := make([]p3SwarmRow, 0, len(ss))
 			for _, s := range ss {
 				v := p3MetaVals(s.ID, s.Meta, s.Spec.Annotations)
@@ -221,11 +220,12 @@ func NewP3SecretsDataSource() datasource.DataSource {
 			"Secret data is never returned by the daemon, so only metadata is listed.",
 		itemAttrs: p3MetaAttrs("Secret"),
 		itemTypes: p3MetaTypes(),
-		fetch: func(ctx context.Context, c *client.Client, args filters.Args) ([]p3SwarmRow, error) {
-			ss, err := c.SecretList(ctx, swarm.SecretListOptions{Filters: args})
+		fetch: func(ctx context.Context, c *client.Client, args client.Filters) ([]p3SwarmRow, error) {
+			ssRes, err := c.SecretList(ctx, client.SecretListOptions{Filters: args})
 			if err != nil {
 				return nil, err
 			}
+			ss := ssRes.Items
 			rows := make([]p3SwarmRow, 0, len(ss))
 			for _, s := range ss {
 				rows = append(rows, p3SwarmRow{key: s.Spec.Name + "\x00" + s.ID, vals: p3MetaVals(s.ID, s.Meta, s.Spec.Annotations)})
@@ -248,11 +248,12 @@ func NewP3ConfigsDataSource() datasource.DataSource {
 			"Filter by `name` and `labels`.",
 		itemAttrs: attrs,
 		itemTypes: typs,
-		fetch: func(ctx context.Context, c *client.Client, args filters.Args) ([]p3SwarmRow, error) {
-			cs, err := c.ConfigList(ctx, swarm.ConfigListOptions{Filters: args})
+		fetch: func(ctx context.Context, c *client.Client, args client.Filters) ([]p3SwarmRow, error) {
+			csRes, err := c.ConfigList(ctx, client.ConfigListOptions{Filters: args})
 			if err != nil {
 				return nil, err
 			}
+			cs := csRes.Items
 			rows := make([]p3SwarmRow, 0, len(cs))
 			for _, s := range cs {
 				v := p3MetaVals(s.ID, s.Meta, s.Spec.Annotations)

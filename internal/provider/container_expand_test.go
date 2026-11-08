@@ -4,11 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/go-connections/nat"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
 )
 
 func TestContainerExpandPorts(t *testing.T) {
@@ -24,10 +23,10 @@ func TestContainerExpandPorts(t *testing.T) {
 	if len(set) != 2 {
 		t.Errorf("exposed: %v", set)
 	}
-	if got := pm[nat.Port("80/tcp")]; len(got) != 2 || got[0].HostPort != "8080" || got[1].HostIP != "10.0.0.1" {
+	if got := pm[network.MustParsePort("80/tcp")]; len(got) != 2 || got[0].HostPort != "8080" || addrString(got[1].HostIP) != "10.0.0.1" {
 		t.Errorf("80/tcp bindings: %+v", got)
 	}
-	if got := pm[nat.Port("53/udp")]; len(got) != 1 || got[0].HostPort != "" || got[0].HostIP != "127.0.0.1" {
+	if got := pm[network.MustParsePort("53/udp")]; len(got) != 1 || got[0].HostPort != "" || addrString(got[0].HostIP) != "127.0.0.1" {
 		t.Errorf("53/udp bindings: %+v", got)
 	}
 
@@ -50,7 +49,7 @@ func TestContainerExpandPorts(t *testing.T) {
 }
 
 func TestContainerFlattenPortsImport(t *testing.T) {
-	pm := nat.PortMap{"443/tcp": {{HostPort: "443"}}, "80/tcp": {{HostPort: "80"}}}
+	pm := network.PortMap{network.MustParsePort("443/tcp"): {{HostPort: "443"}}, network.MustParsePort("80/tcp"): {{HostPort: "80"}}}
 	got := containerFlattenPorts(pm, nil)
 	if len(got) != 2 || got[0].Internal.ValueInt64() != 80 || got[1].Internal.ValueInt64() != 443 {
 		t.Errorf("import order should be sorted by port: %+v", got)
@@ -172,7 +171,7 @@ func TestContainerFlattenNetworks(t *testing.T) {
 	id := "0123456789abcdef0123"
 	eps := map[string]*network.EndpointSettings{
 		"bridge":  {NetworkID: "b1"},
-		"app-net": {NetworkID: "n1aaaaaaaaaaaaaaaa", Aliases: []string{"web", "0123456789ab", "c1"}, IPAMConfig: &network.EndpointIPAMConfig{IPv4Address: "10.1.0.5"}},
+		"app-net": {NetworkID: "n1aaaaaaaaaaaaaaaa", Aliases: []string{"web", "0123456789ab", "c1"}, IPAMConfig: &network.EndpointIPAMConfig{IPv4Address: mustAddr("10.1.0.5")}},
 		"other":   {NetworkID: "n2"},
 	}
 	prior := []containerNetworkModel{{Name: types.StringValue("n1aaaaaaaaaa"), Aliases: types.SetNull(types.StringType), IPv4Address: types.StringNull()}}
@@ -212,15 +211,13 @@ func TestContainerFromInspectSubtractsImageDefaults(t *testing.T) {
 		Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}},
 	}
 	insp := container.InspectResponse{
-		ContainerJSONBase: &container.ContainerJSONBase{
-			ID: "abc", Name: "/web", Image: "sha256:1",
-			State: &container.State{Running: false, Status: "exited"},
-			HostConfig: &container.HostConfig{
-				RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
-				LogConfig:     container.LogConfig{Type: "json-file"},
-				PortBindings:  nat.PortMap{"80/tcp": {{HostPort: "8080"}}},
-				NetworkMode:   "default",
-			},
+		ID: "abc", Name: "/web", Image: "sha256:1",
+		State: &container.State{Running: false, Status: "exited"},
+		HostConfig: &container.HostConfig{
+			RestartPolicy: container.RestartPolicy{Name: "unless-stopped"},
+			LogConfig:     container.LogConfig{Type: "json-file"},
+			PortBindings:  network.PortMap{network.MustParsePort("80/tcp"): {{HostPort: "8080"}}},
+			NetworkMode:   "default",
 		},
 		Config: &container.Config{
 			Image:       "nginx:1.27",

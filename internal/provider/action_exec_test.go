@@ -9,16 +9,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 // actFakeExec wires the exec endpoints: the command writes stdout/stderr
 // and exits with code. hang keeps the stream open until the client closes.
-func actFakeExec(t *testing.T, f *swarmFakeEngine, stdout, stderr string, code int, hang bool) *container.ExecOptions {
+func actFakeExec(t *testing.T, f *swarmFakeEngine, stdout, stderr string, code int, hang bool) *client.ExecCreateOptions {
 	t.Helper()
-	var got container.ExecOptions
+	var got client.ExecCreateOptions
 	f.handle("POST /containers/web/exec", func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
 			t.Error(err)
@@ -37,9 +38,9 @@ func actFakeExec(t *testing.T, f *swarmFakeEngine, stdout, stderr string, code i
 		}
 		defer conn.Close()
 		fmt.Fprint(buf, "HTTP/1.1 101 UPGRADED\r\nContent-Type: application/vnd.docker.raw-stream\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
-		_, _ = stdcopy.NewStdWriter(buf, stdcopy.Stdout).Write([]byte(stdout))
+		_, _ = newTestStdWriter(buf, stdcopy.Stdout).Write([]byte(stdout))
 		if stderr != "" {
-			_, _ = stdcopy.NewStdWriter(buf, stdcopy.Stderr).Write([]byte(stderr))
+			_, _ = newTestStdWriter(buf, stdcopy.Stderr).Write([]byte(stderr))
 		}
 		_ = buf.Flush()
 		if hang {
@@ -49,7 +50,7 @@ func actFakeExec(t *testing.T, f *swarmFakeEngine, stdout, stderr string, code i
 		}
 	})
 	f.handle("GET /exec/e1/json", func(w http.ResponseWriter, r *http.Request) {
-		swarmFakeJSON(w, container.ExecInspect{ExecID: "e1", Running: false, ExitCode: code})
+		swarmFakeJSON(w, client.ExecInspectResult{ID: "e1", Running: false, ExitCode: code})
 	})
 	return &got
 }

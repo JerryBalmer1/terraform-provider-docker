@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -80,7 +81,7 @@ func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest
 		resp.Diagnostics.AddAttributeError(path.Root("image"), "Cannot resolve registry auth", err.Error())
 		return
 	}
-	out, err := r.pd.Client.ServiceCreate(ctx, spec, swarm.ServiceCreateOptions{EncodedRegistryAuth: auth, QueryRegistry: true})
+	out, err := r.pd.Client.ServiceCreate(ctx, client.ServiceCreateOptions{Spec: spec, EncodedRegistryAuth: auth, QueryRegistry: true})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot create service", err.Error())
 		return
@@ -105,7 +106,7 @@ func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest
 // refresh replaces m with the daemon's view, keeping m's spellings. It
 // returns false when the service no longer exists.
 func (r *serviceResource) refresh(ctx context.Context, m *serviceResourceModel, lk *svcLookup, diags *diag.Diagnostics) bool {
-	svc, _, err := r.pd.Client.ServiceInspectWithRaw(ctx, m.ID.ValueString(), swarm.ServiceInspectOptions{})
+	svcRes, err := r.pd.Client.ServiceInspect(ctx, m.ID.ValueString(), client.ServiceInspectOptions{})
 	if err != nil {
 		if isNotFound(err) {
 			return false
@@ -113,6 +114,7 @@ func (r *serviceResource) refresh(ctx context.Context, m *serviceResourceModel, 
 		diags.AddError("Cannot read service", err.Error())
 		return true
 	}
+	svc := svcRes.Service
 	if lk == nil {
 		if lk, err = svcLoadLookup(ctx, r.pd.Client, ""); err != nil {
 			diags.AddError("Cannot resolve service references", err.Error())
@@ -181,10 +183,11 @@ func svcUpdate(ctx context.Context, pd *providerData, id string, spec swarm.Serv
 // svcUpdateKeepForce is svcUpdate; keepForce copies the daemon's ForceUpdate
 // counter into spec (force_update unset) so no forced rollout is replayed.
 func svcUpdateKeepForce(ctx context.Context, pd *providerData, id string, spec swarm.ServiceSpec, keepForce bool) error {
-	cur, _, err := pd.Client.ServiceInspectWithRaw(ctx, id, swarm.ServiceInspectOptions{})
+	curRes, err := pd.Client.ServiceInspect(ctx, id, client.ServiceInspectOptions{})
 	if err != nil {
 		return err
 	}
+	cur := curRes.Service
 	auth, err := pd.registryAuthFor(spec.TaskTemplate.ContainerSpec.Image)
 	if err != nil {
 		return err
@@ -192,7 +195,7 @@ func svcUpdateKeepForce(ctx context.Context, pd *providerData, id string, spec s
 	if keepForce {
 		spec.TaskTemplate.ForceUpdate = cur.Spec.TaskTemplate.ForceUpdate
 	}
-	_, err = pd.Client.ServiceUpdate(ctx, id, cur.Version, spec, swarm.ServiceUpdateOptions{EncodedRegistryAuth: auth, QueryRegistry: true})
+	_, err = pd.Client.ServiceUpdate(ctx, id, client.ServiceUpdateOptions{Version: cur.Version, Spec: spec, EncodedRegistryAuth: auth, QueryRegistry: true})
 	return err
 }
 

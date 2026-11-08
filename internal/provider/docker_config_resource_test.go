@@ -7,12 +7,13 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 // TestDockerConfigFakeDaemonReplace checks that changing data replaces the
@@ -83,7 +84,7 @@ resource "docker_config" "test" {
 				if rs.Type != "docker_config" {
 					continue
 				}
-				if _, _, err := c.ConfigInspectWithRaw(context.Background(), rs.Primary.ID); !isNotFound(err) {
+				if _, err := c.ConfigInspect(context.Background(), rs.Primary.ID, client.ConfigInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("config %s still exists (err=%v)", rs.Primary.ID, err)
 				}
 			}

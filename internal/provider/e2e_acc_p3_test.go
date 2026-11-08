@@ -14,10 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 // e2eDataPlaneConfig: nginx pinned to worker1 (image = repo_digest), a
@@ -136,10 +137,11 @@ func e2eParamsFromEnv(t *testing.T) e2eParams {
 
 // e2eNodeHostname returns the hostname of the node a task ran on.
 func e2eNodeHostname(ctx context.Context, t *testing.T, nodeID string) string {
-	n, _, err := testAccDockerClient(t).NodeInspectWithRaw(ctx, nodeID)
+	nRes, err := testAccDockerClient(t).NodeInspect(ctx, nodeID, client.NodeInspectOptions{})
 	if err != nil {
 		return "?" + nodeID
 	}
+	n := nRes.Node
 	return n.Description.Hostname
 }
 
@@ -173,10 +175,11 @@ func TestAccE2EOverlayDataPlane(t *testing.T) {
 						probeID, _ := p3Attr(s, "docker_service.probe", "id")
 						agentID, _ := p3Attr(s, "docker_service.agent", "id")
 
-						svc, _, err := cli.ServiceInspectWithRaw(ctx, webID, swarm.ServiceInspectOptions{})
+						svcRes, err := cli.ServiceInspect(ctx, webID, client.ServiceInspectOptions{})
 						if err != nil {
 							return err
 						}
+						svc := svcRes.Service
 						if img := svc.Spec.TaskTemplate.ContainerSpec.Image; !strings.Contains(img, "@sha256:") {
 							return fmt.Errorf("web service image %q is not digest-pinned", img)
 						}
@@ -273,7 +276,8 @@ resource "docker_swarm_node" "w2" {
 				if err != nil {
 					return err
 				}
-				info, err := c.Info(context.Background())
+				infoRes, err := c.Info(context.Background(), client.InfoOptions{})
+				info := infoRes.Info
 				c.Close()
 				if err != nil {
 					return fmt.Errorf("%s: %w", h, err)
@@ -302,7 +306,7 @@ resource "docker_swarm_node" "w2" {
 						t.Fatal(err)
 					}
 					defer c.Close()
-					if err := c.SwarmLeave(context.Background(), true); err != nil {
+					if _, err := c.SwarmLeave(context.Background(), client.SwarmLeaveOptions{Force: true}); err != nil {
 						t.Fatalf("worker1 leave: %v", err)
 					}
 					if err := p3Compose("stop", "worker2"); err != nil {

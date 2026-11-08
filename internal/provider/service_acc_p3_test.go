@@ -12,11 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 func svcP3CheckDestroy(t *testing.T) resource.TestCheckFunc {
@@ -25,15 +26,15 @@ func svcP3CheckDestroy(t *testing.T) resource.TestCheckFunc {
 		for _, rs := range s.RootModule().Resources {
 			switch rs.Type {
 			case "docker_service":
-				if _, _, err := c.ServiceInspectWithRaw(context.Background(), rs.Primary.ID, swarm.ServiceInspectOptions{}); !isNotFound(err) {
+				if _, err := c.ServiceInspect(context.Background(), rs.Primary.ID, client.ServiceInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("service %s still exists (err=%v)", rs.Primary.ID, err)
 				}
 			case "docker_config":
-				if _, _, err := c.ConfigInspectWithRaw(context.Background(), rs.Primary.ID); !isNotFound(err) {
+				if _, err := c.ConfigInspect(context.Background(), rs.Primary.ID, client.ConfigInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("config %s still exists (err=%v)", rs.Primary.ID, err)
 				}
 			case "docker_secret":
-				if _, _, err := c.SecretInspectWithRaw(context.Background(), rs.Primary.ID); !isNotFound(err) {
+				if _, err := c.SecretInspect(context.Background(), rs.Primary.ID, client.SecretInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("secret %s still exists (err=%v)", rs.Primary.ID, err)
 				}
 			}
@@ -48,7 +49,8 @@ func svcP3Inspect(t *testing.T, s *terraform.State, addr string) (swarm.Service,
 	if err != nil {
 		return swarm.Service{}, err
 	}
-	svc, _, err := testAccDockerClient(t).ServiceInspectWithRaw(context.Background(), id, swarm.ServiceInspectOptions{})
+	svcRes, err := testAccDockerClient(t).ServiceInspect(context.Background(), id, client.ServiceInspectOptions{})
+	svc := svcRes.Service
 	return svc, err
 }
 
@@ -95,10 +97,11 @@ resource "docker_service" "g" {
 	checkPerNode := func(s *terraform.State) error {
 		ctx := context.Background()
 		c := testAccDockerClient(t)
-		nodes, err := c.NodeList(ctx, swarm.NodeListOptions{})
+		nodesRes, err := c.NodeList(ctx, client.NodeListOptions{})
 		if err != nil {
 			return err
 		}
+		nodes := nodesRes.Items
 		eligible := 0
 		for _, n := range nodes {
 			if n.Status.State == swarm.NodeStateReady && n.Spec.Availability == swarm.NodeAvailabilityActive {
@@ -277,13 +280,14 @@ resource "docker_service" "f" {
 				PreConfig: func() {
 					ctx := context.Background()
 					c := testAccDockerClient(t)
-					svc, _, err := c.ServiceInspectWithRaw(ctx, svcID, swarm.ServiceInspectOptions{})
+					svcRes, err := c.ServiceInspect(ctx, svcID, client.ServiceInspectOptions{})
 					if err != nil {
 						t.Fatal(err)
 					}
+					svc := svcRes.Service
 					spec := svc.Spec
 					spec.TaskTemplate.ForceUpdate++
-					if _, err := c.ServiceUpdate(ctx, svcID, svc.Version, spec, swarm.ServiceUpdateOptions{}); err != nil {
+					if _, err := c.ServiceUpdate(ctx, svcID, client.ServiceUpdateOptions{Version: svc.Version, Spec: spec}); err != nil {
 						t.Fatalf("out-of-band force update: %v", err)
 					}
 				},
@@ -378,7 +382,7 @@ resource "docker_service" "c" {
 			if strings.Join(cs.Hosts, ",") != strings.Join(wantHosts, ",") {
 				errs = append(errs, fmt.Sprintf("Hosts %q, want %q (swarmkit \"ip host\" form)", cs.Hosts, wantHosts))
 			}
-			if cs.DNSConfig == nil || strings.Join(cs.DNSConfig.Nameservers, ",") != "10.0.0.53" ||
+			if cs.DNSConfig == nil || strings.Join(addrStrings(cs.DNSConfig.Nameservers), ",") != "10.0.0.53" ||
 				strings.Join(cs.DNSConfig.Search, ",") != "example.internal" || strings.Join(cs.DNSConfig.Options, ",") != "ndots:2" {
 				errs = append(errs, fmt.Sprintf("DNSConfig %+v", cs.DNSConfig))
 			}

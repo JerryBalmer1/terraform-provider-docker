@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/moby/moby/client"
 )
 
 // testAccProtoV6ProviderFactories serves the provider in-process under the
@@ -149,7 +149,7 @@ func TestLabelHelpers(t *testing.T) {
 	if len(u) != 1 || u["a"] != "2" {
 		t.Errorf("userLabels: %v", u)
 	}
-	if got := labelFilter(map[string]string{"b": "2", "a": "1"}).Get("label"); len(got) != 2 {
+	if got := filterGet(labelFilter(map[string]string{"b": "2", "a": "1"}), "label"); len(got) != 2 {
 		t.Errorf("labelFilter: %v", got)
 	}
 }
@@ -189,7 +189,7 @@ func TestCheckDockerDaemon(t *testing.T) {
 		t.Fatal(err)
 	}
 	var diags diag.Diagnostics
-	checkDockerDaemon(context.Background(), c, endpointConfig{Host: "fake"}, &diags)
+	checkDockerDaemon(context.Background(), c, endpointConfig{Host: "fake"}, DefaultMinAPIVersion, &diags)
 	if len(diags) != 0 {
 		t.Fatalf("reachable daemon: %v", diags)
 	}
@@ -204,7 +204,7 @@ func TestCheckDockerDaemon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkDockerDaemon(context.Background(), c2, endpointConfig{Host: "tcp://" + addr}, &diags)
+	checkDockerDaemon(context.Background(), c2, endpointConfig{Host: "tcp://" + addr}, DefaultMinAPIVersion, &diags)
 	if diags.HasError() || diags.WarningsCount() != 1 {
 		t.Fatalf("unreachable daemon should warn only: %v", diags)
 	}

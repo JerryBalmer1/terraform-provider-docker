@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/moby/moby/api/types/swarm"
 )
 
 func TestP3SwarmListDataSources(t *testing.T) {
@@ -47,7 +47,7 @@ func TestP3SwarmListDataSources(t *testing.T) {
 		svcs[1].Replicas.ValueInt64() != 3 || svcs[1].Image != "nginx:1.27" || svcs[1].CreatedAt != "2026-01-02T03:04:05Z" {
 		t.Errorf("services = %+v", svcs)
 	}
-	if args := p3eFilterArgs(t, f, "GET /services"); !args.ExactMatch("mode", "replicated") || !args.ExactMatch("name", "w") {
+	if args := p3eFilterArgs(t, f, "GET /services"); !filterExactMatch(args, "mode", "replicated") || !filterExactMatch(args, "name", "w") {
 		t.Errorf("filters = %v", args)
 	}
 	var mode types.String

@@ -25,12 +25,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/go-connections/nat"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"net/netip"
 )
 
 type containerPortModel struct {
@@ -247,28 +247,32 @@ func containerPortProtocol(p containerPortModel) string {
 }
 
 // containerExpandPorts builds Config.ExposedPorts and HostConfig.PortBindings.
-func containerExpandPorts(ports []containerPortModel) (nat.PortSet, nat.PortMap, error) {
+func containerExpandPorts(ports []containerPortModel) (network.PortSet, network.PortMap, error) {
 	if len(ports) == 0 {
 		return nil, nil, nil
 	}
-	set := nat.PortSet{}
-	pm := nat.PortMap{}
+	set := network.PortSet{}
+	pm := network.PortMap{}
 	for i, p := range ports {
 		internal, ok := knownInt64(p.Internal)
 		if !ok || internal < 1 || internal > 65535 {
 			return nil, nil, fmt.Errorf("ports[%d].internal must be 1-65535", i)
 		}
-		port, err := nat.NewPort(containerPortProtocol(p), strconv.FormatInt(internal, 10))
-		if err != nil {
-			return nil, nil, fmt.Errorf("ports[%d]: %w", i, err)
+		port, ok := network.PortFrom(uint16(internal), network.IPProtocol(containerPortProtocol(p)))
+		if !ok {
+			return nil, nil, fmt.Errorf("ports[%d]: invalid port %d/%s", i, internal, containerPortProtocol(p))
 		}
 		set[port] = struct{}{}
-		b := nat.PortBinding{}
+		b := network.PortBinding{}
 		if ext, ok := knownInt64(p.External); ok && ext > 0 {
 			b.HostPort = strconv.FormatInt(ext, 10)
 		}
-		if ip, ok := knownString(p.IP); ok {
-			b.HostIP = ip
+		if ip, ok := knownString(p.IP); ok && ip != "" {
+			addr, err := netip.ParseAddr(ip)
+			if err != nil {
+				return nil, nil, fmt.Errorf("ports[%d].ip: %q is not an IP address", i, ip)
+			}
+			b.HostIP = addr
 		}
 		pm[port] = append(pm[port], b)
 	}
@@ -281,18 +285,18 @@ func containerPortKey(p containerPortModel) string {
 
 // containerFlattenPorts maps HostConfig.PortBindings back to blocks, ordered
 // like prior.
-func containerFlattenPorts(pm nat.PortMap, prior []containerPortModel) []containerPortModel {
+func containerFlattenPorts(pm network.PortMap, prior []containerPortModel) []containerPortModel {
 	var got []containerPortModel
 	for port, bindings := range pm {
 		if len(bindings) == 0 {
-			bindings = []nat.PortBinding{{}}
+			bindings = []network.PortBinding{{}}
 		}
 		for _, b := range bindings {
 			m := containerPortModel{
-				Internal: types.Int64Value(int64(port.Int())),
+				Internal: types.Int64Value(int64(port.Num())),
 				External: types.Int64Null(),
-				IP:       stringOrNull(b.HostIP),
-				Protocol: types.StringValue(port.Proto()),
+				IP:       stringOrNull(addrString(b.HostIP)),
+				Protocol: types.StringValue(string(port.Proto())),
 			}
 			if b.HostPort != "" {
 				if n, err := strconv.ParseInt(b.HostPort, 10, 64); err == nil {
@@ -542,12 +546,20 @@ func containerFlattenCapabilities(add, drop, priorAdd, priorDrop []string, prior
 
 // containerEndpointSettings builds the endpoint config for one
 // networks_advanced entry.
-func containerEndpointSettings(aliases []string, ipv4, ipv6 string) *network.EndpointSettings {
+func containerEndpointSettings(aliases []string, ipv4, ipv6 string) (*network.EndpointSettings, error) {
 	ep := &network.EndpointSettings{Aliases: aliases}
 	if ipv4 != "" || ipv6 != "" {
-		ep.IPAMConfig = &network.EndpointIPAMConfig{IPv4Address: ipv4, IPv6Address: ipv6}
+		a4, err := parseOptAddr("ipv4_address", ipv4)
+		if err != nil {
+			return nil, err
+		}
+		a6, err := parseOptAddr("ipv6_address", ipv6)
+		if err != nil {
+			return nil, err
+		}
+		ep.IPAMConfig = &network.EndpointIPAMConfig{IPv4Address: a4, IPv6Address: a6}
 	}
-	return ep
+	return ep, nil
 }
 
 // containerNetworkMatches reports whether endpoint key/networkID is what the
@@ -587,7 +599,7 @@ func containerFlattenNetworks(eps map[string]*network.EndpointSettings, networkM
 		}
 		ipv4, ipv6 := "", ""
 		if ep.IPAMConfig != nil {
-			ipv4, ipv6 = ep.IPAMConfig.IPv4Address, ep.IPAMConfig.IPv6Address
+			ipv4, ipv6 = addrString(ep.IPAMConfig.IPv4Address), addrString(ep.IPAMConfig.IPv6Address)
 		}
 		return containerNetworkModel{Name: name, Aliases: containerSetValue(priorAliases, aliases), IPv4Address: stringOrNull(ipv4), IPv6Address: stringOrNull(ipv6)}
 	}

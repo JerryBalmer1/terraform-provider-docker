@@ -1,0 +1,10 @@
+# Source: TestComposeLocalDrift in internal/provider/compose_parse_test.go
+services:
+  web:
+    image: nginx
+    restart: always
+    volumes:
+      - data:/v
+  once: {image: busybox, restart: "no"}
+volumes:
+  data: {}

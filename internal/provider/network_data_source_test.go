@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/docker/docker/api/types/network"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/moby/moby/api/types/network"
 )
 
 func TestNetworkDataFromInspect(t *testing.T) {
 	n := network.Inspect{
 		ID: "nid", Name: "bridge", Driver: "bridge", Scope: "local",
-		IPAM: network.IPAM{Driver: "default", Config: []network.IPAMConfig{{Subnet: "172.17.0.0/16", Gateway: "172.17.0.1"}}},
+		IPAM: network.IPAM{Driver: "default", Config: []network.IPAMConfig{{Subnet: mustPrefix("172.17.0.0/16"), Gateway: mustAddr("172.17.0.1")}}},
 	}
 	got := networkDataFromInspect(n, types.StringValue("bridge"))
 	if got.ID.ValueString() != "nid" || len(got.IPAMConfig.Elements()) != 1 || got.Options.IsNull() || got.Labels.IsNull() {

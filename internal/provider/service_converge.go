@@ -7,13 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 )
 
 // svcConvergeState is the outcome of one convergence check.
@@ -165,15 +163,17 @@ func svcWaitConverged(ctx context.Context, c *client.Client, id string, cfg *svc
 	}
 	var last svcConvergeState
 	werr := waitFor(ctx, timeout, delay, func(ctx context.Context) (bool, error) {
-		svc, _, err := c.ServiceInspectWithRaw(ctx, id, swarm.ServiceInspectOptions{})
+		svcRes, err := c.ServiceInspect(ctx, id, client.ServiceInspectOptions{})
 		if err != nil {
 			return false, err
 		}
+		svc := svcRes.Service
 		if svc.Spec.Mode.ReplicatedJob != nil || svc.Spec.Mode.GlobalJob != nil {
-			tasks, err := c.TaskList(ctx, swarm.TaskListOptions{Filters: filters.NewArgs(filters.Arg("service", id))})
+			tasksRes, err := c.TaskList(ctx, client.TaskListOptions{Filters: client.Filters{}.Add("service", id)})
 			if err != nil {
 				return false, err
 			}
+			tasks := tasksRes.Items
 			last = svcJobConvergeCheck(tasks, svc)
 			return last.Done, nil
 		}
@@ -184,10 +184,11 @@ func svcWaitConverged(ctx context.Context, c *client.Client, id string, cfg *svc
 				replicas = int(*svc.Spec.Mode.Replicated.Replicas)
 			}
 		}
-		tasks, err := c.TaskList(ctx, swarm.TaskListOptions{Filters: filters.NewArgs(filters.Arg("service", id))})
+		tasksRes, err := c.TaskList(ctx, client.TaskListOptions{Filters: client.Filters{}.Add("service", id)})
 		if err != nil {
 			return false, err
 		}
+		tasks := tasksRes.Items
 		last = svcConvergeCheck(tasks, replicas, svc.UpdateStatus, svc.UpdatedAt)
 		if last.Fatal != nil {
 			return false, svcConvergeError(last.Fatal, last)
@@ -218,16 +219,17 @@ func svcConvergeError(base error, st svcConvergeState) error {
 // left, so the networks, secrets and configs it used can be removed. A
 // service that is already gone is not an error.
 func svcRemoveAndWait(ctx context.Context, c *client.Client, id string, timeout time.Duration) error {
-	if err := c.ServiceRemove(ctx, id); err != nil && !isNotFound(err) {
+	if _, err := c.ServiceRemove(ctx, id, client.ServiceRemoveOptions{}); err != nil && !isNotFound(err) {
 		return err
 	}
 	return waitFor(ctx, timeout, 2*time.Second, func(ctx context.Context) (bool, error) {
 		// Filtering by service fails once the service is gone, so list all
 		// tasks and filter here.
-		tasks, err := c.TaskList(ctx, swarm.TaskListOptions{})
+		tasksRes, err := c.TaskList(ctx, client.TaskListOptions{})
 		if err != nil {
 			return false, err
 		}
+		tasks := tasksRes.Items
 		return svcTasksGone(tasks, id), nil
 	})
 }

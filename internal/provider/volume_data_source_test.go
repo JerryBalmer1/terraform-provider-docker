@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/docker/docker/api/types/volume"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/moby/moby/api/types/volume"
 )
 
 func TestVolumeDataFromInspect(t *testing.T) {

@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/moby/moby/client"
 )
 
 const defaultDockerHost = "unix:///var/run/docker.sock"
@@ -61,6 +62,7 @@ type providerModel struct {
 	CertPath                 types.String        `tfsdk:"cert_path"`
 	DisableDockerDaemonCheck types.Bool          `tfsdk:"disable_docker_daemon_check"`
 	AllowCredentialHelpers   types.Bool          `tfsdk:"allow_credential_helpers"`
+	MinAPIVersion            types.String        `tfsdk:"min_api_version"`
 	TLS                      *tlsModel           `tfsdk:"tls"`
 	SSH                      *sshModel           `tfsdk:"ssh"`
 	RegistryAuth             []registryAuthModel `tfsdk:"registry_auth"`
@@ -84,13 +86,21 @@ type registryAuthModel struct {
 	AuthDisabled      types.Bool   `tfsdk:"auth_disabled"`
 }
 
-// providerData is handed to every resource and data source as
-// ResourceData/DataSourceData. Use providerDataFrom to unpack it.
+// providerData is handed to every resource, data source, action, ephemeral
+// and list resource in Configure. Use providerDataFrom to unpack it, and
+// APIVersion (api_version.go) for the negotiated Engine API version.
 type providerData struct {
 	Client       *client.Client
 	Endpoint     endpointConfig
 	RegistryAuth []registryCredential
 	Version      string
+	// MinAPIVersion is min_api_version (default DefaultMinAPIVersion); ""
+	// (test fixtures) means no floor.
+	MinAPIVersion string
+
+	// apiMu guards apiVersion, the negotiated version APIVersion caches.
+	apiMu      sync.Mutex
+	apiVersion string
 }
 
 func (p *dockerProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -155,6 +165,15 @@ func (p *dockerProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 					"*warning* if it does not answer; it never fails validate or plan. The client itself is lazy either way: no other " +
 					"daemon call happens until a resource or data source needs one. Set `true` to skip the ping (no delay when the " +
 					"daemon is expected to be absent at plan time).",
+			},
+			"min_api_version": schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "Oldest Docker Engine API version the provider accepts from the daemon, in the form `1.NN`. " +
+					"Default: `" + DefaultMinAPIVersion + "` (Docker Engine 25.0). It cannot be above `" + client.MaxAPIVersion + "`, the newest " +
+					"version this provider speaks. When Configure pings the daemon and the negotiated version is older, configuration fails with " +
+					"an error naming both versions; with `disable_docker_daemon_check = true` (or an unreachable daemon) the same error comes " +
+					"from the first operation that asks for the version. A pinned `api_version` below it is rejected. There is no environment " +
+					"variable: the docker CLI has no API floor setting to mirror.",
 			},
 			"allow_credential_helpers": schema.BoolAttribute{
 				Optional: true,
@@ -330,6 +349,8 @@ func (p *dockerProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 	validateProviderModel(m, &resp.Diagnostics)
 	ep := resolveEndpoint(m, os.Getenv, &resp.Diagnostics)
+	minAPI := resolveMinAPIVersion(m, &resp.Diagnostics)
+	checkPinnedAPIFloor(m, ep, minAPI, &resp.Diagnostics)
 	allowHelpers := m.AllowCredentialHelpers.ValueBool()
 	if allowHelpers {
 		tflog.Info(ctx, "allow_credential_helpers = true: docker-credential-* helpers named in docker config files may be run for registry_auth")
@@ -346,11 +367,18 @@ func (p *dockerProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		resp.Diagnostics.AddError("Cannot build Docker client", fmt.Sprintf("host %q: %v", ep.Host, err))
 		return
 	}
+	// With the check disabled no ping happens here; the floor then applies
+	// on the first pd.APIVersion call.
+	negotiated := ""
 	if !m.DisableDockerDaemonCheck.ValueBool() {
-		checkDockerDaemon(ctx, c, ep, &resp.Diagnostics)
+		negotiated = checkDockerDaemon(ctx, c, ep, minAPI, &resp.Diagnostics)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
-	tflog.Debug(ctx, "docker provider configured", map[string]any{"host": ep.Host, "context": ep.Context, "ssh": ep.SSH != nil})
-	pd := &providerData{Client: c, Endpoint: ep, RegistryAuth: creds, Version: p.version}
+	tflog.Debug(ctx, "docker provider configured", map[string]any{"host": ep.Host, "context": ep.Context, "ssh": ep.SSH != nil,
+		"min_api_version": minAPI, "api_version": negotiated})
+	pd := &providerData{Client: c, Endpoint: ep, RegistryAuth: creds, Version: p.version, MinAPIVersion: minAPI, apiVersion: negotiated}
 	resp.ResourceData = pd
 	resp.DataSourceData = pd
 	resp.EphemeralResourceData = pd
@@ -358,9 +386,50 @@ func (p *dockerProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	resp.ListResourceData = pd
 }
 
-// checkDockerDaemon pings the daemon once and turns a failure into a
-// warning: an unreachable daemon must never fail validate or plan.
-func checkDockerDaemon(ctx context.Context, c *client.Client, ep endpointConfig, diags *diag.Diagnostics) {
+// resolveMinAPIVersion returns min_api_version: DefaultMinAPIVersion when
+// unset, "" (with an error on the attribute) when unknown or malformed.
+func resolveMinAPIVersion(m providerModel, diags *diag.Diagnostics) string {
+	switch {
+	case m.MinAPIVersion.IsUnknown():
+		diags.AddAttributeError(path.Root("min_api_version"), "Unknown docker provider argument",
+			"min_api_version is not known until apply. Set it to a literal.")
+		return ""
+	case m.MinAPIVersion.IsNull():
+		return DefaultMinAPIVersion
+	}
+	v := m.MinAPIVersion.ValueString()
+	if err := validateMinAPIVersion(v); err != nil {
+		diags.AddAttributeError(path.Root("min_api_version"), "Invalid min_api_version", err.Error())
+		return ""
+	}
+	return v
+}
+
+// checkPinnedAPIFloor rejects a pinned api_version (attribute or
+// DOCKER_API_VERSION) below min_api_version: the client would never speak
+// anything else, so every daemon call would be below the floor.
+func checkPinnedAPIFloor(m providerModel, ep endpointConfig, floor string, diags *diag.Diagnostics) {
+	if floor == "" || ep.APIVersion == "" || !apiVersionPattern.MatchString(ep.APIVersion) {
+		return
+	}
+	if checkAPIFloor(ep.Host, ep.APIVersion, floor) == nil {
+		return
+	}
+	msg := fmt.Sprintf("api_version pins Engine API %s, below min_api_version %s. Raise api_version, or lower min_api_version.", ep.APIVersion, floor)
+	if knownStr(m.APIVersion) != "" {
+		diags.AddAttributeError(path.Root("api_version"), "api_version below min_api_version", msg)
+		return
+	}
+	diags.AddError("DOCKER_API_VERSION below min_api_version",
+		fmt.Sprintf("DOCKER_API_VERSION pins Engine API %s, below min_api_version %s. Unset or raise DOCKER_API_VERSION, or lower min_api_version.", ep.APIVersion, floor))
+}
+
+// checkDockerDaemon pings the daemon once, negotiating the Engine API
+// version, and returns the negotiated version ("" when the ping failed). A
+// failed ping is a warning: an unreachable daemon must never fail validate or
+// plan. A daemon that answers with a version below floor ("" = no floor) is
+// an error naming both versions.
+func checkDockerDaemon(ctx context.Context, c *client.Client, ep endpointConfig, floor string, diags *diag.Diagnostics) string {
 	timeout := daemonCheckTimeout
 	if ep.SSH != nil {
 		hops, _ := ep.SSH.hops()
@@ -368,11 +437,18 @@ func checkDockerDaemon(ctx context.Context, c *client.Client, ep endpointConfig,
 	}
 	pctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	if _, err := c.Ping(pctx); err != nil {
+	if _, err := c.Ping(pctx, client.PingOptions{NegotiateAPIVersion: true}); err != nil {
 		diags.AddWarning("Docker daemon not reachable",
 			fmt.Sprintf("Pinging %s failed: %v\n\nPlanning continues; operations that need the daemon will fail until it is reachable. "+
 				"Set disable_docker_daemon_check = true to skip this check.", ep.Host, err))
+		return ""
 	}
+	v := c.ClientVersion()
+	if err := checkAPIFloor(ep.Host, v, floor); err != nil {
+		diags.AddAttributeError(path.Root("min_api_version"), "Docker daemon too old", err.Error())
+		return ""
+	}
+	return v
 }
 
 // ===== BEGIN LANE REGISTRATIONS =====

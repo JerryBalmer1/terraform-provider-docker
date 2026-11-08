@@ -9,14 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -126,7 +126,7 @@ func (e *execOutputEphemeral) Open(ctx context.Context, req ephemeral.OpenReques
 	}
 	sort.Strings(env)
 
-	stdout, stderr, code, err := execOutputRun(ctx, e.pd, m.Container.ValueString(), container.ExecOptions{
+	stdout, stderr, code, err := execOutputRun(ctx, e.pd, m.Container.ValueString(), client.ExecCreateOptions{
 		Cmd: cmd, User: m.User.ValueString(), WorkingDir: m.Workdir.ValueString(), Env: env,
 		AttachStdout: true, AttachStderr: true,
 	}, timeout)
@@ -151,14 +151,14 @@ func (e *execOutputEphemeral) Open(ctx context.Context, req ephemeral.OpenReques
 
 // execOutputRun creates, attaches and inspects one exec, returning captured
 // stdout, stderr and the exit code.
-func execOutputRun(ctx context.Context, pd *providerData, ctr string, opts container.ExecOptions, timeout time.Duration) (string, string, int, error) {
+func execOutputRun(ctx context.Context, pd *providerData, ctr string, opts client.ExecCreateOptions, timeout time.Duration) (string, string, int, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	created, err := pd.Client.ContainerExecCreate(ctx, ctr, opts)
+	created, err := pd.Client.ExecCreate(ctx, ctr, opts)
 	if err != nil {
 		return "", "", 0, err
 	}
-	att, err := pd.Client.ContainerExecAttach(ctx, created.ID, container.ExecAttachOptions{})
+	att, err := pd.Client.ExecAttach(ctx, created.ID, client.ExecAttachOptions{})
 	if err != nil {
 		return "", "", 0, fmt.Errorf("attaching to exec %s: %w", created.ID, err)
 	}
@@ -183,7 +183,7 @@ func execOutputRun(ctx context.Context, pd *providerData, ctr string, opts conta
 	// The exit code can lag the stream end by a moment.
 	var code int
 	err = waitFor(ctx, timeout, 200*time.Millisecond, func(ctx context.Context) (bool, error) {
-		insp, err := pd.Client.ContainerExecInspect(ctx, created.ID)
+		insp, err := pd.Client.ExecInspect(ctx, created.ID, client.ExecInspectOptions{})
 		if err != nil {
 			return false, err
 		}

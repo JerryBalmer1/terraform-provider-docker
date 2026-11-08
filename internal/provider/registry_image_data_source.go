@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -68,7 +69,7 @@ func (d *registryImageDataSource) Read(ctx context.Context, req datasource.ReadR
 		resp.Diagnostics.AddAttributeError(path.Root("name"), "Invalid image reference", err.Error())
 		return
 	}
-	di, err := d.pd.Client.DistributionInspect(ctx, name, auth)
+	di, err := d.pd.Client.DistributionInspect(ctx, name, client.DistributionInspectOptions{EncodedRegistryAuth: auth})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot read image digest from registry", fmt.Sprintf("%s: %v", name, err))
 		return

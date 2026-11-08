@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
@@ -20,6 +19,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 func TestSecretBase64Validation(t *testing.T) {
@@ -74,7 +75,7 @@ resource "docker_secret" "test" {
 				if rs.Type != "docker_secret" {
 					continue
 				}
-				if _, _, err := c.SecretInspectWithRaw(context.Background(), rs.Primary.ID); !isNotFound(err) {
+				if _, err := c.SecretInspect(context.Background(), rs.Primary.ID, client.SecretInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("secret %s still exists (err=%v)", rs.Primary.ID, err)
 				}
 			}

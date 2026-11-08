@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/swarm"
 )
 
 func svcTestLookup() *svcLookup {

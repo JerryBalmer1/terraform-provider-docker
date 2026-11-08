@@ -18,19 +18,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/build"
-	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	controlapi "github.com/moby/buildkit/api/services/control"
 	"github.com/moby/buildkit/session/auth"
 	"github.com/moby/buildkit/session/secrets"
 	"github.com/moby/buildkit/session/secrets/secretsprovider"
+	"github.com/moby/moby/api/types/build"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/moby/moby/api/types/jsonstream"
+	"github.com/moby/moby/client"
 )
 
 // imgBkTestTraceAux returns the aux JSON of a moby.buildkit.trace message.
@@ -47,7 +48,7 @@ func imgBkTestTraceAux(t *testing.T, sr *controlapi.StatusResponse) json.RawMess
 	return raw
 }
 
-func imgBkTestMsg(t *testing.T, w io.Writer, m jsonmessage.JSONMessage) {
+func imgBkTestMsg(t *testing.T, w io.Writer, m jsonstream.Message) {
 	t.Helper()
 	if err := json.NewEncoder(w).Encode(m); err != nil {
 		t.Fatal(err)
@@ -126,11 +127,11 @@ func (f *imgBkFakeDaemon) handler(w http.ResponseWriter, r *http.Request) {
 		f.mu.Unlock()
 
 		w.Header().Set("Content-Type", "application/json")
-		imgBkTestMsg(f.t, w, jsonmessage.JSONMessage{ID: imgAuxBuildKitTrace, Aux: imgBkPtr(imgBkTestTraceAux(f.t, &controlapi.StatusResponse{
+		imgBkTestMsg(f.t, w, jsonstream.Message{ID: imgAuxBuildKitTrace, Aux: imgBkPtr(imgBkTestTraceAux(f.t, &controlapi.StatusResponse{
 			Vertexes: []*controlapi.Vertex{{Digest: "sha256:v1", Name: "[1/2] FROM scratch"}},
 			Logs:     []*controlapi.VertexLog{{Vertex: "sha256:v1", Msg: []byte("step output\n")}},
 		}))})
-		imgBkTestMsg(f.t, w, jsonmessage.JSONMessage{ID: imgAuxImageID, Aux: imgBkRaw(`{"ID":"sha256:bk1"}`)})
+		imgBkTestMsg(f.t, w, jsonstream.Message{ID: imgAuxImageID, Aux: imgBkRaw(`{"ID":"sha256:bk1"}`)})
 	default:
 		http.Error(w, "unexpected "+r.Method+" "+r.URL.Path, http.StatusNotImplemented)
 	}
@@ -242,15 +243,15 @@ func TestImageBuildKitOptions(t *testing.T) {
 		CacheFrom: stringListValue([]string{"a:1"}, true),
 		Platforms: stringListValue([]string{"linux/amd64"}, true),
 	}
-	opts := build.ImageBuildOptions{Version: build.BuilderV1, Platform: "linux/arm64"}
+	opts := client.ImageBuildOptions{Version: build.BuilderV1, Platforms: platformsFromString("linux/arm64")}
 	imgApplyBuildKitOptions(ctx, b, &opts, &diags)
-	if diags.HasError() || opts.Version != build.BuilderBuildKit || len(opts.CacheFrom) != 1 || opts.Platform != "linux/amd64" {
+	if diags.HasError() || opts.Version != build.BuilderBuildKit || len(opts.CacheFrom) != 1 || platformsString(opts.Platforms) != "linux/amd64" {
 		t.Errorf("opts: %+v %v", opts, diags)
 	}
 	// No platforms: keep the classic platform resolution.
-	opts = build.ImageBuildOptions{Platform: "linux/arm64"}
+	opts = client.ImageBuildOptions{Platforms: platformsFromString("linux/arm64")}
 	imgApplyBuildKitOptions(ctx, &imageBuildModel{Builder: types.StringValue(imgBuilderBuildKit)}, &opts, &diags)
-	if opts.Platform != "linux/arm64" || opts.CacheFrom != nil {
+	if platformsString(opts.Platforms) != "linux/arm64" || opts.CacheFrom != nil {
 		t.Errorf("defaults: %+v", opts)
 	}
 }
@@ -416,8 +417,8 @@ func TestImageBuildKitDecodeStream(t *testing.T) {
 			{Vertex: "d1", Msg: []byte("main.go\nlinking\n")},
 		},
 	})
-	imgBkTestMsg(t, &ok, jsonmessage.JSONMessage{ID: imgAuxBuildKitTrace, Aux: &trace})
-	imgBkTestMsg(t, &ok, jsonmessage.JSONMessage{ID: imgAuxImageID, Aux: imgBkRaw(`{"ID":"sha256:built"}`)})
+	imgBkTestMsg(t, &ok, jsonstream.Message{ID: imgAuxBuildKitTrace, Aux: &trace})
+	imgBkTestMsg(t, &ok, jsonstream.Message{ID: imgAuxImageID, Aux: imgBkRaw(`{"ID":"sha256:built"}`)})
 	var lines []string
 	id, err := imgDecodeBuildKitStream(strings.NewReader(ok.String()), nil, func(s string) { lines = append(lines, s) })
 	if err != nil || id != "sha256:built" {
@@ -439,8 +440,8 @@ func TestImageBuildKitDecodeStream(t *testing.T) {
 		Vertexes: []*controlapi.Vertex{{Digest: "d2", Name: "[2/2] RUN false", Error: "process \"/bin/sh -c false\" did not complete successfully: exit code: 1"}},
 		Logs:     []*controlapi.VertexLog{{Vertex: "d2", Msg: []byte("about to fail\n")}},
 	})
-	imgBkTestMsg(t, &bad, jsonmessage.JSONMessage{ID: imgAuxBuildKitTrace, Aux: &failTrace})
-	imgBkTestMsg(t, &bad, jsonmessage.JSONMessage{Error: &jsonmessage.JSONError{Message: "failed to solve: exit code: 1"}, ErrorMessage: "failed to solve: exit code: 1"})
+	imgBkTestMsg(t, &bad, jsonstream.Message{ID: imgAuxBuildKitTrace, Aux: &failTrace})
+	imgBkTestMsg(t, &bad, jsonstream.Message{Error: &jsonstream.Error{Message: "failed to solve: exit code: 1"}})
 	_, err = imgDecodeBuildKitStream(strings.NewReader(bad.String()), nil, nil)
 	var se *imgStreamError
 	if !errors.As(err, &se) {

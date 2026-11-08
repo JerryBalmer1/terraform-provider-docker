@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/docker/docker/api/types/network"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 func TestNetworkExpandIPAM(t *testing.T) {
@@ -20,15 +21,15 @@ func TestNetworkExpandIPAM(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ipam.Driver != "default" || len(ipam.Config) != 1 || ipam.Config[0].Gateway != "10.9.0.1" || ipam.Config[0].AuxAddress["host"] != "10.9.0.2" {
+	if ipam.Driver != "default" || len(ipam.Config) != 1 || addrString(ipam.Config[0].Gateway) != "10.9.0.1" || addrString(ipam.Config[0].AuxAddress["host"]) != "10.9.0.2" {
 		t.Errorf("ipam: %+v", ipam)
 	}
 }
 
 func TestNetworkFlattenIPAM(t *testing.T) {
 	got := []network.IPAMConfig{
-		{Subnet: "10.9.0.0/24", Gateway: "10.9.0.1"},
-		{Subnet: "fd00::/64", Gateway: "fd00::1"},
+		{Subnet: mustPrefix("10.9.0.0/24"), Gateway: mustAddr("10.9.0.1")},
+		{Subnet: mustPrefix("fd00::/64"), Gateway: mustAddr("fd00::1")},
 	}
 	prior := []networkIPAMConfigModel{{Subnet: types.StringValue("10.9.0.0/24"), IPRange: types.StringNull(), Gateway: types.StringNull(), AuxAddress: types.MapNull(types.StringType)}}
 	out := networkFlattenIPAM(got, prior, false)
@@ -49,7 +50,7 @@ func TestNetworkFlattenIPAM(t *testing.T) {
 func TestNetworkFromInspect(t *testing.T) {
 	n := network.Inspect{
 		ID: "nid", Name: "app", Driver: "overlay", Scope: "swarm", Attachable: true,
-		IPAM:    network.IPAM{Driver: "", Config: []network.IPAMConfig{{Subnet: "10.0.1.0/24", Gateway: "10.0.1.1"}}},
+		IPAM:    network.IPAM{Driver: "", Config: []network.IPAMConfig{{Subnet: mustPrefix("10.0.1.0/24"), Gateway: mustAddr("10.0.1.1")}}},
 		Options: map[string]string{"com.docker.network.driver.overlay.vxlanid_list": "4097", "encrypted": ""},
 		Labels:  map[string]string{"team": "a", labelManagedBy: labelManagedByValue},
 	}
@@ -84,7 +85,7 @@ func TestAccNetwork_basic(t *testing.T) {
 				if rs.Type != "docker_network" {
 					continue
 				}
-				if _, err := c.NetworkInspect(context.Background(), rs.Primary.ID, network.InspectOptions{}); !isNotFound(err) {
+				if _, err := c.NetworkInspect(context.Background(), rs.Primary.ID, client.NetworkInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("network %s still exists (%v)", rs.Primary.ID, err)
 				}
 			}

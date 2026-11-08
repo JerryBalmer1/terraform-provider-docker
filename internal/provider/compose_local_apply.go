@@ -17,10 +17,10 @@ import (
 	"time"
 
 	ctypes "github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -35,10 +35,11 @@ func composeLocalList(ctx context.Context, pd *providerData, project string) (co
 	c := pd.Client
 	f := labelFilter(map[string]string{composeLabelProject: project})
 	ex := composeLocalExisting{containers: map[string]container.Summary{}, networks: map[string]network.Summary{}, volumes: map[string]*volume.Volume{}}
-	cs, err := c.ContainerList(ctx, container.ListOptions{All: true, Filters: f})
+	csRes, err := c.ContainerList(ctx, client.ContainerListOptions{All: true, Filters: f})
 	if err != nil {
 		return ex, fmt.Errorf("listing containers: %w", err)
 	}
+	cs := csRes.Items
 	for _, s := range cs {
 		if strings.EqualFold(s.Labels[composeLabelOneoff], "true") {
 			continue // `docker compose run` containers are not part of the model
@@ -49,19 +50,21 @@ func composeLocalList(ctx context.Context, pd *providerData, project string) (co
 		}
 		ex.containers[name] = s
 	}
-	ns, err := c.NetworkList(ctx, network.ListOptions{Filters: f})
+	nsRes, err := c.NetworkList(ctx, client.NetworkListOptions{Filters: f})
 	if err != nil {
 		return ex, fmt.Errorf("listing networks: %w", err)
 	}
+	ns := nsRes.Items
 	for _, n := range ns {
 		ex.networks[n.Name] = n
 	}
-	vs, err := c.VolumeList(ctx, volume.ListOptions{Filters: f})
+	vsRes, err := c.VolumeList(ctx, client.VolumeListOptions{Filters: f})
 	if err != nil {
 		return ex, fmt.Errorf("listing volumes: %w", err)
 	}
-	for _, v := range vs.Volumes {
-		ex.volumes[v.Name] = v
+	vs := vsRes.Items
+	for _, v := range vs {
+		ex.volumes[v.Name] = &v
 	}
 	return ex, nil
 }
@@ -186,7 +189,7 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 	wantNet := map[string]bool{}
 	for _, n := range plan.Networks {
 		if n.External {
-			if _, err := c.NetworkInspect(ctx, n.Name, network.InspectOptions{}); err != nil {
+			if _, err := c.NetworkInspect(ctx, n.Name, client.NetworkInspectOptions{}); err != nil {
 				return fmt.Errorf("external network %s: %w", n.Name, err)
 			}
 			continue
@@ -200,7 +203,7 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 		if !v.External {
 			continue
 		}
-		if _, err := c.VolumeInspect(ctx, v.Name); err != nil {
+		if _, err := c.VolumeInspect(ctx, v.Name, client.VolumeInspectOptions{}); err != nil {
 			return fmt.Errorf("external volume %s: %w", v.Name, err)
 		}
 	}
@@ -243,7 +246,7 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 		}
 	}
 	for _, name := range composeSortedKeys(remove) {
-		if err := c.ContainerRemove(ctx, ex.containers[name].ID, container.RemoveOptions{Force: true, RemoveVolumes: true}); err != nil && !isNotFound(err) {
+		if _, err := c.ContainerRemove(ctx, ex.containers[name].ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil && !isNotFound(err) {
 			return fmt.Errorf("removing container %s: %w", name, err)
 		}
 	}
@@ -254,7 +257,10 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 			continue
 		}
 		id := ex.networks[name].ID
-		if err := stackRemoveRetry(ctx, "network "+name, func(ctx context.Context) error { return c.NetworkRemove(ctx, id) }); err != nil {
+		if err := stackRemoveRetry(ctx, "network "+name, func(ctx context.Context) error {
+			_, err := c.NetworkRemove(ctx, id, client.NetworkRemoveOptions{})
+			return err
+		}); err != nil {
 			return err
 		}
 	}
@@ -311,7 +317,7 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 		if exists && !remove[dc.Name] {
 			ids[dc.Service] = append(ids[dc.Service], got.ID)
 			if got.State == container.StateCreated || (got.State == container.StateExited && composeLocalStateDrift(got, dc.Host.RestartPolicy.Name) != "") {
-				if err := c.ContainerStart(ctx, got.ID, container.StartOptions{}); err != nil {
+				if _, err := c.ContainerStart(ctx, got.ID, client.ContainerStartOptions{}); err != nil {
 					return fmt.Errorf("starting container %s: %w", dc.Name, err)
 				}
 			}
@@ -334,7 +340,7 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 			if want[name] {
 				continue
 			}
-			if err := c.VolumeRemove(ctx, name, false); err != nil && !isNotFound(err) {
+			if _, err := c.VolumeRemove(ctx, name, client.VolumeRemoveOptions{Force: false}); err != nil && !isNotFound(err) {
 				warn("Cannot remove orphan volume", fmt.Sprintf("%s: %v", name, err))
 			}
 		}
@@ -371,7 +377,7 @@ func composePull(ctx context.Context, pd *providerData, ref, platform string) er
 	if err != nil {
 		return err
 	}
-	rc, err := pd.Client.ImagePull(ctx, ref, image.PullOptions{RegistryAuth: auth, Platform: platform})
+	rc, err := pd.Client.ImagePull(ctx, ref, client.ImagePullOptions{RegistryAuth: auth, Platforms: platformsFromString(platform)})
 	if err != nil {
 		return err
 	}
@@ -409,11 +415,13 @@ func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalCo
 	var netCfg *network.NetworkingConfig
 	if len(dc.Networks) > 0 {
 		ep := dc.Networks[0]
-		netCfg = &network.NetworkingConfig{EndpointsConfig: map[string]*network.EndpointSettings{
-			ep.Name: containerEndpointSettings(ep.Aliases, ep.IPv4, ep.IPv6),
-		}}
+		es, err := containerEndpointSettings(ep.Aliases, ep.IPv4, ep.IPv6)
+		if err != nil {
+			return "", fmt.Errorf("container %s network %s: %w", dc.Name, ep.Name, err)
+		}
+		netCfg = &network.NetworkingConfig{EndpointsConfig: map[string]*network.EndpointSettings{ep.Name: es}}
 	}
-	resp, err := c.ContainerCreate(ctx, dc.Config, dc.Host, netCfg, composeParsePlatform(dc.Platform), dc.Name)
+	resp, err := c.ContainerCreate(ctx, client.ContainerCreateOptions{Config: dc.Config, HostConfig: dc.Host, NetworkingConfig: netCfg, Platform: composeParsePlatform(dc.Platform), Name: dc.Name})
 	if err != nil {
 		return "", fmt.Errorf("creating container %s: %w", dc.Name, err)
 	}
@@ -422,7 +430,11 @@ func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalCo
 		if id == "" {
 			id = ep.Name
 		}
-		if err := c.NetworkConnect(ctx, id, resp.ID, containerEndpointSettings(ep.Aliases, ep.IPv4, ep.IPv6)); err != nil {
+		es, err := containerEndpointSettings(ep.Aliases, ep.IPv4, ep.IPv6)
+		if err != nil {
+			return resp.ID, fmt.Errorf("container %s network %s: %w", dc.Name, ep.Name, err)
+		}
+		if _, err := c.NetworkConnect(ctx, id, client.NetworkConnectOptions{Container: resp.ID, EndpointConfig: es}); err != nil {
 			return resp.ID, fmt.Errorf("connecting %s to network %s: %w", dc.Name, ep.Name, err)
 		}
 	}
@@ -431,11 +443,11 @@ func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalCo
 		if err != nil {
 			return resp.ID, err
 		}
-		if err := c.CopyToContainer(ctx, resp.ID, "/", tr, container.CopyToContainerOptions{}); err != nil {
+		if _, err := c.CopyToContainer(ctx, resp.ID, client.CopyToContainerOptions{DestinationPath: "/", Content: tr}); err != nil {
 			return resp.ID, fmt.Errorf("copying secrets/configs into %s: %w", dc.Name, err)
 		}
 	}
-	if err := c.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	if _, err := c.ContainerStart(ctx, resp.ID, client.ContainerStartOptions{}); err != nil {
 		return resp.ID, fmt.Errorf("starting container %s: %w", dc.Name, err)
 	}
 	return resp.ID, nil
@@ -482,15 +494,16 @@ func composeWaitDependency(ctx context.Context, pd *providerData, svc string, id
 	for _, id := range ids {
 		var last string
 		err := waitFor(ctx, timeout, containerPollInterval, func(ctx context.Context) (bool, error) {
-			insp, err := pd.Client.ContainerInspect(ctx, id)
+			inspRes, err := pd.Client.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 			if err != nil {
 				return false, err
 			}
+			insp := inspRes.Container
 			st := insp.State
 			if st == nil {
 				return false, nil
 			}
-			last = st.Status
+			last = string(st.Status)
 			exited := !st.Running && !st.Restarting && (st.Status == "exited" || st.Status == "dead")
 			healthy := st.Health == nil || st.Health.Status == container.NoHealthcheck || st.Health.Status == container.Healthy
 			switch condition {
@@ -536,19 +549,22 @@ func composeLocalDestroy(ctx context.Context, pd *providerData, project string, 
 	}
 	var errs []error
 	for _, name := range composeSortedKeys(ex.containers) {
-		if err := c.ContainerRemove(ctx, ex.containers[name].ID, container.RemoveOptions{Force: true, RemoveVolumes: true}); err != nil && !isNotFound(err) {
+		if _, err := c.ContainerRemove(ctx, ex.containers[name].ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil && !isNotFound(err) {
 			errs = append(errs, fmt.Errorf("removing container %s: %w", name, err))
 		}
 	}
 	for _, name := range composeSortedKeys(ex.networks) {
 		id := ex.networks[name].ID
-		if err := stackRemoveRetry(ctx, "network "+name, func(ctx context.Context) error { return c.NetworkRemove(ctx, id) }); err != nil {
+		if err := stackRemoveRetry(ctx, "network "+name, func(ctx context.Context) error {
+			_, err := c.NetworkRemove(ctx, id, client.NetworkRemoveOptions{})
+			return err
+		}); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	if !keepVolumes {
 		for _, name := range composeSortedKeys(ex.volumes) {
-			if err := c.VolumeRemove(ctx, name, false); err != nil && !isNotFound(err) {
+			if _, err := c.VolumeRemove(ctx, name, client.VolumeRemoveOptions{Force: false}); err != nil && !isNotFound(err) {
 				errs = append(errs, fmt.Errorf("removing volume %s: %w", name, err))
 			}
 		}

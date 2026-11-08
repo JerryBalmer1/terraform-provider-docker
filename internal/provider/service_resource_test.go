@@ -4,19 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/hashicorp/terraform-plugin-testing/plancheck"
-	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 // ---------------------------------------------------------------------------
@@ -68,11 +67,11 @@ func svcFakeErr(w http.ResponseWriter, code int, msg string) {
 }
 
 func svcFakeLabelsMatch(r *http.Request, labels map[string]string) bool {
-	args, err := filters.FromJSON(r.URL.Query().Get("filters"))
+	args, err := testParseFilters(r.URL.Query().Get("filters"))
 	if err != nil {
 		return true
 	}
-	for _, kv := range args.Get("label") {
+	for _, kv := range filterGet(args, "label") {
 		k, v, _ := strings.Cut(kv, "=")
 		if labels[k] != v {
 			return false
@@ -283,7 +282,7 @@ func svcFakeNormalize(spec *swarm.ServiceSpec) {
 		}
 		for i := range es.Ports {
 			if es.Ports[i].Protocol == "" {
-				es.Ports[i].Protocol = swarm.PortConfigProtocolTCP
+				es.Ports[i].Protocol = network.TCP
 			}
 			if es.Ports[i].PublishMode == "" {
 				es.Ports[i].PublishMode = swarm.PortConfigPublishModeIngress
@@ -407,9 +406,9 @@ func (f *svcFakeDaemon) handleServices(w http.ResponseWriter, r *http.Request, p
 }
 
 func (f *svcFakeDaemon) handleTasks(w http.ResponseWriter, r *http.Request) {
-	args, _ := filters.FromJSON(r.URL.Query().Get("filters"))
+	args, _ := testParseFilters(r.URL.Query().Get("filters"))
 	var only *swarm.Service
-	if refs := args.Get("service"); len(refs) > 0 {
+	if refs := filterGet(args, "service"); len(refs) > 0 {
 		if only = f.findService(refs[0]); only == nil {
 			svcFakeErr(w, 404, "service not found")
 			return
@@ -658,7 +657,7 @@ resource "docker_service" "test" {
 				if rs.Type != "docker_service" {
 					continue
 				}
-				if _, _, err := c.ServiceInspectWithRaw(context.Background(), rs.Primary.ID, swarm.ServiceInspectOptions{}); !isNotFound(err) {
+				if _, err := c.ServiceInspect(context.Background(), rs.Primary.ID, client.ServiceInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("service %s still exists (err=%v)", rs.Primary.ID, err)
 				}
 			}

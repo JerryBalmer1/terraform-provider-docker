@@ -3,19 +3,18 @@ package provider
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
-	"testing"
-	"time"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
+	"os"
+	"strings"
+	"testing"
+	"time"
 )
 
 // e2eParams are the inputs for the end-to-end configuration. All of them
@@ -234,13 +233,11 @@ func e2eCheckTasksSpread(t *testing.T, serviceID *string, replicas, nodes int) r
 		defer cli.Close()
 		var last string
 		err := waitFor(context.Background(), 3*time.Minute, 3*time.Second, func(ctx context.Context) (bool, error) {
-			tasks, err := cli.TaskList(ctx, swarm.TaskListOptions{Filters: filters.NewArgs(
-				filters.Arg("service", *serviceID),
-				filters.Arg("desired-state", "running"),
-			)})
+			tasksRes, err := cli.TaskList(ctx, client.TaskListOptions{Filters: client.Filters{}.Add("service", *serviceID).Add("desired-state", "running")})
 			if err != nil {
 				return false, err
 			}
+			tasks := tasksRes.Items
 			running := 0
 			nodeIDs := map[string]bool{}
 			for _, tk := range tasks {
@@ -267,19 +264,20 @@ func e2eCheckDestroy(t *testing.T, serviceID, secretID *string) resource.TestChe
 		cli := testAccDockerClient(t)
 		defer cli.Close()
 
-		info, err := cli.Info(ctx)
+		infoRes, err := cli.Info(ctx, client.InfoOptions{})
 		if err != nil {
 			return fmt.Errorf("manager info: %w", err)
 		}
+		info := infoRes.Info
 		if st := info.Swarm.LocalNodeState; st != swarm.LocalNodeStateInactive {
 			// Swarm still up: the objects must at least be gone.
 			if *serviceID != "" {
-				if _, _, err := cli.ServiceInspectWithRaw(ctx, *serviceID, swarm.ServiceInspectOptions{}); !isNotFound(err) {
+				if _, err := cli.ServiceInspect(ctx, *serviceID, client.ServiceInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("service %s still exists (err=%v)", *serviceID, err)
 				}
 			}
 			if *secretID != "" {
-				if _, _, err := cli.SecretInspectWithRaw(ctx, *secretID); !isNotFound(err) {
+				if _, err := cli.SecretInspect(ctx, *secretID, client.SecretInspectOptions{}); !isNotFound(err) {
 					return fmt.Errorf("secret %s still exists (err=%v)", *secretID, err)
 				}
 			}
@@ -292,7 +290,8 @@ func e2eCheckDestroy(t *testing.T, serviceID, secretID *string) resource.TestChe
 			if err != nil {
 				return fmt.Errorf("%s client: %w", env, err)
 			}
-			wi, err := wc.Info(ctx)
+			wiRes, err := wc.Info(ctx, client.InfoOptions{})
+			wi := wiRes.Info
 			wc.Close()
 			if err != nil {
 				return fmt.Errorf("%s info: %w", env, err)

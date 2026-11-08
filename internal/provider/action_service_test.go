@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/registry"
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/moby/moby/api/pkg/authconfig"
+	"github.com/moby/moby/api/types/swarm"
 )
 
 // actFakeService serves one service "s1" named "web".
@@ -133,7 +133,7 @@ func TestServiceScaleAction(t *testing.T) {
 	if len(s.updates) != 1 || *s.updates[0].Spec.Mode.Replicated.Replicas != 3 || s.updates[0].Spec.TaskTemplate.ContainerSpec.Image != "ghcr.io/acme/web:2" {
 		t.Fatalf("updates %+v", s.updates)
 	}
-	if a, err := registry.DecodeAuthConfig(s.updates[0].Auth); err != nil || a.Username != "u" {
+	if a, err := authconfig.Decode(s.updates[0].Auth); err != nil || a.Username != "u" {
 		t.Errorf("registry auth not sent: %v %v", a, err)
 	}
 	if polls.Load() < 3 {

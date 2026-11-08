@@ -15,10 +15,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 )
 
 type composeFakeContainer struct {
@@ -199,15 +200,15 @@ func (f *composeFakeEngine) handleContainers(w http.ResponseWriter, r *http.Requ
 			svcFakeErr(w, 404, "No such container: "+parts[0])
 			return
 		}
-		st := &container.State{Status: c.State, Running: c.State == "running", ExitCode: c.Exit}
+		st := &container.State{Status: container.ContainerState(c.State), Running: c.State == "running", ExitCode: c.Exit}
 		if c.Config.Healthcheck != nil && len(c.Config.Healthcheck.Test) > 0 && c.Config.Healthcheck.Test[0] != "NONE" {
 			st.Health = &container.Health{Status: container.Healthy}
 		}
 		cfg := c.Config
 		svcFakeJSON(w, 200, container.InspectResponse{
-			ContainerJSONBase: &container.ContainerJSONBase{ID: c.ID, Name: "/" + c.Name, State: st, HostConfig: &c.Host},
-			Config:            &cfg,
-			NetworkSettings:   &container.NetworkSettings{Networks: c.Nets},
+			ID: c.ID, Name: "/" + c.Name, State: st, HostConfig: &c.Host,
+			Config:          &cfg,
+			NetworkSettings: &container.NetworkSettings{Networks: c.Nets},
 		})
 	case len(parts) == 2 && parts[1] == "start":
 		c := f.findContainer(parts[0])
@@ -283,7 +284,7 @@ func (f *composeFakeEngine) handleNetworks(w http.ResponseWriter, r *http.Reques
 			svcFakeErr(w, 404, "network not found")
 			return
 		}
-		var req network.ConnectOptions
+		var req client.NetworkConnectOptions
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		c := f.findContainer(req.Container)
 		if c == nil {
@@ -327,15 +328,15 @@ func (f *composeFakeEngine) handleNetworks(w http.ResponseWriter, r *http.Reques
 func (f *composeFakeEngine) handleVolumes(w http.ResponseWriter, r *http.Request, rest string) {
 	switch {
 	case rest == "" && r.Method == http.MethodGet:
-		out := volume.ListResponse{Volumes: []*volume.Volume{}}
+		out := volume.ListResponse{Volumes: []volume.Volume{}}
 		for _, v := range f.volumes {
 			if svcFakeLabelsMatch(r, v.Labels) {
-				out.Volumes = append(out.Volumes, v)
+				out.Volumes = append(out.Volumes, *v)
 			}
 		}
 		svcFakeJSON(w, 200, out)
 	case rest == "create":
-		var req volume.CreateOptions
+		var req client.VolumeCreateOptions
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		if _, ok := f.volumes[req.Name]; ok {
 			svcFakeErr(w, 409, "volume exists")

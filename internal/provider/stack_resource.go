@@ -13,10 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -27,6 +23,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -201,9 +201,6 @@ func stackPlanObjects(desired, prior map[string]string, existing map[string]bool
 func stackServiceRefs(spec swarm.ServiceSpec) map[string]bool {
 	out := map[string]bool{}
 	for _, n := range spec.TaskTemplate.Networks {
-		out[n.Target] = true
-	}
-	for _, n := range spec.Networks { //nolint:staticcheck // deprecated field still read for old services
 		out[n.Target] = true
 	}
 	if cs := spec.TaskTemplate.ContainerSpec; cs != nil {
@@ -419,31 +416,35 @@ func stackListExisting(ctx context.Context, c *client.Client, stack string) (sta
 		secrets:  map[string]swarm.Secret{},
 		configs:  map[string]swarm.Config{},
 	}
-	svcs, err := c.ServiceList(ctx, swarm.ServiceListOptions{Filters: f})
+	svcsRes, err := c.ServiceList(ctx, client.ServiceListOptions{Filters: f})
 	if err != nil {
 		return ex, fmt.Errorf("listing services: %w", err)
 	}
+	svcs := svcsRes.Items
 	for _, s := range svcs {
 		ex.services[stackShortName(stack, s.Spec.Name)] = s
 	}
-	nets, err := c.NetworkList(ctx, network.ListOptions{Filters: f})
+	netsRes, err := c.NetworkList(ctx, client.NetworkListOptions{Filters: f})
 	if err != nil {
 		return ex, fmt.Errorf("listing networks: %w", err)
 	}
+	nets := netsRes.Items
 	for _, n := range nets {
 		ex.networks[stackShortName(stack, n.Name)] = n
 	}
-	secs, err := c.SecretList(ctx, swarm.SecretListOptions{Filters: f})
+	secsRes, err := c.SecretList(ctx, client.SecretListOptions{Filters: f})
 	if err != nil {
 		return ex, fmt.Errorf("listing secrets: %w", err)
 	}
+	secs := secsRes.Items
 	for _, s := range secs {
 		ex.secrets[stackShortName(stack, s.Spec.Name)] = s
 	}
-	cfgs, err := c.ConfigList(ctx, swarm.ConfigListOptions{Filters: f})
+	cfgsRes, err := c.ConfigList(ctx, client.ConfigListOptions{Filters: f})
 	if err != nil {
 		return ex, fmt.Errorf("listing configs: %w", err)
 	}
+	cfgs := cfgsRes.Items
 	for _, s := range cfgs {
 		ex.configs[stackShortName(stack, s.Spec.Name)] = s
 	}
@@ -474,15 +475,16 @@ func stackRemoveServices(ctx context.Context, c *client.Client, ids []string) er
 		return nil
 	}
 	for _, id := range ids {
-		if err := c.ServiceRemove(ctx, id); err != nil && !isNotFound(err) {
+		if _, err := c.ServiceRemove(ctx, id, client.ServiceRemoveOptions{}); err != nil && !isNotFound(err) {
 			return fmt.Errorf("removing service %s: %w", id, err)
 		}
 	}
 	return waitFor(ctx, stackRemoveTimeout, 2*time.Second, func(ctx context.Context) (bool, error) {
-		tasks, err := c.TaskList(ctx, swarm.TaskListOptions{})
+		tasksRes, err := c.TaskList(ctx, client.TaskListOptions{})
 		if err != nil {
 			return false, err
 		}
+		tasks := tasksRes.Items
 		for _, id := range ids {
 			if !svcTasksGone(tasks, id) {
 				return false, nil
@@ -570,21 +572,30 @@ func (r *stackResource) apply(ctx context.Context, plan, prior *stackResourceMod
 	// 2. Remove replaced and orphan configs, secrets, networks.
 	for _, n := range append(append([]string{}, cfgPlan.Replace...), cfgPlan.Remove...) {
 		id := ex.configs[n].ID
-		if err := stackRemoveRetry(ctx, "config "+prefix+n, func(ctx context.Context) error { return c.ConfigRemove(ctx, id) }); err != nil {
+		if err := stackRemoveRetry(ctx, "config "+prefix+n, func(ctx context.Context) error {
+			_, err := c.ConfigRemove(ctx, id, client.ConfigRemoveOptions{})
+			return err
+		}); err != nil {
 			diags.AddError("Cannot remove stack config", err.Error())
 			return diags
 		}
 	}
 	for _, n := range append(append([]string{}, secPlan.Replace...), secPlan.Remove...) {
 		id := ex.secrets[n].ID
-		if err := stackRemoveRetry(ctx, "secret "+prefix+n, func(ctx context.Context) error { return c.SecretRemove(ctx, id) }); err != nil {
+		if err := stackRemoveRetry(ctx, "secret "+prefix+n, func(ctx context.Context) error {
+			_, err := c.SecretRemove(ctx, id, client.SecretRemoveOptions{})
+			return err
+		}); err != nil {
 			diags.AddError("Cannot remove stack secret", err.Error())
 			return diags
 		}
 	}
 	for _, n := range append(append([]string{}, netPlan.Replace...), netPlan.Remove...) {
 		id := ex.networks[n].ID
-		if err := stackRemoveRetry(ctx, "network "+prefix+n, func(ctx context.Context) error { return c.NetworkRemove(ctx, id) }); err != nil {
+		if err := stackRemoveRetry(ctx, "network "+prefix+n, func(ctx context.Context) error {
+			_, err := c.NetworkRemove(ctx, id, client.NetworkRemoveOptions{})
+			return err
+		}); err != nil {
 			diags.AddError("Cannot remove stack network", err.Error())
 			return diags
 		}
@@ -604,7 +615,7 @@ func (r *stackResource) apply(ctx context.Context, plan, prior *stackResourceMod
 		if !createN[n.Name.ValueString()] {
 			continue
 		}
-		_, err := c.NetworkCreate(ctx, prefix+n.Name.ValueString(), network.CreateOptions{
+		_, err := c.NetworkCreate(ctx, prefix+n.Name.ValueString(), client.NetworkCreateOptions{
 			Driver:     svcOr(n.Driver.ValueString(), "overlay"),
 			Scope:      "swarm",
 			Attachable: n.Attachable.ValueBool(),
@@ -626,10 +637,10 @@ func (r *stackResource) apply(ctx context.Context, plan, prior *stackResourceMod
 			diags.AddError("Invalid stack secret data", fmt.Sprintf("%s: %v", s.Name.ValueString(), err))
 			return diags
 		}
-		_, err = c.SecretCreate(ctx, swarm.SecretSpec{
+		_, err = c.SecretCreate(ctx, client.SecretCreateOptions{Spec: swarm.SecretSpec{
 			Annotations: swarm.Annotations{Name: prefix + s.Name.ValueString(), Labels: mergeLabels(stringMapFrom(ctx, s.Labels, &diags), nsLabels)},
 			Data:        data,
-		})
+		}})
 		if err != nil {
 			diags.AddError("Cannot create stack secret", fmt.Sprintf("%s%s: %v", prefix, s.Name.ValueString(), err))
 			return diags
@@ -644,10 +655,10 @@ func (r *stackResource) apply(ctx context.Context, plan, prior *stackResourceMod
 			diags.AddError("Invalid stack config data", fmt.Sprintf("%s: %v", s.Name.ValueString(), err))
 			return diags
 		}
-		_, err = c.ConfigCreate(ctx, swarm.ConfigSpec{
+		_, err = c.ConfigCreate(ctx, client.ConfigCreateOptions{Spec: swarm.ConfigSpec{
 			Annotations: swarm.Annotations{Name: prefix + s.Name.ValueString(), Labels: mergeLabels(stringMapFrom(ctx, s.Labels, &diags), nsLabels)},
 			Data:        data,
-		})
+		}})
 		if err != nil {
 			diags.AddError("Cannot create stack config", fmt.Sprintf("%s%s: %v", prefix, s.Name.ValueString(), err))
 			return diags
@@ -701,7 +712,7 @@ func (r *stackResource) apply(ctx context.Context, plan, prior *stackResourceMod
 			diags.AddError("Cannot resolve registry auth", fmt.Sprintf("%s%s: %v", prefix, short, err))
 			return diags
 		}
-		out, err := c.ServiceCreate(ctx, spec, swarm.ServiceCreateOptions{EncodedRegistryAuth: auth, QueryRegistry: true})
+		out, err := c.ServiceCreate(ctx, client.ServiceCreateOptions{Spec: spec, EncodedRegistryAuth: auth, QueryRegistry: true})
 		if err != nil {
 			diags.AddError("Cannot create stack service", fmt.Sprintf("%s%s: %v", prefix, short, err))
 			return diags
@@ -992,19 +1003,28 @@ func stackDestroy(ctx context.Context, c *client.Client, stack string) diag.Diag
 	}
 	for _, s := range ex.configs {
 		id := s.ID
-		if err := stackRemoveRetry(ctx, "config "+s.Spec.Name, func(ctx context.Context) error { return c.ConfigRemove(ctx, id) }); err != nil {
+		if err := stackRemoveRetry(ctx, "config "+s.Spec.Name, func(ctx context.Context) error {
+			_, err := c.ConfigRemove(ctx, id, client.ConfigRemoveOptions{})
+			return err
+		}); err != nil {
 			diags.AddError("Cannot remove stack config", err.Error())
 		}
 	}
 	for _, s := range ex.secrets {
 		id := s.ID
-		if err := stackRemoveRetry(ctx, "secret "+s.Spec.Name, func(ctx context.Context) error { return c.SecretRemove(ctx, id) }); err != nil {
+		if err := stackRemoveRetry(ctx, "secret "+s.Spec.Name, func(ctx context.Context) error {
+			_, err := c.SecretRemove(ctx, id, client.SecretRemoveOptions{})
+			return err
+		}); err != nil {
 			diags.AddError("Cannot remove stack secret", err.Error())
 		}
 	}
 	for _, n := range ex.networks {
 		id := n.ID
-		if err := stackRemoveRetry(ctx, "network "+n.Name, func(ctx context.Context) error { return c.NetworkRemove(ctx, id) }); err != nil {
+		if err := stackRemoveRetry(ctx, "network "+n.Name, func(ctx context.Context) error {
+			_, err := c.NetworkRemove(ctx, id, client.NetworkRemoveOptions{})
+			return err
+		}); err != nil {
 			diags.AddError("Cannot remove stack network", err.Error())
 		}
 	}

@@ -28,8 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
 	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	fwpath "github.com/hashicorp/terraform-plugin-framework/path"
@@ -39,6 +37,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/client"
 )
 
 // containerUploadModel is one upload block.
@@ -256,7 +256,7 @@ func containerPrepareUploads(in []containerUploadModel) ([]containerUploadItem, 
 // containerApplyUploads copies each prepared file into the container.
 func containerApplyUploads(ctx context.Context, pd *providerData, id string, items []containerUploadItem) error {
 	for _, it := range items {
-		if err := pd.Client.CopyToContainer(ctx, id, it.Dir, bytes.NewReader(it.Tar), container.CopyToContainerOptions{}); err != nil {
+		if _, err := pd.Client.CopyToContainer(ctx, id, client.CopyToContainerOptions{DestinationPath: it.Dir, Content: bytes.NewReader(it.Tar)}); err != nil {
 			return fmt.Errorf("%s: %w", it.File, err)
 		}
 	}

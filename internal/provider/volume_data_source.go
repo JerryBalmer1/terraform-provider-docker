@@ -3,10 +3,11 @@ package provider
 import (
 	"context"
 
-	"github.com/docker/docker/api/types/volume"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -72,11 +73,12 @@ func (d *volumeDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	if resp.Diagnostics.HasError() || d.pd == nil {
 		return
 	}
-	v, err := d.pd.Client.VolumeInspect(ctx, cfg.Name.ValueString())
+	vRes, err := d.pd.Client.VolumeInspect(ctx, cfg.Name.ValueString(), client.VolumeInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot find volume", err.Error())
 		return
 	}
+	v := vRes.Volume
 	state := volumeDataFromInspect(v)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

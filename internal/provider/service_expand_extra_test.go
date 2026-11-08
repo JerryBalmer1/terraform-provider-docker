@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
 )
 
 func TestServiceP2ExpandSpotChecks(t *testing.T) {
@@ -23,7 +23,7 @@ func TestServiceP2ExpandSpotChecks(t *testing.T) {
 	if !reflect.DeepEqual(cs.Hosts, []string{"10.0.0.5 db.local", "fd00::1 v6.local"}) {
 		t.Errorf("hosts = %q", cs.Hosts)
 	}
-	if cs.DNSConfig == nil || cs.DNSConfig.Nameservers[0] != "10.0.0.2" || cs.DNSConfig.Search != nil || cs.DNSConfig.Options[0] != "ndots:2" {
+	if cs.DNSConfig == nil || addrString(cs.DNSConfig.Nameservers[0]) != "10.0.0.2" || cs.DNSConfig.Search != nil || cs.DNSConfig.Options[0] != "ndots:2" {
 		t.Errorf("dns = %+v", cs.DNSConfig)
 	}
 	if !reflect.DeepEqual(cs.CapabilityAdd, []string{"NET_ADMIN"}) || cs.CapabilityDrop != nil || cs.Sysctls["net.core.somaxconn"] != "1024" {

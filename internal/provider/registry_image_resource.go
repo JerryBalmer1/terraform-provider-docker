@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/image"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -24,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -194,14 +194,14 @@ func (r *registryImageResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 	digest, err := registryImagePushWithRetry(ctx, int(plan.PushRetries.ValueInt64()), func(ctx context.Context) (io.ReadCloser, error) {
-		return r.pd.Client.ImagePush(ctx, name, image.PushOptions{RegistryAuth: auth})
+		return r.pd.Client.ImagePush(ctx, name, client.ImagePushOptions{RegistryAuth: auth})
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Image push failed", fmt.Sprintf("%s: %v", name, err))
 		return
 	}
 	if digest == "" {
-		di, err := r.pd.Client.DistributionInspect(ctx, name, auth)
+		di, err := r.pd.Client.DistributionInspect(ctx, name, client.DistributionInspectOptions{EncodedRegistryAuth: auth})
 		if err != nil {
 			resp.Diagnostics.AddError("Pushed, but cannot read the digest", fmt.Sprintf("%s: %v", name, err))
 			return
@@ -241,7 +241,7 @@ func (r *registryImageResource) Read(ctx context.Context, req resource.ReadReque
 		resp.Diagnostics.AddError("Invalid image reference", err.Error())
 		return
 	}
-	di, err := r.pd.Client.DistributionInspect(ctx, name, auth)
+	di, err := r.pd.Client.DistributionInspect(ctx, name, client.DistributionInspectOptions{EncodedRegistryAuth: auth})
 	if err != nil {
 		if registryImageNotFound(err) {
 			tflog.Warn(ctx, "image gone from registry; removing from state", map[string]any{"name": name})

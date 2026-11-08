@@ -6,36 +6,34 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strings"
-	"testing"
-	"time"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
+	"strings"
+	"testing"
+	"time"
 )
 
 func stackP3CheckGone(t *testing.T, stack string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		c := testAccDockerClient(t)
 		ctx := context.Background()
-		f := filters.NewArgs(filters.Arg("label", labelStackNamespace+"="+stack))
-		if svcs, err := c.ServiceList(ctx, swarm.ServiceListOptions{Filters: f}); err != nil || len(svcs) != 0 {
-			return fmt.Errorf("stack %s: %d services left (err=%v)", stack, len(svcs), err)
+		f := client.Filters{}.Add("label", labelStackNamespace+"="+stack)
+		if svcs, err := c.ServiceList(ctx, client.ServiceListOptions{Filters: f}); err != nil || len(svcs.Items) != 0 {
+			return fmt.Errorf("stack %s: %d services left (err=%v)", stack, len(svcs.Items), err)
 		}
-		if nets, err := c.NetworkList(ctx, network.ListOptions{Filters: f}); err != nil || len(nets) != 0 {
-			return fmt.Errorf("stack %s: %d networks left (err=%v)", stack, len(nets), err)
+		if nets, err := c.NetworkList(ctx, client.NetworkListOptions{Filters: f}); err != nil || len(nets.Items) != 0 {
+			return fmt.Errorf("stack %s: %d networks left (err=%v)", stack, len(nets.Items), err)
 		}
 		return nil
 	}
 }
 
 func stackP3Service(t *testing.T, name string) (swarm.Service, error) {
-	svc, _, err := testAccDockerClient(t).ServiceInspectWithRaw(context.Background(), name, swarm.ServiceInspectOptions{})
+	svcRes, err := testAccDockerClient(t).ServiceInspect(context.Background(), name, client.ServiceInspectOptions{})
+	svc := svcRes.Service
 	return svc, err
 }
 
@@ -54,7 +52,7 @@ func TestAccStackP3_aliasAndVolumes(t *testing.T) {
 		// Task containers go away asynchronously after the services.
 		c := testAccDockerClient(t)
 		_ = waitFor(context.Background(), time.Minute, 2*time.Second, func(ctx context.Context) (bool, error) {
-			err := c.VolumeRemove(ctx, volName, true)
+			_, err := c.VolumeRemove(ctx, volName, client.VolumeRemoveOptions{Force: true})
 			return err == nil || isNotFound(err), nil
 		})
 	})
@@ -112,7 +110,7 @@ resource "docker_stack" "a" {
 			func(*terraform.State) error {
 				// Created by the web task on the node, never by the provider,
 				// so destroying the stack leaves it.
-				if _, err := testAccDockerClient(t).VolumeInspect(context.Background(), volName); err != nil {
+				if _, err := testAccDockerClient(t).VolumeInspect(context.Background(), volName, client.VolumeInspectOptions{}); err != nil {
 					return fmt.Errorf("volume %s should survive stack destroy (provider never removes stack volumes): %v", volName, err)
 				}
 				return nil
@@ -155,15 +153,16 @@ resource "docker_stack" "a" {
 							return fmt.Errorf("probe job did not complete: alias web not reachable (%d tasks)", len(tasks))
 						}
 						// The volume exists now only because the web task created it.
-						vols, err := c.VolumeList(ctx, volume.ListOptions{Filters: filters.NewArgs(filters.Arg("name", volName))})
+						volsRes, err := c.VolumeList(ctx, client.VolumeListOptions{Filters: client.Filters{}.Add("name", volName)})
 						if err != nil {
 							return err
 						}
-						if len(vols.Volumes) != 1 {
-							return fmt.Errorf("volume %s not created by the task (%d found)", volName, len(vols.Volumes))
+						vols := volsRes.Items
+						if len(vols) != 1 {
+							return fmt.Errorf("volume %s not created by the task (%d found)", volName, len(vols))
 						}
-						if vols.Volumes[0].Labels["purpose"] != "p3" {
-							t.Logf("note: task-created volume labels %v (stack volume labels travel via mount VolumeOptions)", vols.Volumes[0].Labels)
+						if vols[0].Labels["purpose"] != "p3" {
+							t.Logf("note: task-created volume labels %v (stack volume labels travel via mount VolumeOptions)", vols[0].Labels)
 						}
 						return nil
 					},

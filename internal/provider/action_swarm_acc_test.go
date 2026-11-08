@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 // actAccTrigger is an action block plus a terraform_data that runs it once
@@ -44,10 +44,11 @@ func TestAccActionSwarmRotateTokens_basic(t *testing.T) {
 	testAccPreCheck(t)
 	swarmAccManagerAddr(t)
 	c := testAccDockerClient(t)
-	before, err := c.SwarmInspect(context.Background())
+	beforeRes, err := c.SwarmInspect(context.Background(), client.SwarmInspectOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	before := beforeRes.Swarm
 	resource.Test(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -55,10 +56,11 @@ func TestAccActionSwarmRotateTokens_basic(t *testing.T) {
 			Config: actAccTrigger("docker_swarm_rotate_tokens", "r", `    worker  = true
     manager = false`),
 			Check: func(*terraform.State) error {
-				after, err := c.SwarmInspect(context.Background())
+				afterRes, err := c.SwarmInspect(context.Background(), client.SwarmInspectOptions{})
 				if err != nil {
 					return err
 				}
+				after := afterRes.Swarm
 				if after.JoinTokens.Worker == before.JoinTokens.Worker {
 					return fmt.Errorf("worker token not rotated")
 				}
@@ -74,10 +76,11 @@ func TestAccActionSwarmRotateTokens_basic(t *testing.T) {
 // actAccPickNode prefers a worker so the manager keeps running tasks.
 func actAccPickNode(t *testing.T, c *client.Client) swarm.Node {
 	t.Helper()
-	nodes, err := c.NodeList(context.Background(), swarm.NodeListOptions{})
+	nodesRes, err := c.NodeList(context.Background(), client.NodeListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	nodes := nodesRes.Items
 	for _, n := range nodes {
 		if n.Spec.Role == swarm.NodeRoleWorker && n.Status.State == swarm.NodeStateReady {
 			return n
@@ -88,10 +91,11 @@ func actAccPickNode(t *testing.T, c *client.Client) swarm.Node {
 
 func actAccNodeAvailability(c *client.Client, id string, want swarm.NodeAvailability) resource.TestCheckFunc {
 	return func(*terraform.State) error {
-		n, _, err := c.NodeInspectWithRaw(context.Background(), id)
+		nRes, err := c.NodeInspect(context.Background(), id, client.NodeInspectOptions{})
 		if err != nil {
 			return err
 		}
+		n := nRes.Node
 		if n.Spec.Availability != want {
 			return fmt.Errorf("node %s availability %s, want %s", n.Description.Hostname, n.Spec.Availability, want)
 		}
@@ -146,13 +150,13 @@ func TestAccActionServiceScaleForceUpdateRollback_basic(t *testing.T) {
 	c := testAccDockerClient(t)
 	name := acctest.RandomWithPrefix("tfacc-svcact")
 	one := uint64(1)
-	created, err := c.ServiceCreate(context.Background(), swarm.ServiceSpec{
+	created, err := c.ServiceCreate(context.Background(), client.ServiceCreateOptions{Spec: swarm.ServiceSpec{
 		Annotations: swarm.Annotations{Name: name},
 		TaskTemplate: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{
 			Image: actAccImage, Command: []string{"sh", "-c", "sleep 3600"},
 		}},
 		Mode: swarm.ServiceMode{Replicated: &swarm.ReplicatedService{Replicas: &one}},
-	}, swarm.ServiceCreateOptions{})
+	}})
 	if err != nil {
 		t.Fatalf("creating service: %v", err)
 	}
@@ -161,7 +165,8 @@ func TestAccActionServiceScaleForceUpdateRollback_basic(t *testing.T) {
 		t.Fatalf("seed service did not converge: %v", err)
 	}
 	inspect := func() (swarm.Service, error) {
-		s, _, err := c.ServiceInspectWithRaw(context.Background(), created.ID, swarm.ServiceInspectOptions{})
+		sRes, err := c.ServiceInspect(context.Background(), created.ID, client.ServiceInspectOptions{})
+		s := sRes.Service
 		return s, err
 	}
 	scale := actAccTrigger("docker_service_scale", "s", fmt.Sprintf(`    service  = %q

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/docker/api/types/network"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -17,6 +16,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -154,9 +155,11 @@ func networkExpandIPAM(ctx context.Context, driver string, cfgs []networkIPAMCon
 		if diags.HasError() {
 			return nil, fmt.Errorf("ipam_config[%d].aux_address: %v", i, diags)
 		}
-		ipam.Config = append(ipam.Config, network.IPAMConfig{
-			Subnet: c.Subnet.ValueString(), IPRange: c.IPRange.ValueString(), Gateway: c.Gateway.ValueString(), AuxAddress: aux,
-		})
+		pool, err := ipamConfigFrom(c.Subnet.ValueString(), c.IPRange.ValueString(), c.Gateway.ValueString(), aux)
+		if err != nil {
+			return nil, fmt.Errorf("ipam_config[%d].%w", i, err)
+		}
+		ipam.Config = append(ipam.Config, pool)
 	}
 	return ipam, nil
 }
@@ -170,10 +173,10 @@ func networkFlattenIPAM(got []network.IPAMConfig, prior []networkIPAMConfigModel
 	used := make([]bool, len(got))
 	pick := func(p *networkIPAMConfigModel, g network.IPAMConfig) networkIPAMConfigModel {
 		m := networkIPAMConfigModel{
-			Subnet:     stringOrNull(g.Subnet),
-			IPRange:    stringOrNull(g.IPRange),
-			Gateway:    stringOrNull(g.Gateway),
-			AuxAddress: stringMapValue(g.AuxAddress, true),
+			Subnet:     stringOrNull(prefixString(g.Subnet)),
+			IPRange:    stringOrNull(prefixString(g.IPRange)),
+			Gateway:    stringOrNull(addrString(g.Gateway)),
+			AuxAddress: stringMapValue(auxAddressStrings(g.AuxAddress), true),
 		}
 		if p != nil {
 			if p.Gateway.IsNull() {
@@ -182,14 +185,14 @@ func networkFlattenIPAM(got []network.IPAMConfig, prior []networkIPAMConfigModel
 			if p.IPRange.IsNull() {
 				m.IPRange = types.StringNull()
 			}
-			m.AuxAddress = containerMapValue(p.AuxAddress, g.AuxAddress)
+			m.AuxAddress = containerMapValue(p.AuxAddress, auxAddressStrings(g.AuxAddress))
 		}
 		return m
 	}
 	for i := range prior {
 		p := &prior[i]
 		for j, g := range got {
-			if !used[j] && g.Subnet == p.Subnet.ValueString() {
+			if !used[j] && prefixString(g.Subnet) == p.Subnet.ValueString() {
 				used[j] = true
 				out = append(out, pick(p, g))
 				break
@@ -255,7 +258,7 @@ func (r *networkResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 	ipv6 := plan.IPv6.ValueBool()
-	opts := network.CreateOptions{
+	opts := client.NetworkCreateOptions{
 		Driver:     plan.Driver.ValueString(),
 		Attachable: plan.Attachable.ValueBool(),
 		Internal:   plan.Internal.ValueBool(),
@@ -274,13 +277,14 @@ func (r *networkResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 	plan.ID = types.StringValue(created.ID)
-	n, err := r.pd.Client.NetworkInspect(ctx, created.ID, network.InspectOptions{})
+	nRes, err := r.pd.Client.NetworkInspect(ctx, created.ID, client.NetworkInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), plan.ID)...)
 		resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, created.ID)...)
 		resp.Diagnostics.AddError("Cannot inspect network", err.Error())
 		return
 	}
+	n := nRes.Network
 	state := networkFromInspect(n, plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
@@ -292,7 +296,8 @@ func (r *networkResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	n, err := r.pd.Client.NetworkInspect(ctx, prior.ID.ValueString(), network.InspectOptions{})
+	nRes, err := r.pd.Client.NetworkInspect(ctx, prior.ID.ValueString(), client.NetworkInspectOptions{})
+	n := nRes.Network
 	if isNotFound(err) {
 		resp.State.RemoveResource(ctx)
 		return
@@ -323,7 +328,7 @@ func (r *networkResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	if err := r.pd.Client.NetworkRemove(ctx, state.ID.ValueString()); err != nil && !isNotFound(err) {
+	if _, err := r.pd.Client.NetworkRemove(ctx, state.ID.ValueString(), client.NetworkRemoveOptions{}); err != nil && !isNotFound(err) {
 		resp.Diagnostics.AddError("Cannot remove network", fmt.Sprintf("%s: %v (are containers or services still attached?)", state.Name.ValueString(), err))
 	}
 }

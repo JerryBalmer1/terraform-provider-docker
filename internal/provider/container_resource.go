@@ -9,9 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -30,6 +27,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -456,7 +456,7 @@ func containerBuildCreate(ctx context.Context, m containerResourceModel, diags *
 	hc := &container.HostConfig{
 		Privileged:     m.Privileged.ValueBool(),
 		RestartPolicy:  containerRestartPolicy(m.Restart.ValueString(), m.MaxRetryCount.ValueInt64()),
-		DNS:            stringListFrom(ctx, m.DNS, diags),
+		DNS:            containerParseDNS(stringListFrom(ctx, m.DNS, diags), diags),
 		DNSSearch:      stringListFrom(ctx, m.DNSSearch, diags),
 		ExtraHosts:     stringListFrom(ctx, m.ExtraHosts, diags),
 		SecurityOpt:    stringSetFrom(ctx, m.SecurityOpt, diags),
@@ -517,9 +517,11 @@ func containerBuildCreate(ctx context.Context, m containerResourceModel, diags *
 		first := m.NetworksAdvanced[0]
 		name := first.Name.ValueString()
 		hc.NetworkMode = container.NetworkMode(name)
-		netCfg = &network.NetworkingConfig{EndpointsConfig: map[string]*network.EndpointSettings{
-			name: containerEndpointSettings(stringSetFrom(ctx, first.Aliases, diags), first.IPv4Address.ValueString(), first.IPv6Address.ValueString()),
-		}}
+		es, err := containerEndpointSettings(stringSetFrom(ctx, first.Aliases, diags), first.IPv4Address.ValueString(), first.IPv6Address.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("networks_advanced"), "Invalid networks_advanced", err.Error())
+		}
+		netCfg = &network.NetworkingConfig{EndpointsConfig: map[string]*network.EndpointSettings{name: es}}
 		extra = m.NetworksAdvanced[1:]
 	}
 	return cfg, hc, netCfg, extra
@@ -538,7 +540,7 @@ func containerEnsureImage(ctx context.Context, pd *providerData, ref string) err
 	if err != nil {
 		return err
 	}
-	rc, err := pd.Client.ImagePull(ctx, ref, image.PullOptions{RegistryAuth: auth})
+	rc, err := pd.Client.ImagePull(ctx, ref, client.ImagePullOptions{RegistryAuth: auth})
 	if err != nil {
 		return err
 	}
@@ -564,10 +566,11 @@ func containerEnsureImage(ctx context.Context, pd *providerData, ref string) err
 // no healthcheck).
 func containerWait(ctx context.Context, pd *providerData, id string, timeout time.Duration) error {
 	return waitFor(ctx, timeout, containerPollInterval, func(ctx context.Context) (bool, error) {
-		insp, err := pd.Client.ContainerInspect(ctx, id)
+		inspRes, err := pd.Client.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 		if err != nil {
 			return false, err
 		}
+		insp := inspRes.Container
 		st := insp.State
 		if st == nil {
 			return false, nil
@@ -587,7 +590,7 @@ func containerWait(ctx context.Context, pd *providerData, id string, timeout tim
 
 func (r *containerResource) startAndWait(ctx context.Context, m containerResourceModel, diags *diag.Diagnostics) {
 	id := m.ID.ValueString()
-	if err := r.pd.Client.ContainerStart(ctx, id, container.StartOptions{}); err != nil {
+	if _, err := r.pd.Client.ContainerStart(ctx, id, client.ContainerStartOptions{}); err != nil {
 		diags.AddError("Cannot start container", fmt.Sprintf("%s: %v", m.Name.ValueString(), err))
 		return
 	}
@@ -627,7 +630,7 @@ func (r *containerResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.AddAttributeError(path.Root("image"), "Cannot pull image", fmt.Sprintf("%s: %v", cfg.Image, err))
 		return
 	}
-	created, err := r.pd.Client.ContainerCreate(ctx, cfg, hc, netCfg, nil, plan.Name.ValueString())
+	created, err := r.pd.Client.ContainerCreate(ctx, client.ContainerCreateOptions{Config: cfg, HostConfig: hc, NetworkingConfig: netCfg, Platform: nil, Name: plan.Name.ValueString()})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot create container", err.Error())
 		return
@@ -638,8 +641,12 @@ func (r *containerResource) Create(ctx context.Context, req resource.CreateReque
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, created.ID)...)
 
 	for _, n := range extra {
-		ep := containerEndpointSettings(stringSetFrom(ctx, n.Aliases, &resp.Diagnostics), n.IPv4Address.ValueString(), n.IPv6Address.ValueString())
-		if err := r.pd.Client.NetworkConnect(ctx, n.Name.ValueString(), created.ID, ep); err != nil {
+		ep, err := containerEndpointSettings(stringSetFrom(ctx, n.Aliases, &resp.Diagnostics), n.IPv4Address.ValueString(), n.IPv6Address.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root("networks_advanced"), "Invalid networks_advanced", err.Error())
+			return
+		}
+		if _, err := r.pd.Client.NetworkConnect(ctx, n.Name.ValueString(), client.NetworkConnectOptions{Container: created.ID, EndpointConfig: ep}); err != nil {
 			resp.Diagnostics.AddError("Cannot connect container to network", fmt.Sprintf("%s: %v", n.Name.ValueString(), err))
 			return
 		}
@@ -686,7 +693,8 @@ func (r *containerResource) Read(ctx context.Context, req resource.ReadRequest, 
 // refresh inspects the container and maps it onto prior (state on Read, plan
 // after Create/Update). found is false when the container is gone.
 func (r *containerResource) refresh(ctx context.Context, prior containerResourceModel, diags *diag.Diagnostics) (containerResourceModel, bool) {
-	insp, err := r.pd.Client.ContainerInspect(ctx, prior.ID.ValueString())
+	inspRes, err := r.pd.Client.ContainerInspect(ctx, prior.ID.ValueString(), client.ContainerInspectOptions{})
+	insp := inspRes.Container
 	if isNotFound(err) {
 		return prior, false
 	}
@@ -717,7 +725,7 @@ func containerFromInspect(insp container.InspectResponse, imgCfg *container.Conf
 		cfg = &container.Config{}
 	}
 	hc := &container.HostConfig{}
-	if insp.ContainerJSONBase != nil {
+	if insp.ID != "" {
 		out.ID = types.StringValue(insp.ID)
 		out.Name = types.StringValue(strings.TrimPrefix(insp.Name, "/"))
 		out.ImageID = types.StringValue(insp.Image)
@@ -791,7 +799,7 @@ func containerFromInspect(insp container.InspectResponse, imgCfg *container.Conf
 	out.NanoCPUs = containerInt64Read(prior.NanoCPUs, hc.NanoCPUs)
 
 	out.Hostname = containerHostnameRead(prior.Hostname, cfg.Hostname, out.ID.ValueString())
-	out.DNS = containerListRead(prior.DNS, hc.DNS, nil)
+	out.DNS = containerListRead(prior.DNS, addrStrings(hc.DNS), nil)
 	out.DNSSearch = containerListRead(prior.DNSSearch, hc.DNSSearch, nil)
 	out.ExtraHosts = containerListRead(prior.ExtraHosts, hc.ExtraHosts, nil)
 	out.Devices = containerFlattenDevices(hc.Devices, prior.Devices)
@@ -840,7 +848,7 @@ func (r *containerResource) Update(ctx context.Context, req resource.UpdateReque
 	plan.ID = state.ID
 
 	if !plan.Name.Equal(state.Name) {
-		if err := r.pd.Client.ContainerRename(ctx, id, plan.Name.ValueString()); err != nil {
+		if _, err := r.pd.Client.ContainerRename(ctx, id, client.ContainerRenameOptions{NewName: plan.Name.ValueString()}); err != nil {
 			resp.Diagnostics.AddAttributeError(path.Root("name"), "Cannot rename container", err.Error())
 			return
 		}
@@ -860,7 +868,7 @@ func (r *containerResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 		uc.CPUShares = plan.CPUShares.ValueInt64()
 		uc.NanoCPUs = plan.NanoCPUs.ValueInt64()
-		if _, err := r.pd.Client.ContainerUpdate(ctx, id, uc); err != nil {
+		if _, err := r.pd.Client.ContainerUpdate(ctx, id, client.ContainerUpdateOptions{Resources: &uc.Resources, RestartPolicy: &uc.RestartPolicy}); err != nil {
 			resp.Diagnostics.AddError("Cannot update container", err.Error())
 			return
 		}
@@ -879,11 +887,12 @@ func (r *containerResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 	}
 
-	insp, err := r.pd.Client.ContainerInspect(ctx, id)
+	inspRes, err := r.pd.Client.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect container", err.Error())
 		return
 	}
+	insp := inspRes.Container
 	if plan.MustRun.ValueBool() && (insp.State == nil || !insp.State.Running) {
 		r.startAndWait(ctx, plan, &resp.Diagnostics)
 		if resp.Diagnostics.HasError() {
@@ -913,7 +922,7 @@ func (r *containerResource) Delete(ctx context.Context, req resource.DeleteReque
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	err := r.pd.Client.ContainerRemove(ctx, state.ID.ValueString(), container.RemoveOptions{Force: true, RemoveVolumes: false})
+	_, err := r.pd.Client.ContainerRemove(ctx, state.ID.ValueString(), client.ContainerRemoveOptions{Force: true, RemoveVolumes: false})
 	if err != nil && !isNotFound(err) {
 		resp.Diagnostics.AddError("Cannot remove container", err.Error())
 	}
@@ -928,11 +937,12 @@ func (r *containerResource) ImportState(ctx context.Context, req resource.Import
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	insp, err := r.pd.Client.ContainerInspect(ctx, ref)
+	inspRes, err := r.pd.Client.ContainerInspect(ctx, ref, client.ContainerInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot find container", fmt.Sprintf("%q: %v", ref, err))
 		return
 	}
+	insp := inspRes.Container
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), insp.ID)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, insp.ID)...)
 }

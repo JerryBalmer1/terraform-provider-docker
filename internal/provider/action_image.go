@@ -3,19 +3,19 @@ package provider
 // docker_image_import, docker_image_load and docker_image_save.
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"os"
 	"strings"
 
 	"github.com/distribution/reference"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/jsonstream"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -33,8 +33,8 @@ func actIsURL(s string) bool {
 }
 
 // actStreamProgress forwards each human line of a JSON message stream.
-func actStreamProgress(ctx context.Context, resp *action.InvokeResponse) func(jsonmessage.JSONMessage) {
-	return func(m jsonmessage.JSONMessage) {
+func actStreamProgress(ctx context.Context, resp *action.InvokeResponse) func(jsonstream.Message) {
+	return func(m jsonstream.Message) {
 		line := strings.TrimRight(m.Stream, "\r\n")
 		if line == "" && m.Status != "" && m.Progress == nil {
 			line = strings.TrimSpace(m.ID + " " + m.Status)
@@ -116,7 +116,7 @@ func (a *imageImportAction) Invoke(ctx context.Context, req action.InvokeRequest
 		return
 	}
 	src := m.Source.ValueString()
-	is := image.ImportSource{SourceName: src}
+	is := client.ImageImportSource{SourceName: src}
 	if !actIsURL(src) {
 		f, err := os.Open(expandHome(src))
 		if err != nil {
@@ -124,16 +124,16 @@ func (a *imageImportAction) Invoke(ctx context.Context, req action.InvokeRequest
 			return
 		}
 		defer f.Close()
-		is = image.ImportSource{Source: f, SourceName: "-"}
+		is = client.ImageImportSource{Source: f, SourceName: "-"}
 	}
 	ref := m.Repository.ValueString()
 	tag := m.Tag.ValueString()
 	actProgress(ctx, resp, "importing %s", src)
-	rc, err := c.ImageImport(ctx, is, ref, image.ImportOptions{
+	rc, err := c.ImageImport(ctx, is, ref, client.ImageImportOptions{
 		Tag:      tag,
 		Message:  m.Message.ValueString(),
 		Changes:  changes,
-		Platform: m.Platform.ValueString(),
+		Platform: platformFromString(m.Platform.ValueString()),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("docker_image_import failed", err.Error())
@@ -141,7 +141,7 @@ func (a *imageImportAction) Invoke(ctx context.Context, req action.InvokeRequest
 	}
 	defer rc.Close()
 	id := ""
-	_, err = imgDecodeStream(rc, func(msg jsonmessage.JSONMessage) {
+	_, err = imgDecodeStream(rc, func(msg jsonstream.Message) {
 		if strings.HasPrefix(msg.Status, "sha256:") {
 			id = strings.TrimSpace(msg.Status)
 			return
@@ -209,9 +209,13 @@ func (a *imageLoadAction) Invoke(ctx context.Context, req action.InvokeRequest, 
 		resp.Diagnostics.AddError("docker_image_load failed", err.Error())
 		return
 	}
-	defer lr.Body.Close()
-	if !lr.JSON {
-		b, _ := io.ReadAll(lr.Body)
+	defer lr.Close()
+	// The v0 client no longer reports the response Content-Type; current
+	// daemons always answer with a JSON message stream, older ones with
+	// plain text. Peek at the first byte to tell them apart.
+	br := bufio.NewReader(lr)
+	if first, _ := br.Peek(1); len(first) == 0 || first[0] != '{' {
+		b, _ := io.ReadAll(br)
 		for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
 			if l != "" {
 				actProgress(ctx, resp, "%s", l)
@@ -219,7 +223,7 @@ func (a *imageLoadAction) Invoke(ctx context.Context, req action.InvokeRequest, 
 		}
 		return
 	}
-	if _, err := imgDecodeStream(lr.Body, actStreamProgress(ctx, resp)); err != nil {
+	if _, err := imgDecodeStream(br, actStreamProgress(ctx, resp)); err != nil {
 		resp.Diagnostics.AddError("docker_image_load failed", err.Error())
 	}
 }

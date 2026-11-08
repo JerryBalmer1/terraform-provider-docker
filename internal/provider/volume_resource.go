@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/docker/api/types/volume"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -13,6 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -107,7 +108,7 @@ func (r *volumeResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 	name, _ := knownString(plan.Name)
-	opts := volume.CreateOptions{
+	opts := client.VolumeCreateOptions{
 		Name:       name,
 		Driver:     plan.Driver.ValueString(),
 		DriverOpts: stringMapFrom(ctx, plan.DriverOpts, &resp.Diagnostics),
@@ -135,7 +136,7 @@ func (r *volumeResource) Create(ctx context.Context, req resource.CreateRequest,
 		resp.Diagnostics.AddError("Cannot create volume", err.Error())
 		return
 	}
-	state := volumeFromInspect(v, plan)
+	state := volumeFromInspect(v.Volume, plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
@@ -146,7 +147,8 @@ func (r *volumeResource) Read(ctx context.Context, req resource.ReadRequest, res
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	v, err := r.pd.Client.VolumeInspect(ctx, prior.ID.ValueString())
+	vRes, err := r.pd.Client.VolumeInspect(ctx, prior.ID.ValueString(), client.VolumeInspectOptions{})
+	v := vRes.Volume
 	if isNotFound(err) {
 		resp.State.RemoveResource(ctx)
 		return
@@ -177,7 +179,7 @@ func (r *volumeResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	if err := r.pd.Client.VolumeRemove(ctx, state.ID.ValueString(), false); err != nil && !isNotFound(err) {
+	if _, err := r.pd.Client.VolumeRemove(ctx, state.ID.ValueString(), client.VolumeRemoveOptions{Force: false}); err != nil && !isNotFound(err) {
 		resp.Diagnostics.AddError("Cannot remove volume", fmt.Sprintf("%s: %v (is a container still using it?)", state.ID.ValueString(), err))
 	}
 }

@@ -11,12 +11,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"sort"
-	"strconv"
-
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/list"
@@ -28,6 +22,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/moby/moby/client"
+	"reflect"
+	"sort"
+	"strconv"
 )
 
 // listIDIdentitySchema is the identity schema every listed managed resource
@@ -84,7 +82,7 @@ type listFilter struct {
 
 // listQuery is the decoded list config.
 type listQuery struct {
-	Filters filters.Args
+	Filters client.Filters
 	Strings map[string]string
 	Bools   map[string]bool
 }
@@ -143,7 +141,7 @@ func (l *dockerListResource) Configure(_ context.Context, req resource.Configure
 // query decodes the list config into Engine filters and raw values.
 func (l *dockerListResource) query(ctx context.Context, cfg tfsdk.Config) (listQuery, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	q := listQuery{Filters: filters.NewArgs(), Strings: map[string]string{}, Bools: map[string]bool{}}
+	q := listQuery{Filters: client.Filters{}, Strings: map[string]string{}, Bools: map[string]bool{}}
 	if cfg.Raw.IsNull() {
 		return q, diags
 	}
@@ -317,7 +315,7 @@ func listLabelsFilter(what, key string) listFilter {
 
 // p3AddLabelFilters adds one key=value filter per label, sorted; an empty
 // value adds the bare key (label present with any value).
-func p3AddLabelFilters(args filters.Args, key string, m map[string]string) {
+func p3AddLabelFilters(args client.Filters, key string, m map[string]string) {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)

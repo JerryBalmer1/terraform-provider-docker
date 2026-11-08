@@ -7,13 +7,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/swarm"
-	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/client"
 	"github.com/hashicorp/terraform-plugin-framework/list"
+	"github.com/moby/moby/client"
 )
 
 // NewContainerListResource lists containers as docker_container.
@@ -39,10 +34,11 @@ func NewContainerListResource() list.ListResource {
 			if v, ok := q.Bools["all"]; ok {
 				all = v
 			}
-			cs, err := c.ContainerList(ctx, container.ListOptions{All: all, Filters: q.Filters})
+			csRes, err := c.ContainerList(ctx, client.ContainerListOptions{All: all, Filters: q.Filters})
 			if err != nil {
 				return nil, err
 			}
+			cs := csRes.Items
 			out := make([]listItem, 0, len(cs))
 			for _, s := range cs {
 				name := listShortID(s.ID)
@@ -70,10 +66,11 @@ func NewImageListResource() list.ListResource {
 		},
 		newResource: NewImageResource,
 		fetch: func(ctx context.Context, c *client.Client, q listQuery) ([]listItem, error) {
-			imgs, err := c.ImageList(ctx, image.ListOptions{Filters: q.Filters})
+			imgsRes, err := c.ImageList(ctx, client.ImageListOptions{Filters: q.Filters})
 			if err != nil {
 				return nil, err
 			}
+			imgs := imgsRes.Items
 			out := make([]listItem, 0, len(imgs))
 			for _, s := range imgs {
 				it := listItem{ID: s.ID, DisplayName: listShortID(s.ID), ImportID: s.ID}
@@ -107,10 +104,11 @@ func NewNetworkListResource() list.ListResource {
 		},
 		newResource: NewNetworkResource,
 		fetch: func(ctx context.Context, c *client.Client, q listQuery) ([]listItem, error) {
-			ns, err := c.NetworkList(ctx, network.ListOptions{Filters: q.Filters})
+			nsRes, err := c.NetworkList(ctx, client.NetworkListOptions{Filters: q.Filters})
 			if err != nil {
 				return nil, err
 			}
+			ns := nsRes.Items
 			out := make([]listItem, 0, len(ns))
 			for _, n := range ns {
 				out = append(out, listItem{ID: n.ID, DisplayName: n.Name, ImportID: n.ID})
@@ -134,15 +132,13 @@ func NewVolumeListResource() list.ListResource {
 		},
 		newResource: NewVolumeResource,
 		fetch: func(ctx context.Context, c *client.Client, q listQuery) ([]listItem, error) {
-			vs, err := c.VolumeList(ctx, volume.ListOptions{Filters: q.Filters})
+			vsRes, err := c.VolumeList(ctx, client.VolumeListOptions{Filters: q.Filters})
 			if err != nil {
 				return nil, err
 			}
-			out := make([]listItem, 0, len(vs.Volumes))
-			for _, v := range vs.Volumes {
-				if v == nil {
-					continue
-				}
+			vs := vsRes.Items
+			out := make([]listItem, 0, len(vs))
+			for _, v := range vs {
 				out = append(out, listItem{ID: v.Name, DisplayName: v.Name, ImportID: v.Name})
 			}
 			return out, nil
@@ -165,10 +161,11 @@ func NewSwarmNodeListResource() list.ListResource {
 		},
 		newResource: NewSwarmNodeResource,
 		fetch: func(ctx context.Context, c *client.Client, q listQuery) ([]listItem, error) {
-			ns, err := c.NodeList(ctx, swarm.NodeListOptions{Filters: q.Filters})
+			nsRes, err := c.NodeList(ctx, client.NodeListOptions{Filters: q.Filters})
 			if err != nil {
 				return nil, err
 			}
+			ns := nsRes.Items
 			out := make([]listItem, 0, len(ns))
 			for _, n := range ns {
 				name := n.Description.Hostname
@@ -196,10 +193,11 @@ func NewServiceListResource() list.ListResource {
 		},
 		newResource: NewServiceResource,
 		fetch: func(ctx context.Context, c *client.Client, q listQuery) ([]listItem, error) {
-			ss, err := c.ServiceList(ctx, swarm.ServiceListOptions{Filters: q.Filters})
+			ssRes, err := c.ServiceList(ctx, client.ServiceListOptions{Filters: q.Filters})
 			if err != nil {
 				return nil, err
 			}
+			ss := ssRes.Items
 			out := make([]listItem, 0, len(ss))
 			for _, s := range ss {
 				out = append(out, listItem{ID: s.ID, DisplayName: s.Spec.Name, ImportID: s.ID})
@@ -221,10 +219,11 @@ func NewSecretListResource() list.ListResource {
 		},
 		newResource: NewSecretResource,
 		fetch: func(ctx context.Context, c *client.Client, q listQuery) ([]listItem, error) {
-			ss, err := c.SecretList(ctx, swarm.SecretListOptions{Filters: q.Filters})
+			ssRes, err := c.SecretList(ctx, client.SecretListOptions{Filters: q.Filters})
 			if err != nil {
 				return nil, err
 			}
+			ss := ssRes.Items
 			out := make([]listItem, 0, len(ss))
 			for _, s := range ss {
 				out = append(out, listItem{ID: s.ID, DisplayName: s.Spec.Name, ImportID: s.ID})
@@ -246,10 +245,11 @@ func NewConfigListResource() list.ListResource {
 		},
 		newResource: NewDockerConfigResource,
 		fetch: func(ctx context.Context, c *client.Client, q listQuery) ([]listItem, error) {
-			cs, err := c.ConfigList(ctx, swarm.ConfigListOptions{Filters: q.Filters})
+			csRes, err := c.ConfigList(ctx, client.ConfigListOptions{Filters: q.Filters})
 			if err != nil {
 				return nil, err
 			}
+			cs := csRes.Items
 			out := make([]listItem, 0, len(cs))
 			for _, s := range cs {
 				out = append(out, listItem{ID: s.ID, DisplayName: s.Spec.Name, ImportID: s.ID})

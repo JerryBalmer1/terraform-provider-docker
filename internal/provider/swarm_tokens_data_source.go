@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -50,11 +51,12 @@ func (d *swarmTokensDataSource) Read(ctx context.Context, _ datasource.ReadReque
 	if d.pd == nil {
 		return
 	}
-	sw, err := d.pd.Client.SwarmInspect(ctx)
+	swRes, err := d.pd.Client.SwarmInspect(ctx, client.SwarmInspectOptions{})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot inspect swarm", "The provider's Docker host must be a swarm manager: "+err.Error())
 		return
 	}
+	sw := swRes.Swarm
 	m := swarmTokensModel{
 		ID:      types.StringValue(sw.ID),
 		Worker:  types.StringValue(sw.JoinTokens.Worker),

@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/docker/docker/api/types/build"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -40,17 +39,17 @@ func (t *actPruneTotals) String() string {
 	return fmt.Sprintf("removed %s; reclaimed %s", strings.Join(t.parts, ", "), actHumanSize(t.reclaimed))
 }
 
-// actPruneImages runs ImagesPrune with the dangling switch and filters.
+// actPruneImages runs ImagePrune with the dangling switch and filters.
 func actPruneImages(ctx context.Context, a *actBase, dangling bool, f map[string]string) (int, uint64, error) {
 	args := actPruneFilters(f, "label", "label!", "until")
 	if !dangling {
 		args.Add("dangling", "false")
 	}
-	rep, err := a.pd.Client.ImagesPrune(ctx, args)
+	res, err := a.pd.Client.ImagePrune(ctx, client.ImagePruneOptions{Filters: args})
 	if err != nil {
 		return 0, 0, err
 	}
-	return len(rep.ImagesDeleted), rep.SpaceReclaimed, nil
+	return len(res.Report.ImagesDeleted), res.Report.SpaceReclaimed, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -123,29 +122,32 @@ func (a *systemPruneAction) Invoke(ctx context.Context, req action.InvokeRequest
 		resp.Diagnostics.AddError("docker_system_prune failed", fmt.Sprintf("pruning %s: %v (so far: %s)", what, err, tot.String()))
 	}
 	if actBool(m.Containers, true) {
-		rep, err := c.ContainersPrune(ctx, actPruneFilters(f, "label", "label!", "until"))
+		res, err := c.ContainerPrune(ctx, client.ContainerPruneOptions{Filters: actPruneFilters(f, "label", "label!", "until")})
 		if err != nil {
 			fail("containers", err)
 			return
 		}
+		rep := res.Report
 		tot.add("containers", len(rep.ContainersDeleted), rep.SpaceReclaimed)
 		actProgress(ctx, resp, "pruned %d containers (%s)", len(rep.ContainersDeleted), actHumanSize(rep.SpaceReclaimed))
 	}
 	if actBool(m.Networks, true) {
-		rep, err := c.NetworksPrune(ctx, actPruneFilters(f, "label", "label!", "until"))
+		res, err := c.NetworkPrune(ctx, client.NetworkPruneOptions{Filters: actPruneFilters(f, "label", "label!", "until")})
 		if err != nil {
 			fail("networks", err)
 			return
 		}
+		rep := res.Report
 		tot.add("networks", len(rep.NetworksDeleted), 0)
 		actProgress(ctx, resp, "pruned %d networks", len(rep.NetworksDeleted))
 	}
 	if actBool(m.Volumes, false) {
-		rep, err := c.VolumesPrune(ctx, actPruneFilters(f, "label", "label!"))
+		res, err := c.VolumePrune(ctx, client.VolumePruneOptions{Filters: actPruneFilters(f, "label", "label!")})
 		if err != nil {
 			fail("volumes", err)
 			return
 		}
+		rep := res.Report
 		tot.add("volumes", len(rep.VolumesDeleted), rep.SpaceReclaimed)
 		actProgress(ctx, resp, "pruned %d volumes (%s)", len(rep.VolumesDeleted), actHumanSize(rep.SpaceReclaimed))
 	}
@@ -160,15 +162,16 @@ func (a *systemPruneAction) Invoke(ctx context.Context, req action.InvokeRequest
 		actProgress(ctx, resp, "pruned %d images (%s)", n, actHumanSize(sz))
 	}
 	if actBool(m.BuildCache, true) {
-		args := filters.NewArgs()
+		args := client.Filters{}
 		if v, ok := f["until"]; ok {
 			args.Add("until", v)
 		}
-		rep, err := c.BuildCachePrune(ctx, build.CachePruneOptions{All: all, Filters: args})
+		res, err := c.BuildCachePrune(ctx, client.BuildCachePruneOptions{All: all, Filters: args})
 		if err != nil {
 			fail("build cache", err)
 			return
 		}
+		rep := res.Report
 		tot.add("build cache entries", len(rep.CachesDeleted), rep.SpaceReclaimed)
 		actProgress(ctx, resp, "pruned %d build cache entries (%s)", len(rep.CachesDeleted), actHumanSize(rep.SpaceReclaimed))
 	}

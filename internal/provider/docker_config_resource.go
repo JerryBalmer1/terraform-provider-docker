@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 
-	"github.com/docker/docker/api/types/swarm"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -14,6 +13,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
 )
 
 var (
@@ -111,7 +112,7 @@ func (r *dockerConfigResource) Create(ctx context.Context, req resource.CreateRe
 		},
 		Data: data,
 	}
-	out, err := r.pd.Client.ConfigCreate(ctx, spec)
+	out, err := r.pd.Client.ConfigCreate(ctx, client.ConfigCreateOptions{Spec: spec})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot create config", err.Error())
 		return
@@ -125,7 +126,7 @@ func (r *dockerConfigResource) Create(ctx context.Context, req resource.CreateRe
 }
 
 func (r *dockerConfigResource) read(ctx context.Context, m *dockerConfigResourceModel, diags *diag.Diagnostics, gone *bool) {
-	s, _, err := r.pd.Client.ConfigInspectWithRaw(ctx, m.ID.ValueString())
+	sRes, err := r.pd.Client.ConfigInspect(ctx, m.ID.ValueString(), client.ConfigInspectOptions{})
 	if err != nil {
 		if isNotFound(err) && gone != nil {
 			*gone = true
@@ -134,6 +135,7 @@ func (r *dockerConfigResource) read(ctx context.Context, m *dockerConfigResource
 		diags.AddError("Cannot read config", err.Error())
 		return
 	}
+	s := sRes.Config
 	m.ID = types.StringValue(s.ID)
 	m.Name = types.StringValue(s.Spec.Name)
 	m.Labels = svcMapValue(m.Labels, userLabels(s.Spec.Labels, false))

@@ -29,13 +29,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/docker/docker/api/types/build"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/moby/moby/api/types/build"
+	"github.com/moby/moby/api/types/jsonstream"
+	"github.com/moby/moby/client"
 )
 
 const (
@@ -117,11 +117,11 @@ func imgValidateBuildKit(ctx context.Context, b *imageBuildModel) diag.Diagnosti
 }
 
 // imgApplyBuildKitOptions turns classic build options into BuildKit ones.
-func imgApplyBuildKitOptions(ctx context.Context, b *imageBuildModel, opts *build.ImageBuildOptions, diags *diag.Diagnostics) {
+func imgApplyBuildKitOptions(ctx context.Context, b *imageBuildModel, opts *client.ImageBuildOptions, diags *diag.Diagnostics) {
 	opts.Version = build.BuilderBuildKit
 	opts.CacheFrom = stringListFrom(ctx, b.CacheFrom, diags)
 	if ps := stringListFrom(ctx, b.Platforms, diags); len(ps) == 1 {
-		opts.Platform = ps[0]
+		opts.Platforms = platformsFromString(ps[0])
 	} else if len(ps) > 1 {
 		diags.AddAttributeError(path.Root("build").AtName("platforms"), "Multi-platform build not supported",
 			"The Engine API /build endpoint accepts a single platform.")
@@ -246,7 +246,7 @@ func imgStartBuildKitSession(ctx context.Context, d imgSessionDialer, sharedKey 
 
 // imgBuildKitBuild runs a BuildKit build of bc with opts (classic options
 // already filled in) and returns the built image ID.
-func imgBuildKitBuild(ctx context.Context, c *client.Client, creds []registryCredential, b *imageBuildModel, bc *imgBuildContext, opts build.ImageBuildOptions) (string, diag.Diagnostics) {
+func imgBuildKitBuild(ctx context.Context, c *client.Client, creds []registryCredential, b *imageBuildModel, bc *imgBuildContext, opts client.ImageBuildOptions) (string, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	imgApplyBuildKitOptions(ctx, b, &opts, &diags)
 	if diags.HasError() {
@@ -273,7 +273,7 @@ func imgBuildKitBuild(ctx context.Context, c *client.Client, creds []registryCre
 	}()
 	opts.SessionID = s.ID()
 
-	tflog.Info(ctx, "building image with BuildKit", map[string]any{"session": s.ID(), "cache_from": opts.CacheFrom, "platform": opts.Platform, "secrets": len(b.Secrets)})
+	tflog.Info(ctx, "building image with BuildKit", map[string]any{"session": s.ID(), "cache_from": opts.CacheFrom, "platform": platformsString(opts.Platforms), "secrets": len(b.Secrets)})
 	tarStream := imgTarReader(bc)
 	defer tarStream.Close()
 	res, err := c.ImageBuild(buildCtx, tarStream, opts)
@@ -312,7 +312,7 @@ type imgBuildKitTrace struct {
 }
 
 // handle processes one stream message; non-BuildKit messages are ignored.
-func (t *imgBuildKitTrace) handle(m jsonmessage.JSONMessage) {
+func (t *imgBuildKitTrace) handle(m jsonstream.Message) {
 	if m.Aux == nil {
 		return
 	}
@@ -401,9 +401,9 @@ func imgParseBuildKitTrace(raw json.RawMessage) (*controlapi.StatusResponse, err
 // imgDecodeBuildKitStream drains a BuildKit build stream. It returns the
 // image ID (moby.image.id aux, else a classic {"ID"} aux). A stream error is
 // returned with the failed vertices and last step output attached.
-func imgDecodeBuildKitStream(r io.Reader, onMsg func(jsonmessage.JSONMessage), onLine func(string)) (string, error) {
+func imgDecodeBuildKitStream(r io.Reader, onMsg func(jsonstream.Message), onLine func(string)) (string, error) {
 	tr := &imgBuildKitTrace{onLine: onLine}
-	res, err := imgDecodeStream(r, func(m jsonmessage.JSONMessage) {
+	res, err := imgDecodeStream(r, func(m jsonstream.Message) {
 		tr.handle(m)
 		if onMsg != nil {
 			onMsg(m)

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/docker/api/types/image"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/image"
 )
 
 var (
@@ -77,7 +77,7 @@ func (d *imageDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		resp.Diagnostics.AddError("Cannot inspect image", fmt.Sprintf("%s: %v", m.Name.ValueString(), err))
 		return
 	}
-	imgDataSourceApply(&m, insp)
+	imgDataSourceApply(&m, insp.InspectResponse)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
 
