@@ -16,7 +16,6 @@
   "naming_questions": [
     "docker_compose exposes the project name as `id` and `project_name`; the contract's identity name is `name`. Add a `name` alias, rename project_name to name (breaking), or keep project_name?",
     "Facets of docker_compose: one `project` attribute (whole project) as proposed, or per-slice attributes (`project_services`, `project_networks`, ...) that do not clash with today's computed `services`/`networks`/`volumes` ID maps?",
-    "docker_compose_logs raw output: `logs_json` (JSON array of entries, as proposed) or a plain-text `logs` / `output` string like `docker compose logs` prints?",
     "Action results: `result` object {exit_code, stdout, stderr} (as proposed for docker_compose_exec / _run) or flat `exit_code` / `stdout` / `stderr` like docker_exec_output?"
   ],
   "allowed_violations": [],
@@ -62,7 +61,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The whole normalized project, mirroring the compose-spec top-level schema: `project.services[\"web\"].ports`, `project.networks`, ...",
           "fields": [
             {
@@ -822,7 +821,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -854,7 +852,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -1434,7 +1433,8 @@
                   "name": "driver_opts",
                   "upstream": "driver_opts",
                   "tf_type": "map(string)",
-                  "pointer": "#/$defs/volume/properties/driver_opts"
+                  "pointer": "#/$defs/volume/properties/driver_opts",
+                  "sensitive": true
                 },
                 {
                   "name": "external",
@@ -1505,8 +1505,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/secret/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             },
             {
               "name": "configs",
@@ -1558,8 +1557,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/config/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             },
             {
               "name": "jobs",
@@ -2279,7 +2277,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -2311,7 +2308,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -2618,7 +2616,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.services` slice of the shared `project` attribute (full project on compose:name). Every service property, build/deploy/healthcheck/ports/volumes one level deeper.",
           "fields": [
             {
@@ -3338,7 +3336,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -3370,7 +3367,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -3907,7 +3905,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.networks` slice of the shared `project` attribute (full project on compose:name). ",
           "fields": [
             {
@@ -4084,7 +4082,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.volumes` slice of the shared `project` attribute (full project on compose:name). ",
           "fields": [
             {
@@ -4109,7 +4107,8 @@
                   "name": "driver_opts",
                   "upstream": "driver_opts",
                   "tf_type": "map(string)",
-                  "pointer": "#/$defs/volume/properties/driver_opts"
+                  "pointer": "#/$defs/volume/properties/driver_opts",
+                  "sensitive": true
                 },
                 {
                   "name": "external",
@@ -4198,8 +4197,8 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "The `project.configs` slice of the shared `project` attribute (full project on compose:name). Sensitive: inline `content` and environment-sourced values.",
+          "sensitive": false,
+          "description": "The `project.configs` slice of the shared `project` attribute (full project on compose:name). Field-level sensitive: inline `content` and environment-sourced values.",
           "fields": [
             {
               "name": "configs",
@@ -4251,8 +4250,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/config/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             }
           ],
           "fields_complete": false,
@@ -4325,8 +4323,8 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "The `project.secrets` slice of the shared `project` attribute (full project on compose:name). Sensitive: file/environment sources resolve to secret values.",
+          "sensitive": false,
+          "description": "The `project.secrets` slice of the shared `project` attribute (full project on compose:name). Field-level sensitive: environment-sourced values.",
           "fields": [
             {
               "name": "secrets",
@@ -4383,8 +4381,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/secret/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             }
           ],
           "fields_complete": false,
@@ -4457,7 +4454,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.models` slice of the shared `project` attribute (full project on compose:name). ",
           "fields": [
             {
@@ -4550,7 +4547,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.jobs` slice of the shared `project` attribute (full project on compose:name). Follows compose-spec (jobs.*.extends is spec-only).",
           "fields": [
             {
@@ -5271,7 +5268,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -5303,7 +5299,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -5556,7 +5553,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.include` slice of the shared `project` attribute (full project on compose:name). ",
           "fields": [
             {
@@ -5644,8 +5641,8 @@
             "pointer": "#/$defs/workload_spec/properties/build"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "The service's normalized `build` section (short form becomes {context}). Sensitive: args, secrets, ssh.",
+          "sensitive": false,
+          "description": "The service's normalized `build` section (short form becomes {context}). Field-level sensitive: args, secrets, ssh, dockerfile_inline.",
           "fields": [
             {
               "name": "context",
@@ -5781,7 +5778,6 @@
               "upstream": "secrets",
               "tf_type": "list(object({...}))",
               "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-              "sensitive": true,
               "fields": [
                 {
                   "name": "source",
@@ -5813,7 +5809,8 @@
                   "tf_type": "number",
                   "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                 }
-              ]
+              ],
+              "sensitive": true
             },
             {
               "name": "tags",
@@ -6272,7 +6269,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The whole normalized project (same shape as `project` on docker_compose).",
           "fields": [
             {
@@ -7032,7 +7029,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -7064,7 +7060,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -7644,7 +7641,8 @@
                   "name": "driver_opts",
                   "upstream": "driver_opts",
                   "tf_type": "map(string)",
-                  "pointer": "#/$defs/volume/properties/driver_opts"
+                  "pointer": "#/$defs/volume/properties/driver_opts",
+                  "sensitive": true
                 },
                 {
                   "name": "external",
@@ -7715,8 +7713,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/secret/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             },
             {
               "name": "configs",
@@ -7768,8 +7765,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/config/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             },
             {
               "name": "jobs",
@@ -8489,7 +8485,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -8521,7 +8516,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -8813,7 +8809,7 @@
             "pointer": "#/definitions/ContainerSummary"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The project's containers, ContainerSummary fields plus service/number from the compose labels.",
           "fields": [
             {
@@ -8862,8 +8858,7 @@
               "name": "command",
               "upstream": "Command",
               "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Command",
-              "sensitive": true
+              "pointer": "#/definitions/ContainerSummary/properties/Command"
             },
             {
               "name": "created",
@@ -9211,6 +9206,19 @@
     "compose:cli-logs": {
       "outputs": [
         {
+          "name": "logs",
+          "tf_type": "string",
+          "category": "raw",
+          "source": {
+            "type": "derived",
+            "from": "entries",
+            "how": "one line per entry, as `docker compose logs` prints it without color: \"<container_name>  | <line>\", joined with \n"
+          },
+          "known_after_apply": true,
+          "sensitive": true,
+          "description": "The log lines as plain text, prefixed with the container name like `docker compose logs`. Sensitive: application output can print secrets."
+        },
+        {
           "name": "logs_json",
           "tf_type": "string",
           "category": "raw",
@@ -9225,18 +9233,32 @@
           "serializes": "entries"
         },
         {
-          "name": "content_sha256",
+          "name": "logs_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "logs",
+            "how": "hex sha256 of the UTF-8 bytes of logs"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "hash_of": "logs",
+          "description": "sha256 of logs."
+        },
+        {
+          "name": "logs_json_sha256",
           "tf_type": "string",
           "category": "hash",
           "source": {
             "type": "derived",
             "from": "logs_json",
-            "how": "sha256 of the UTF-8 bytes"
+            "how": "hex sha256 of the UTF-8 bytes of logs_json"
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "Hex SHA-256 of `logs_json`.",
-          "hash_of": "logs_json"
+          "hash_of": "logs_json",
+          "description": "sha256 of logs_json."
         },
         {
           "name": "entries",
@@ -9248,7 +9270,7 @@
             "pointer": "#/paths/~1containers~1{id}~1logs/get"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Log lines of the selected service containers, in time order.",
           "fields": [
             {
@@ -9596,7 +9618,7 @@
             "pointer": "#/definitions/ContainerTopResponse"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Container name -> ps titles and rows.",
           "fields": [
             {
@@ -10197,15 +10219,15 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
             "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema"
           },
           "known_after_apply": true,
-          "sensitive": true,
-          "description": "Exit code and captured output of the command. Sensitive: output can print secrets.",
+          "sensitive": false,
+          "description": "Exit code and captured output of the command. Field-level sensitive: stdout and stderr (output can print secrets); exit_code stays plain.",
           "fields": [
             {
               "name": "exit_code",
@@ -10934,15 +10956,15 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
             "pointer": "#/definitions/ContainerWaitResponse"
           },
           "known_after_apply": true,
-          "sensitive": true,
-          "description": "Exit code (ContainerWaitResponse.StatusCode) and captured output. Sensitive: output can print secrets.",
+          "sensitive": false,
+          "description": "Exit code (ContainerWaitResponse.StatusCode) and captured output. Field-level sensitive: stdout and stderr (output can print secrets); exit_code stays plain.",
           "fields": [
             {
               "name": "exit_code",
@@ -11203,7 +11225,7 @@
         {
           "name": "results",
           "tf_type": "map(object({...}))",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",

@@ -22,8 +22,6 @@
     "cli-only:stack `stack` follows compose-spec #/$defs/service (allOf service + container_spec + workload_spec, 94 top-level keys); nested compose objects (deploy, build, healthcheck, networks, ...) are dynamic under the mechanical rule."
   ],
   "naming_questions": [
-    "buildkit_version (builder) is a version but not one of the six V3 names: keep it as category identity (current), or add `buildkit_version` to the V3 version-name list?",
-    "cli-only items (stack, manifest list) mirror docker CLI v29.5.3 semantics: add a `docker_cli_version` version name (pin docker_cli), or keep using engine_api_version/buildx_version only (current)?",
     "docker_stack data source structured output: `services` + `tasks` (current) or split tasks into docker_tasks only and drop `tasks` here?",
     "stack ls Services count: `services` in docker_stacks (upstream name) while docker_stack.stack.services is the compose service map; rename the docker_stacks field to `services_count`, or keep upstream `services`?"
   ],
@@ -71,7 +69,7 @@
             "file": "upstream/buildx/docs/reference/buildx_inspect.md"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The builder object field by field (name, driver, last activity, nodes with endpoint, status, BuildKit version, platforms, labels, GC policy).",
           "fields": [
             {
@@ -124,7 +122,8 @@
                   "upstream": "Driver Options",
                   "tf_type": "map(string)",
                   "label": "Driver Options",
-                  "file": "upstream/buildx/docs/reference/buildx_inspect.md"
+                  "file": "upstream/buildx/docs/reference/buildx_inspect.md",
+                  "sensitive": true
                 },
                 {
                   "name": "status",
@@ -294,7 +293,7 @@
         {
           "name": "buildkit_version",
           "tf_type": "string",
-          "category": "identity",
+          "category": "version",
           "source": {
             "type": "cli",
             "command": "docker buildx ls",
@@ -405,7 +404,7 @@
             "file": "upstream/buildx/docs/reference/buildx_inspect.md"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The builder object field by field (name, driver, last activity, nodes with endpoint, status, BuildKit version, platforms, labels, GC policy).",
           "fields": [
             {
@@ -458,7 +457,8 @@
                   "upstream": "Driver Options",
                   "tf_type": "map(string)",
                   "label": "Driver Options",
-                  "file": "upstream/buildx/docs/reference/buildx_inspect.md"
+                  "file": "upstream/buildx/docs/reference/buildx_inspect.md",
+                  "sensitive": true
                 },
                 {
                   "name": "status",
@@ -628,7 +628,7 @@
         {
           "name": "buildkit_version",
           "tf_type": "string",
-          "category": "identity",
+          "category": "version",
           "source": {
             "type": "cli",
             "command": "docker buildx ls",
@@ -739,7 +739,7 @@
             "format_field": "{{.Builder}}"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "One entry per builder, same shape as the docker_buildx_builder data source `builder` output.",
           "fields": [
             {
@@ -792,7 +792,8 @@
                   "upstream": "Driver Options",
                   "tf_type": "map(string)",
                   "label": "Driver Options",
-                  "file": "upstream/buildx/docs/reference/buildx_inspect.md"
+                  "file": "upstream/buildx/docs/reference/buildx_inspect.md",
+                  "sensitive": true
                 },
                 {
                   "name": "status",
@@ -1336,7 +1337,7 @@
             "format_field": "json"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The build record field by field.",
           "fields": [
             {
@@ -1358,7 +1359,8 @@
               "upstream": "Context",
               "tf_type": "string",
               "format_field": "{{.Context}}",
-              "file": "upstream/buildx/docs/reference/buildx_history_inspect.md"
+              "file": "upstream/buildx/docs/reference/buildx_history_inspect.md",
+              "sensitive": true
             },
             {
               "name": "dockerfile",
@@ -1372,7 +1374,8 @@
               "upstream": "VCSRepository",
               "tf_type": "string",
               "format_field": "{{.VCSRepository}}",
-              "file": "upstream/buildx/docs/reference/buildx_history_inspect.md"
+              "file": "upstream/buildx/docs/reference/buildx_history_inspect.md",
+              "sensitive": true
             },
             {
               "name": "vcs_revision",
@@ -1464,7 +1467,8 @@
                   "upstream": "ImageResolveMode",
                   "tf_type": "string"
                 }
-              ]
+              ],
+              "sensitive": true
             },
             {
               "name": "materials",
@@ -1476,7 +1480,8 @@
                 {
                   "name": "uri",
                   "upstream": "URI",
-                  "tf_type": "string"
+                  "tf_type": "string",
+                  "sensitive": true
                 },
                 {
                   "name": "digests",
@@ -1948,7 +1953,7 @@
             "format_field": "{{json .Image}}"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The image config field by field (for an index: one entry per platform, keyed os/arch[/variant]).",
           "fields": [
             {
@@ -1978,7 +1983,8 @@
               "tf_type": "dynamic",
               "format_field": "{{json .Image}}",
               "file": "upstream/buildx/docs/reference/buildx_imagetools_inspect.md",
-              "note": "container config (Env, Cmd, ...); upstream keys kept as-is under the mechanical rule"
+              "note": "container config (Env, Cmd, ...); upstream keys kept as-is under the mechanical rule",
+              "sensitive": true
             },
             {
               "name": "rootfs",
@@ -2014,7 +2020,8 @@
                 {
                   "name": "created_by",
                   "upstream": "created_by",
-                  "tf_type": "string"
+                  "tf_type": "string",
+                  "sensitive": true
                 },
                 {
                   "name": "empty_layer",
@@ -2469,7 +2476,7 @@
             "format_field": "{{json .Image}}"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The image config field by field (for an index: one entry per platform, keyed os/arch[/variant]).",
           "fields": [
             {
@@ -2499,7 +2506,8 @@
               "tf_type": "dynamic",
               "format_field": "{{json .Image}}",
               "file": "upstream/buildx/docs/reference/buildx_imagetools_inspect.md",
-              "note": "container config (Env, Cmd, ...); upstream keys kept as-is under the mechanical rule"
+              "note": "container config (Env, Cmd, ...); upstream keys kept as-is under the mechanical rule",
+              "sensitive": true
             },
             {
               "name": "rootfs",
@@ -2535,7 +2543,8 @@
                 {
                   "name": "created_by",
                   "upstream": "created_by",
-                  "tf_type": "string"
+                  "tf_type": "string",
+                  "sensitive": true
                 },
                 {
                   "name": "empty_layer",
@@ -2637,6 +2646,18 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx."
+        },
+        {
+          "name": "docker_cli_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "sources_md",
+            "pin": "docker_cli"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "partial",
@@ -2879,6 +2900,18 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx."
+        },
+        {
+          "name": "docker_cli_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "sources_md",
+            "pin": "docker_cli"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "missing",
@@ -2975,7 +3008,7 @@
         {
           "name": "bake",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "cli",
             "command": "docker buildx bake",
@@ -2983,7 +3016,7 @@
             "label": "--print"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The resolved definition field by field: groups and targets with every target attribute.",
           "fields": [
             {
@@ -3012,7 +3045,8 @@
                   "upstream": "args",
                   "tf_type": "map(string)",
                   "anchor": "#targetargs",
-                  "file": "upstream/buildx/docs/bake-reference.md"
+                  "file": "upstream/buildx/docs/bake-reference.md",
+                  "sensitive": true
                 },
                 {
                   "name": "annotations",
@@ -3075,7 +3109,8 @@
                   "upstream": "dockerfile-inline",
                   "tf_type": "string",
                   "anchor": "#targetdockerfileinline",
-                  "file": "upstream/buildx/docs/bake-reference.md"
+                  "file": "upstream/buildx/docs/bake-reference.md",
+                  "sensitive": true
                 },
                 {
                   "name": "dockerfile",
@@ -3212,7 +3247,8 @@
                   "tf_type": "list(dynamic)",
                   "note": "string or {type,id,src/env} entries; ids and sources only, never secret values",
                   "anchor": "#targetsecret",
-                  "file": "upstream/buildx/docs/bake-reference.md"
+                  "file": "upstream/buildx/docs/bake-reference.md",
+                  "sensitive": true
                 },
                 {
                   "name": "shm_size",
@@ -3227,7 +3263,8 @@
                   "upstream": "ssh",
                   "tf_type": "list(dynamic)",
                   "anchor": "#targetssh",
-                  "file": "upstream/buildx/docs/bake-reference.md"
+                  "file": "upstream/buildx/docs/bake-reference.md",
+                  "sensitive": true
                 },
                 {
                   "name": "tags",
@@ -3258,7 +3295,7 @@
         {
           "name": "metadata",
           "tf_type": "map(object({...}))",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "cli",
             "command": "docker buildx bake",
@@ -3266,7 +3303,7 @@
             "label": "--metadata-file"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Target name -> build result.",
           "fields": [
             {
@@ -3274,7 +3311,8 @@
               "upstream": "buildx.build.provenance",
               "tf_type": "dynamic",
               "file": "upstream/buildx/docs/reference/buildx_bake.md",
-              "anchor": "#metadata-file"
+              "anchor": "#metadata-file",
+              "sensitive": true
             },
             {
               "name": "buildx_build_ref",
@@ -3517,7 +3555,7 @@
             "label": "--metadata-file"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The build result field by field (dotted metadata keys become snake_case).",
           "fields": [
             {
@@ -3525,7 +3563,8 @@
               "upstream": "buildx.build.provenance",
               "tf_type": "dynamic",
               "file": "upstream/buildx/docs/reference/buildx_bake.md",
-              "anchor": "#metadata-file"
+              "anchor": "#metadata-file",
+              "sensitive": true
             },
             {
               "name": "buildx_build_ref",
@@ -3778,7 +3817,7 @@
         {
           "name": "status",
           "tf_type": "string",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "cli",
             "command": "docker buildx ls",
@@ -3832,7 +3871,7 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -3941,7 +3980,7 @@
             "pointer": "#/$defs/service"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The stack as a compose-spec document field by field: `services` is a map of service name -> compose-spec service (all top-level service keys recorded).",
           "fields": [
             {
@@ -4196,7 +4235,8 @@
                   "name": "env_file",
                   "upstream": "env_file",
                   "tf_type": "list(dynamic)",
-                  "pointer": "#/$defs/container_spec/properties/env_file"
+                  "pointer": "#/$defs/container_spec/properties/env_file",
+                  "sensitive": true
                 },
                 {
                   "name": "label_file",
@@ -4209,7 +4249,8 @@
                   "upstream": "environment",
                   "tf_type": "map(string)",
                   "pointer": "#/$defs/container_spec/properties/environment",
-                  "note": "sensitive: values"
+                  "note": "sensitive: values",
+                  "sensitive": true
                 },
                 {
                   "name": "extra_hosts",
@@ -4395,7 +4436,8 @@
                   "name": "secrets",
                   "upstream": "secrets",
                   "tf_type": "list(dynamic)",
-                  "pointer": "#/$defs/container_spec/properties/secrets"
+                  "pointer": "#/$defs/container_spec/properties/secrets",
+                  "sensitive": true
                 },
                 {
                   "name": "sysctls",
@@ -4560,7 +4602,7 @@
         {
           "name": "service_status",
           "tf_type": "list(object({...}))",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "cli",
             "command": "docker stack services",
@@ -4568,7 +4610,7 @@
             "format_field": "json"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Runtime view per service (the `stack services` row: id, mode, replicas, image, ports) plus its ServiceSpec.",
           "fields": [
             {
@@ -4635,7 +4677,8 @@
               "upstream": "Spec",
               "tf_type": "dynamic",
               "pointer": "#/definitions/ServiceSpec",
-              "note": "full ServiceSpec, mechanical snake_case below"
+              "note": "full ServiceSpec, mechanical snake_case below",
+              "sensitive": true
             }
           ],
           "fields_complete": false,
@@ -4789,6 +4832,18 @@
           "known_after_apply": true,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
+        },
+        {
+          "name": "docker_cli_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "sources_md",
+            "pin": "docker_cli"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "partial",
@@ -4836,7 +4891,7 @@
             "format_field": "json"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "One entry per service: the `stack services` row plus the full spec.",
           "fields": [
             {
@@ -4903,7 +4958,8 @@
               "upstream": "Spec",
               "tf_type": "dynamic",
               "pointer": "#/definitions/ServiceSpec",
-              "note": "full ServiceSpec, mechanical snake_case below"
+              "note": "full ServiceSpec, mechanical snake_case below",
+              "sensitive": true
             }
           ],
           "fields_complete": false
@@ -5047,6 +5103,18 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
+        },
+        {
+          "name": "docker_cli_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "sources_md",
+            "pin": "docker_cli"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "missing",
@@ -5168,6 +5236,18 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
+        },
+        {
+          "name": "docker_cli_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "sources_md",
+            "pin": "docker_cli"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "missing"

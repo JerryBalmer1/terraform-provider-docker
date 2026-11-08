@@ -104,7 +104,7 @@
       "pointer": "#/definitions/ContainerInspectResponse"
      },
      "known_after_apply": true,
-     "sensitive": true,
+     "sensitive": false,
      "description": "The GET /containers/{id}/json response as a nested object, field by field.",
      "fields": [
       {
@@ -945,7 +945,8 @@
          "name": "env",
          "upstream": "Env",
          "tf_type": "list(string)",
-         "pointer": "#/definitions/ContainerConfig/properties/Env"
+         "pointer": "#/definitions/ContainerConfig/properties/Env",
+         "sensitive": true
         },
         {
          "name": "cmd",
@@ -1188,7 +1189,7 @@
       "pointer": "#/definitions/ContainerInspectResponse"
      },
      "known_after_apply": false,
-     "sensitive": true,
+     "sensitive": false,
      "description": "The GET /containers/{id}/json response as a nested object, field by field.",
      "fields": [
       {
@@ -2029,7 +2030,8 @@
          "name": "env",
          "upstream": "Env",
          "tf_type": "list(string)",
-         "pointer": "#/definitions/ContainerConfig/properties/Env"
+         "pointer": "#/definitions/ContainerConfig/properties/Env",
+         "sensitive": true
         },
         {
          "name": "cmd",
@@ -3135,7 +3137,7 @@
       "pointer": "#/definitions/Plugin"
      },
      "known_after_apply": true,
-     "sensitive": true,
+     "sensitive": false,
      "description": "The GET /plugins/{name}/json response as a nested object, field by field.",
      "fields": [
       {
@@ -3172,7 +3174,8 @@
          "name": "env",
          "upstream": "Env",
          "tf_type": "list(string)",
-         "pointer": "#/definitions/Plugin/properties/Settings/properties/Env"
+         "pointer": "#/definitions/Plugin/properties/Settings/properties/Env",
+         "sensitive": true
         },
         {
          "name": "args",
@@ -3276,7 +3279,8 @@
          "name": "env",
          "upstream": "Env",
          "tf_type": "list(object({...}))",
-         "pointer": "#/definitions/Plugin/properties/Config/properties/Env"
+         "pointer": "#/definitions/Plugin/properties/Config/properties/Env",
+         "sensitive": true
         },
         {
          "name": "args",
@@ -3412,7 +3416,7 @@
       "pointer": "#/definitions/Plugin"
      },
      "known_after_apply": false,
-     "sensitive": true,
+     "sensitive": false,
      "description": "The GET /plugins/{name}/json response as a nested object, field by field.",
      "fields": [
       {
@@ -3449,7 +3453,8 @@
          "name": "env",
          "upstream": "Env",
          "tf_type": "list(string)",
-         "pointer": "#/definitions/Plugin/properties/Settings/properties/Env"
+         "pointer": "#/definitions/Plugin/properties/Settings/properties/Env",
+         "sensitive": true
         },
         {
          "name": "args",
@@ -3553,7 +3558,8 @@
          "name": "env",
          "upstream": "Env",
          "tf_type": "list(object({...}))",
-         "pointer": "#/definitions/Plugin/properties/Config/properties/Env"
+         "pointer": "#/definitions/Plugin/properties/Config/properties/Env",
+         "sensitive": true
         },
         {
          "name": "args",
@@ -4395,7 +4401,7 @@
       "pointer": "#/definitions/Volume"
      },
      "known_after_apply": true,
-     "sensitive": true,
+     "sensitive": false,
      "description": "The GET /volumes/{name} response as a nested object, field by field.",
      "fields": [
       {
@@ -4494,7 +4500,8 @@
        "name": "options",
        "upstream": "Options",
        "tf_type": "map(string)",
-       "pointer": "#/definitions/Volume/properties/Options"
+       "pointer": "#/definitions/Volume/properties/Options",
+       "sensitive": true
       },
       {
        "name": "usage_data",
@@ -4636,7 +4643,7 @@
       "pointer": "#/definitions/Volume"
      },
      "known_after_apply": false,
-     "sensitive": true,
+     "sensitive": false,
      "description": "The GET /volumes/{name} response as a nested object, field by field.",
      "fields": [
       {
@@ -4735,7 +4742,8 @@
        "name": "options",
        "upstream": "Options",
        "tf_type": "map(string)",
-       "pointer": "#/definitions/Volume/properties/Options"
+       "pointer": "#/definitions/Volume/properties/Options",
+       "sensitive": true
       },
       {
        "name": "usage_data",
@@ -6014,7 +6022,7 @@
       "pointer": "#/paths/~1images~1{name}~1attestations/get/responses/200/schema"
      },
      "known_after_apply": false,
-     "sensitive": true,
+     "sensitive": false,
      "description": "The GET /images/{name}/attestations response as a nested object, field by field.",
      "fields": [
       {
@@ -6057,7 +6065,8 @@
          "name": "data",
          "upstream": "data",
          "tf_type": "string",
-         "pointer": "#/definitions/OCIDescriptor/properties/data"
+         "pointer": "#/definitions/OCIDescriptor/properties/data",
+         "sensitive": true
         },
         {
          "name": "platform",
@@ -6083,7 +6092,8 @@
        "name": "statement",
        "upstream": "Statement",
        "tf_type": "dynamic",
-       "pointer": "#/definitions/AttestationStatement/properties/Statement"
+       "pointer": "#/definitions/AttestationStatement/properties/Statement",
+       "sensitive": true
       }
      ],
      "fields_complete": false
@@ -6171,7 +6181,7 @@
       "pointer": "#/paths/~1images~1{name}~1history/get/responses/200/schema"
      },
      "known_after_apply": false,
-     "sensitive": true,
+     "sensitive": false,
      "description": "The GET /images/{name}/history response as a nested object, field by field.",
      "fields": [
       {
@@ -6190,7 +6200,8 @@
        "name": "created_by",
        "upstream": "CreatedBy",
        "tf_type": "string",
-       "pointer": "#/definitions/ImageHistoryResponseItem/properties/CreatedBy"
+       "pointer": "#/definitions/ImageHistoryResponseItem/properties/CreatedBy",
+       "sensitive": true
       },
       {
        "name": "tags",
@@ -7354,6 +7365,50 @@
      "provided": false
     },
     {
+     "name": "logs_json",
+     "tf_type": "string",
+     "category": "raw",
+     "source": {
+      "type": "derived",
+      "from": "the same stream as logs",
+      "how": "JSON array with one object per log line, in arrival order: {\"timestamp\": RFC 3339 nano from the frame (timestamps=true), \"stream\": \"stdout\"|\"stderr\" from the multiplexed frame header (\"stdout\" for a TTY), \"line\": the text without the trailing newline}"
+     },
+     "known_after_apply": false,
+     "sensitive": true,
+     "description": "The same log lines as a JSON array of {timestamp, stream, line} entries. Sensitive: logs routinely contain secrets.",
+     "provided": false
+    },
+    {
+     "name": "logs_sha256",
+     "tf_type": "string",
+     "category": "hash",
+     "source": {
+      "type": "derived",
+      "from": "logs",
+      "how": "hex sha256 of the UTF-8 bytes of logs"
+     },
+     "known_after_apply": false,
+     "sensitive": false,
+     "hash_of": "logs",
+     "description": "sha256 of logs.",
+     "provided": false
+    },
+    {
+     "name": "logs_json_sha256",
+     "tf_type": "string",
+     "category": "hash",
+     "source": {
+      "type": "derived",
+      "from": "logs_json",
+      "how": "hex sha256 of the UTF-8 bytes of logs_json"
+     },
+     "known_after_apply": false,
+     "sensitive": false,
+     "hash_of": "logs_json",
+     "description": "sha256 of logs_json.",
+     "provided": false
+    },
+    {
      "name": "engine_api_version",
      "tf_type": "string",
      "category": "version",
@@ -7380,26 +7435,11 @@
      "sensitive": false,
      "description": "Docker Engine version from GET /version.",
      "provided": false
-    },
-    {
-     "name": "content_sha256",
-     "tf_type": "string",
-     "category": "hash",
-     "source": {
-      "type": "derived",
-      "from": "logs",
-      "how": "hex sha256 of the UTF-8 bytes of logs"
-     },
-     "known_after_apply": false,
-     "sensitive": false,
-     "hash_of": "logs",
-     "description": "sha256 of logs.",
-     "provided": false
     }
    ],
    "no_structured_reason": "GET /containers/{id}/logs returns an unstructured byte stream (raw or multiplexed stdout/stderr frames); swagger has no schema to map field by field. The existing logs_list_string (one element per line) is a convenience split, not an upstream structure.",
    "outputs_status": "missing",
-   "outputs_note": "Exposed today: none. Missing: container_id, logs, engine_api_version, docker_server_version, content_sha256."
+   "outputs_note": "Exposed today: none. Missing: container_id, logs, engine_api_version, docker_server_version, logs_sha256, logs_json_sha256."
   },
   "engine:networks": {
    "outputs": [
@@ -7667,7 +7707,7 @@
       "pointer": "#/paths/~1plugins/get/responses/200/schema"
      },
      "known_after_apply": false,
-     "sensitive": true,
+     "sensitive": false,
      "description": "The GET /plugins response as a nested object, field by field.",
      "fields": [
       {
@@ -7704,7 +7744,8 @@
          "name": "env",
          "upstream": "Env",
          "tf_type": "list(string)",
-         "pointer": "#/definitions/Plugin/properties/Settings/properties/Env"
+         "pointer": "#/definitions/Plugin/properties/Settings/properties/Env",
+         "sensitive": true
         },
         {
          "name": "args",
@@ -7808,7 +7849,8 @@
          "name": "env",
          "upstream": "Env",
          "tf_type": "list(object({...}))",
-         "pointer": "#/definitions/Plugin/properties/Config/properties/Env"
+         "pointer": "#/definitions/Plugin/properties/Config/properties/Env",
+         "sensitive": true
         },
         {
          "name": "args",
@@ -7923,7 +7965,7 @@
       "pointer": "#/definitions/AuthResponse"
      },
      "known_after_apply": false,
-     "sensitive": true,
+     "sensitive": false,
      "description": "The POST /auth response as a nested object, field by field.",
      "fields": [
       {
@@ -7936,7 +7978,8 @@
        "name": "identity_token",
        "upstream": "IdentityToken",
        "tf_type": "string",
-       "pointer": "#/definitions/AuthResponse/properties/IdentityToken"
+       "pointer": "#/definitions/AuthResponse/properties/IdentityToken",
+       "sensitive": true
       }
      ],
      "fields_complete": true
@@ -8467,7 +8510,7 @@
       "pointer": "#/definitions/VolumeListResponse"
      },
      "known_after_apply": false,
-     "sensitive": true,
+     "sensitive": false,
      "description": "The GET /volumes response as a nested object, field by field.",
      "fields": [
       {
@@ -8528,7 +8571,8 @@
          "name": "options",
          "upstream": "Options",
          "tf_type": "map(string)",
-         "pointer": "#/definitions/Volume/properties/Options"
+         "pointer": "#/definitions/Volume/properties/Options",
+         "sensitive": true
         },
         {
          "name": "usage_data",
@@ -8609,7 +8653,7 @@
     {
      "name": "result",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -8682,7 +8726,7 @@
     {
      "name": "result",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -8755,7 +8799,7 @@
     {
      "name": "result",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -8842,7 +8886,7 @@
     {
      "name": "result",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -8909,7 +8953,7 @@
     {
      "name": "result",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -8982,7 +9026,7 @@
     {
      "name": "state",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -9135,7 +9179,7 @@
     {
      "name": "state",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -9288,7 +9332,7 @@
     {
      "name": "state",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -9441,7 +9485,7 @@
     {
      "name": "state",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -9594,7 +9638,7 @@
     {
      "name": "state",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -9747,7 +9791,7 @@
     {
      "name": "state",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -9900,7 +9944,7 @@
     {
      "name": "result",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",
@@ -10149,7 +10193,7 @@
     {
      "name": "result",
      "tf_type": "object({...})",
-     "category": "structured",
+     "category": "result",
      "source": {
       "type": "swagger",
       "file": "upstream/engine-api/api/swagger.yaml",

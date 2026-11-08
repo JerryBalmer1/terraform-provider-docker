@@ -11,7 +11,7 @@ them per layer, [inventory.json](inventory.json) has them in full (types, source
 edit the lane's file and run `Invoke-Build Inventory`. `Invoke-Build InventoryValidate` (part of the default task)
 checks the rules below.
 
-## The five categories
+## The six categories
 
 Each output has `name`, `tf_type`, `category`, `source`, `known_after_apply` and `sensitive`.
 
@@ -19,6 +19,7 @@ Each output has `name`, `tf_type`, `category`, `source`, `known_after_apply` and
 |---|---|---|
 | **raw** | The whole result as one string, serialized from the structured output where possible. | `dockerfile` (rendered), `compose_yaml` (normalized, as `docker compose config` prints it), `stack_yaml`, `inspect_json` (the exact Engine API inspect response), `bake_hcl` / `bake_json`, `manifest_json` |
 | **structured** | A nested object mirroring the upstream schema, so every field is addressable. | `stages[0].base_image`, `project.services["web"].ports`, `inspect.spec.task_template.container_spec.image` |
+| **result** | The outcome of running an action, or a descriptive value about how the data was produced, not the identity or state of a lasting object. Every structured output of an action is a result. | prune `result` (`space_reclaimed`), container `state` after start/stop, exec/run `result` (`exit_code`, `stdout`), service `update_status`, `created`, `fidelity`, `reconstructed` |
 | **identity** | Stable handoff values. | `id`, `name`, `image_ref` (repo:tag), `image_digest_ref` (repo@sha256:…), `digest`, `platforms`, `labels` |
 | **version** | Which versions produced or describe the result. | see [Version metadata](#version-metadata) |
 | **hash** | `sha256` of a raw output, so a consumer can detect change without diffing the text. | `content_sha256`, or `<raw>_sha256` when an item has more than one raw output |
@@ -26,9 +27,19 @@ Each output has `name`, `tf_type`, `category`, `source`, `known_after_apply` and
 Rules:
 - Raw and structured describe the same data. The raw output names the structured one it serializes (`serializes`).
 - Every raw output has exactly one hash output (`hash_of`).
-- Anything a secret value could leak through is `sensitive`: container/service env, build args, ENV/ARG values,
-  secret data, join tokens, unlock keys, registry auth, logs and exec output, whole compose projects (interpolated
-  variables). Hashes are never sensitive.
+- Sensitivity is per field. The secret channels are container/service/task/plugin env, image config env, volume
+  driver options, build args / secrets / ssh / inline Dockerfiles, ENV values and ARG defaults (and image history
+  `created_by`, which records them), compose `environment` / `env_file` / environment-sourced secrets and configs /
+  config `content`, build provenance and attestations, join tokens, unlock keys, registry auth, logs and exec/run
+  output. Command lines (args, cmd, entrypoint, process lists) are not a secret channel.
+  - A raw output (one string) is `sensitive` when any secret channel can reach it.
+  - A structured or result output is not sensitive as a whole: each FIELD that is a secret channel carries
+    `sensitive: true`, so harmless fields (image, ports, names) stay readable in plans. A `dynamic` field cannot hide
+    nested values, so the whole field is marked. Only an output whose every field is a secret (join tokens) is
+    `sensitive` as a whole, and it says why in `sensitive_reason` (rule V5).
+  - A secret interpolated (`${VAR}`) into a field that is not a secret channel is not hidden; secrets belong in env
+    or secrets.
+  - Hashes are never sensitive.
 - `known_after_apply` is true for values computed by create/update or by the action run, and false for inputs
   echoed back and for data sources that read existing objects.
 
@@ -37,6 +48,9 @@ Rules:
 - Attribute names are snake_case, derived from the upstream name: `HostConfig` → `host_config`,
   `IPAddress` → `ip_address`, `Id`/`ID` → `id`, `EnableIPv6` → `enable_ipv6`. Acronym runs stay whole
   (`LinkLocalIPs` → `link_local_ips`, `NanoCPUs` → `nano_cpus`).
+- Logs: every logs item has two raw outputs, `logs` (plain text, as the CLI prints it) and `logs_json` (a JSON array
+  of `{timestamp, stream, line}` entries, plus service/container for compose), hashed as `logs_sha256` and
+  `logs_json_sha256`.
 - Compose keys are already snake_case (hyphens become `_`). Dockerfile flags drop the dashes
   (`--keep-git-dir` → `keep_git_dir`).
 - Each structured output records the full upstream → snake_case mapping in its `fields`, so no mapping is
@@ -56,8 +70,10 @@ Rules:
 | `compose_go_version` | The compose-go library that parses and validates | SOURCES.md pin `compose_go` (v2.16.2) |
 | `dockerfile_syntax` | The `# syntax=` value, or the default frontend when there is none | Dockerfile reference `#syntax`; pin `dockerfile` (1.28.0) |
 | `buildx_version` | The buildx release the bake/imagetools model follows | SOURCES.md pin `buildx` (v0.38.2) |
+| `buildkit_version` | The BuildKit version a builder node runs | `docker buildx inspect` node `BuildkitVersion` |
+| `docker_cli_version` | The docker CLI release whose client-side behaviour a cli-only type reproduces (stack, manifest) | SOURCES.md pin `docker_cli` (v29.5.3) |
 
-Only these six names may use the version category (rule V3). A swarm object's `Version.Index` is an identity value
+Only these eight names may use the version category (rule V3). A swarm object's `Version.Index` is an identity value
 (`version_index`), not version metadata.
 
 ## Validation rules
@@ -66,12 +82,14 @@ Only these six names may use the version category (rule V3). A swarm object's `V
 |---|---|
 | V1 | Every non-skipped item has at least one identity and one version output. |
 | V2 | Every resource and data source has a raw and a structured output, or a written `no_raw_reason` / `no_structured_reason`. |
-| V3 | Version outputs use only the six names above. |
-| V4 | Every structured output has a non-empty `fields` mapping. |
+| V3 | Version outputs use only the eight names above. |
+| V4 | Every structured output, and every object-typed result output, has a non-empty `fields` mapping. |
+| V5 | A structured or result output is `sensitive` as a whole only with a `sensitive_reason`; otherwise its secret-carrying fields are marked. |
 
 A violation fails `Invoke-Build InventoryValidate` unless [_gen/allowed-violations.txt](_gen/allowed-violations.txt)
 lists it with a reason. merge.py separately fails on structural errors: unknown or duplicate ids, bad categories or
-types, a raw output without a hash.
+types, a raw output without a hash, a sensitive hash, a field marked sensitive inside an output that is already
+sensitive as a whole.
 
 ## Handoff
 

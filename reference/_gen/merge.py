@@ -17,13 +17,24 @@ FRAGS = ["z1-engine.json", "z2-compose.json", "z3-cli.json", "z4-dockerfile.json
 # Fragments added after the harvest; each is read only when the file exists, in this order.
 EXTRA_FRAGS = ["dockerfile-sources.json"]
 OUTPUTS_DIR = os.path.join(Z, "outputs")  # outputs/<lane>.json, joined onto items by id (SCHEMA.md)
-OUT_CATEGORIES = ["raw", "structured", "identity", "version", "hash"]
+OUT_CATEGORIES = ["raw", "structured", "result", "identity", "version", "hash"]
 OUT_SOURCE_TYPES = ["swagger", "schema", "doc", "cli", "sources_md", "derived"]
 ITEM_OUT_KEYS = {"no_raw_reason", "no_structured_reason", "outputs_status", "outputs_note"}
 TF_TYPE = re.compile(r"^(string|number|bool|dynamic|(list|set|map)\(.+\)|object\(\{.*\}\))$", re.S)
 LAYERS = ["engine", "swarm", "compose", "dockerfile", "buildx", "cli-only"]
 KINDS = ["resource", "data_source", "action", "dockerfile_block", "skip"]
 STATUSES = ["exists", "partial", "missing"]
+
+
+
+def field_flags(fields, prefix):
+    """Yield (dotted path, sensitive value) for every FIELD that sets sensitive, at any depth."""
+    for fd in fields:
+        p = prefix + fd.get("name", "?")
+        if "sensitive" in fd:
+            yield p, fd["sensitive"]
+        yield from field_flags(fd.get("fields") or [], p + ".")
+
 
 items, notes, questions, errors = [], {}, [], []
 for fn in FRAGS + [x for x in EXTRA_FRAGS if os.path.exists(os.path.join(Z, x))]:
@@ -138,6 +149,15 @@ for fn in out_files:
                 errors.append("%s: bad source type %r" % (where, src.get("type")))
             if src.get("file") and not os.path.exists(os.path.join(REF, src["file"].replace("/", os.sep))):
                 errors.append("%s: source file missing: %s" % (where, src["file"]))
+            if o.get("category") == "hash" and o.get("sensitive"):
+                errors.append("%s: a hash output is never sensitive" % where)
+            if "sensitive_reason" in o and not (o.get("sensitive") and str(o["sensitive_reason"]).strip()):
+                errors.append("%s: sensitive_reason needs sensitive: true and a non-empty reason" % where)
+            for fp, fv in field_flags(o.get("fields") or [], ""):
+                if not isinstance(fv, bool):
+                    errors.append("%s: field %s sensitive is not a bool" % (where, fp))
+                elif fv and o.get("sensitive"):
+                    errors.append("%s: field %s is marked sensitive inside an output that is already sensitive as a whole" % (where, fp))
             if o.get("category") == "hash" and o.get("hash_of") not in raws:
                 errors.append("%s: hash_of %r is not a raw output of this item" % (where, o.get("hash_of")))
         for r in raws:
@@ -267,13 +287,15 @@ if any(i.get("outputs") for i in out_items):
     n_outs = sum(len(i.get("outputs") or []) for i in out_items)
     md += ["## Outputs", "",
            "The outputs contract ([CONTRACT.md](CONTRACT.md)): %d items, %d outputs, from [_gen/fragments/outputs/](_gen/fragments/outputs/). "
-           "`*` = sensitive, `+` = known after apply. Full detail (types, sources, field maps) is in inventory.json." % (n_items, n_outs), ""]
+           "`*` = sensitive, `(a.b*)` = only those nested fields are sensitive, `+` = known after apply. Full detail (types, sources, field maps) is in inventory.json." % (n_items, n_outs), ""]
 
     def ocell(it, cat):
         names = []
         for o in it.get("outputs") or []:
             if o.get("category") == cat:
-                names.append("`%s`%s%s" % (o["name"], "*" if o.get("sensitive") else "", "+" if o.get("known_after_apply") else ""))
+                secret = [fp for fp, fv in field_flags(o.get("fields") or [], "") if fv is True]
+                sf = "(%s*)" % ", ".join(secret) if secret and not o.get("sensitive") else ""
+                names.append("`%s`%s%s%s" % (o["name"], "*" if o.get("sensitive") else "", sf, "+" if o.get("known_after_apply") else ""))
         if not names and cat in ("raw", "structured") and it.get("no_%s_reason" % cat):
             return "none: " + esc(it["no_%s_reason" % cat])
         return ", ".join(names)
@@ -283,15 +305,15 @@ if any(i.get("outputs") for i in out_items):
         if not any(i.get("outputs") for i in rows):
             continue
         md += ["### %s" % TITLES[L], "",
-               "| kind | name | raw | structured | identity | version | hash | outputs status |",
-               "|---|---|---|---|---|---|---|---|"]
+               "| kind | name | raw | structured | result | identity | version | hash | outputs status |",
+               "|---|---|---|---|---|---|---|---|---|"]
         for it in rows:
             st = it.get("outputs_status", "")
             if it.get("outputs_note"):
                 st = (st + ": " if st else "") + it["outputs_note"]
-            md.append("| %s | %s | %s | %s | %s | %s | %s | %s |" % (
+            md.append("| %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
                 KN[it["kind"]], ("`%s`" % it["name"]) if it.get("name") else "-",
-                ocell(it, "raw"), ocell(it, "structured"), ocell(it, "identity"),
+                ocell(it, "raw"), ocell(it, "structured"), ocell(it, "result"), ocell(it, "identity"),
                 ocell(it, "version"), ocell(it, "hash"), esc(st)))
         md.append("")
 

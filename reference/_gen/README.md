@@ -40,7 +40,7 @@ merge.py joins them and fails on an unknown or skipped id, an id in two lanes' f
 Lanes: A engine, B swarm, C compose, D dockerfile + image data sources + the builder (`engine:image`),
 E buildx + cli-only (incl. docker_stack), Z cross-lane questions only.
 
-- `Invoke-Build InventoryValidate` runs `validate.py` (rules V1-V4) on the merged inventory.json. Exceptions go
+- `Invoke-Build InventoryValidate` runs `validate.py` (rules V1-V5) on the merged inventory.json. Exceptions go
   in `allowed-violations.txt` with a reason; an entry that no longer matches a violation fails as STALE.
 - Checking one lane without touching the repo:
   `python -I reference/_gen/merge.py --dry-run --outputs <lane> --emit <tmp>/inv.json`, then

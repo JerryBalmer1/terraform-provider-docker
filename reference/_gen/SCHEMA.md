@@ -57,7 +57,8 @@ Rules:
 The outputs contract ([../CONTRACT.md](../CONTRACT.md)) gives every non-skipped item an `outputs` array.
 Each lane owns one file in `fragments/outputs/`. merge.py joins it onto the items by id and exits 1 when:
 an id is unknown or skipped; one id appears in two outputs files; an output is missing a required field, has a bad
-category, `tf_type` or source type, or is not snake_case; two outputs of one item share a name; a raw output has no
+category, `tf_type` or source type, or is not snake_case; a hash output is sensitive; `sensitive_reason` comes without
+`sensitive: true`; a FIELD `sensitive` is not a bool or sits inside an output that is already sensitive as a whole; two outputs of one item share a name; a raw output has no
 hash output; a `hash_of` does not name a raw output of the same item; an item-level key is not in the list below.
 
 ```
@@ -81,20 +82,23 @@ OUTPUT:
 {
   "name": "inspect_json",                 // snake_case; the Terraform attribute name
   "tf_type": "string",                    // string | number | bool | dynamic | list(T) | set(T) | map(T) | object({...})
-  "category": "raw|structured|identity|version|hash",
+  "category": "raw|structured|result|identity|version|hash",
   "source": SOURCE,
   "known_after_apply": true,              // unknown at plan time (computed by create/update or by a read that depends on unknown inputs)
-  "sensitive": false,                     // true when a secret value could leak through it (env, secret data, auth, build args...)
+  "sensitive": false,                     // raw: true when a secret value could leak through it. structured/result: false, with the
+                                          //   secret-carrying FIELDs marked instead; true only with sensitive_reason (rule V5)
+  "sensitive_reason": "why",              // structured/result only, with sensitive: true: every field is a secret (e.g. join tokens)
   "description": "one line",              // optional
   "serializes": "inspect",                // raw only, optional: the structured output this raw output is the serialization of
   "hash_of": "inspect_json",              // hash only, required: the raw output it hashes
-  "fields": [ FIELD, ... ],               // structured only, required (V4): the upstream -> snake_case mapping
-  "fields_complete": true,                // structured only: false when nested levels below `fields` are left to the mechanical rule
+  "fields": [ FIELD, ... ],               // structured (and object-typed result) only, required (V4): the upstream -> snake_case mapping
+  "fields_complete": true,                // structured/result only: false when nested levels below `fields` are left to the mechanical rule
   "provided": false                       // optional: true when the provider exposes this attribute today
 }
 
 FIELD:
 { "name": "host_config", "upstream": "HostConfig", "tf_type": "object({...})", "pointer": "#/definitions/HostConfig",
+  "sensitive": true,                      // optional: this field (and everything under it) is a secret channel; only in an output that is not sensitive
   "fields": [ FIELD, ... ] }              // nested fields optional; tf_type "object({...})" / "list(object({...}))" / "map(object({...}))" means "see fields"
 
 SOURCE (paths relative to reference/):
@@ -111,16 +115,21 @@ Naming rules:
   `EnableIPv6` -> `enable_ipv6`; compose keys are already snake_case (hyphens become `_`); Dockerfile flags drop the
   dashes (`--keep-git-dir` -> `keep_git_dir`). `fields` always records both names, so no mapping is implicit.
 - raw outputs: `dockerfile`, `compose_yaml`, `stack_yaml`, `inspect_json`, `bake_hcl`, `bake_json`, or `<thing>_json`.
+  Logs items have both `logs` (plain text) and `logs_json` (JSON array of entries).
 - hash outputs: `content_sha256` when the item has one raw output, else `<raw name>_sha256`.
 - version outputs use exactly these names: `engine_api_version` (negotiated), `docker_server_version`,
   `compose_spec_version` (pinned commit), `compose_go_version`, `dockerfile_syntax` (the `# syntax=` value or the
-  default frontend), `buildx_version`.
+  default frontend), `buildx_version`, `buildkit_version` (a builder node's BuildKit), `docker_cli_version` (pin
+  `docker_cli`, for cli-only types).
+- result outputs: the outcome of an action (every structured output of an action) or a descriptive value about how
+  the data was produced (`created`, `fidelity`, `reconstructed`), not the identity or state of a lasting object.
 - identity outputs: `id`, `name`, `image_ref` (repo:tag), `image_digest_ref` (repo@sha256:...), `digest`, `platforms`,
   `labels`, or another stable handoff value.
 
-Contract rules (checked by `Invoke-Build InventoryValidate`, reference/_gen/validate.py; exceptions only through
+Contract rules V1-V5 (checked by `Invoke-Build InventoryValidate`, reference/_gen/validate.py; exceptions only through
 `reference/_gen/allowed-violations.txt`, one `<id><TAB><rule><TAB><reason>` per line):
 - V1: every non-skipped item has at least one identity output and at least one version output.
 - V2: every resource and data source has a raw and a structured output, or `no_raw_reason` / `no_structured_reason`.
-- V3: every version output name is one of the six version names above.
-- V4: every structured output has a non-empty `fields` list.
+- V3: every version output name is one of the eight version names above.
+- V4: every structured output, and every object-typed result output, has a non-empty `fields` list.
+- V5: a structured or result output with `sensitive: true` has a `sensitive_reason`; otherwise mark the secret-carrying fields.

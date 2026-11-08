@@ -258,19 +258,11 @@
     },
     {
       "lane": "outputs:B",
-      "question": "Raw output for service/task logs (no upstream JSON): `logs_text` (this lane) vs `logs` vs a list like the container logs data source's existing `logs_list_string`; should every log data source share one name?"
-    },
-    {
-      "lane": "outputs:B",
       "question": "docker_swarm_init exposes the cluster ID today as `cluster_id`; the contract uses `id` = ClusterInfo.ID. Keep `cluster_id` as an alias, or drop it?"
     },
     {
       "lane": "outputs:B",
       "question": "Plural data sources: structured list named after the type (`services`, `nodes`, ...) with raw `<plural>_json` (this lane), or a uniform `items` / `items_json` across every plural data source?"
-    },
-    {
-      "lane": "outputs:B",
-      "question": "Service/task `inspect` is sensitive as a whole because ContainerSpec.Env may hold secrets, which makes `inspect.spec.task_template.container_spec.image` sensitive too. Keep whole-object sensitivity plus non-sensitive copies (image_digest_ref, replicas, published_ports), or add a redacted `inspect_redacted` (Env/Args/Command blanked)?"
     },
     {
       "lane": "outputs:B",
@@ -283,10 +275,6 @@
     {
       "lane": "outputs:C",
       "question": "Facets of docker_compose: one `project` attribute (whole project) as proposed, or per-slice attributes (`project_services`, `project_networks`, ...) that do not clash with today's computed `services`/`networks`/`volumes` ID maps?"
-    },
-    {
-      "lane": "outputs:C",
-      "question": "docker_compose_logs raw output: `logs_json` (JSON array of entries, as proposed) or a plain-text `logs` / `output` string like `docker compose logs` prints?"
     },
     {
       "lane": "outputs:C",
@@ -314,19 +302,7 @@
     },
     {
       "lane": "outputs:D",
-      "question": "Whole-Dockerfile outputs (`dockerfile`, `stages`) are sensitive because ENV/ARG values are inline: keep them sensitive (current), or move ENV values and ARG defaults into separate sensitive outputs (`env_values`, `arg_defaults`) so the rest stays plain?"
-    },
-    {
-      "lane": "outputs:D",
       "question": "data.docker_dockerfile image mode: name the provenance outputs `reconstructed` + `fidelity` (current, both identity) or a single `fidelity` (`exact`/`approximate`)?"
-    },
-    {
-      "lane": "outputs:E",
-      "question": "buildkit_version (builder) is a version but not one of the six V3 names: keep it as category identity (current), or add `buildkit_version` to the V3 version-name list?"
-    },
-    {
-      "lane": "outputs:E",
-      "question": "cli-only items (stack, manifest list) mirror docker CLI v29.5.3 semantics: add a `docker_cli_version` version name (pin docker_cli), or keep using engine_api_version/buildx_version only (current)?"
     },
     {
       "lane": "outputs:E",
@@ -335,22 +311,6 @@
     {
       "lane": "outputs:E",
       "question": "stack ls Services count: `services` in docker_stacks (upstream name) while docker_stack.stack.services is the compose service map; rename the docker_stacks field to `services_count`, or keep upstream `services`?"
-    },
-    {
-      "lane": "outputs:Z",
-      "question": "Cross-lane: one raw logs output for container, service, task and compose logs? Lanes proposed `logs`/`logs_text` (A, B, plain text) and `logs_json` (C, JSON entries). Options: `logs` text everywhere | `logs_json` everywhere | both."
-    },
-    {
-      "lane": "outputs:Z",
-      "question": "Cross-lane: add a sixth category (e.g. `result`) for action results and descriptive values (`space_reclaimed`, `exit_code`, `fidelity`, `reconstructed`, `created`) that lanes filed under identity or structured? Options: add `result` | keep five categories."
-    },
-    {
-      "lane": "outputs:Z",
-      "question": "Cross-lane: whole-object sensitivity. Lanes mark whole `inspect`/`project`/`stack` outputs sensitive when any nested field can carry a secret, which hides harmless fields (image, ports) in plans. Options: keep whole-object sensitive | redacted structured output + sensitive raw | split secret-bearing fields into their own sensitive outputs."
-    },
-    {
-      "lane": "outputs:Z",
-      "question": "Cross-lane: version names beyond the six (Lane E asked about `buildkit_version`, `docker_cli_version`). Options: extend the V3 list | keep six and file them as identity."
     }
   ],
   "collisions": {
@@ -741,7 +701,13 @@
     ],
     "outputs:Z": [
       "Lane Z (merge/contract) owns no items. It carries cross-lane questions raised while merging lanes A-E; per-lane questions stay in each lane's file.",
-      "Lane Z fix: removed schema=compose-go-embedded from the 7 build.shm_size fields in C.json (Lane C reported it as a generator mistake). build.shm_size is integer|string in both compose-spec.json and compose-go-embedded.json (#/$defs/workload_spec/properties/build/oneOf/1/properties/shm_size); only container_spec.shm_size differs."
+      "Lane Z fix: removed schema=compose-go-embedded from the 7 build.shm_size fields in C.json (Lane C reported it as a generator mistake). build.shm_size is integer|string in both compose-spec.json and compose-go-embedded.json (#/$defs/workload_spec/properties/build/oneOf/1/properties/shm_size); only container_spec.shm_size differs.",
+      "Decided by the user 2026-11-08 (Pass 4.5 Lane Z), applied to A-E by Lane Z; the four cross-lane questions and the lane questions they answer (B: logs name, service/task inspect sensitivity; C: compose logs output; D: whole-Dockerfile sensitivity; E: buildkit_version, docker_cli_version) are closed.",
+      "Logs: every logs item has both `logs` (plain text) and `logs_json` (JSON array of entries) as raw outputs, each with its own hash (`logs_sha256`, `logs_json_sha256`, per the two-raw hash rule): engine:container-logs, swarm:service-logs, swarm:task-logs (logs_text renamed to logs), compose:cli-logs (logs added).",
+      "Sixth category `result`: the outcome of running an action or a descriptive value about how data was produced, not the identity or state of a lasting object. Every structured output of an action is now `result` (prune results, container state after start/stop/..., exec/wait/run results, service update_status/update_response/mode/service_status, node spec, swarm tls_info/swarm_info/join_tokens, buildx bake/metadata/status/result); plus root_rotation_in_progress, force_update, image created, dockerfile reconstructed/fidelity, stack service_status. Identity handoff values (deleted IDs, tokens, digests) stay identity. V2 still asks resources and data sources for a structured output; V4 also applies to object-typed result outputs.",
+      "Sensitivity is per field (new rule V5): a structured or result output is sensitive as a whole only with a `sensitive_reason` (only the three join_tokens outputs, where every field is a secret). Otherwise the output is not sensitive and the secret-carrying FIELDs carry `sensitive: true`. Raw outputs (JSON/text strings) stay sensitive as before; hashes never are. Secret channels marked: container/service/task env, plugin settings/config env, image config env, volume driver options (CIFS/NFS passwords), compose environment/env_file/secrets/build args/ssh/secrets/dockerfile_inline/configs content/environment-sourced values, Dockerfile ENV values/ARG defaults/history created_by, build provenance, attestation statements, buildx driver_opts, bake args/secret/ssh/dockerfile_inline, log lines, exec/run stdout/stderr, registry identity_token. A `dynamic` field cannot hide nested values, so the whole field is marked (stack service spec, image config blobs, provenance).",
+      "Sensitivity judgment calls by Lane Z, reversible: (1) command lines (container args/cmd/entrypoint, service Args/Command, compose ps Command, compose top processes) are NOT a secret channel, following Lane A and CONTRACT.md's list; B and C had treated them as sensitive, so compose:cli-ps containers and compose:cli-top processes are now plain. (2) Lane C's parent-level marks on the whole `secrets` and `configs` maps were dropped (they hid every field); their environment/content children stay marked. (3) compose networks/models slices carry no secret channel and are now plain. Accepted risk: a secret interpolated (${VAR}) into a field that is not a secret channel is no longer hidden in plans; secrets belong in environment/secrets.",
+      "Version names: V3 now allows eight names: the six plus `buildkit_version` (buildx:builder, buildx:builder-inspect, moved from identity) and `docker_cli_version` (sources_md pin docker_cli, added to the five cli-only items: stack, stacks, stack-services, manifest-list, manifest-inspect)."
     ]
   },
   "items": [
@@ -929,7 +895,7 @@
             "pointer": "#/definitions/ContainerInspectResponse"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The GET /containers/{id}/json response as a nested object, field by field.",
           "fields": [
             {
@@ -1770,7 +1736,8 @@
                   "name": "env",
                   "upstream": "Env",
                   "tf_type": "list(string)",
-                  "pointer": "#/definitions/ContainerConfig/properties/Env"
+                  "pointer": "#/definitions/ContainerConfig/properties/Env",
+                  "sensitive": true
                 },
                 {
                   "name": "cmd",
@@ -2135,7 +2102,7 @@
             "anchor": "#from"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Build stages in order: name, base image (as written, resolved ref and digest when available) and every instruction with all its flags, in the dockerfile:* block model.",
           "fields": [
             {
@@ -2261,7 +2228,8 @@
                   "tf_type": "object({...})",
                   "anchor": "#env",
                   "see": "dockerfile:ENV",
-                  "description": "Set when keyword = ENV; shape = the `env` output of dockerfile:ENV."
+                  "description": "Set when keyword = ENV; shape = the `env` output of dockerfile:ENV.",
+                  "sensitive": true
                 },
                 {
                   "name": "add",
@@ -2317,7 +2285,8 @@
                   "tf_type": "object({...})",
                   "anchor": "#arg",
                   "see": "dockerfile:ARG",
-                  "description": "Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG."
+                  "description": "Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG.",
+                  "sensitive": true
                 },
                 {
                   "name": "onbuild",
@@ -2359,7 +2328,8 @@
                   "description": "Image mode only: the history entry this instruction was reconstructed from.",
                   "filled_by": [
                     "image"
-                  ]
+                  ],
+                  "sensitive": true
                 },
                 {
                   "name": "created",
@@ -2420,7 +2390,7 @@
             "pointer": "#/definitions/ImageInspect"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "ImageInspect of the result, field by field.",
           "fields": [
             {
@@ -3833,7 +3803,7 @@
             "pointer": "#/definitions/Plugin"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The GET /plugins/{name}/json response as a nested object, field by field.",
           "fields": [
             {
@@ -3870,7 +3840,8 @@
                   "name": "env",
                   "upstream": "Env",
                   "tf_type": "list(string)",
-                  "pointer": "#/definitions/Plugin/properties/Settings/properties/Env"
+                  "pointer": "#/definitions/Plugin/properties/Settings/properties/Env",
+                  "sensitive": true
                 },
                 {
                   "name": "args",
@@ -3974,7 +3945,8 @@
                   "name": "env",
                   "upstream": "Env",
                   "tf_type": "list(object({...}))",
-                  "pointer": "#/definitions/Plugin/properties/Config/properties/Env"
+                  "pointer": "#/definitions/Plugin/properties/Config/properties/Env",
+                  "sensitive": true
                 },
                 {
                   "name": "args",
@@ -4944,7 +4916,7 @@
             "pointer": "#/definitions/Volume"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The GET /volumes/{name} response as a nested object, field by field.",
           "fields": [
             {
@@ -5043,7 +5015,8 @@
               "name": "options",
               "upstream": "Options",
               "tf_type": "map(string)",
-              "pointer": "#/definitions/Volume/properties/Options"
+              "pointer": "#/definitions/Volume/properties/Options",
+              "sensitive": true
             },
             {
               "name": "usage_data",
@@ -5224,7 +5197,7 @@
             "pointer": "#/definitions/ContainerInspectResponse"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The GET /containers/{id}/json response as a nested object, field by field.",
           "fields": [
             {
@@ -6065,7 +6038,8 @@
                   "name": "env",
                   "upstream": "Env",
                   "tf_type": "list(string)",
-                  "pointer": "#/definitions/ContainerConfig/properties/Env"
+                  "pointer": "#/definitions/ContainerConfig/properties/Env",
+                  "sensitive": true
                 },
                 {
                   "name": "cmd",
@@ -7656,7 +7630,7 @@
         {
           "name": "created",
           "tf_type": "string",
-          "category": "identity",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -7794,7 +7768,7 @@
             "pointer": "#/definitions/ImageConfig"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Image config (ImageInspect.Config).",
           "fields": [
             {
@@ -7933,7 +7907,7 @@
             "pointer": "#/definitions/ImageInspect"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Full ImageInspect, field by field.",
           "fields": [
             {
@@ -8582,7 +8556,7 @@
             "pointer": "#/paths/~1images~1{name}~1attestations/get/responses/200/schema"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The GET /images/{name}/attestations response as a nested object, field by field.",
           "fields": [
             {
@@ -8625,7 +8599,8 @@
                   "name": "data",
                   "upstream": "data",
                   "tf_type": "string",
-                  "pointer": "#/definitions/OCIDescriptor/properties/data"
+                  "pointer": "#/definitions/OCIDescriptor/properties/data",
+                  "sensitive": true
                 },
                 {
                   "name": "platform",
@@ -8651,7 +8626,8 @@
               "name": "statement",
               "upstream": "Statement",
               "tf_type": "dynamic",
-              "pointer": "#/definitions/AttestationStatement/properties/Statement"
+              "pointer": "#/definitions/AttestationStatement/properties/Statement",
+              "sensitive": true
             }
           ],
           "fields_complete": false
@@ -8764,7 +8740,7 @@
             "pointer": "#/paths/~1images~1{name}~1history/get/responses/200/schema"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The GET /images/{name}/history response as a nested object, field by field.",
           "fields": [
             {
@@ -8783,7 +8759,8 @@
               "name": "created_by",
               "upstream": "CreatedBy",
               "tf_type": "string",
-              "pointer": "#/definitions/ImageHistoryResponseItem/properties/CreatedBy"
+              "pointer": "#/definitions/ImageHistoryResponseItem/properties/CreatedBy",
+              "sensitive": true
             },
             {
               "name": "tags",
@@ -10063,6 +10040,50 @@
           "provided": false
         },
         {
+          "name": "logs_json",
+          "tf_type": "string",
+          "category": "raw",
+          "source": {
+            "type": "derived",
+            "from": "the same stream as logs",
+            "how": "JSON array with one object per log line, in arrival order: {\"timestamp\": RFC 3339 nano from the frame (timestamps=true), \"stream\": \"stdout\"|\"stderr\" from the multiplexed frame header (\"stdout\" for a TTY), \"line\": the text without the trailing newline}"
+          },
+          "known_after_apply": false,
+          "sensitive": true,
+          "description": "The same log lines as a JSON array of {timestamp, stream, line} entries. Sensitive: logs routinely contain secrets.",
+          "provided": false
+        },
+        {
+          "name": "logs_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "logs",
+            "how": "hex sha256 of the UTF-8 bytes of logs"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "hash_of": "logs",
+          "description": "sha256 of logs.",
+          "provided": false
+        },
+        {
+          "name": "logs_json_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "logs_json",
+            "how": "hex sha256 of the UTF-8 bytes of logs_json"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "hash_of": "logs_json",
+          "description": "sha256 of logs_json.",
+          "provided": false
+        },
+        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -10089,26 +10110,11 @@
           "sensitive": false,
           "description": "Docker Engine version from GET /version.",
           "provided": false
-        },
-        {
-          "name": "content_sha256",
-          "tf_type": "string",
-          "category": "hash",
-          "source": {
-            "type": "derived",
-            "from": "logs",
-            "how": "hex sha256 of the UTF-8 bytes of logs"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "hash_of": "logs",
-          "description": "sha256 of logs.",
-          "provided": false
         }
       ],
       "no_structured_reason": "GET /containers/{id}/logs returns an unstructured byte stream (raw or multiplexed stdout/stderr frames); swagger has no schema to map field by field. The existing logs_list_string (one element per line) is a convenience split, not an upstream structure.",
       "outputs_status": "missing",
-      "outputs_note": "Exposed today: none. Missing: container_id, logs, engine_api_version, docker_server_version, content_sha256.",
+      "outputs_note": "Exposed today: none. Missing: container_id, logs, engine_api_version, docker_server_version, logs_sha256, logs_json_sha256.",
       "outputs_lane": "A",
       "lane": "Z1"
     },
@@ -10808,7 +10814,7 @@
             "pointer": "#/definitions/Plugin"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The GET /plugins/{name}/json response as a nested object, field by field.",
           "fields": [
             {
@@ -10845,7 +10851,8 @@
                   "name": "env",
                   "upstream": "Env",
                   "tf_type": "list(string)",
-                  "pointer": "#/definitions/Plugin/properties/Settings/properties/Env"
+                  "pointer": "#/definitions/Plugin/properties/Settings/properties/Env",
+                  "sensitive": true
                 },
                 {
                   "name": "args",
@@ -10949,7 +10956,8 @@
                   "name": "env",
                   "upstream": "Env",
                   "tf_type": "list(object({...}))",
-                  "pointer": "#/definitions/Plugin/properties/Config/properties/Env"
+                  "pointer": "#/definitions/Plugin/properties/Config/properties/Env",
+                  "sensitive": true
                 },
                 {
                   "name": "args",
@@ -11081,7 +11089,7 @@
             "pointer": "#/paths/~1plugins/get/responses/200/schema"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The GET /plugins response as a nested object, field by field.",
           "fields": [
             {
@@ -11118,7 +11126,8 @@
                   "name": "env",
                   "upstream": "Env",
                   "tf_type": "list(string)",
-                  "pointer": "#/definitions/Plugin/properties/Settings/properties/Env"
+                  "pointer": "#/definitions/Plugin/properties/Settings/properties/Env",
+                  "sensitive": true
                 },
                 {
                   "name": "args",
@@ -11222,7 +11231,8 @@
                   "name": "env",
                   "upstream": "Env",
                   "tf_type": "list(object({...}))",
-                  "pointer": "#/definitions/Plugin/properties/Config/properties/Env"
+                  "pointer": "#/definitions/Plugin/properties/Config/properties/Env",
+                  "sensitive": true
                 },
                 {
                   "name": "args",
@@ -11366,7 +11376,7 @@
             "pointer": "#/definitions/AuthResponse"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The POST /auth response as a nested object, field by field.",
           "fields": [
             {
@@ -11379,7 +11389,8 @@
               "name": "identity_token",
               "upstream": "IdentityToken",
               "tf_type": "string",
-              "pointer": "#/definitions/AuthResponse/properties/IdentityToken"
+              "pointer": "#/definitions/AuthResponse/properties/IdentityToken",
+              "sensitive": true
             }
           ],
           "fields_complete": true
@@ -11560,7 +11571,7 @@
         {
           "name": "created",
           "tf_type": "string",
-          "category": "identity",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -11681,7 +11692,7 @@
             "pointer": "#/definitions/ImageConfig"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Same shape as data.docker_image.config; the registry side cannot fill it (DistributionInspect has no config), always null.",
           "fields": [
             {
@@ -12604,7 +12615,7 @@
             "pointer": "#/definitions/Volume"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The GET /volumes/{name} response as a nested object, field by field.",
           "fields": [
             {
@@ -12703,7 +12714,8 @@
               "name": "options",
               "upstream": "Options",
               "tf_type": "map(string)",
-              "pointer": "#/definitions/Volume/properties/Options"
+              "pointer": "#/definitions/Volume/properties/Options",
+              "sensitive": true
             },
             {
               "name": "usage_data",
@@ -12844,7 +12856,7 @@
             "pointer": "#/definitions/VolumeListResponse"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The GET /volumes response as a nested object, field by field.",
           "fields": [
             {
@@ -12905,7 +12917,8 @@
                   "name": "options",
                   "upstream": "Options",
                   "tf_type": "map(string)",
-                  "pointer": "#/definitions/Volume/properties/Options"
+                  "pointer": "#/definitions/Volume/properties/Options",
+                  "sensitive": true
                 },
                 {
                   "name": "usage_data",
@@ -13015,7 +13028,7 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -13211,7 +13224,7 @@
         {
           "name": "state",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -13389,7 +13402,7 @@
         {
           "name": "state",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -13571,7 +13584,7 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -13669,7 +13682,7 @@
         {
           "name": "state",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -13847,7 +13860,7 @@
         {
           "name": "state",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -14025,7 +14038,7 @@
         {
           "name": "state",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -14203,7 +14216,7 @@
         {
           "name": "state",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -14480,7 +14493,7 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -14630,7 +14643,7 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -15202,7 +15215,7 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -15423,7 +15436,7 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -15688,7 +15701,7 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -16524,7 +16537,7 @@
           },
           "known_after_apply": true,
           "sensitive": true,
-          "description": "The exact Engine API inspect response for the service, as JSON. Sensitive: ContainerSpec.Env (and Args/Command) can carry secret values.",
+          "description": "The exact Engine API inspect response for the service, as JSON. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "serializes": "inspect",
           "provided": false
         },
@@ -16538,8 +16551,8 @@
             "pointer": "#/definitions/Service"
           },
           "known_after_apply": true,
-          "sensitive": true,
-          "description": "The service inspect response as a nested object mirroring Service field by field (snake_case). Sensitive: ContainerSpec.Env (and Args/Command) can carry secret values.",
+          "sensitive": false,
+          "description": "The service inspect response as a nested object mirroring Service field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "fields": [
             {
               "name": "id",
@@ -16689,7 +16702,8 @@
                           "name": "env",
                           "upstream": "Env",
                           "tf_type": "list(string)",
-                          "pointer": "#/definitions/TaskSpec/properties/ContainerSpec/properties/Env"
+                          "pointer": "#/definitions/TaskSpec/properties/ContainerSpec/properties/Env",
+                          "sensitive": true
                         },
                         {
                           "name": "dir",
@@ -16947,7 +16961,8 @@
                                       "name": "options",
                                       "upstream": "Options",
                                       "tf_type": "map(string)",
-                                      "pointer": "#/definitions/Mount/properties/VolumeOptions/properties/DriverConfig/properties/Options"
+                                      "pointer": "#/definitions/Mount/properties/VolumeOptions/properties/DriverConfig/properties/Options",
+                                      "sensitive": true
                                     }
                                   ]
                                 },
@@ -18151,7 +18166,7 @@
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Today: id plus the input spec attributes (some Computed, e.g. endpoint_spec ports, restart_policy). Missing: inspect_json, inspect, content_sha256, version_index, image_digest_ref, published_ports, version outputs. inspect/inspect_json are sensitive (Env); image_digest_ref, replicas and published_ports are non-sensitive copies so consumers need no nonsensitive().",
+      "outputs_note": "Today: id plus the input spec attributes (some Computed, e.g. endpoint_spec ports, restart_policy). Missing: inspect_json, inspect, content_sha256, version_index, image_digest_ref, published_ports, version outputs. inspect_json is sensitive; inspect is sensitive only at ContainerSpec.Env (field-level); image_digest_ref, replicas and published_ports are non-sensitive copies so consumers need no nonsensitive().",
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -18568,7 +18583,8 @@
             }
           ],
           "fields_complete": true,
-          "provided": false
+          "provided": false,
+          "sensitive_reason": "Every field is a secret: worker and manager join tokens each let their holder join the swarm."
         },
         {
           "name": "id",
@@ -21138,7 +21154,7 @@
           },
           "known_after_apply": false,
           "sensitive": true,
-          "description": "The exact Engine API inspect response for the service, as JSON. Sensitive: ContainerSpec.Env (and Args/Command) can carry secret values.",
+          "description": "The exact Engine API inspect response for the service, as JSON. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "serializes": "inspect",
           "provided": false
         },
@@ -21152,8 +21168,8 @@
             "pointer": "#/definitions/Service"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "The service inspect response as a nested object mirroring Service field by field (snake_case). Sensitive: ContainerSpec.Env (and Args/Command) can carry secret values.",
+          "sensitive": false,
+          "description": "The service inspect response as a nested object mirroring Service field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "fields": [
             {
               "name": "id",
@@ -21303,7 +21319,8 @@
                           "name": "env",
                           "upstream": "Env",
                           "tf_type": "list(string)",
-                          "pointer": "#/definitions/TaskSpec/properties/ContainerSpec/properties/Env"
+                          "pointer": "#/definitions/TaskSpec/properties/ContainerSpec/properties/Env",
+                          "sensitive": true
                         },
                         {
                           "name": "dir",
@@ -21561,7 +21578,8 @@
                                       "name": "options",
                                       "upstream": "Options",
                                       "tf_type": "map(string)",
-                                      "pointer": "#/definitions/Mount/properties/VolumeOptions/properties/DriverConfig/properties/Options"
+                                      "pointer": "#/definitions/Mount/properties/VolumeOptions/properties/DriverConfig/properties/Options",
+                                      "sensitive": true
                                     }
                                   ]
                                 },
@@ -22796,7 +22814,7 @@
       "collision": "Could instead extend data.docker_logs with a service_id/task_id argument.",
       "outputs": [
         {
-          "name": "logs_text",
+          "name": "logs",
           "tf_type": "string",
           "category": "raw",
           "source": {
@@ -22810,18 +22828,47 @@
           "provided": false
         },
         {
-          "name": "content_sha256",
+          "name": "logs_json",
+          "tf_type": "string",
+          "category": "raw",
+          "source": {
+            "type": "derived",
+            "from": "the same stream as logs",
+            "how": "JSON array with one object per log line, in arrival order: {\"timestamp\": RFC 3339 nano from the frame (timestamps=true), \"stream\": \"stdout\"|\"stderr\" from the multiplexed frame header (\"stdout\" for a TTY), \"line\": the text without the trailing newline}"
+          },
+          "known_after_apply": false,
+          "sensitive": true,
+          "description": "The same log lines as a JSON array of {timestamp, stream, line} entries. Sensitive: logs routinely contain secrets.",
+          "provided": false
+        },
+        {
+          "name": "logs_sha256",
           "tf_type": "string",
           "category": "hash",
           "source": {
             "type": "derived",
-            "from": "logs_text",
-            "how": "sha256 (hex) of the UTF-8 bytes of logs_text"
+            "from": "logs",
+            "how": "hex sha256 of the UTF-8 bytes of logs"
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "SHA-256 of logs_text.",
-          "hash_of": "logs_text",
+          "hash_of": "logs",
+          "description": "sha256 of logs.",
+          "provided": false
+        },
+        {
+          "name": "logs_json_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "logs_json",
+            "how": "hex sha256 of the UTF-8 bytes of logs_json"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "hash_of": "logs_json",
+          "description": "sha256 of logs_json.",
           "provided": false
         },
         {
@@ -22912,7 +22959,7 @@
           },
           "known_after_apply": false,
           "sensitive": true,
-          "description": "The exact list response (JSON array of Service) as returned by the Engine API. Sensitive: ContainerSpec.Env (and Args/Command) can carry secret values.",
+          "description": "The exact list response (JSON array of Service) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "serializes": "services",
           "provided": false
         },
@@ -22926,8 +22973,8 @@
             "pointer": "#/definitions/Service"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "Every service returned by the list endpoint, each mirroring Service field by field (snake_case). Sensitive: ContainerSpec.Env (and Args/Command) can carry secret values.",
+          "sensitive": false,
+          "description": "Every service returned by the list endpoint, each mirroring Service field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "fields": [
             {
               "name": "id",
@@ -23077,7 +23124,8 @@
                           "name": "env",
                           "upstream": "Env",
                           "tf_type": "list(string)",
-                          "pointer": "#/definitions/TaskSpec/properties/ContainerSpec/properties/Env"
+                          "pointer": "#/definitions/TaskSpec/properties/ContainerSpec/properties/Env",
+                          "sensitive": true
                         },
                         {
                           "name": "dir",
@@ -23335,7 +23383,8 @@
                                       "name": "options",
                                       "upstream": "Options",
                                       "tf_type": "map(string)",
-                                      "pointer": "#/definitions/Mount/properties/VolumeOptions/properties/DriverConfig/properties/Options"
+                                      "pointer": "#/definitions/Mount/properties/VolumeOptions/properties/DriverConfig/properties/Options",
+                                      "sensitive": true
                                     }
                                   ]
                                 },
@@ -24436,7 +24485,7 @@
         }
       ],
       "outputs_status": "partial",
-      "outputs_note": "Today: a list of services with id/name/labels. Missing: services_json, the full spec chain, content_sha256, ids/names, version outputs. services/services_json sensitive (Env); ids/names are not. known_after_apply false.",
+      "outputs_note": "Today: a list of services with id/name/labels. Missing: services_json, the full spec chain, content_sha256, ids/names, version outputs. services_json sensitive; services only at ContainerSpec.Env (field-level); ids/names are not. known_after_apply false.",
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -24817,7 +24866,8 @@
             }
           ],
           "fields_complete": true,
-          "provided": false
+          "provided": false,
+          "sensitive_reason": "Every field is a secret: worker and manager join tokens each let their holder join the swarm."
         },
         {
           "name": "id",
@@ -24959,7 +25009,7 @@
           },
           "known_after_apply": false,
           "sensitive": true,
-          "description": "The exact Engine API inspect response for the task, as JSON. Sensitive: ContainerSpec.Env (and Args/Command) can carry secret values.",
+          "description": "The exact Engine API inspect response for the task, as JSON. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "serializes": "inspect",
           "provided": false
         },
@@ -24973,8 +25023,8 @@
             "pointer": "#/definitions/Task"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "The task inspect response as a nested object mirroring Task field by field (snake_case). Sensitive: ContainerSpec.Env (and Args/Command) can carry secret values.",
+          "sensitive": false,
+          "description": "The task inspect response as a nested object mirroring Task field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "fields": [
             {
               "name": "id",
@@ -25118,7 +25168,8 @@
                       "name": "env",
                       "upstream": "Env",
                       "tf_type": "list(string)",
-                      "pointer": "#/definitions/TaskSpec/properties/ContainerSpec/properties/Env"
+                      "pointer": "#/definitions/TaskSpec/properties/ContainerSpec/properties/Env",
+                      "sensitive": true
                     },
                     {
                       "name": "dir",
@@ -25376,7 +25427,8 @@
                                   "name": "options",
                                   "upstream": "Options",
                                   "tf_type": "map(string)",
-                                  "pointer": "#/definitions/Mount/properties/VolumeOptions/properties/DriverConfig/properties/Options"
+                                  "pointer": "#/definitions/Mount/properties/VolumeOptions/properties/DriverConfig/properties/Options",
+                                  "sensitive": true
                                 }
                               ]
                             },
@@ -26542,7 +26594,7 @@
       "collision": "Could merge with docker_service_logs or data.docker_logs.",
       "outputs": [
         {
-          "name": "logs_text",
+          "name": "logs",
           "tf_type": "string",
           "category": "raw",
           "source": {
@@ -26556,18 +26608,47 @@
           "provided": false
         },
         {
-          "name": "content_sha256",
+          "name": "logs_json",
+          "tf_type": "string",
+          "category": "raw",
+          "source": {
+            "type": "derived",
+            "from": "the same stream as logs",
+            "how": "JSON array with one object per log line, in arrival order: {\"timestamp\": RFC 3339 nano from the frame (timestamps=true), \"stream\": \"stdout\"|\"stderr\" from the multiplexed frame header (\"stdout\" for a TTY), \"line\": the text without the trailing newline}"
+          },
+          "known_after_apply": false,
+          "sensitive": true,
+          "description": "The same log lines as a JSON array of {timestamp, stream, line} entries. Sensitive: logs routinely contain secrets.",
+          "provided": false
+        },
+        {
+          "name": "logs_sha256",
           "tf_type": "string",
           "category": "hash",
           "source": {
             "type": "derived",
-            "from": "logs_text",
-            "how": "sha256 (hex) of the UTF-8 bytes of logs_text"
+            "from": "logs",
+            "how": "hex sha256 of the UTF-8 bytes of logs"
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "SHA-256 of logs_text.",
-          "hash_of": "logs_text",
+          "hash_of": "logs",
+          "description": "sha256 of logs.",
+          "provided": false
+        },
+        {
+          "name": "logs_json_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "logs_json",
+            "how": "hex sha256 of the UTF-8 bytes of logs_json"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "hash_of": "logs_json",
+          "description": "sha256 of logs_json.",
           "provided": false
         },
         {
@@ -26666,7 +26747,7 @@
           },
           "known_after_apply": false,
           "sensitive": true,
-          "description": "The exact list response (JSON array of Task) as returned by the Engine API. Sensitive: ContainerSpec.Env (and Args/Command) can carry secret values.",
+          "description": "The exact list response (JSON array of Task) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "serializes": "tasks",
           "provided": false
         },
@@ -26680,8 +26761,8 @@
             "pointer": "#/definitions/Task"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "Every task returned by the list endpoint, each mirroring Task field by field (snake_case). Sensitive: ContainerSpec.Env (and Args/Command) can carry secret values.",
+          "sensitive": false,
+          "description": "Every task returned by the list endpoint, each mirroring Task field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "fields": [
             {
               "name": "id",
@@ -26825,7 +26906,8 @@
                       "name": "env",
                       "upstream": "Env",
                       "tf_type": "list(string)",
-                      "pointer": "#/definitions/TaskSpec/properties/ContainerSpec/properties/Env"
+                      "pointer": "#/definitions/TaskSpec/properties/ContainerSpec/properties/Env",
+                      "sensitive": true
                     },
                     {
                       "name": "dir",
@@ -27083,7 +27165,8 @@
                                   "name": "options",
                                   "upstream": "Options",
                                   "tf_type": "map(string)",
-                                  "pointer": "#/definitions/Mount/properties/VolumeOptions/properties/DriverConfig/properties/Options"
+                                  "pointer": "#/definitions/Mount/properties/VolumeOptions/properties/DriverConfig/properties/Options",
+                                  "sensitive": true
                                 }
                               ]
                             },
@@ -28134,7 +28217,7 @@
         }
       ],
       "outputs_status": "missing",
-      "outputs_note": "Type does not exist yet. tasks/tasks_json sensitive (Env); ids/names are not. known_after_apply false.",
+      "outputs_note": "Type does not exist yet. tasks_json sensitive; tasks only at ContainerSpec.Env (field-level); ids/names are not. known_after_apply false.",
       "outputs_lane": "B",
       "lane": "Z1"
     },
@@ -28206,7 +28289,7 @@
         {
           "name": "spec",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -28346,7 +28429,7 @@
         {
           "name": "spec",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -28485,7 +28568,7 @@
         {
           "name": "spec",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -28625,7 +28708,7 @@
         {
           "name": "spec",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -28764,7 +28847,7 @@
         {
           "name": "update_response",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -28786,7 +28869,7 @@
         {
           "name": "update_status",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -28826,7 +28909,7 @@
         {
           "name": "force_update",
           "tf_type": "number",
-          "category": "identity",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -28938,7 +29021,7 @@
         {
           "name": "update_response",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -28960,7 +29043,7 @@
         {
           "name": "update_status",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -29112,7 +29195,7 @@
         {
           "name": "update_response",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -29134,7 +29217,7 @@
         {
           "name": "update_status",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -29174,7 +29257,7 @@
         {
           "name": "mode",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -29236,7 +29319,7 @@
         {
           "name": "service_status",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -29354,7 +29437,7 @@
         {
           "name": "tls_info",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -29388,7 +29471,7 @@
         {
           "name": "root_rotation_in_progress",
           "tf_type": "bool",
-          "category": "identity",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -29487,7 +29570,7 @@
         {
           "name": "join_tokens",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -29511,7 +29594,8 @@
             }
           ],
           "fields_complete": true,
-          "provided": false
+          "provided": false,
+          "sensitive_reason": "Every field is a secret: worker and manager join tokens each let their holder join the swarm."
         },
         {
           "name": "worker_join_token",
@@ -29712,7 +29796,7 @@
         {
           "name": "swarm_info",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -29843,8 +29927,8 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "The `project.configs` slice of the shared `project` attribute (full project on compose:name). Sensitive: inline `content` and environment-sourced values.",
+          "sensitive": false,
+          "description": "The `project.configs` slice of the shared `project` attribute (full project on compose:name). Field-level sensitive: inline `content` and environment-sourced values.",
           "fields": [
             {
               "name": "configs",
@@ -29896,8 +29980,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/config/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             }
           ],
           "fields_complete": false,
@@ -30012,7 +30095,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.include` slice of the shared `project` attribute (full project on compose:name). ",
           "fields": [
             {
@@ -30157,7 +30240,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.jobs` slice of the shared `project` attribute (full project on compose:name). Follows compose-spec (jobs.*.extends is spec-only).",
           "fields": [
             {
@@ -30878,7 +30961,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -30910,7 +30992,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -31205,7 +31288,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.models` slice of the shared `project` attribute (full project on compose:name). ",
           "fields": [
             {
@@ -31359,7 +31442,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The whole normalized project, mirroring the compose-spec top-level schema: `project.services[\"web\"].ports`, `project.networks`, ...",
           "fields": [
             {
@@ -32119,7 +32202,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -32151,7 +32233,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -32731,7 +32814,8 @@
                   "name": "driver_opts",
                   "upstream": "driver_opts",
                   "tf_type": "map(string)",
-                  "pointer": "#/$defs/volume/properties/driver_opts"
+                  "pointer": "#/$defs/volume/properties/driver_opts",
+                  "sensitive": true
                 },
                 {
                   "name": "external",
@@ -32802,8 +32886,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/secret/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             },
             {
               "name": "configs",
@@ -32855,8 +32938,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/config/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             },
             {
               "name": "jobs",
@@ -33576,7 +33658,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -33608,7 +33689,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -33958,7 +34040,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.networks` slice of the shared `project` attribute (full project on compose:name). ",
           "fields": [
             {
@@ -34179,8 +34261,8 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "The `project.secrets` slice of the shared `project` attribute (full project on compose:name). Sensitive: file/environment sources resolve to secret values.",
+          "sensitive": false,
+          "description": "The `project.secrets` slice of the shared `project` attribute (full project on compose:name). Field-level sensitive: environment-sourced values.",
           "fields": [
             {
               "name": "secrets",
@@ -34237,8 +34319,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/secret/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             }
           ],
           "fields_complete": false,
@@ -34367,7 +34448,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.services` slice of the shared `project` attribute (full project on compose:name). Every service property, build/deploy/healthcheck/ports/volumes one level deeper.",
           "fields": [
             {
@@ -35087,7 +35168,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -35119,7 +35199,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -35699,7 +35780,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The `project.volumes` slice of the shared `project` attribute (full project on compose:name). ",
           "fields": [
             {
@@ -35724,7 +35805,8 @@
                   "name": "driver_opts",
                   "upstream": "driver_opts",
                   "tf_type": "map(string)",
-                  "pointer": "#/$defs/volume/properties/driver_opts"
+                  "pointer": "#/$defs/volume/properties/driver_opts",
+                  "sensitive": true
                 },
                 {
                   "name": "external",
@@ -35846,8 +35928,8 @@
             "pointer": "#/$defs/workload_spec/properties/build"
           },
           "known_after_apply": false,
-          "sensitive": true,
-          "description": "The service's normalized `build` section (short form becomes {context}). Sensitive: args, secrets, ssh.",
+          "sensitive": false,
+          "description": "The service's normalized `build` section (short form becomes {context}). Field-level sensitive: args, secrets, ssh, dockerfile_inline.",
           "fields": [
             {
               "name": "context",
@@ -35983,7 +36065,6 @@
               "upstream": "secrets",
               "tf_type": "list(object({...}))",
               "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-              "sensitive": true,
               "fields": [
                 {
                   "name": "source",
@@ -36015,7 +36096,8 @@
                   "tf_type": "number",
                   "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                 }
-              ]
+              ],
+              "sensitive": true
             },
             {
               "name": "tags",
@@ -36543,7 +36625,7 @@
             "pointer": "#"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The whole normalized project (same shape as `project` on docker_compose).",
           "fields": [
             {
@@ -37303,7 +37385,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -37335,7 +37416,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -37915,7 +37997,8 @@
                   "name": "driver_opts",
                   "upstream": "driver_opts",
                   "tf_type": "map(string)",
-                  "pointer": "#/$defs/volume/properties/driver_opts"
+                  "pointer": "#/$defs/volume/properties/driver_opts",
+                  "sensitive": true
                 },
                 {
                   "name": "external",
@@ -37986,8 +38069,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/secret/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             },
             {
               "name": "configs",
@@ -38039,8 +38121,7 @@
                   "tf_type": "string",
                   "pointer": "#/$defs/config/properties/template_driver"
                 }
-              ],
-              "sensitive": true
+              ]
             },
             {
               "name": "jobs",
@@ -38760,7 +38841,6 @@
                       "upstream": "secrets",
                       "tf_type": "list(object({...}))",
                       "pointer": "#/$defs/workload_spec/properties/build/oneOf/1/properties/secrets",
-                      "sensitive": true,
                       "fields": [
                         {
                           "name": "source",
@@ -38792,7 +38872,8 @@
                           "tf_type": "number",
                           "pointer": "#/$defs/service_config_or_secret/items/oneOf/1/properties/mode"
                         }
-                      ]
+                      ],
+                      "sensitive": true
                     },
                     {
                       "name": "tags",
@@ -39113,7 +39194,7 @@
             "pointer": "#/definitions/ContainerSummary"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The project's containers, ContainerSummary fields plus service/number from the compose labels.",
           "fields": [
             {
@@ -39162,8 +39243,7 @@
               "name": "command",
               "upstream": "Command",
               "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Command",
-              "sensitive": true
+              "pointer": "#/definitions/ContainerSummary/properties/Command"
             },
             {
               "name": "created",
@@ -39561,6 +39641,19 @@
       "cli_only": true,
       "outputs": [
         {
+          "name": "logs",
+          "tf_type": "string",
+          "category": "raw",
+          "source": {
+            "type": "derived",
+            "from": "entries",
+            "how": "one line per entry, as `docker compose logs` prints it without color: \"<container_name>  | <line>\", joined with \n"
+          },
+          "known_after_apply": true,
+          "sensitive": true,
+          "description": "The log lines as plain text, prefixed with the container name like `docker compose logs`. Sensitive: application output can print secrets."
+        },
+        {
           "name": "logs_json",
           "tf_type": "string",
           "category": "raw",
@@ -39575,18 +39668,32 @@
           "serializes": "entries"
         },
         {
-          "name": "content_sha256",
+          "name": "logs_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "logs",
+            "how": "hex sha256 of the UTF-8 bytes of logs"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "hash_of": "logs",
+          "description": "sha256 of logs."
+        },
+        {
+          "name": "logs_json_sha256",
           "tf_type": "string",
           "category": "hash",
           "source": {
             "type": "derived",
             "from": "logs_json",
-            "how": "sha256 of the UTF-8 bytes"
+            "how": "hex sha256 of the UTF-8 bytes of logs_json"
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "Hex SHA-256 of `logs_json`.",
-          "hash_of": "logs_json"
+          "hash_of": "logs_json",
+          "description": "sha256 of logs_json."
         },
         {
           "name": "entries",
@@ -39598,7 +39705,7 @@
             "pointer": "#/paths/~1containers~1{id}~1logs/get"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Log lines of the selected service containers, in time order.",
           "fields": [
             {
@@ -40017,7 +40124,7 @@
             "pointer": "#/definitions/ContainerTopResponse"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Container name -> ps titles and rows.",
           "fields": [
             {
@@ -40775,15 +40882,15 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
             "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema"
           },
           "known_after_apply": true,
-          "sensitive": true,
-          "description": "Exit code and captured output of the command. Sensitive: output can print secrets.",
+          "sensitive": false,
+          "description": "Exit code and captured output of the command. Field-level sensitive: stdout and stderr (output can print secrets); exit_code stays plain.",
           "fields": [
             {
               "name": "exit_code",
@@ -41540,15 +41647,15 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
             "pointer": "#/definitions/ContainerWaitResponse"
           },
           "known_after_apply": true,
-          "sensitive": true,
-          "description": "Exit code (ContainerWaitResponse.StatusCode) and captured output. Sensitive: output can print secrets.",
+          "sensitive": false,
+          "description": "Exit code (ContainerWaitResponse.StatusCode) and captured output. Field-level sensitive: stdout and stderr (output can print secrets); exit_code stays plain.",
           "fields": [
             {
               "name": "exit_code",
@@ -42133,7 +42240,7 @@
         {
           "name": "results",
           "tf_type": "map(object({...}))",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -43025,7 +43132,7 @@
         {
           "name": "reconstructed",
           "tf_type": "bool",
-          "category": "identity",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -43038,7 +43145,7 @@
         {
           "name": "fidelity",
           "tf_type": "string",
-          "category": "identity",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -43085,7 +43192,7 @@
             "anchor": "#from"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Build stages in order: name, base image (as written, resolved ref and digest when available) and every instruction with all its flags, in the dockerfile:* block model. Image mode: one stage, instructions from history CreatedBy, base unknown.",
           "fields": [
             {
@@ -43211,7 +43318,8 @@
                   "tf_type": "object({...})",
                   "anchor": "#env",
                   "see": "dockerfile:ENV",
-                  "description": "Set when keyword = ENV; shape = the `env` output of dockerfile:ENV."
+                  "description": "Set when keyword = ENV; shape = the `env` output of dockerfile:ENV.",
+                  "sensitive": true
                 },
                 {
                   "name": "add",
@@ -43267,7 +43375,8 @@
                   "tf_type": "object({...})",
                   "anchor": "#arg",
                   "see": "dockerfile:ARG",
-                  "description": "Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG."
+                  "description": "Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG.",
+                  "sensitive": true
                 },
                 {
                   "name": "onbuild",
@@ -43309,7 +43418,8 @@
                   "description": "Image mode only: the history entry this instruction was reconstructed from.",
                   "filled_by": [
                     "image"
-                  ]
+                  ],
+                  "sensitive": true
                 },
                 {
                   "name": "created",
@@ -43431,7 +43541,7 @@
             "anchor": "#understand-how-arg-and-from-interact"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "ARGs declared before the first FROM (usable in FROM).",
           "fields": [
             {
@@ -43536,7 +43646,7 @@
             "pointer": "#/definitions/ImageHistoryResponseItem"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Image mode only: GET /images/{name}/history entries the reconstruction used (CreatedBy holds build-arg values).",
           "fields": [
             {
@@ -44018,7 +44128,7 @@
             "anchor": "#arg"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The ARG instruction as typed fields; every documented flag is a field.",
           "fields": [
             {
@@ -45390,7 +45500,7 @@
             "anchor": "#env"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The ENV instruction as typed fields; every documented flag is a field.",
           "fields": [
             {
@@ -47928,7 +48038,7 @@
             "file": "upstream/buildx/docs/reference/buildx_inspect.md"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The builder object field by field (name, driver, last activity, nodes with endpoint, status, BuildKit version, platforms, labels, GC policy).",
           "fields": [
             {
@@ -47981,7 +48091,8 @@
                   "upstream": "Driver Options",
                   "tf_type": "map(string)",
                   "label": "Driver Options",
-                  "file": "upstream/buildx/docs/reference/buildx_inspect.md"
+                  "file": "upstream/buildx/docs/reference/buildx_inspect.md",
+                  "sensitive": true
                 },
                 {
                   "name": "status",
@@ -48151,7 +48262,7 @@
         {
           "name": "buildkit_version",
           "tf_type": "string",
-          "category": "identity",
+          "category": "version",
           "source": {
             "type": "cli",
             "command": "docker buildx ls",
@@ -48358,7 +48469,7 @@
             "label": "--metadata-file"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The build result field by field (dotted metadata keys become snake_case).",
           "fields": [
             {
@@ -48366,7 +48477,8 @@
               "upstream": "buildx.build.provenance",
               "tf_type": "dynamic",
               "file": "upstream/buildx/docs/reference/buildx_bake.md",
-              "anchor": "#metadata-file"
+              "anchor": "#metadata-file",
+              "sensitive": true
             },
             {
               "name": "buildx_build_ref",
@@ -48657,7 +48769,7 @@
             "file": "upstream/buildx/docs/reference/buildx_inspect.md"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The builder object field by field (name, driver, last activity, nodes with endpoint, status, BuildKit version, platforms, labels, GC policy).",
           "fields": [
             {
@@ -48710,7 +48822,8 @@
                   "upstream": "Driver Options",
                   "tf_type": "map(string)",
                   "label": "Driver Options",
-                  "file": "upstream/buildx/docs/reference/buildx_inspect.md"
+                  "file": "upstream/buildx/docs/reference/buildx_inspect.md",
+                  "sensitive": true
                 },
                 {
                   "name": "status",
@@ -48880,7 +48993,7 @@
         {
           "name": "buildkit_version",
           "tf_type": "string",
-          "category": "identity",
+          "category": "version",
           "source": {
             "type": "cli",
             "command": "docker buildx ls",
@@ -49016,7 +49129,7 @@
             "format_field": "{{.Builder}}"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "One entry per builder, same shape as the docker_buildx_builder data source `builder` output.",
           "fields": [
             {
@@ -49069,7 +49182,8 @@
                   "upstream": "Driver Options",
                   "tf_type": "map(string)",
                   "label": "Driver Options",
-                  "file": "upstream/buildx/docs/reference/buildx_inspect.md"
+                  "file": "upstream/buildx/docs/reference/buildx_inspect.md",
+                  "sensitive": true
                 },
                 {
                   "name": "status",
@@ -49704,7 +49818,7 @@
             "format_field": "json"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The build record field by field.",
           "fields": [
             {
@@ -49726,7 +49840,8 @@
               "upstream": "Context",
               "tf_type": "string",
               "format_field": "{{.Context}}",
-              "file": "upstream/buildx/docs/reference/buildx_history_inspect.md"
+              "file": "upstream/buildx/docs/reference/buildx_history_inspect.md",
+              "sensitive": true
             },
             {
               "name": "dockerfile",
@@ -49740,7 +49855,8 @@
               "upstream": "VCSRepository",
               "tf_type": "string",
               "format_field": "{{.VCSRepository}}",
-              "file": "upstream/buildx/docs/reference/buildx_history_inspect.md"
+              "file": "upstream/buildx/docs/reference/buildx_history_inspect.md",
+              "sensitive": true
             },
             {
               "name": "vcs_revision",
@@ -49832,7 +49948,8 @@
                   "upstream": "ImageResolveMode",
                   "tf_type": "string"
                 }
-              ]
+              ],
+              "sensitive": true
             },
             {
               "name": "materials",
@@ -49844,7 +49961,8 @@
                 {
                   "name": "uri",
                   "upstream": "URI",
-                  "tf_type": "string"
+                  "tf_type": "string",
+                  "sensitive": true
                 },
                 {
                   "name": "digests",
@@ -50343,7 +50461,7 @@
             "format_field": "{{json .Image}}"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The image config field by field (for an index: one entry per platform, keyed os/arch[/variant]).",
           "fields": [
             {
@@ -50373,7 +50491,8 @@
               "tf_type": "dynamic",
               "format_field": "{{json .Image}}",
               "file": "upstream/buildx/docs/reference/buildx_imagetools_inspect.md",
-              "note": "container config (Env, Cmd, ...); upstream keys kept as-is under the mechanical rule"
+              "note": "container config (Env, Cmd, ...); upstream keys kept as-is under the mechanical rule",
+              "sensitive": true
             },
             {
               "name": "rootfs",
@@ -50409,7 +50528,8 @@
                 {
                   "name": "created_by",
                   "upstream": "created_by",
-                  "tf_type": "string"
+                  "tf_type": "string",
+                  "sensitive": true
                 },
                 {
                   "name": "empty_layer",
@@ -50648,7 +50768,7 @@
         {
           "name": "bake",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "cli",
             "command": "docker buildx bake",
@@ -50656,7 +50776,7 @@
             "label": "--print"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The resolved definition field by field: groups and targets with every target attribute.",
           "fields": [
             {
@@ -50685,7 +50805,8 @@
                   "upstream": "args",
                   "tf_type": "map(string)",
                   "anchor": "#targetargs",
-                  "file": "upstream/buildx/docs/bake-reference.md"
+                  "file": "upstream/buildx/docs/bake-reference.md",
+                  "sensitive": true
                 },
                 {
                   "name": "annotations",
@@ -50748,7 +50869,8 @@
                   "upstream": "dockerfile-inline",
                   "tf_type": "string",
                   "anchor": "#targetdockerfileinline",
-                  "file": "upstream/buildx/docs/bake-reference.md"
+                  "file": "upstream/buildx/docs/bake-reference.md",
+                  "sensitive": true
                 },
                 {
                   "name": "dockerfile",
@@ -50885,7 +51007,8 @@
                   "tf_type": "list(dynamic)",
                   "note": "string or {type,id,src/env} entries; ids and sources only, never secret values",
                   "anchor": "#targetsecret",
-                  "file": "upstream/buildx/docs/bake-reference.md"
+                  "file": "upstream/buildx/docs/bake-reference.md",
+                  "sensitive": true
                 },
                 {
                   "name": "shm_size",
@@ -50900,7 +51023,8 @@
                   "upstream": "ssh",
                   "tf_type": "list(dynamic)",
                   "anchor": "#targetssh",
-                  "file": "upstream/buildx/docs/bake-reference.md"
+                  "file": "upstream/buildx/docs/bake-reference.md",
+                  "sensitive": true
                 },
                 {
                   "name": "tags",
@@ -50931,7 +51055,7 @@
         {
           "name": "metadata",
           "tf_type": "map(object({...}))",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "cli",
             "command": "docker buildx bake",
@@ -50939,7 +51063,7 @@
             "label": "--metadata-file"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Target name -> build result.",
           "fields": [
             {
@@ -50947,7 +51071,8 @@
               "upstream": "buildx.build.provenance",
               "tf_type": "dynamic",
               "file": "upstream/buildx/docs/reference/buildx_bake.md",
-              "anchor": "#metadata-file"
+              "anchor": "#metadata-file",
+              "sensitive": true
             },
             {
               "name": "buildx_build_ref",
@@ -51181,7 +51306,7 @@
         {
           "name": "status",
           "tf_type": "string",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "cli",
             "command": "docker buildx ls",
@@ -51269,7 +51394,7 @@
         {
           "name": "result",
           "tf_type": "object({...})",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -52190,6 +52315,18 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx."
+        },
+        {
+          "name": "docker_cli_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "sources_md",
+            "pin": "docker_cli"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "missing",
@@ -52294,7 +52431,7 @@
             "pointer": "#/$defs/service"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The stack as a compose-spec document field by field: `services` is a map of service name -> compose-spec service (all top-level service keys recorded).",
           "fields": [
             {
@@ -52549,7 +52686,8 @@
                   "name": "env_file",
                   "upstream": "env_file",
                   "tf_type": "list(dynamic)",
-                  "pointer": "#/$defs/container_spec/properties/env_file"
+                  "pointer": "#/$defs/container_spec/properties/env_file",
+                  "sensitive": true
                 },
                 {
                   "name": "label_file",
@@ -52562,7 +52700,8 @@
                   "upstream": "environment",
                   "tf_type": "map(string)",
                   "pointer": "#/$defs/container_spec/properties/environment",
-                  "note": "sensitive: values"
+                  "note": "sensitive: values",
+                  "sensitive": true
                 },
                 {
                   "name": "extra_hosts",
@@ -52748,7 +52887,8 @@
                   "name": "secrets",
                   "upstream": "secrets",
                   "tf_type": "list(dynamic)",
-                  "pointer": "#/$defs/container_spec/properties/secrets"
+                  "pointer": "#/$defs/container_spec/properties/secrets",
+                  "sensitive": true
                 },
                 {
                   "name": "sysctls",
@@ -52913,7 +53053,7 @@
         {
           "name": "service_status",
           "tf_type": "list(object({...}))",
-          "category": "structured",
+          "category": "result",
           "source": {
             "type": "cli",
             "command": "docker stack services",
@@ -52921,7 +53061,7 @@
             "format_field": "json"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Runtime view per service (the `stack services` row: id, mode, replicas, image, ports) plus its ServiceSpec.",
           "fields": [
             {
@@ -52988,7 +53128,8 @@
               "upstream": "Spec",
               "tf_type": "dynamic",
               "pointer": "#/definitions/ServiceSpec",
-              "note": "full ServiceSpec, mechanical snake_case below"
+              "note": "full ServiceSpec, mechanical snake_case below",
+              "sensitive": true
             }
           ],
           "fields_complete": false,
@@ -53142,6 +53283,18 @@
           "known_after_apply": true,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
+        },
+        {
+          "name": "docker_cli_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "sources_md",
+            "pin": "docker_cli"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "partial",
@@ -53538,7 +53691,7 @@
             "format_field": "{{json .Image}}"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The image config field by field (for an index: one entry per platform, keyed os/arch[/variant]).",
           "fields": [
             {
@@ -53568,7 +53721,8 @@
               "tf_type": "dynamic",
               "format_field": "{{json .Image}}",
               "file": "upstream/buildx/docs/reference/buildx_imagetools_inspect.md",
-              "note": "container config (Env, Cmd, ...); upstream keys kept as-is under the mechanical rule"
+              "note": "container config (Env, Cmd, ...); upstream keys kept as-is under the mechanical rule",
+              "sensitive": true
             },
             {
               "name": "rootfs",
@@ -53604,7 +53758,8 @@
                 {
                   "name": "created_by",
                   "upstream": "created_by",
-                  "tf_type": "string"
+                  "tf_type": "string",
+                  "sensitive": true
                 },
                 {
                   "name": "empty_layer",
@@ -53706,6 +53861,18 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx."
+        },
+        {
+          "name": "docker_cli_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "sources_md",
+            "pin": "docker_cli"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "partial",
@@ -53787,7 +53954,7 @@
             "format_field": "json"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "One entry per service: the `stack services` row plus the full spec.",
           "fields": [
             {
@@ -53854,7 +54021,8 @@
               "upstream": "Spec",
               "tf_type": "dynamic",
               "pointer": "#/definitions/ServiceSpec",
-              "note": "full ServiceSpec, mechanical snake_case below"
+              "note": "full ServiceSpec, mechanical snake_case below",
+              "sensitive": true
             }
           ],
           "fields_complete": false
@@ -53998,6 +54166,18 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
+        },
+        {
+          "name": "docker_cli_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "sources_md",
+            "pin": "docker_cli"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "missing",
@@ -54146,6 +54326,18 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "Docker Engine version of the daemon (GET /version Version)."
+        },
+        {
+          "name": "docker_cli_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "sources_md",
+            "pin": "docker_cli"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "docker CLI release whose client-side behaviour this type reproduces (the docker_cli pin in SOURCES.md, v29.5.3)."
         }
       ],
       "outputs_status": "missing",

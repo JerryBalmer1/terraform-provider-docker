@@ -1,4 +1,4 @@
-"""Check the outputs contract (rules V1-V4 in SCHEMA.md) on a merged inventory.json.
+"""Check the outputs contract (rules V1-V5 in SCHEMA.md) on a merged inventory.json.
 
 Run through `Invoke-Build InventoryValidate` from the repo root. Stdlib only.
 Violations listed in allowed-violations.txt (`<id><TAB><rule><TAB><reason>`) are reported as allowed;
@@ -12,7 +12,9 @@ import argparse, json, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 REF = os.path.normpath(os.path.join(HERE, ".."))
 VERSION_NAMES = {"engine_api_version", "docker_server_version", "compose_spec_version",
-                 "compose_go_version", "dockerfile_syntax", "buildx_version"}
+                 "compose_go_version", "dockerfile_syntax", "buildx_version",
+                 "buildkit_version", "docker_cli_version"}
+OBJECTISH = ("object(", "list(object(", "set(object(", "map(object(")
 
 ap = argparse.ArgumentParser()
 ap.add_argument("inventory", nargs="?", default=os.path.join(REF, "inventory.json"))
@@ -63,6 +65,10 @@ for it in inv["items"]:
             violations.append((iid, "V3", "version output %s is not one of %s" % (o["name"], ", ".join(sorted(VERSION_NAMES)))))
         if o["category"] == "structured" and not o.get("fields"):
             violations.append((iid, "V4", "structured output %s has no fields" % o["name"]))
+        if o["category"] == "result" and o["tf_type"].startswith(OBJECTISH) and not o.get("fields"):
+            violations.append((iid, "V4", "result output %s is an object but has no fields" % o["name"]))
+        if o["category"] in ("structured", "result") and o.get("sensitive") and not o.get("sensitive_reason"):
+            violations.append((iid, "V5", "%s output %s is sensitive as a whole with no sensitive_reason; mark the secret-carrying fields instead" % (o["category"], o["name"])))
 
 failing = [v for v in violations if (v[0], v[1]) not in allowed]
 used = {(v[0], v[1]) for v in violations}

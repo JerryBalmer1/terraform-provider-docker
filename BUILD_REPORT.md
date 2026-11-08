@@ -749,3 +749,56 @@ pwsh -File build.ps1 -Task apiwatch
 go run ./tools/apiwatch -check
 go run ./tools/genskill -check
 ```
+
+## Pass 4
+
+Goal: full Docker Engine API coverage at a pinned version (1.56), the Pass 3 TODOs closed, a release pipeline, and the provider proven on the Claude.Agent topology. Lanes: 0 (client bump + version policy, blocks the rest), A (Engine API coverage), B (Pass 3 TODOs), C (release pipeline), D (Claude.Agent dogfood), E (skill/docs/climap/apiwatch), F (harness + verification).
+
+### Log
+
+[P4-0] [VERIFIED] engine-api-watch at pass start: `go run ./tools/apiwatch` reports v1.56 -> v1.56, no endpoint or definition changes; v1.56 is still the newest published spec. The open work is the nine apiwatch TODOs filed under "Pass 4 Lane 0" (docker_container, docker_image, list docker_image, docker_network, docker_volume, docker_system_prune, registry_auth, docker_service, docker_plugin); they go to Lane A.
+[P4-0] [BUILD] Target module versions (newest at 2026-11-04): github.com/moby/moby/client v0.6.2, github.com/moby/moby/api v1.56.1 (Engine API 1.56), github.com/moby/buildkit v0.34.2 (v0.35.0-rc1 not taken), github.com/docker/cli v29.9.3+incompatible (already newest), github.com/compose-spec/compose-go/v2 v2.16.2 (already newest).
+[P4-0] [BUILD] Client migration: github.com/docker/docker v28.5.2+incompatible removed; github.com/moby/moby/client v0.6.2 and github.com/moby/moby/api v1.56.1 (Engine API 1.56) are now direct requirements (were indirect). buildkit v0.34.2, docker/cli v29.9.3+incompatible and compose-go v2.16.2 unchanged. 102 tracked files under internal/provider changed; new: api_version.go, moby_convert.go, moby_helpers_test.go, compose_hash_compat.go. No Go file imports github.com/docker/docker.
+[P4-0] [BUILD] min_api_version in the provider schema (optional string, form 1.NN, default DefaultMinAPIVersion = 1.44 / Docker Engine 25.0, rejected above client.MaxAPIVersion 1.56). No environment variable: env fallbacks in this provider mirror docker CLI variables only, and the CLI has no API floor setting. Configure: unknown -> attribute error; unset -> 1.44; validateMinAPIVersion -> attribute error on min_api_version; a pinned api_version / DOCKER_API_VERSION below the floor is rejected; after a successful ping with negotiation, a daemon below the floor is an attribute error naming host and both versions; a failed ping stays a warning. providerData carries MinAPIVersion and is pre-seeded with the negotiated version. With disable_docker_daemon_check the floor applies on the first pd.APIVersion call.
+[P4-0] [TEST] api_version_test.go: TestMinAPIVersionSchema, TestConfigureMinAPIVersionDefault, TestConfigureMinAPIVersionExplicit, TestConfigureMinAPIVersionInvalid (1.4x, 2.0, 1., "", 1.999), TestConfigureMinAPIVersionUnknown, TestConfigureDaemonBelowFloor (daemon 1.41, floor 1.44), TestConfigureDaemonCheckDisabledFloorIsLazy, TestConfigureUnreachableDaemonWarnsOnly, TestConfigurePinnedAPIVersionBelowFloor, TestCheckAPIFloor. PASS.
+[P4-0] [VERIFIED] Compose config hash compatibility v28 -> moby: 134 digests (local: 41 container, 17 network, 8 volume; swarm: 30 service, 17 network, 11 secret, 10 config) captured on HEAD 51e266b with docker/docker v28 over 12 fixtures from 10 YAML files in internal/provider/testdata/compose_hash (both examples/resources/docker_compose projects, both tools/compose2stack testdata files, five compose unit-test fixtures, and a new kitchen_sink.yml covering env/file secrets, content/file/env configs, build, deploy, profiles, IPv6 + enable_ipv4:false networks and driver_opts volumes). Pinned in compose_hash_compat_test.go (TestComposeHashCompat, no env vars, -short, working dir normalized to /compose-hash). 0 mismatches; the hashed JSON of all 132 captured objects is byte-identical between v28 and moby. Mutation check: hashing the moby types directly fails 75 digests.
+[P4-0] [FIXED] Debug code removed: the HASH_JSON writer in composeHash (compose_parse.go) and zz_hash_probe_test.go. No file in the repo references HASH_JSON, HASH_OUT or FIXDIR.
+[P4-0] [TODO] client.go: wire apiFloorHook so every versioned request enforces the floor even on paths that never call pd.APIVersion: carry the floor on endpointConfig (set in Configure before newDockerClient) and add client.WithRequestHook(apiFloorHook(ep.Host, floor)) (check the option name in moby/moby/client v0.6.2) when the floor is non-empty.
+[P4-0] [TODO] apiSince / gateAPISince stay unwired. Gate worklist from reference/inventory.json (min_api above 1.44): engine:image-attestations (docker_image_attestations data source, not implemented; GET /images/{name}/attestations) 1.55. That is the only one: 212 of 233 items have null min_api and 20 have <= 1.44. The inventory's min_api is endpoint-level only (from Engine API CHANGELOG "added" lines), so field-level additions in 1.45-1.56 need a separate CHANGELOG pass before attributes are annotated.
+[P4-0] [VERIFIED] Invoke-Build Docs (GenSkill + tfplugindocs): docs/index.md and .claude/skills/terraform-provider-docker/reference/provider.md show min_api_version. Invoke-Build (Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate): succeeded. Invoke-Build FmtCheck, GenSkillCheck, DocsValidate: succeeded. CLAUDE.md and README.md default-task lines now list InventoryValidate.
+
+### Pass 4 Lane 0 summary
+
+- **Client migration.** github.com/docker/docker v28.5.2+incompatible was replaced by github.com/moby/moby/client v0.6.2 + github.com/moby/moby/api v1.56.1 (Engine API 1.56). Other modules unchanged: buildkit v0.34.2, docker/cli v29.9.3+incompatible, compose-go v2.16.2.
+- **Version policy.** min_api_version (default 1.44, max 1.56) is in the schema and docs. Configure validates it, rejects a pinned api_version below it, and fails when the negotiated daemon version is below it; an unreachable daemon is still only a warning. apiSince/gateAPISince exist but are not wired to any schema yet.
+- **Compose hash compatibility.** 134 v28 digests over 12 fixtures (10 YAML files) are pinned in TestComposeHashCompat with 0 mismatches, so upgrading does not recreate compose networks, volumes, containers or services.
+- **Debug removal.** The HASH_JSON hook and zz_hash_probe_test.go are gone.
+- **Tests** (unit, -short, TF_ACC unset, all packages; counted with go test -json, verdict from Invoke-Build Test):
+  - Before this close-out: 295 / 21 / 77 as recorded at the start (and TestZZHashProbe failed without FIXDIR).
+  - After: 303 top-level tests pass, 0 fail, 77 skip; 354 passing including 51 subtests. New: 10 min_api_version tests (+6 subtests) and TestComposeHashCompat (+12 subtests); removed: TestZZHashProbe.
+- **Gate worklist** for the later Pass 4 lanes: engine:image-attestations -> docker_image_attestations (not implemented), Engine API 1.55. Nothing else in the inventory is above the floor at endpoint level; field-level minimums still need a CHANGELOG pass.
+- **Open TODOs:** wire apiFloorHook in client.go; the apiSince annotations above; the nine apiwatch TODOs (to Lane A).
+
+## Pass 4.5 Lane Z
+
+Goal: close the four cross-lane naming questions Lane Z carried after merging the outputs-contract lanes A-E (committed in 51e266b), with the user's decisions, and apply them across the lane files. Lanes A-E were complete (no running lanes or worktrees); Lane Z owns no items.
+
+### Log
+
+[P4.5-Z] [VERIFIED] Lanes A-E done: outputs/A-E.json merged into inventory.json in 51e266b (1136 outputs, 158 items), InventoryValidate green, no allowed-violations proposed. Open: the four cross-lane questions in outputs/Z.json.
+[P4.5-Z] [BUILD] Decisions from the user (2026-11-08): logs = both `logs` and `logs_json`; add a sixth category `result`; sensitivity per field; extend the V3 version names.
+[P4.5-Z] [BUILD] Logs: engine:container-logs, swarm:service-logs, swarm:task-logs (logs_text -> logs) gained `logs_json` (JSON array of {timestamp, stream, line}); compose:cli-logs gained `logs` (text, "<container>  | <line>"). content_sha256 became logs_sha256 + logs_json_sha256 (two-raw hash rule).
+[P4.5-Z] [BUILD] Category `result` (merge.py OUT_CATEGORIES; INVENTORY.md outputs tables gained a result column): every structured output of an action (35 outputs: A 13, B 15, C 3, E 4) plus root_rotation_in_progress, force_update, image created (x2), dockerfile reconstructed/fidelity, stack service_status. Identity handoff values (deleted IDs, tokens, digests) unchanged. V4 extended to object-typed result outputs.
+[P4.5-Z] [BUILD] Per-field sensitivity: new rule V5 (validate.py) - a structured/result output is sensitive as a whole only with `sensitive_reason`; merge.py rejects a sensitive hash, a sensitive_reason without sensitive, a non-bool FIELD sensitive, and a sensitive FIELD inside a whole-sensitive output. The 57 whole-sensitive outputs were converted: 54 now mark their secret-carrying fields (env, volume/driver options, build args/secrets/ssh/dockerfile_inline, compose environment/env_file/configs content, ENV/ARG values, history created_by, provenance/attestation, log line, stdout/stderr, identity_token; `dynamic` carriers marked whole), 3 join_tokens outputs keep whole sensitivity with a reason. Raw outputs unchanged (still sensitive). Stale "Sensitive: ..." descriptions in B and C rewritten.
+[P4.5-Z] [ASSUMED] Sensitivity judgment calls (reversible, listed in Z.json notes): command lines (container args/cmd/entrypoint, service Args/Command, compose ps Command, compose top processes) are not a secret channel, per Lane A and CONTRACT.md, so compose:cli-ps containers and compose:cli-top processes are now plain; Lane C's parent-level marks on whole `secrets`/`configs` maps dropped (children stay marked); compose networks/models slices are plain. Accepted risk: a secret interpolated into a non-secret field is not hidden.
+[P4.5-Z] [BUILD] Version names: V3 allows eight: + buildkit_version (buildx:builder, buildx:builder-inspect, moved from identity) and docker_cli_version (pin docker_cli v29.5.3, added to the five cli-only items).
+[P4.5-Z] [BUILD] Lane questions answered by these decisions removed from naming_questions (B 2, C 1, D 1, E 2) and recorded in Z.json notes; Z.json naming_questions now empty. Still open: A's raw names for non-JSON streams (exec output, build_log, content_base64) and A/C's result shape (one `result` object vs flat exit_code/stdout).
+[P4.5-Z] [BUILD] Docs: CONTRACT.md (six categories, per-field sensitivity, logs naming, eight version names, V4/V5), _gen/SCHEMA.md, _gen/README.md, allowed-violations.txt header (V1-V5).
+[P4.5-Z] [TEST] Invoke-Build Inventory: 233 items, 0 errors. InventoryValidate: 158 items, 1149 outputs, 0 violations, 0 allowed. Mutation check: re-marking engine:container inspect sensitive without a reason fails V5.
+[P4.5-Z] [TODO] terraform-provider-docker.build.ps1 InventoryValidate synopsis still says "V1-V4"; change to "V1-V5" (left alone: the build file was out of scope).
+
+### Pass 4.5 Lane Z summary
+
+- All four cross-lane questions are decided and applied; 1136 -> 1149 outputs (+13: logs_json x3, logs x1, a second logs hash x4, docker_cli_version x5).
+- Six categories, eight version names, rules V1-V5; InventoryValidate passes with no allowed violations.
+- Two lane questions stay open for a later pass: non-JSON raw stream names (A) and result shape (A, C).

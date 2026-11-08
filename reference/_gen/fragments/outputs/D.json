@@ -18,7 +18,6 @@
     "`image_id` duplicates `id` on docker_image and data.docker_image: keep both, or deprecate `image_id`?",
     "data.docker_dockerfile: expose the original input text as a second raw output (`source_dockerfile` + `source_dockerfile_sha256`) beside the re-rendered `dockerfile`, or only the rendered form?",
     "Structured output name on each dockerfile_block item: the lowercase keyword (`run`, `copy`, `from`, current) or one uniform name (`block`)?",
-    "Whole-Dockerfile outputs (`dockerfile`, `stages`) are sensitive because ENV/ARG values are inline: keep them sensitive (current), or move ENV values and ARG defaults into separate sensitive outputs (`env_values`, `arg_defaults`) so the rest stays plain?",
     "data.docker_dockerfile image mode: name the provenance outputs `reconstructed` + `fidelity` (current, both identity) or a single `fidelity` (`exact`/`approximate`)?"
   ],
   "allowed_violations": [],
@@ -1165,7 +1164,7 @@
             "anchor": "#env"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The ENV instruction as typed fields; every documented flag is a field.",
           "fields": [
             {
@@ -2119,7 +2118,7 @@
             "anchor": "#arg"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "The ARG instruction as typed fields; every documented flag is a field.",
           "fields": [
             {
@@ -3124,7 +3123,7 @@
         {
           "name": "created",
           "tf_type": "string",
-          "category": "identity",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -3262,7 +3261,7 @@
             "pointer": "#/definitions/ImageConfig"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Image config (ImageInspect.Config).",
           "fields": [
             {
@@ -3401,7 +3400,7 @@
             "pointer": "#/definitions/ImageInspect"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Full ImageInspect, field by field.",
           "fields": [
             {
@@ -4085,7 +4084,7 @@
         {
           "name": "created",
           "tf_type": "string",
-          "category": "identity",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -4206,7 +4205,7 @@
             "pointer": "#/definitions/ImageConfig"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Same shape as data.docker_image.config; the registry side cannot fill it (DistributionInspect has no config), always null.",
           "fields": [
             {
@@ -4679,7 +4678,7 @@
             "anchor": "#from"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Build stages in order: name, base image (as written, resolved ref and digest when available) and every instruction with all its flags, in the dockerfile:* block model.",
           "fields": [
             {
@@ -4805,7 +4804,8 @@
                   "tf_type": "object({...})",
                   "anchor": "#env",
                   "see": "dockerfile:ENV",
-                  "description": "Set when keyword = ENV; shape = the `env` output of dockerfile:ENV."
+                  "description": "Set when keyword = ENV; shape = the `env` output of dockerfile:ENV.",
+                  "sensitive": true
                 },
                 {
                   "name": "add",
@@ -4861,7 +4861,8 @@
                   "tf_type": "object({...})",
                   "anchor": "#arg",
                   "see": "dockerfile:ARG",
-                  "description": "Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG."
+                  "description": "Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG.",
+                  "sensitive": true
                 },
                 {
                   "name": "onbuild",
@@ -4903,7 +4904,8 @@
                   "description": "Image mode only: the history entry this instruction was reconstructed from.",
                   "filled_by": [
                     "image"
-                  ]
+                  ],
+                  "sensitive": true
                 },
                 {
                   "name": "created",
@@ -4964,7 +4966,7 @@
             "pointer": "#/definitions/ImageInspect"
           },
           "known_after_apply": true,
-          "sensitive": true,
+          "sensitive": false,
           "description": "ImageInspect of the result, field by field.",
           "fields": [
             {
@@ -5649,7 +5651,7 @@
         {
           "name": "reconstructed",
           "tf_type": "bool",
-          "category": "identity",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -5662,7 +5664,7 @@
         {
           "name": "fidelity",
           "tf_type": "string",
-          "category": "identity",
+          "category": "result",
           "source": {
             "type": "swagger",
             "file": "upstream/engine-api/api/swagger.yaml",
@@ -5709,7 +5711,7 @@
             "anchor": "#from"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Build stages in order: name, base image (as written, resolved ref and digest when available) and every instruction with all its flags, in the dockerfile:* block model. Image mode: one stage, instructions from history CreatedBy, base unknown.",
           "fields": [
             {
@@ -5835,7 +5837,8 @@
                   "tf_type": "object({...})",
                   "anchor": "#env",
                   "see": "dockerfile:ENV",
-                  "description": "Set when keyword = ENV; shape = the `env` output of dockerfile:ENV."
+                  "description": "Set when keyword = ENV; shape = the `env` output of dockerfile:ENV.",
+                  "sensitive": true
                 },
                 {
                   "name": "add",
@@ -5891,7 +5894,8 @@
                   "tf_type": "object({...})",
                   "anchor": "#arg",
                   "see": "dockerfile:ARG",
-                  "description": "Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG."
+                  "description": "Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG.",
+                  "sensitive": true
                 },
                 {
                   "name": "onbuild",
@@ -5933,7 +5937,8 @@
                   "description": "Image mode only: the history entry this instruction was reconstructed from.",
                   "filled_by": [
                     "image"
-                  ]
+                  ],
+                  "sensitive": true
                 },
                 {
                   "name": "created",
@@ -6055,7 +6060,7 @@
             "anchor": "#understand-how-arg-and-from-interact"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "ARGs declared before the first FROM (usable in FROM).",
           "fields": [
             {
@@ -6160,7 +6165,7 @@
             "pointer": "#/definitions/ImageHistoryResponseItem"
           },
           "known_after_apply": false,
-          "sensitive": true,
+          "sensitive": false,
           "description": "Image mode only: GET /images/{name}/history entries the reconstruction used (CreatedBy holds build-arg values).",
           "fields": [
             {
