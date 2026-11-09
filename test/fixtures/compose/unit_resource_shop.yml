@@ -1,0 +1,45 @@
+# ComposeParity replacement for internal/provider/testdata/compose_hash/unit_resource_shop.yml:
+# the file config is an absolute path on the harness daemon host (${PARITY_DIR},
+# staged by the test), because a Windows client path is not a path on the
+# Linux daemon; the db healthcheck retries long enough for postgres to
+# initialise (3 x 1s marks it unhealthy first). Original source: composeTestYAML in
+# internal/provider/compose_resource_test.go,
+# TestComposeFakeLocalLifecycle fills it first (tag 1.27 plus the cache service).
+name: shop
+services:
+  web:
+    image: nginx:1.27
+    ports: ["8080:80"]
+    depends_on:
+      db: {condition: service_healthy}
+    configs:
+      - source: site
+        target: /etc/nginx/conf.d/default.conf
+    networks: [front, back]
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_pw
+    secrets: [db_pw]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 1s
+      retries: 120  # parity: postgres:16 initialises longer than 3 x 1s
+    networks: [back]
+  cache:
+    image: redis:7
+    networks: [back]
+    deploy: {replicas: 2}
+
+networks:
+  front: {}
+  back: {}
+volumes:
+  pgdata: {}
+secrets:
+  db_pw:
+    environment: DB_PW
+configs:
+  site:
+    file: ${PARITY_DIR}/site.conf

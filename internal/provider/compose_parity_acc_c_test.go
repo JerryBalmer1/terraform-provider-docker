@@ -9,10 +9,16 @@ package provider
 // The provider never shells out; this TEST runs the CLI (os/exec in this
 // _test.go file only) against DOCKER_HOST from test/harness/.env. It needs
 // TF_ACC, DOCKER_HOST and TF_ACC_COMPOSE_CLI (the docker binary with the
-// compose v2 plugin; harness-up writes it) and skips without them. A
-// fixture the CLI itself cannot bring up on the harness (e.g. a bind mount
-// of a host path the dind daemon does not have, or a build context) is
-// skipped with the CLI's error: there is no reference to compare against.
+// compose v2 plugin; harness-up writes it) and skips without them.
+//
+// Each sub-case first gets what it needs on the harness daemon
+// (composeParityOverrides in p_compose_parity_test.go: fictional images,
+// external networks / volumes, host files), and a fixture that cannot run on
+// one Linux daemon at all (Windows client paths as bind sources, replicas
+// sharing a host port or a pinned IP) runs as its replacement under
+// test/fixtures/compose. Leftovers of the project are removed before and
+// after each side. A fixture the CLI still cannot bring up is skipped with
+// the CLI's error: there is no reference to compare against.
 
 import (
 	"context"
@@ -58,6 +64,8 @@ type composeParityCase struct {
 	Env      map[string]string
 	Profiles []string
 	Files    map[string]string
+	Source   string              // the fixture file, for the log
+	Setup    *composeParitySetup // created on the daemon first
 }
 
 // composeParityCases returns the testdata/compose_hash fixtures plus the
@@ -75,7 +83,10 @@ func composeParityCases(t *testing.T) []composeParityCase {
 		if project == "" {
 			project = "parity" + strings.ReplaceAll(name, "_", "")
 		}
-		out = append(out, composeParityCase{Name: name, Project: project, Content: string(b), Env: fx.Env, Profiles: fx.Profiles, Files: fx.Files})
+		c := composeParityCase{Name: name, Project: project, Content: string(b), Env: fx.Env, Profiles: fx.Profiles, Files: fx.Files,
+			Source: "internal/provider/testdata/compose_hash/" + fx.File}
+		composeParityApplyOverride(t, &c)
+		out = append(out, c)
 	}
 	return append(out, composeParityExampleCases(t)...)
 }
@@ -112,7 +123,8 @@ func composeParityExampleCases(t *testing.T) []composeParityCase {
 		if str("mode") == "swarm" || str("content") == "" {
 			continue
 		}
-		c := composeParityCase{Name: "example_" + b.Labels[1], Project: str("name"), Content: str("content"), Env: map[string]string{}}
+		c := composeParityCase{Name: "example_" + b.Labels[1], Project: str("name"), Content: str("content"), Env: map[string]string{},
+			Source: "examples/resources/docker_compose/resource.tf docker_compose." + b.Labels[1]}
 		if a, ok := b.Body.Attributes["env"]; ok {
 			if v, d := a.Expr.Value(nil); !d.HasErrors() && v.CanIterateElements() {
 				for k, e := range v.AsValueMap() {
@@ -146,6 +158,21 @@ func composeParitySnapshot(ctx context.Context, c *client.Client, project string
 	if err != nil {
 		return nil, err
 	}
+	// container:<id> references (network_mode / ipc / pid / volumes_from
+	// of a service:<name> reference) name a container of this run; compare
+	// the container's name, which both sides derive the same way.
+	names := map[string]string{}
+	for _, s := range cs.Items {
+		if len(s.Names) > 0 {
+			names[s.ID] = strings.TrimPrefix(s.Names[0], "/")
+		}
+	}
+	ref := func(v string) string {
+		for id, n := range names {
+			v = strings.ReplaceAll(v, id, "<"+n+">")
+		}
+		return v
+	}
 	for _, s := range cs.Items {
 		insp, err := c.ContainerInspect(ctx, s.ID, client.ContainerInspectOptions{})
 		if err != nil {
@@ -163,7 +190,10 @@ func composeParitySnapshot(ctx context.Context, c *client.Client, project string
 		o["working_dir"] = ci.Config.WorkingDir
 		if hc := ci.HostConfig; hc != nil {
 			o["restart"] = string(hc.RestartPolicy.Name)
-			o["network_mode"] = string(hc.NetworkMode)
+			o["network_mode"] = ref(string(hc.NetworkMode))
+			o["ipc_mode"] = ref(string(hc.IpcMode))
+			o["pid_mode"] = ref(string(hc.PidMode))
+			o["volumes_from"] = ref(strings.Join(hc.VolumesFrom, "; "))
 			var ms []string
 			for _, m := range hc.Mounts {
 				ms = append(ms, fmt.Sprintf("%s %s->%s ro=%v", m.Type, m.Source, m.Target, m.ReadOnly))
@@ -333,9 +363,19 @@ func TestAccComposeParity(t *testing.T) {
 			}
 			cctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 			defer cancel()
+			t.Logf("fixture %s, project %s", tc.Source, tc.Project)
+			clean := func() {
+				if err := composeParityClean(context.Background(), c, tc.Project); err != nil {
+					t.Log(err)
+				}
+			}
 			down := func() {
 				_, _ = composeParityCLI(context.Background(), bin, dir, tc, "down", "--volumes", "--remove-orphans")
+				clean()
 			}
+			clean()
+			t.Cleanup(clean)
+			composeParityPrepare(cctx, t, c, tc.Name, tc.Setup)
 
 			// 1. The CLI.
 			out, err := composeParityCLI(cctx, bin, dir, tc, "up", "--detach", "--quiet-pull")

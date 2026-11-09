@@ -1,0 +1,208 @@
+# ComposeParity replacement for internal/provider/testdata/compose_hash/kitchen_sink.yml.
+# Same services and features; on dind:
+# - the registry.example.com/sink/* images are created by the test on the
+#   harness daemon (busybox plus a /bin/api httpd script, /bin/work), so
+#   nothing is pulled from or built for a registry that does not exist;
+# - api runs 1 replica, not 3: it pins ipv4_address / ipv6_address, a
+#   hostname and fixed host ports, which replicas on one daemon cannot share;
+# - bind / file secret / file config sources are absolute paths on the
+#   harness daemon host (${PARITY_DIR}, staged by the test), not Windows
+#   client paths;
+# - read_only moves from api to worker: the compose CLI refuses environment /
+#   content secrets in a read-only container ("`file` is the sole supported
+#   option"), and api keeps its environment and content secrets and configs;
+# - the flags config target moves from /etc/api/flags to /etc/flags: compose
+#   copies an environment config into the container, which fails inside the
+#   read-only ./conf:/etc/api bind ("read-only file system").
+# The external network shared_ext and volume legacy_data are created by the test.
+name: sink
+services:
+  api:
+    image: registry.example.com/sink/api:${TAG}
+    build:
+      context: ./api
+      dockerfile: Dockerfile.prod
+      args: {VERSION: "${TAG}"}
+      target: runtime
+      labels: {built.by: compose}
+    entrypoint: ["/bin/api"]
+    command: ["--listen", ":8080"]
+    working_dir: /srv
+    user: "1000:1000"
+    hostname: api
+    domainname: example.internal
+    environment:
+      MODE: prod
+      TAG: ${TAG}
+    labels: {tier: backend}
+    ports:
+      - "8080:8080"
+      - target: 9090
+        published: "9090"
+        protocol: tcp
+        mode: host
+    expose: ["7000"]
+    cap_add: [NET_ADMIN]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    sysctls: {net.core.somaxconn: "1024"}
+    ulimits:
+      nofile: {soft: 1024, hard: 4096}
+      nproc: 512
+    init: true
+    tty: true
+    stdin_open: true
+    shm_size: 64m
+    pids_limit: 100
+    stop_signal: SIGINT
+    stop_grace_period: 20s
+    dns: [1.1.1.1]
+    dns_search: [example.internal]
+    extra_hosts: ["db.local:10.0.0.2"]
+    tmpfs: [/run]
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    volumes:
+      - cache:/var/cache/api
+      - ${PARITY_DIR}/conf:/etc/api:ro
+      - type: volume
+        source: shared
+        target: /shared
+        volume: {nocopy: true}
+    secrets:
+      - api_key
+      - source: tls_key
+        target: /run/secrets/tls.key
+        mode: 0400
+      - source: token
+        target: token.txt
+    configs:
+      - source: api_conf
+        target: /etc/api/api.yaml
+      - source: banner
+      - source: flags
+        target: /etc/flags  # parity: moved out of the read-only /etc/api bind (see the header)
+    networks:
+      front:
+        aliases: [api.front]
+      back:
+        ipv4_address: 10.20.0.10
+        ipv6_address: fd00:20::10
+    deploy:
+      mode: replicated
+      replicas: 1
+      endpoint_mode: vip
+      labels: {deploy.label: "yes"}
+      resources:
+        limits: {cpus: "1.5", memory: 256M, pids: 100}
+        reservations: {cpus: "0.25", memory: 64M}
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 4
+        window: 60s
+      placement:
+        constraints: ["node.role==worker", "node.labels.zone==a"]
+        preferences:
+          - spread: node.labels.rack
+        max_replicas_per_node: 2
+      update_config:
+        parallelism: 2
+        delay: 10s
+        failure_action: rollback
+        monitor: 30s
+        max_failure_ratio: 0.1
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+        monitor: 10s
+        order: stop-first
+  worker:
+    image: registry.example.com/sink/worker:${TAG}
+    command: ["work"]
+    read_only: true  # parity: moved from api (compose refuses environment / content secrets in a read-only container)
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [back, v4off]
+    volumes:
+      - shared:/shared:ro
+    deploy:
+      mode: global
+      resources:
+        limits: {memory: 128M}
+  admin:
+    image: registry.example.com/sink/admin:${TAG}
+    profiles: [admin]
+    ports: ["8443:8443"]
+    networks: [front]
+    deploy:
+      replicas: 1
+  debug:
+    image: busybox:1.36
+    profiles: [debug]
+    command: ["sleep", "infinity"]
+networks:
+  front:
+    driver: bridge
+    attachable: true
+    labels: {net.label: front}
+    driver_opts:
+      com.docker.network.bridge.name: sink-front
+  back:
+    driver: bridge
+    internal: true
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.20.0.0/24
+          ip_range: 10.20.0.0/25
+          gateway: 10.20.0.1
+          aux_addresses: {reserved: 10.20.0.5}
+        - subnet: fd00:20::/64
+          gateway: fd00:20::1
+  v4off:
+    enable_ipv4: false
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:30::/64
+  ext:
+    external: true
+    name: shared_ext
+volumes:
+  cache:
+    driver: local
+    driver_opts: {type: tmpfs, device: tmpfs, o: "size=64m"}
+    labels: {vol.label: cache}
+  shared:
+    name: sink-shared-data
+    labels: {vol.label: shared}
+  old:
+    external: true
+    name: legacy_data
+secrets:
+  api_key:
+    environment: API_KEY
+  tls_key:
+    file: ${PARITY_DIR}/tls.key
+    labels: {secret.label: tls}
+  token:
+    environment: TOKEN
+configs:
+  api_conf:
+    file: ${PARITY_DIR}/api.yaml
+    labels: {config.label: api}
+  banner:
+    content: "hello from sink"
+  flags:
+    environment: FLAGS

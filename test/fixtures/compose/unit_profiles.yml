@@ -1,0 +1,15 @@
+# ComposeParity replacement for internal/provider/testdata/compose_hash/unit_profiles.yml
+# (source: TestComposeLoadProfilesAndOrder in internal/provider/compose_parse_test.go).
+# Same services, profiles and depends_on graph; on dind, db (postgres) gets a
+# password setting and a healthcheck, because api waits for
+# condition: service_healthy and the original db has neither (postgres exits
+# without a password, and compose refuses service_healthy on a container with
+# no healthcheck). The image "api" is created by the test.
+services:
+  web: {image: nginx, depends_on: [api]}
+  api: {image: api, depends_on: {db: {condition: service_healthy}}}
+  db:
+    image: postgres
+    environment: {POSTGRES_HOST_AUTH_METHOD: trust}
+    healthcheck: {test: ["CMD", "pg_isready", "-U", "postgres"], interval: 1s, retries: 60}
+  debug: {image: busybox, profiles: [debug], depends_on: [web]}

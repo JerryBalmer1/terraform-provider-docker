@@ -1,0 +1,11 @@
+reference/_gen/pass51/harness-requests.md
+reference/_gen/pass51/lane-P.md
+reference/_gen/pass51/lane-P.files
+internal/provider/compose_parity_acc_c_test.go
+internal/provider/p_compose_parity_test.go
+test/fixtures/compose/c2s_webapp.yml
+test/fixtures/compose/example_stack.yml
+test/fixtures/compose/kitchen_sink.yml
+test/fixtures/compose/unit_expand.yml
+test/fixtures/compose/unit_profiles.yml
+test/fixtures/compose/unit_resource_shop.yml

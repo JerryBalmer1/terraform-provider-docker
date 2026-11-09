@@ -1,0 +1,11 @@
+# ComposeParity replacement for internal/provider/testdata/compose_hash/example_stack.yml:
+# the same service with a host port range, so its 2 replicas do not collide on
+# one daemon (the swarm original publishes 8081 through the routing mesh).
+services:
+  web:
+    image: nginx:1.27-alpine
+    ports: ["8081-8082:80"]  # parity: 2 replicas on one daemon need a host port range
+    deploy:
+      replicas: 2
+      placement:
+        constraints: ["node.role==worker"]
