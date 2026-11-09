@@ -1,0 +1,34 @@
+# Dockerfile doc examples that TestDockerfileGoldenDocExamples
+# (dockerfile_seam_test.go) does not expect to round-trip.
+#
+# Format: one entry per line, fields separated by whitespace:
+#
+#   <id> <hash> <kind> <reason...>
+#
+#   id      <doc file>#<nnn>: the doc file's base name under
+#           reference/upstream/dockerfile/frontend/dockerfile/docs (reference.md
+#           or rules/*.md) and the 0-based index of the ```dockerfile fenced
+#           block in that file, three digits.
+#   hash    first 12 hex digits of the SHA-256 of the example text as the test
+#           extracts it (dedented, LF line endings); a changed example fails
+#           until its entry is reviewed.
+#   kind    fragment: not a whole Dockerfile (a syntax template with
+#           <placeholders> or [optional] parts, `...` elisions, an example the
+#           reference itself shows as invalid);
+#           blocked:  a real Dockerfile the BuildKit parser cannot round-trip
+#           through our renderer (logged as BLOCKED in the pass report).
+#   reason  free text, the rest of the line.
+#
+# Lines starting with # and blank lines are ignored. The test fails on an
+# example that does not round-trip and is not listed, on a listed example that
+# round-trips, changed or no longer exists, and on a malformed line.
+
+from-platform-flag-const-disallowed.md#003 2120bf8d2464 fragment three stages whose bodies are elided with `...` lines; `...` is not an instruction
+reference.md#000 b10e41be7a71 fragment the generic format template `INSTRUCTION arguments`; INSTRUCTION is a placeholder, not an instruction
+reference.md#004 ed78c26ad43c fragment shown by the reference as invalid ("Invalid due to line continuation"): directives do not continue lines, so `tive=value` would be an unknown instruction
+reference.md#015 cc4d813e58ac fragment the check directive syntax template (`<checks|all>`, `<boolean>` placeholders, two check lines where one is allowed); BuildKit rejects the duplicate directive
+reference.md#028 aab49d90418d fragment FROM syntax template with [optional] parts and <placeholders>
+reference.md#029 6e128e5dbcff fragment FROM syntax template with [optional] parts and <placeholders>
+reference.md#030 3657727f35dc fragment FROM syntax template with [optional] parts and <placeholders>
+reference.md#120 71b480406786 fragment ARG syntax template (`<name>[=<default value>] ...`); no FROM, nothing to round-trip but placeholder words
+reference.md#134 69eef4c10ddd fragment ONBUILD syntax template; <INSTRUCTION> is a placeholder

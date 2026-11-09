@@ -1,0 +1,4 @@
+internal/provider/dockerfile_seam_test.go
+internal/provider/testdata/dockerfile/roundtrip_allowlist.txt
+reference/_gen/pass51/lane-D.files
+reference/_gen/pass51/lane-D.md

@@ -2,6 +2,8 @@ package provider
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -65,50 +67,140 @@ func dockerfileDedent(s string) string {
 	return strings.Join(lines, "\n")
 }
 
+// dockerfileRoundTripAllowlist lists the doc examples that are not expected
+// to round-trip; the format is documented at the top of the file.
+const dockerfileRoundTripAllowlist = "testdata/dockerfile/roundtrip_allowlist.txt"
+
+// dockerfileAllowEntry is one line of the allowlist.
+type dockerfileAllowEntry struct {
+	Hash, Kind, Reason string
+	Line               int
+}
+
+// dockerfileExampleHash is the allowlist hash of an example: the first 12
+// hex digits of the SHA-256 of its dedented, LF-only text.
+func dockerfileExampleHash(src string) string {
+	sum := sha256.Sum256([]byte(src))
+	return hex.EncodeToString(sum[:])[:12]
+}
+
+// dockerfileReadAllowlist parses the allowlist file.
+func dockerfileReadAllowlist(t *testing.T) map[string]dockerfileAllowEntry {
+	t.Helper()
+	b, err := os.ReadFile(dockerfileRoundTripAllowlist)
+	if err != nil {
+		t.Fatalf("read allowlist: %v", err)
+	}
+	out := map[string]dockerfileAllowEntry{}
+	for i, line := range strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		f := strings.Fields(line)
+		if len(f) < 4 {
+			t.Errorf("%s:%d: want `<id> <hash> <kind> <reason>`, got %q", dockerfileRoundTripAllowlist, i+1, line)
+			continue
+		}
+		if f[2] != "fragment" && f[2] != "blocked" {
+			t.Errorf("%s:%d: kind %q is not fragment or blocked", dockerfileRoundTripAllowlist, i+1, f[2])
+		}
+		if _, dup := out[f[0]]; dup {
+			t.Errorf("%s:%d: %s is listed twice", dockerfileRoundTripAllowlist, i+1, f[0])
+		}
+		out[f[0]] = dockerfileAllowEntry{Hash: f[1], Kind: f[2], Reason: strings.Join(f[3:], " "), Line: i + 1}
+	}
+	return out
+}
+
+// dockerfileDocExampleRoundTrip round-trips one doc example and returns why it
+// does not. Snippets are completed the way a reader would: a header of parser
+// directives / comments only, or instructions before any FROM, get a
+// "FROM scratch" stage. Nothing else is skipped.
+func dockerfileDocExampleRoundTrip(src string) error {
+	if _, err := parser.Parse(bytes.NewReader([]byte(src))); err != nil {
+		if !dockerfileCommentsOnly(src) {
+			return fmt.Errorf("buildkit parser: %w", err)
+		}
+		// A directive header shown on its own.
+		src = strings.TrimRight(src, "\n") + "\nFROM scratch\n"
+		if _, err := parser.Parse(bytes.NewReader([]byte(src))); err != nil {
+			return fmt.Errorf("buildkit parser: %w", err)
+		}
+	}
+	p1, err := dockerfileParse(src)
+	if err != nil && strings.Contains(err.Error(), "before the first FROM") {
+		// Instruction snippets: give them a stage.
+		p1, err = dockerfileParse(dockerfileWithFrom(src))
+	}
+	if err != nil {
+		return err
+	}
+	if len(p1.Doc.Stages) == 0 {
+		return fmt.Errorf("no stage (FROM) and no instruction to give one")
+	}
+	_, err = dockerfileRoundTrip(p1.Doc)
+	return err
+}
+
+// dockerfileCommentsOnly reports whether every non-blank line is a comment.
+func dockerfileCommentsOnly(src string) bool {
+	seen := false
+	for _, l := range strings.Split(src, "\n") {
+		l = strings.TrimSpace(l)
+		if l == "" {
+			continue
+		}
+		if !strings.HasPrefix(l, "#") {
+			return false
+		}
+		seen = true
+	}
+	return seen
+}
+
 // TestDockerfileGoldenDocExamples: parse -> render -> parse round-trips for
-// every Dockerfile example of the harvested reference docs. Examples the
-// BuildKit parser itself rejects, or that are fragments (no FROM, unknown
-// instructions, placeholders), are counted and skipped.
+// every Dockerfile example of the harvested reference docs. Every example
+// must round-trip unless testdata/dockerfile/roundtrip_allowlist.txt lists it
+// (a fragment, or a BuildKit parser limit); a listed example that now
+// round-trips, changed, or no longer exists fails the test too.
 func TestDockerfileGoldenDocExamples(t *testing.T) {
 	ex := dockerfileDocExamples(t)
 	if len(ex) < 100 {
 		t.Fatalf("only %d dockerfile examples found in %s", len(ex), dockerfileDocsDir)
 	}
+	allow := dockerfileReadAllowlist(t)
 	keys := make([]string, 0, len(ex))
 	for k := range ex {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	roundTripped, fragments := 0, 0
+	roundTripped, kinds := 0, map[string]int{}
 	for _, k := range keys {
 		src := ex[k]
-		if _, err := parser.Parse(bytes.NewReader([]byte(src))); err != nil {
-			fragments++
-			continue
+		err := dockerfileDocExampleRoundTrip(src)
+		a, listed := allow[k]
+		switch {
+		case !listed && err != nil:
+			t.Errorf("%s (hash %s): does not round-trip: %v\n%s", k, dockerfileExampleHash(src), err, src)
+		case !listed:
+			roundTripped++
+		case a.Hash != dockerfileExampleHash(src):
+			t.Errorf("%s:%d: %s changed (hash %s, listed %s): review it and update the entry", dockerfileRoundTripAllowlist, a.Line, k, dockerfileExampleHash(src), a.Hash)
+		case err == nil:
+			t.Errorf("%s:%d: %s round-trips now: remove it from the allowlist", dockerfileRoundTripAllowlist, a.Line, k)
+		default:
+			kinds[a.Kind]++
+			t.Logf("%s: allowlisted (%s: %s): %v", k, a.Kind, a.Reason, err)
 		}
-		p1, err := dockerfileParse(src)
-		if err != nil && strings.Contains(err.Error(), "before the first FROM") {
-			// Instruction snippets: give them a stage.
-			src = dockerfileWithFrom(src)
-			p1, err = dockerfileParse(src)
-		}
-		if err != nil {
-			// Fragments: instructions without FROM, `<placeholders>`, etc.
-			fragments++
-			t.Logf("%s: not a whole Dockerfile (%v)", k, err)
-			continue
-		}
-		if len(p1.Doc.Stages) == 0 {
-			fragments++
-			continue
-		}
-		dockerfileAssertRoundTrip(t, k, p1.Doc)
-		roundTripped++
 	}
-	t.Logf("round-tripped %d doc examples, skipped %d fragments", roundTripped, fragments)
-	if roundTripped < 60 {
-		t.Fatalf("only %d examples round-tripped", roundTripped)
+	for k, a := range allow {
+		if _, ok := ex[k]; !ok {
+			t.Errorf("%s:%d: %s is not an example of %s any more: remove it", dockerfileRoundTripAllowlist, a.Line, k, dockerfileDocsDir)
+		}
 	}
+	t.Logf("%d doc examples: %d round-trip, %d allowlisted fragment, %d allowlisted blocked",
+		len(ex), roundTripped, kinds["fragment"], kinds["blocked"])
 }
 
 // dockerfileWithFrom inserts "FROM scratch" after the leading parser
@@ -128,24 +220,32 @@ func dockerfileWithFrom(src string) string {
 // the document is unchanged and rendering is idempotent.
 func dockerfileAssertRoundTrip(t *testing.T, name string, doc seamDockerfileDoc) string {
 	t.Helper()
+	text, err := dockerfileRoundTrip(doc)
+	if err != nil {
+		t.Errorf("%s: %v", name, err)
+	}
+	return text
+}
+
+// dockerfileRoundTrip renders doc, parses the text again and returns an error
+// unless the document is unchanged and rendering is idempotent.
+func dockerfileRoundTrip(doc seamDockerfileDoc) (string, error) {
 	text, err := seamDockerfileImpl.Render(doc)
 	if err != nil {
-		t.Errorf("%s: render: %v", name, err)
-		return ""
+		return "", fmt.Errorf("render: %w", err)
 	}
 	doc2, err := seamDockerfileImpl.Parse(text)
 	if err != nil {
-		t.Errorf("%s: re-parse of rendered text: %v\n%s", name, err, text)
-		return text
+		return text, fmt.Errorf("re-parse of rendered text: %w\n%s", err, text)
 	}
 	if !reflect.DeepEqual(doc, doc2) {
-		t.Errorf("%s: round trip changed the document\nrendered:\n%s\nbefore: %#v\nafter:  %#v", name, text, doc, doc2)
+		return text, fmt.Errorf("round trip changed the document\nrendered:\n%s\nbefore: %#v\nafter:  %#v", text, doc, doc2)
 	}
 	text2, err := seamDockerfileImpl.Render(doc2)
 	if err != nil || text2 != text {
-		t.Errorf("%s: render is not idempotent (%v)\n%s\n---\n%s", name, err, text, text2)
+		return text, fmt.Errorf("render is not idempotent (%v)\n%s\n---\n%s", err, text, text2)
 	}
-	return text
+	return text, nil
 }
 
 // TestDockerfileGoldenFixtures round-trips testdata/dockerfile/*.Dockerfile
