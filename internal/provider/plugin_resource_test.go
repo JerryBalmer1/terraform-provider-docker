@@ -319,17 +319,23 @@ resource "docker_plugin" "p" {
 	})
 }
 
-// TestAccPlugin_basic installs vieux/sshfs. It needs TF_ACC, DOCKER_HOST and
-// TF_ACC_PLUGIN=1 (the daemon must reach Docker Hub and allow managed plugins).
+// TestAccPlugin_basic installs the managed plugin named by TF_ACC_PLUGIN (the
+// harness exports 127.0.0.1:12380/tfacc/noop-volume:1, the tfacc no-op
+// volume plugin that harness-up builds from test/harness/tfaccplugin and
+// pushes to the harness registry: no kernel module, no FUSE, no Docker Hub),
+// toggles it and its settable DEBUG env, imports it, and checks destroy.
 func TestAccPlugin_basic(t *testing.T) {
 	testAccPreCheck(t)
-	testAccPluginPreCheck(t)
+	ref := testAccPluginPreCheck(t)
 	c := testAccDockerClient(t)
+	t.Cleanup(func() {
+		_, _ = c.PluginRemove(context.Background(), "tfacc-plugin", client.PluginRemoveOptions{Force: true})
+	})
 	cfg := func(debug string, enabled bool) string {
 		return fmt.Sprintf(`
-resource "docker_plugin" "sshfs" {
-  name                  = "vieux/sshfs:latest"
-  alias                 = "tfacc-sshfs"
+resource "docker_plugin" "p" {
+  name                  = %q
+  alias                 = "tfacc-plugin"
   grant_all_permissions = true
   env                   = ["DEBUG=%s"]
   enabled               = %t
@@ -337,14 +343,14 @@ resource "docker_plugin" "sshfs" {
 }
 
 data "docker_plugin" "by_alias" {
-  alias = docker_plugin.sshfs.alias
+  alias = docker_plugin.p.alias
 }
-`, debug, enabled)
+`, ref, debug, enabled)
 	}
-	tfresource.Test(t, tfresource.TestCase{
+	hAccTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(*terraform.State) error {
-			if _, err := c.PluginInspect(context.Background(), "tfacc-sshfs", client.PluginInspectOptions{}); !isNotFound(err) {
+			if _, err := c.PluginInspect(context.Background(), "tfacc-plugin", client.PluginInspectOptions{}); !isNotFound(err) {
 				return fmt.Errorf("plugin still installed (%v)", err)
 			}
 			return nil
@@ -353,19 +359,19 @@ data "docker_plugin" "by_alias" {
 			{
 				Config: cfg("0", true),
 				Check: tfresource.ComposeAggregateTestCheckFunc(
-					tfresource.TestCheckResourceAttr("docker_plugin.sshfs", "enabled", "true"),
-					tfresource.TestCheckResourceAttrPair("data.docker_plugin.by_alias", "id", "docker_plugin.sshfs", "id"),
+					tfresource.TestCheckResourceAttr("docker_plugin.p", "enabled", "true"),
+					tfresource.TestCheckResourceAttrPair("data.docker_plugin.by_alias", "id", "docker_plugin.p", "id"),
 				),
 			},
 			{
 				Config: cfg("1", false),
 				Check: tfresource.ComposeAggregateTestCheckFunc(
-					tfresource.TestCheckResourceAttr("docker_plugin.sshfs", "enabled", "false"),
-					tfresource.TestCheckTypeSetElemAttr("docker_plugin.sshfs", "env.*", "DEBUG=1"),
+					tfresource.TestCheckResourceAttr("docker_plugin.p", "enabled", "false"),
+					tfresource.TestCheckTypeSetElemAttr("docker_plugin.p", "env.*", "DEBUG=1"),
 				),
 			},
 			{
-				ResourceName:            "docker_plugin.sshfs",
+				ResourceName:            "docker_plugin.p",
 				ImportState:             true,
 				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"grant_all_permissions", "env", "force_destroy", "alias", "name"},
@@ -374,11 +380,19 @@ data "docker_plugin" "by_alias" {
 	})
 }
 
-// testAccPluginPreCheck skips plugin acceptance tests unless TF_ACC_PLUGIN is
-// set: they pull from Docker Hub and need a daemon that runs managed plugins.
-func testAccPluginPreCheck(t *testing.T) {
+// testAccPluginPreCheck returns TF_ACC_PLUGIN, the managed plugin reference
+// the plugin acceptance tests install, and skips without it. The harness
+// exports its own no-op volume plugin from the local registry; any reference
+// the daemon can pull works (e.g. vieux/sshfs:latest on a host with FUSE).
+// "1" (the pre-Pass 5.1 meaning) still selects vieux/sshfs:latest.
+func testAccPluginPreCheck(t *testing.T) string {
 	t.Helper()
-	if os.Getenv("TF_ACC_PLUGIN") == "" {
-		t.Skip("TF_ACC_PLUGIN not set; skipping docker_plugin acceptance test")
+	ref := os.Getenv("TF_ACC_PLUGIN")
+	switch ref {
+	case "":
+		t.Skip("TF_ACC_PLUGIN not set; skipping docker_plugin acceptance test (bring up test/harness, which exports it)")
+	case "1":
+		ref = "vieux/sshfs:latest"
 	}
+	return ref
 }

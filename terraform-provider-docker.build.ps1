@@ -62,6 +62,7 @@ $PythonExe = Resolve-Tool $Python
 
 $TfPluginDocs = 'github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs'
 $Harness = Join-Path $BuildRoot 'test/harness/Invoke-E2E.ps1'
+# Every acceptance test that needs DOCKER_HOST to be a swarm manager: -Run of the swarm pass, -Skip of the plain one.
 $SwarmAccRegex = 'TestAcc(Service|Stack|Secret|DockerConfig|SwarmTokens|SwarmDataSources|Node_|Nodes_|NodeResource|SwarmNode|ComposeSwarm|ListSecret|P3SwarmList|ObjClusterVolume|Action(SwarmRotateTokens|NodeDrainActivate|ServiceScaleForceUpdateRollback|NodePromoteDemote|SwarmRotateCA|SwarmUnlockKey))'
 
 $RefDir = Join-Path $BuildRoot 'reference'
@@ -179,7 +180,9 @@ task TestAcc {
     try {
         # Both passes always run; the task fails afterwards if either did.
         $plain = 0
-        try { $global:LASTEXITCODE = 0; & $Harness -Run TestAcc -Timeout 120m -Log test/harness/last-acc.log; $plain = $LASTEXITCODE }
+        # The plain pass skips the swarm tests (-Skip $SwarmAccRegex): they need
+        # DOCKER_HOST to be a swarm manager and run once, in the swarm pass.
+        try { $global:LASTEXITCODE = 0; & $Harness -Run TestAcc -Skip $SwarmAccRegex -Timeout 120m -Log test/harness/last-acc.log; $plain = $LASTEXITCODE }
         catch { Write-Warning "TestAcc plain pass: $_"; $plain = 1 }
         $swarm = 0
         try { $global:LASTEXITCODE = 0; & $Harness -SwarmInit -Run $SwarmAccRegex -Timeout 120m -Log test/harness/last-acc-swarm.log; $swarm = $LASTEXITCODE }
@@ -391,19 +394,21 @@ task RegistryCheck {
     finally { if ($null -ne $saved) { $env:TF_ACC = $saved } }
 }
 
-# Synopsis: List the Pass 5 stubs and open markers left in internal/provider (STUB(pass5) lines), per file; prints the total.
+# Synopsis: List status markers in internal/provider: STUB(pass5) placeholders (fail) and PARTIAL(pass5) sub-feature gaps (listed only).
 task StubReport {
     $dir = Join-Path $BuildRoot 'internal/provider'
     $hits = @(Get-ChildItem -LiteralPath $dir -Filter *.go -File |
             Where-Object { $_.Name -notlike '*_test.go' } |
-            Select-String -Pattern '//\s*STUB\(pass5\)\s+(\S+)(\s+partial:)?' -CaseSensitive)
-    $stubs = @($hits | Where-Object { -not $_.Matches[0].Groups[2].Success })
-    $partial = @($hits | Where-Object { $_.Matches[0].Groups[2].Success })
-    foreach ($g in ($hits | Group-Object Filename | Sort-Object Name)) {
-        print Cyan ("{0}: {1}" -f $g.Name, $g.Count)
-        foreach ($h in $g.Group) { print Gray ("  " + $h.Line.Trim()) }
-    }
-    print $(if ($hits.Count) { 'Yellow' } else { 'Green' }) ("StubReport: {0} markers ({1} stubs, {2} partial)" -f $hits.Count, $stubs.Count, $partial.Count)
+            Select-String -Pattern '//[ \t]*(STUB|PARTIAL)\(pass5\)[ \t]+(\S+)[ \t]*(.*)$' -CaseSensitive)
+    $stubs = @($hits | Where-Object { $_.Matches[0].Groups[1].Value -eq 'STUB' })
+    $partials = @($hits | Where-Object { $_.Matches[0].Groups[1].Value -eq 'PARTIAL' })
+    print Cyan ("Stubs ({0}):" -f $stubs.Count)
+    foreach ($h in ($stubs | Sort-Object Filename, LineNumber)) { print Gray ("  {0}  ({1}:{2})" -f $h.Matches[0].Groups[2].Value, $h.Filename, $h.LineNumber) }
+    print Cyan ("Partials ({0}):" -f $partials.Count)
+    foreach ($h in ($partials | Sort-Object { $_.Matches[0].Groups[2].Value }, Filename, LineNumber)) { $m = $h.Matches[0]; print Gray ("  {0}  {1}  ({2}:{3})" -f $m.Groups[2].Value, $m.Groups[3].Value.Trim(), $h.Filename, $h.LineNumber) }
+    $msg = "StubReport: {0} stubs, {1} partials" -f $stubs.Count, $partials.Count
+    if ($stubs.Count) { throw "$msg. Stubs fail: implement each one (reference/inventory.json shows them as missing)." }
+    print $(if ($partials.Count) { 'Yellow' } else { 'Green' }) $msg
 }
 
 # Synopsis: Regenerate internal/provider/contract_gen.go (outputs-contract tables + per-item model structs) from reference/inventory.json (tools/contractgen).

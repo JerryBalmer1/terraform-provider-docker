@@ -353,7 +353,7 @@ func TestBuildxContractNoWarnings(t *testing.T) {
 
 func TestAccBuildxDataSources_default(t *testing.T) {
 	testAccPreCheck(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: `
@@ -380,7 +380,7 @@ func TestAccBuildxBake_basic(t *testing.T) {
 	testAccPreCheck(t)
 	dir := t.TempDir()
 	out := filepath.ToSlash(filepath.Join(dir, "result.json"))
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		TerraformVersionChecks:   actAccVersionChecks,
 		Steps: []resource.TestStep{{

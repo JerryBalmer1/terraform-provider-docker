@@ -1,0 +1,18 @@
+{
+  "description": "tfacc no-op volume plugin (terraform-provider-docker test harness fixture)",
+  "documentation": "https://github.com/JerryBalmer1/terraform-provider-docker/tree/main/test/harness",
+  "entrypoint": ["/tfaccplugin", "volume"],
+  "workdir": "/",
+  "interface": {
+    "types": ["docker.volumedriver/1.0"],
+    "socket": "tfacc.sock"
+  },
+  "env": [
+    {
+      "name": "DEBUG",
+      "description": "1 logs every request",
+      "settable": ["value"],
+      "value": "0"
+    }
+  ]
+}

@@ -148,7 +148,7 @@ resource "docker_container" "test" {
 }
 `, name, restart, mem)
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(s *terraform.State) error {
 			for _, rs := range s.RootModule().Resources {

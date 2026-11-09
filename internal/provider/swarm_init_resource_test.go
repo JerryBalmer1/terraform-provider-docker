@@ -132,7 +132,7 @@ func TestAccSwarmInit_basic(t *testing.T) {
 	if info.Swarm.LocalNodeState != swarm.LocalNodeStateInactive {
 		t.Skip("DOCKER_HOST is already part of a swarm; docker_swarm_init needs a daemon outside any swarm")
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(*terraform.State) error {

@@ -54,7 +54,7 @@ resource "docker_secret" "bad" {
 func TestAccSecretBasic(t *testing.T) {
 	testAccPreCheck(t)
 	_ = swarmAccManagerAddr(t) // skips unless DOCKER_HOST is a swarm manager
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -217,7 +217,7 @@ resource "docker_secret" "wo" {
 }
 `, v, v, v)
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		TerraformVersionChecks:   []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_11_0)},
 		Steps: []resource.TestStep{

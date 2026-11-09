@@ -68,7 +68,7 @@ resource "docker_volume" "v" {
   labels = { via = "tls" }
 }
 `, name)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             tlsP3VolumeCheck(t, ep, name, false),
 		Steps: []resource.TestStep{
@@ -103,7 +103,7 @@ func TestAccProviderP3_TLSFromEnv(t *testing.T) {
 	t.Setenv("DOCKER_TLS_VERIFY", "1")
 	t.Setenv("DOCKER_CERT_PATH", certPath)
 	name := acctest.RandomWithPrefix("tfacc-tlsenv")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             tlsP3VolumeCheck(t, ep, name, false),
 		Steps: []resource.TestStep{{
@@ -124,7 +124,7 @@ func TestAccProviderP3_TLSRequiresClientCert(t *testing.T) {
 	testAccPreCheck(t)
 	ep := p3TLSEndpoint(t)
 	name := acctest.RandomWithPrefix("tfacc-tlsno")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             tlsP3VolumeCheck(t, ep, name, false),
 		Steps: []resource.TestStep{{

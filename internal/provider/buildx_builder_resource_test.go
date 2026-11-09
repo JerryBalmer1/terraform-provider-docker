@@ -348,7 +348,7 @@ func TestBuildxBuilderExamplePlan(t *testing.T) {
 func TestAccBuildxBuilder_basic(t *testing.T) {
 	testAccPreCheck(t)
 	c := testAccDockerClient(t)
-	tfresource.Test(t, tfresource.TestCase{
+	hAccTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(*terraform.State) error {
 			if _, err := c.ContainerInspect(context.Background(), "buildx_buildkit_tfacc0", client.ContainerInspectOptions{}); !isNotFound(err) {

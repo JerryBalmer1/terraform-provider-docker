@@ -24,7 +24,7 @@ func TestNetworkDataFromInspect(t *testing.T) {
 func TestAccNetworkDataSource_basic(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-netds")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: fmt.Sprintf(`

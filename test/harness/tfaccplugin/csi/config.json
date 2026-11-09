@@ -1,0 +1,18 @@
+{
+  "description": "tfacc controller-only CSI plugin (terraform-provider-docker test harness fixture)",
+  "documentation": "https://github.com/JerryBalmer1/terraform-provider-docker/tree/main/test/harness",
+  "entrypoint": ["/tfaccplugin", "csi"],
+  "workdir": "/",
+  "interface": {
+    "types": ["docker.csicontroller/1.0", "docker.csinode/1.0"],
+    "socket": "csi.sock"
+  },
+  "env": [
+    {
+      "name": "DEBUG",
+      "description": "1 logs every request",
+      "settable": ["value"],
+      "value": "0"
+    }
+  ]
+}

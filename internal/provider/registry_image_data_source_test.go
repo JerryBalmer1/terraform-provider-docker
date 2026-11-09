@@ -2,6 +2,8 @@ package provider
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"testing"
 
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
@@ -33,17 +35,24 @@ func TestRegistryImageDataSourceSchema(t *testing.T) {
 	}
 }
 
-// TestAccRegistryImageDataSource asks Docker Hub for a public tag's digest.
+// TestAccRegistryImageDataSource asks a registry for a public tag's digest:
+// the harness registry's seeded copy of alpine:3.20 when the harness is up
+// (the provider queries it from the host, so 127.0.0.1:12380), else Docker
+// Hub (anonymous; skipped with TF_ACC_SKIP_INTERNET).
 func TestAccRegistryImageDataSource(t *testing.T) {
 	testAccPreCheck(t)
+	name := hAccHostImage("alpine:3.20")
+	if name == "alpine:3.20" && os.Getenv("TF_ACC_SKIP_INTERNET") != "" {
+		t.Skip("TF_ACC_SKIP_INTERNET set and alpine:3.20 not seeded in the harness registry; skipping test that reaches Docker Hub")
+	}
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
-			Config: `
+			Config: fmt.Sprintf(`
 data "docker_registry_image" "alpine" {
-  name = "alpine:3.20"
+  name = %q
 }
-`,
+`, name),
 			Check: resource.ComposeAggregateTestCheckFunc(
 				resource.TestMatchResourceAttr("data.docker_registry_image.alpine", "digest", imgTestSHA),
 			),

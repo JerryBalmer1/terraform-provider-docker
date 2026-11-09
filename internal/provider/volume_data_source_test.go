@@ -19,7 +19,7 @@ func TestVolumeDataFromInspect(t *testing.T) {
 func TestAccVolumeDataSource_basic(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-volds")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: fmt.Sprintf(`

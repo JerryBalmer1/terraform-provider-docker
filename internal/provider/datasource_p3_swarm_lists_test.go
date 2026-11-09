@@ -89,7 +89,7 @@ func TestP3SwarmListDataSources(t *testing.T) {
 func TestAccP3SwarmListDataSources(t *testing.T) {
 	testAccPreCheck(t)
 	_ = swarmAccManagerAddr(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: `

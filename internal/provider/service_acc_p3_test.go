@@ -117,7 +117,7 @@ resource "docker_service" "g" {
 		}
 		return nil
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             svcP3CheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -190,7 +190,7 @@ resource "docker_service" "j" {
 		}
 	}
 	var firstID string
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             svcP3CheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -264,7 +264,7 @@ resource "docker_service" "f" {
 		}
 	}
 	var svcID string
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             svcP3CheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -419,7 +419,7 @@ resource "docker_service" "c" {
 		}
 	}
 	var firstID string
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             svcP3CheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -491,7 +491,7 @@ resource "docker_service" "fn" {
   }
 }
 `, secName, cfgName, sfx)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             svcP3CheckDestroy(t),
 		Steps: []resource.TestStep{{
@@ -529,7 +529,7 @@ func TestAccDockerConfigP3_importFillsData(t *testing.T) {
 	testAccPreCheck(t)
 	_ = swarmAccManagerAddr(t)
 	name := acctest.RandomWithPrefix("tfacc-cfgimp")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             svcP3CheckDestroy(t),
 		Steps: []resource.TestStep{

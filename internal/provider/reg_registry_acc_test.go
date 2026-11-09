@@ -30,7 +30,7 @@ func regAccRegistry(t *testing.T) string {
 func TestAccRegistryManifestList(t *testing.T) {
 	reg := regAccRegistry(t)
 	dir := t.TempDir()
-	imgTestWrite(t, dir, map[string]string{"Dockerfile": "FROM alpine:3.20\nARG V\nRUN echo $V > /v\n"})
+	imgTestWrite(t, dir, map[string]string{"Dockerfile": hAccConfig("FROM alpine:3.20\nARG V\nRUN echo $V > /v\n")})
 	repo := "tfacc/ml-" + strings.ToLower(acctest.RandString(6))
 	cfg := fmt.Sprintf(`
 resource "docker_image" "a" {
@@ -71,7 +71,7 @@ data "docker_registry_image_manifests" "ml" {
   name = docker_registry_manifest_list.ml.image_digest_ref
 }
 `, reg, repo, p3HCLPath(dir))
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -106,7 +106,7 @@ func TestAccRegistryLogin(t *testing.T) {
 	if user == "" {
 		user, pass = "tfacc", "tfacc"
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccEphemeralFactories(),
 		TerraformVersionChecks:   []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_10_0)},
 		Steps: []resource.TestStep{{

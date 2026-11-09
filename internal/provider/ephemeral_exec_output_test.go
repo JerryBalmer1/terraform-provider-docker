@@ -113,7 +113,7 @@ func TestCappedBuffer(t *testing.T) {
 
 func TestAccExecOutputEphemeral(t *testing.T) {
 	testAccPreCheck(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccEphemeralFactories(),
 		TerraformVersionChecks:   []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_10_0)},
 		Steps: []resource.TestStep{{

@@ -44,11 +44,11 @@ func TestAccImageP3_relativeContext(t *testing.T) {
 	ctxRel := imgP3RelDir(t, ".tfacc-ctx-")
 	dfRel := imgP3RelDir(t, ".tfacc-df-")
 	imgTestWrite(t, ctxRel, map[string]string{
-		"Dockerfile": "FROM alpine:3.20\nLABEL from=incontext\n",
+		"Dockerfile": hAccConfig("FROM alpine:3.20\nLABEL from=incontext\n"),
 		"hello.txt":  "hi",
 	})
 	imgTestWrite(t, dfRel, map[string]string{
-		"Dockerfile.out": "FROM alpine:3.20\nCOPY hello.txt /hello.txt\nLABEL from=outside\n",
+		"Dockerfile.out": hAccConfig("FROM alpine:3.20\nCOPY hello.txt /hello.txt\nLABEL from=outside\n"),
 	})
 	absDF, err := filepath.Abs(filepath.Join(dfRel, "Dockerfile.out"))
 	if err != nil {
@@ -91,7 +91,7 @@ data "docker_image" "outabs" {
   name = docker_image.outabs.id
 }
 `, sfx, ctxRel, "../"+filepath.Base(dfRel)+"/Dockerfile.out", p3HCLPath(absDF))
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccImageCheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -108,7 +108,7 @@ data "docker_image" "outabs" {
 			{
 				// Editing the out-of-context Dockerfile changes context_digest -> rebuild.
 				PreConfig: func() {
-					imgTestWrite(t, dfRel, map[string]string{"Dockerfile.out": "FROM alpine:3.20\nCOPY hello.txt /hello.txt\nLABEL from=outside2\n"})
+					imgTestWrite(t, dfRel, map[string]string{"Dockerfile.out": hAccConfig("FROM alpine:3.20\nCOPY hello.txt /hello.txt\nLABEL from=outside2\n")})
 				},
 				Config: cfg,
 				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
@@ -134,7 +134,7 @@ func TestAccImageP3_unreadableContext(t *testing.T) {
 	if err := os.Mkdir(ctxDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	imgTestWrite(t, ctxDir, map[string]string{"Dockerfile": "FROM alpine:3.20\nLABEL p3=unreadable\n"})
+	imgTestWrite(t, ctxDir, map[string]string{"Dockerfile": hAccConfig("FROM alpine:3.20\nLABEL p3=unreadable\n")})
 	sfx := strings.ToLower(acctest.RandString(6))
 	base := fmt.Sprintf(`
 resource "docker_image" "u" {
@@ -153,7 +153,7 @@ resource "docker_image" "missing" {
 }
 `, sfx, p3HCLPath(filepath.Join(dir, "does-not-exist")))
 	moved := filepath.Join(dir, "ctx-moved")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccImageCheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -222,7 +222,7 @@ func TestAccRegistryImageP3_pushDeleteKeep(t *testing.T) {
 		t.Skipf("registry %s not reachable from the test process: %v", reg, err)
 	}
 	dir := t.TempDir()
-	imgTestWrite(t, dir, map[string]string{"Dockerfile": "FROM alpine:3.20\nRUN echo p3 > /p3\n"})
+	imgTestWrite(t, dir, map[string]string{"Dockerfile": hAccConfig("FROM alpine:3.20\nRUN echo p3 > /p3\n")})
 	sfx := strings.ToLower(acctest.RandString(6))
 	delRepo, keepRepo := "tfacc/p3del-"+sfx, "tfacc/p3keep-"+sfx
 	cfg := fmt.Sprintf(`
@@ -276,7 +276,7 @@ resource "docker_registry_image" "keep" {
 			return nil
 		}
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(*terraform.State) error {
 			code, _, err := regP3Manifest(reg, delRepo, digests[delRepo])

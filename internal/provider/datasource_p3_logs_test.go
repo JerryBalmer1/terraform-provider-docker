@@ -154,7 +154,7 @@ func TestCopLogsMissingContainer(t *testing.T) {
 
 func TestAccP3LogsDataSource(t *testing.T) {
 	testAccPreCheck(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: `

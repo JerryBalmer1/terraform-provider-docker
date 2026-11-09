@@ -543,7 +543,7 @@ resource "docker_swarm_node" "w1" {
 }
 `, worker, mgrAddr, avail, labels)
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             swarmAccCheckNodesGone,
@@ -603,7 +603,7 @@ data "docker_nodes" "all" {
 }
 `, w1, mgrAddr, w2, mgrAddr, role2)
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             swarmAccCheckNodesGone,

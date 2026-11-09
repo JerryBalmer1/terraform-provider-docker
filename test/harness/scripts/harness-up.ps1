@@ -1,8 +1,8 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-  Bring up the dind harness (manager + 3 workers, registry:2, TLS daemon) and
-  write test/harness/.env.
+  Bring up the dind harness (manager + 4 workers, registry:2, Hub mirror, TLS
+  daemon), seed the registry and write test/harness/.env.
 
 .DESCRIPTION
   PowerShell equivalent of harness-up.sh. Uses the same docker-compose.yml and
@@ -21,6 +21,21 @@
   so terraform-plugin-testing does not download it again for every test. If
   the download fails only TF_ACC_TERRAFORM_VERSION is exported and
   terraform-plugin-testing installs that version itself.
+
+  After the daemons answer it:
+  - copies the Docker Hub images in test/harness/seed-images.txt into the
+    harness registry (pull on the manager through the Hub mirror, push as
+    manager:12380/<ref>, remove the local tags) and exports the ones that
+    worked as TF_ACC_SEEDED_IMAGES, so the tests pull from the local registry;
+  - builds the tfacc plugin fixtures (test/harness/tfaccplugin, go build for
+    linux) into test/harness/.plugins/{volume,csi}, pushes the no-op volume
+    plugin to the harness registry and exports TF_ACC_PLUGIN (its reference),
+    TF_ACC_PLUGIN_DIR, TF_ACC_CSI_PLUGIN and TF_ACC_CSI_PLUGIN_DIR (the CSI
+    plugin is installed on the manager by harness-swarm-init, -SwarmInit pass);
+  - asks the manager for one Docker Hub search result: TPD_ACC_INTERNET=1 when
+    that works, TF_ACC_SKIP_INTERNET=1 when it does not.
+  Each of these is best effort: a failure is a warning, and the tests that
+  need the missing variable skip and say which one.
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -30,6 +45,9 @@ $ComposeFile = Join-Path $HarnessDir 'docker-compose.yml'
 $EnvFile     = Join-Path $HarnessDir '.env'
 $TlsDir      = Join-Path $HarnessDir 'tls'
 $BinDir      = Join-Path $HarnessDir '.bin'
+$PluginsDir  = Join-Path $HarnessDir '.plugins'
+$SeedFile    = Join-Path $HarnessDir 'seed-images.txt'
+$RepoRoot    = (Resolve-Path (Join-Path $HarnessDir '../..')).Path
 $TerraformVersion = if ($env:HARNESS_TF_VERSION) { $env:HARNESS_TF_VERSION } else { '1.14.9' }
 
 # Forward slashes: Go accepts them on Windows, and bash `source .env` does not
@@ -42,6 +60,7 @@ $HarnessEnv = [ordered]@{
     DOCKER_WORKER1_HOST      = 'tcp://127.0.0.1:12376'
     DOCKER_WORKER2_HOST      = 'tcp://127.0.0.1:12377'
     DOCKER_WORKER3_HOST      = 'tcp://127.0.0.1:12379'
+    DOCKER_WORKER4_HOST      = 'tcp://127.0.0.1:12381'
     E2E_MANAGER_ADDR         = 'manager:2377'
     E2E_ADVERTISE_ADDR       = 'eth0'
     TF_ACC_REGISTRY          = '127.0.0.1:12380'
@@ -230,12 +249,105 @@ Wait-HarnessDaemon -Name manager -DockerArgs @('-H', $HarnessEnv.DOCKER_HOST)
 Wait-HarnessDaemon -Name worker1 -DockerArgs @('-H', $HarnessEnv.DOCKER_WORKER1_HOST)
 Wait-HarnessDaemon -Name worker2 -DockerArgs @('-H', $HarnessEnv.DOCKER_WORKER2_HOST)
 Wait-HarnessDaemon -Name worker3 -DockerArgs @('-H', $HarnessEnv.DOCKER_WORKER3_HOST)
+Wait-HarnessDaemon -Name worker4 -DockerArgs @('-H', $HarnessEnv.DOCKER_WORKER4_HOST)
 Wait-HarnessDaemon -Name tlsnode -DockerArgs @('-H', $HarnessEnv.TF_ACC_TLS_HOST, '--tlsverify',
     '--tlscacert', $HarnessEnv.TF_ACC_TLS_CA, '--tlscert', $HarnessEnv.TF_ACC_TLS_CERT, '--tlskey', $HarnessEnv.TF_ACC_TLS_KEY)
 Wait-HarnessHttp -Name registry -Url "http://$($HarnessEnv.TF_ACC_REGISTRY)/v2/"
 
-# LF line endings and no BOM so bash `source` reads it cleanly.
-$lines = foreach ($k in $HarnessEnv.Keys) { "export $k=$($HarnessEnv[$k])" }
+# ---------------------------------------------------------------------------
+# Docker CLI against the harness manager; returns @{ Exit; Out }.
+# A simple function ($args, no param block) so --flags pass through as-is.
+function Invoke-Manager {
+    $out = & docker -H $HarnessEnv.DOCKER_HOST @args 2>&1
+    return @{ Exit = $LASTEXITCODE; Out = (($out | ForEach-Object { "$_" }) -join "`n").Trim() }
+}
+
+# Seed the harness registry with the Docker Hub images the tests use.
+$seeded = [System.Collections.Generic.List[string]]::new()
+$seedRefs = @(Get-Content -LiteralPath $SeedFile | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
+foreach ($ref in $seedRefs) {
+    $copy = "$($HarnessEnv.TF_ACC_REGISTRY_NODES)/$ref"
+    $r = Invoke-Manager pull --quiet $ref
+    if ($r.Exit -eq 0) { $r = Invoke-Manager tag $ref $copy }
+    if ($r.Exit -eq 0) { $r = Invoke-Manager push --quiet $copy }
+    # Leave the manager's image store as empty as compose up made it.
+    $null = Invoke-Manager rmi $copy $ref
+    if ($r.Exit -eq 0) {
+        $seeded.Add($ref)
+    } else {
+        Write-Warning "harness-up: could not seed $ref into the harness registry; the tests keep pulling it from Docker Hub. $($r.Out)"
+    }
+}
+$HarnessEnv['TF_ACC_SEEDED_IMAGES'] = $seeded -join ','
+Write-Host "Seeded $($seeded.Count)/$($seedRefs.Count) images into the harness registry as $($HarnessEnv.TF_ACC_REGISTRY_NODES)/<ref>."
+
+# tfacc plugin fixtures: one static linux binary, two plugin directories
+# (config.json + rootfs/). The docker CLI uploads the directory (and marks
+# files executable when it runs on Windows), so plugin create works against
+# the remote manager.
+function Build-HarnessPlugins {
+    if (-not (Get-Command go -ErrorAction SilentlyContinue)) { throw 'go is not on PATH' }
+    $r = Invoke-Manager info --format '{{.Architecture}}'
+    if ($r.Exit -ne 0) { throw "manager architecture: $($r.Out)" }
+    $goarch = if ($r.Out -in 'aarch64', 'arm64') { 'arm64' } else { 'amd64' }
+    Remove-Item -LiteralPath $PluginsDir -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Path $PluginsDir -Force | Out-Null
+    $bin = Join-Path $PluginsDir 'tfaccplugin'
+    $saved = @{ GOOS = $env:GOOS; GOARCH = $env:GOARCH; CGO_ENABLED = $env:CGO_ENABLED }
+    $env:GOOS = 'linux'; $env:GOARCH = $goarch; $env:CGO_ENABLED = '0'
+    Push-Location $RepoRoot
+    try {
+        $out = & go build -trimpath -o $bin ./test/harness/tfaccplugin 2>&1
+        if ($LASTEXITCODE -ne 0) { throw "go build ./test/harness/tfaccplugin: $($out | Out-String)" }
+    } finally {
+        Pop-Location
+        foreach ($k in $saved.Keys) {
+            if ($null -eq $saved[$k]) { Remove-Item "Env:$k" -ErrorAction SilentlyContinue } else { Set-Item "Env:$k" $saved[$k] }
+        }
+    }
+    foreach ($kind in 'volume', 'csi') {
+        $dir = Join-Path $PluginsDir $kind
+        $rootfs = Join-Path $dir 'rootfs'
+        foreach ($d in 'run/docker/plugins', 'dev', 'proc', 'sys', 'tmp', 'etc') {
+            New-Item -ItemType Directory -Path (Join-Path $rootfs $d) -Force | Out-Null
+        }
+        Copy-Item -LiteralPath $bin -Destination (Join-Path $rootfs 'tfaccplugin')
+        Copy-Item -LiteralPath (Join-Path $HarnessDir "tfaccplugin/$kind/config.json") -Destination (Join-Path $dir 'config.json')
+    }
+    Remove-Item -LiteralPath $bin -Force
+}
+try {
+    Build-HarnessPlugins
+    $HarnessEnv['TF_ACC_PLUGIN_DIR'] = ConvertTo-SlashPath (Join-Path $PluginsDir 'volume')
+    $HarnessEnv['TF_ACC_CSI_PLUGIN_DIR'] = ConvertTo-SlashPath (Join-Path $PluginsDir 'csi')
+    $HarnessEnv['TF_ACC_CSI_PLUGIN'] = 'tfacc-csi'
+    $pluginRef = "$($HarnessEnv.TF_ACC_REGISTRY)/tfacc/noop-volume:1"
+    $r = Invoke-Manager plugin create $pluginRef (Join-Path $PluginsDir 'volume')
+    if ($r.Exit -eq 0) { $r = Invoke-Manager plugin push $pluginRef }
+    $null = Invoke-Manager plugin rm --force $pluginRef
+    if ($r.Exit -eq 0) {
+        $HarnessEnv['TF_ACC_PLUGIN'] = $pluginRef
+        Write-Host "tfacc plugins built in $PluginsDir; volume plugin pushed as $pluginRef."
+    } else {
+        Write-Warning "harness-up: could not push the tfacc volume plugin: $($r.Out)"
+    }
+} catch {
+    Write-Warning "harness-up: tfacc plugin fixtures not built ($($_.Exception.Message)); the plugin tests will skip."
+}
+
+# Docker Hub search goes from the daemon straight to index.docker.io (no
+# mirror, no credentials): probe it the way docker_image_search does.
+$r = Invoke-Manager search --limit 1 --format '{{.Name}}' busybox
+if ($r.Exit -eq 0 -and $r.Out) {
+    $HarnessEnv['TPD_ACC_INTERNET'] = '1'
+} else {
+    $HarnessEnv['TF_ACC_SKIP_INTERNET'] = '1'
+    Write-Warning "harness-up: the manager cannot reach Docker Hub search; exporting TF_ACC_SKIP_INTERNET=1 (the Internet tests skip). $($r.Out)"
+}
+
+# LF line endings and no BOM so bash `source` reads it cleanly; values are
+# double-quoted (TF_ACC_COMPOSE_CLI is often under C:/Program Files).
+$lines = foreach ($k in $HarnessEnv.Keys) { "export $k=`"$($HarnessEnv[$k])`"" }
 [System.IO.File]::WriteAllText($EnvFile, (($lines -join "`n") + "`n"), [System.Text.UTF8Encoding]::new($false))
 
 foreach ($k in $HarnessEnv.Keys) {

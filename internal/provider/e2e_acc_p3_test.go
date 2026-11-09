@@ -157,14 +157,14 @@ func TestAccE2EOverlayDataPlane(t *testing.T) {
 	t.Cleanup(func() { p3ForceLeave(p.Worker1Host); p3ForceLeave(p.Worker2Host) })
 	cfg := e2eDataPlaneConfig(p)
 	var none1, none2 string
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             e2eCheckDestroy(t, &none1, &none2),
 		Steps: []resource.TestStep{
 			{
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestMatchResourceAttr("docker_image.web", "image_digest_ref", regexp.MustCompile(`^nginx@sha256:[0-9a-f]{64}$`)),
+					resource.TestMatchResourceAttr("docker_image.web", "image_digest_ref", regexp.MustCompile(`^`+regexp.QuoteMeta(hAccRepo(e2eImage))+`@sha256:[0-9a-f]{64}$`)),
 					resource.TestCheckResourceAttrPair("docker_service.web", "image", "docker_image.web", "image_digest_ref"),
 					resource.TestCheckResourceAttr("docker_service.probe", "mode", "replicated_job"),
 					resource.TestCheckResourceAttr("docker_service.agent", "mode", "global"),
@@ -267,7 +267,7 @@ resource "docker_swarm_node" "w2" {
   advertise_addr  = %[1]q
 }
 `, p.AdvertiseAddr, p.ManagerAddr, p.Worker1Host, p.Worker2Host)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(s *terraform.State) error {
 			// worker2 is still stopped here; ask the manager and worker1.

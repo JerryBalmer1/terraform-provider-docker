@@ -18,6 +18,7 @@ import (
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/api/types/volume"
+	"github.com/moby/moby/client"
 )
 
 func objCVTestSpec(avail string) types.Object {
@@ -154,10 +155,17 @@ func TestObjClusterVolumeCreateUpdate(t *testing.T) {
 // TestAccObjClusterVolume creates a Swarm cluster (CSI) volume with the CSI
 // plugin named by TF_ACC_CSI_PLUGIN (installed and enabled on every node)
 // and then drains it in place. It needs a swarm manager (the -SwarmInit
-// harness pass) and skips unless TF_ACC_CSI_PLUGIN is set.
+// harness pass) and skips unless TF_ACC_CSI_PLUGIN is set and enabled there.
+// The harness plugin is tfacc-csi (test/harness/tfaccplugin, controller-only:
+// create, drain and delete work; publishing to a task does not, so no task
+// mounts the volume here).
 func TestAccObjClusterVolume(t *testing.T) {
 	testAccPreCheck(t)
+	_ = swarmAccManagerAddr(t) // skips unless DOCKER_HOST is a swarm manager
 	env := p3Env(t, "TF_ACC_CSI_PLUGIN")
+	if p, err := testAccDockerClient(t).PluginInspect(context.Background(), env[0], client.PluginInspectOptions{}); err != nil || !p.Plugin.Enabled {
+		t.Skipf("CSI plugin %s is not enabled on DOCKER_HOST (test/harness/scripts/harness-swarm-init enables it): %v", env[0], err)
+	}
 	name := acctest.RandomWithPrefix("tfacc-csi")
 	cfg := func(avail string) string {
 		return fmt.Sprintf(`
@@ -175,7 +183,7 @@ resource "docker_volume" "csi" {
 }
 `, name, env[0], avail)
 	}
-	tfresource.Test(t, tfresource.TestCase{
+	hAccTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []tfresource.TestStep{
 			{Config: cfg("active"), Check: tfresource.ComposeAggregateTestCheckFunc(

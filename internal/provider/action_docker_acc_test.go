@@ -25,7 +25,7 @@ import (
 	"github.com/moby/moby/client"
 )
 
-const actAccImage = "busybox:1.36"
+var actAccImage = hAccImage("busybox:1.36") // the harness registry copy when harness-up seeded it
 
 // actAccVersionChecks skips action tests on Terraform < 1.14, which has no
 // action blocks.
@@ -98,7 +98,7 @@ resource "terraform_data" "fail" {
   }
 }
 `
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -127,7 +127,7 @@ func TestAccActionContainerExport_basic(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-export")
 	out := filepath.Join(t.TempDir(), "export", "c.tar")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
@@ -223,7 +223,7 @@ resource "terraform_data" "load" {
   }
 }
 `
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -270,7 +270,7 @@ func TestAccActionImageImport_basic(t *testing.T) {
 	src := filepath.ToSlash(actAccRootfsTar(t))
 	c := testAccDockerClient(t)
 	t.Cleanup(func() { _, _ = c.ImageRemove(context.Background(), repo+":v1", client.ImageRemoveOptions{Force: true}) })
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
@@ -328,7 +328,7 @@ func TestAccActionImagePrune_basic(t *testing.T) {
 		t.Fatalf("seeding image: %v", err)
 	}
 	t.Cleanup(func() { _, _ = c.ImageRemove(context.Background(), ref, client.ImageRemoveOptions{Force: true}) })
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
@@ -374,7 +374,7 @@ func TestAccActionSystemPrune_basic(t *testing.T) {
 	t.Cleanup(func() {
 		_, _ = c.ContainerRemove(context.Background(), created.ID, client.ContainerRemoveOptions{Force: true})
 	})
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{

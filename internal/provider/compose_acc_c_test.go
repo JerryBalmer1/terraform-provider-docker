@@ -44,7 +44,7 @@ resource "docker_compose" "acc" {
 
 func TestAccComposeDataSources(t *testing.T) {
 	testAccPreCheck(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{Config: composeAccProject},
@@ -106,7 +106,7 @@ func TestAccComposeActions(t *testing.T) {
 	testAccPreCheck(t)
 	dir := t.TempDir()
 	res := filepath.ToSlash(filepath.Join(dir, "run.json"))
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		TerraformVersionChecks:   actAccVersionChecks,
 		Steps: []resource.TestStep{{
@@ -304,10 +304,10 @@ func TestAccComposeImageActions(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, "app"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "app", "Dockerfile"), []byte("FROM busybox:1.36\nRUN echo built > /built\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "app", "Dockerfile"), []byte(hAccConfig("FROM busybox:1.36\nRUN echo built > /built\n")), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		TerraformVersionChecks:   actAccVersionChecks,
 		Steps: []resource.TestStep{{
@@ -376,14 +376,14 @@ resource "docker_stack" "acc" {
   }
 }
 `
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("docker_stack.acc", "service_ids.web"),
-					resource.TestMatchResourceAttr("docker_stack.acc", "stack_yaml", regexp.MustCompile(`nginx:alpine`)),
+					resource.TestMatchResourceAttr("docker_stack.acc", "stack_yaml", regexp.MustCompile(regexp.QuoteMeta(hAccImage("nginx:alpine")))),
 				),
 			},
 			{

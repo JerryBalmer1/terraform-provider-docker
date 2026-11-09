@@ -59,7 +59,7 @@ var ctrP3Ignore = []string{"wait", "wait_timeout", "must_run", "logging", "inspe
 func TestAccContainerP3_capabilities(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-caps")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             ctrP3CheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -160,7 +160,7 @@ resource "docker_container" "c" {
 	update := resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
 		plancheck.ExpectResourceAction("docker_container.c", plancheck.ResourceActionUpdate),
 	}}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             ctrP3CheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -200,7 +200,7 @@ resource "docker_container" "c" {
 }
 `, name)
 	var id string
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             ctrP3CheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -249,7 +249,7 @@ resource "docker_container" "c" {
 func TestAccContainerP3_laneCAttributes(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-ctrc")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             ctrP3CheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -334,7 +334,7 @@ resource "docker_container" "c" {
 func TestAccContainerP3_imageDefaults(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-imgdef")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             ctrP3CheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -376,7 +376,7 @@ resource "docker_container" "c" {
 func TestAccContainerP3_gpusNoDriver(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-gpu")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             ctrP3CheckDestroy(t),
 		Steps: []resource.TestStep{{
@@ -408,7 +408,7 @@ func TestAccContainerP3_ipv6Address(t *testing.T) {
 	}
 	_, _ = c.NetworkRemove(ctx, resp.ID, client.NetworkRemoveOptions{})
 	name := acctest.RandomWithPrefix("tfacc-v6")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             ctrP3CheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -469,7 +469,7 @@ func TestAccVolumeP3_refusesExistingName(t *testing.T) {
 		t.Fatalf("pre-creating volume: %v", err)
 	}
 	t.Cleanup(func() { _, _ = c.VolumeRemove(context.Background(), name, client.VolumeRemoveOptions{Force: true}) })
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(*terraform.State) error {
 			vRes, err := c.VolumeInspect(context.Background(), name, client.VolumeInspectOptions{})

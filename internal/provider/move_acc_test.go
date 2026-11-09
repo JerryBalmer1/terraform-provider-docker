@@ -77,7 +77,7 @@ resource "docker_network" "n_moved" {
   name = %[2]q
 }
 `, vol, net)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks: []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_8_0)},
 		Steps: []resource.TestStep{
 			{

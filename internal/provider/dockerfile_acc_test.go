@@ -68,7 +68,7 @@ data "docker_dockerfile" "image" {
   image = docker_image.alpine.id
 }
 `, "FROM alpine:3.20 AS base\nLABEL a=b\nEXPOSE 80\n")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: cfg,

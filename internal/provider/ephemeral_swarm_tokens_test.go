@@ -71,7 +71,7 @@ func TestSwarmTokensEphemeralOpen(t *testing.T) {
 func TestAccSwarmTokensEphemeral(t *testing.T) {
 	testAccPreCheck(t)
 	_ = swarmAccManagerAddr(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccEphemeralFactories(),
 		TerraformVersionChecks:   []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_10_0)},
 		Steps: []resource.TestStep{{

@@ -182,7 +182,7 @@ func TestAccE2EImageToService(t *testing.T) {
 	// Captured by e2eCheckServiceID so CheckDestroy knows what to look for.
 	var serviceID, secretID string
 
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             e2eCheckDestroy(t, &serviceID, &secretID),
 		Steps: []resource.TestStep{

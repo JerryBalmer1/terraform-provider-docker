@@ -182,7 +182,7 @@ func TestAccRegistryImage(t *testing.T) {
 		t.Skip("TF_ACC_REGISTRY not set; skipping registry push test")
 	}
 	dir := t.TempDir()
-	imgTestWrite(t, dir, map[string]string{"Dockerfile": "FROM alpine:3.20\nRUN echo tfacc > /tfacc\n"})
+	imgTestWrite(t, dir, map[string]string{"Dockerfile": hAccConfig("FROM alpine:3.20\nRUN echo tfacc > /tfacc\n")})
 	cfg := fmt.Sprintf(`
 resource "docker_image" "app" {
   name = "%s/tfacc/app:1"
@@ -201,7 +201,7 @@ data "docker_registry_image" "app" {
   depends_on = [docker_registry_image.app]
 }
 `, reg, strings.ReplaceAll(dir, `\`, "/"))
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{

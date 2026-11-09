@@ -250,7 +250,7 @@ func testAccImageCheckDestroy(t *testing.T) resource.TestCheckFunc {
 
 func TestAccImagePull(t *testing.T) {
 	testAccPreCheck(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccImageCheckDestroy(t),
 		Steps: []resource.TestStep{
@@ -274,7 +274,7 @@ data "docker_image" "alpine" {
 			{
 				ResourceName:            "docker_image.alpine",
 				ImportState:             true,
-				ImportStateId:           "alpine:3.20",
+				ImportStateId:           hAccImage("alpine:3.20"),
 				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"keep_locally", "force_remove"},
 			},
@@ -286,7 +286,7 @@ func TestAccImageBuild(t *testing.T) {
 	testAccPreCheck(t)
 	dir := t.TempDir()
 	imgTestWrite(t, dir, map[string]string{
-		"Dockerfile":    "FROM alpine:3.20\nARG GREETING\nCOPY hello.txt /hello.txt\nRUN echo \"$GREETING\" > /greeting\n",
+		"Dockerfile":    hAccConfig("FROM alpine:3.20\nARG GREETING\nCOPY hello.txt /hello.txt\nRUN echo \"$GREETING\" > /greeting\n"),
 		"hello.txt":     "v1",
 		".dockerignore": "*.secret\n",
 		"x.secret":      "nope",
@@ -305,7 +305,7 @@ data "docker_image" "app" {
 }
 `, filepath.ToSlash(dir))
 	var firstID string
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccImageCheckDestroy(t),
 		Steps: []resource.TestStep{

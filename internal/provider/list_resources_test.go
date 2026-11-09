@@ -304,7 +304,7 @@ func TestListInitPrivate(t *testing.T) {
 func TestAccListSecretQuery(t *testing.T) {
 	testAccPreCheck(t)
 	_ = swarmAccManagerAddr(t)
-	tfresource.Test(t, tfresource.TestCase{
+	hAccTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		TerraformVersionChecks:   []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_14_0)},
 		Steps: []tfresource.TestStep{

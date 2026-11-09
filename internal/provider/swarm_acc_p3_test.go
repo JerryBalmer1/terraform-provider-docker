@@ -88,7 +88,7 @@ func TestAccSwarmInitP3_autolockAtCreate(t *testing.T) {
 	testAccPreCheck(t)
 	p3RequireInactive(t)
 	t.Cleanup(func() { p3ForceLeave(os.Getenv("DOCKER_HOST")) })
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             swarmP3CheckInactive(t, endpointConfig{Host: os.Getenv("DOCKER_HOST")}),
 		Steps: []resource.TestStep{{
@@ -112,7 +112,7 @@ func TestAccSwarmInitP3_autolock(t *testing.T) {
 	toggle := resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
 		plancheck.ExpectResourceAction("docker_swarm_init.this", plancheck.ResourceActionUpdate),
 	}}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             swarmP3CheckInactive(t, endpointConfig{Host: os.Getenv("DOCKER_HOST")}),
 		Steps: []resource.TestStep{
@@ -199,7 +199,7 @@ resource "docker_swarm_init" "locked" {
 	isState := func(want swarm.LocalNodeState) func(swarm.LocalNodeState) bool {
 		return func(s swarm.LocalNodeState) bool { return s == want }
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             swarmP3CheckInactive(t, ep),
 		Steps: []resource.TestStep{
@@ -285,7 +285,7 @@ func TestAccSwarmNodeP3_importThenApply(t *testing.T) {
 	p3RequireNodeInactive(t, worker)
 	var nodeID string
 	cfg := swarmP3NodeConfig(worker, mgrAddr, `  labels          = { imported = "yes" }`)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             resource.ComposeTestCheckFunc(swarmAccCheckNodesGone, swarmP3CheckInactive(t, endpointConfig{Host: worker})),
 		Steps: []resource.TestStep{
@@ -341,7 +341,7 @@ func TestAccSwarmNodeP3_adoptJoined(t *testing.T) {
 	mgrAddr := swarmAccManagerAddr(t)
 	p3RequireNodeInactive(t, worker)
 	var nodeID string
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             resource.ComposeTestCheckFunc(swarmAccCheckNodesGone, swarmP3CheckInactive(t, endpointConfig{Host: worker})),
 		Steps: []resource.TestStep{
@@ -400,7 +400,7 @@ resource "docker_service" "gpu" {
   depends_on = [docker_swarm_node.gpu]
 }
 `, w3, mgrAddr, name)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             resource.ComposeTestCheckFunc(swarmAccCheckNodesGone, swarmP3CheckInactive(t, endpointConfig{Host: w3})),
 		Steps: []resource.TestStep{{

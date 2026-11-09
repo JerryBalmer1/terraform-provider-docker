@@ -49,7 +49,7 @@ func TestAccActionSwarmRotateTokens_basic(t *testing.T) {
 		t.Fatal(err)
 	}
 	before := beforeRes.Swarm
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
@@ -116,7 +116,7 @@ func TestAccActionNodeDrainActivate_basic(t *testing.T) {
 	drain := actAccTrigger("docker_node_drain", "d", fmt.Sprintf(`    node_id = %q
     timeout = "2m"`, node.Description.Hostname))
 	activate := actAccTrigger("docker_node_activate", "a", fmt.Sprintf(`    node_id = %q`, node.ID))
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -176,7 +176,7 @@ func TestAccActionServiceScaleForceUpdateRollback_basic(t *testing.T) {
     timeout = "3m"`, name))
 	rollback := actAccTrigger("docker_service_rollback", "r", fmt.Sprintf(`    service_id = %q
     timeout = "3m"`, created.ID))
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{

@@ -39,7 +39,7 @@ func objAccResultFile(p, key string) resource.TestCheckFunc {
 
 func TestAccObjSystemDataSources(t *testing.T) {
 	testAccPreCheck(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: `
@@ -62,7 +62,7 @@ data "docker_system_df" "df" {}
 func TestAccObjNetworksVolumesDataSources(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-objlist")
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: fmt.Sprintf(`
@@ -107,7 +107,7 @@ data "docker_network" "one" {
 
 func TestAccObjPluginsDataSource(t *testing.T) {
 	testAccPreCheck(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: `data "docker_plugins" "all" {}`,
@@ -137,7 +137,7 @@ func TestAccObjPruneActions(t *testing.T) {
 	t.Cleanup(func() { _, _ = c.NetworkRemove(context.Background(), label, client.NetworkRemoveOptions{}) })
 	dir := t.TempDir()
 	rp := func(n string) string { return filepath.ToSlash(filepath.Join(dir, n+".json")) }
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
@@ -209,7 +209,7 @@ func TestAccObjPluginCreatePush(t *testing.T) {
 	c := testAccDockerClient(t)
 	t.Cleanup(func() { _, _ = c.PluginRemove(context.Background(), name, client.PluginRemoveOptions{Force: true}) })
 	out := filepath.ToSlash(filepath.Join(t.TempDir(), "push.json"))
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{

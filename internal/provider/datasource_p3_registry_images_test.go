@@ -142,7 +142,7 @@ func TestP3RegistryImageTagsPaginated(t *testing.T) {
 func TestAccP3RegistryImageDataSources(t *testing.T) {
 	testAccPreCheck(t)
 	host := testAccRegistryHost(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: fmt.Sprintf(`

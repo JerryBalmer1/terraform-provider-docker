@@ -22,7 +22,7 @@ func TestSwarmTokensSchemaSensitive(t *testing.T) {
 func TestAccSwarmTokens_basic(t *testing.T) {
 	testAccPreCheck(t)
 	swarmAccManagerAddr(t) // skips unless DOCKER_HOST is a swarm manager
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{

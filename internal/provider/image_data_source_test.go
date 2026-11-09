@@ -22,7 +22,7 @@ func TestImageDataSourceRepoDigest(t *testing.T) {
 // TestAccImageDataSource reads an image pulled by a docker_image resource.
 func TestAccImageDataSource(t *testing.T) {
 	testAccPreCheck(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: `
@@ -38,7 +38,7 @@ data "docker_image" "busybox" {
 `,
 			Check: resource.ComposeAggregateTestCheckFunc(
 				resource.TestCheckResourceAttrPair("data.docker_image.busybox", "id", "docker_image.busybox", "id"),
-				resource.TestCheckTypeSetElemAttr("data.docker_image.busybox", "repo_tags.*", "busybox:1.36"),
+				resource.TestCheckTypeSetElemAttr("data.docker_image.busybox", "repo_tags.*", hAccImage("busybox:1.36")),
 				resource.TestCheckResourceAttrSet("data.docker_image.busybox", "image_digest_ref"),
 			),
 		}},

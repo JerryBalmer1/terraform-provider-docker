@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# Bring up the dind harness (manager + 3 workers, registry:2, TLS daemon) and
-# write test/harness/.env for `make e2e`. The docker CLI is used here, in the
+# Bring up the dind harness (manager + 4 workers, registry:2, Hub mirror, TLS
+# daemon), seed the registry and write test/harness/.env. The docker CLI is used here, in the
 # test harness only; the provider never shells out to it.
 #
 # Mirrors harness-up.ps1: generates throwaway TLS material for tlsnode into
 # test/harness/tls/ (openssl), installs Terraform ${HARNESS_TF_VERSION:-1.14.9}
 # into test/harness/.bin/ once (SHA256-checked) and exports
 # TF_ACC_TERRAFORM_VERSION (+ TF_ACC_TERRAFORM_PATH when the install worked).
+# After the daemons answer it seeds the harness registry with the images in
+# test/harness/seed-images.txt (TF_ACC_SEEDED_IMAGES), builds the tfacc plugin
+# fixtures (TF_ACC_PLUGIN, TF_ACC_PLUGIN_DIR, TF_ACC_CSI_PLUGIN[_DIR]) and
+# probes Docker Hub search (TPD_ACC_INTERNET=1 or TF_ACC_SKIP_INTERNET=1), all
+# best effort, exactly like harness-up.ps1.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,6 +20,12 @@ COMPOSE_FILE="${HARNESS_DIR}/docker-compose.yml"
 ENV_FILE="${HARNESS_DIR}/.env"
 TLS_DIR="${HARNESS_DIR}/tls"
 BIN_DIR="${HARNESS_DIR}/.bin"
+PLUGINS_DIR="${HARNESS_DIR}/.plugins"
+SEED_FILE="${HARNESS_DIR}/seed-images.txt"
+REPO_ROOT="$(cd "${HARNESS_DIR}/../.." && pwd)"
+MGR_HOST="tcp://127.0.0.1:12375"
+REGISTRY="127.0.0.1:12380"
+REGISTRY_NODES="manager:12380"
 TF_VERSION="${HARNESS_TF_VERSION:-1.14.9}"
 
 # compose must talk to the HOST daemon, not a stale harness manager value.
@@ -147,29 +158,104 @@ wait_daemon manager -H tcp://127.0.0.1:12375
 wait_daemon worker1 -H tcp://127.0.0.1:12376
 wait_daemon worker2 -H tcp://127.0.0.1:12377
 wait_daemon worker3 -H tcp://127.0.0.1:12379
+wait_daemon worker4 -H tcp://127.0.0.1:12381
 wait_daemon tlsnode -H tcp://127.0.0.1:12378 --tlsverify --tlscacert "${TLS_CA}" --tlscert "${TLS_CERT}" --tlskey "${TLS_KEY}"
 wait_http registry http://127.0.0.1:12380/v2/
 
+mgr() { docker -H "${MGR_HOST}" "$@"; }
+
+# Seed the harness registry with the Docker Hub images the tests use.
+SEEDED=""
+total=0
+while IFS= read -r ref || [ -n "${ref}" ]; do
+  ref="$(printf '%s' "${ref}" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  case "${ref}" in ''|'#'*) continue ;; esac
+  total=$((total + 1))
+  copy="${REGISTRY_NODES}/${ref}"
+  if out="$(mgr pull --quiet "${ref}" 2>&1 && mgr tag "${ref}" "${copy}" 2>&1 && mgr push --quiet "${copy}" 2>&1)"; then
+    SEEDED="${SEEDED:+${SEEDED},}${ref}"
+  else
+    echo "WARNING: could not seed ${ref} into the harness registry; the tests keep pulling it from Docker Hub. ${out}" >&2
+  fi
+  # Leave the manager's image store as empty as compose up made it.
+  mgr rmi "${copy}" "${ref}" >/dev/null 2>&1 || true
+done < "${SEED_FILE}"
+echo "Seeded $(printf '%s' "${SEEDED}" | awk -F, '{print (NF ? NF : 0)}')/${total} images into the harness registry as ${REGISTRY_NODES}/<ref>."
+
+# tfacc plugin fixtures: one static linux binary, two plugin directories
+# (config.json + rootfs/); the docker CLI uploads the directory to the manager.
+build_plugins() {
+  local arch goarch kind d
+  command -v go >/dev/null 2>&1 || { echo "go is not on PATH" >&2; return 1; }
+  arch="$(mgr info --format '{{.Architecture}}')" || return 1
+  case "${arch}" in aarch64|arm64) goarch=arm64 ;; *) goarch=amd64 ;; esac
+  rm -rf "${PLUGINS_DIR}"
+  mkdir -p "${PLUGINS_DIR}"
+  (cd "${REPO_ROOT}" && GOOS=linux GOARCH="${goarch}" CGO_ENABLED=0 go build -trimpath -o "${PLUGINS_DIR}/tfaccplugin" ./test/harness/tfaccplugin) || return 1
+  for kind in volume csi; do
+    for d in run/docker/plugins dev proc sys tmp etc; do mkdir -p "${PLUGINS_DIR}/${kind}/rootfs/${d}"; done
+    cp "${PLUGINS_DIR}/tfaccplugin" "${PLUGINS_DIR}/${kind}/rootfs/tfaccplugin"
+    chmod 0755 "${PLUGINS_DIR}/${kind}/rootfs/tfaccplugin"
+    cp "${HARNESS_DIR}/tfaccplugin/${kind}/config.json" "${PLUGINS_DIR}/${kind}/config.json"
+  done
+  rm -f "${PLUGINS_DIR}/tfaccplugin"
+}
+PLUGIN_REF=""
+PLUGIN_DIR=""
+CSI_PLUGIN_DIR=""
+if build_plugins; then
+  PLUGIN_DIR="$(native_path "${PLUGINS_DIR}/volume")"
+  CSI_PLUGIN_DIR="$(native_path "${PLUGINS_DIR}/csi")"
+  ref="${REGISTRY}/tfacc/noop-volume:1"
+  if out="$(mgr plugin create "${ref}" "${PLUGINS_DIR}/volume" 2>&1 && mgr plugin push "${ref}" 2>&1)"; then
+    PLUGIN_REF="${ref}"
+    echo "tfacc plugins built in ${PLUGINS_DIR}; volume plugin pushed as ${ref}."
+  else
+    echo "WARNING: could not push the tfacc volume plugin: ${out}" >&2
+  fi
+  mgr plugin rm --force "${ref}" >/dev/null 2>&1 || true
+else
+  echo "WARNING: tfacc plugin fixtures not built; the plugin tests will skip." >&2
+fi
+
+# Docker Hub search goes from the daemon straight to index.docker.io (no
+# mirror, no credentials): probe it the way docker_image_search does.
+INTERNET=""
+if [ -n "$(mgr search --limit 1 --format '{{.Name}}' busybox 2>/dev/null)" ]; then
+  INTERNET=1
+else
+  echo "WARNING: the manager cannot reach Docker Hub search; exporting TF_ACC_SKIP_INTERNET=1 (the Internet tests skip)." >&2
+fi
+
 # Same values, same order as harness-up.ps1.
 {
-  echo "export DOCKER_HOST=tcp://127.0.0.1:12375"
-  echo "export DOCKER_WORKER1_HOST=tcp://127.0.0.1:12376"
-  echo "export DOCKER_WORKER2_HOST=tcp://127.0.0.1:12377"
-  echo "export DOCKER_WORKER3_HOST=tcp://127.0.0.1:12379"
-  echo "export E2E_MANAGER_ADDR=manager:2377"
-  echo "export E2E_ADVERTISE_ADDR=eth0"
-  echo "export TF_ACC_REGISTRY=127.0.0.1:12380"
-  echo "export TF_ACC_REGISTRY_NODES=manager:12380"
-  echo "export TF_ACC_TLS_HOST=tcp://127.0.0.1:12378"
-  echo "export TF_ACC_TLS_CA=${TLS_CA}"
-  echo "export TF_ACC_TLS_CERT=${TLS_CERT}"
-  echo "export TF_ACC_TLS_KEY=${TLS_KEY}"
-  echo "export TF_ACC_TLS_CERT_PATH=$(native_path "${TLS_DIR}")"
-  echo "export TF_ACC_GPU_NODE_LABEL=gpu=nvidia"
-  echo "export TF_ACC_HARNESS_COMPOSE=$(native_path "${COMPOSE_FILE}")"
-  echo "export TF_ACC_COMPOSE_CLI=$(native_path "$(command -v docker)")"
-  echo "export TF_ACC_TERRAFORM_VERSION=${TF_VERSION}"
-  if [ -n "${TF_PATH}" ]; then echo "export TF_ACC_TERRAFORM_PATH=${TF_PATH}"; fi
+  echo "export DOCKER_HOST=\"tcp://127.0.0.1:12375\""
+  echo "export DOCKER_WORKER1_HOST=\"tcp://127.0.0.1:12376\""
+  echo "export DOCKER_WORKER2_HOST=\"tcp://127.0.0.1:12377\""
+  echo "export DOCKER_WORKER3_HOST=\"tcp://127.0.0.1:12379\""
+  echo "export DOCKER_WORKER4_HOST=\"tcp://127.0.0.1:12381\""
+  echo "export E2E_MANAGER_ADDR=\"manager:2377\""
+  echo "export E2E_ADVERTISE_ADDR=\"eth0\""
+  echo "export TF_ACC_REGISTRY=\"127.0.0.1:12380\""
+  echo "export TF_ACC_REGISTRY_NODES=\"manager:12380\""
+  echo "export TF_ACC_TLS_HOST=\"tcp://127.0.0.1:12378\""
+  echo "export TF_ACC_TLS_CA=\"${TLS_CA}\""
+  echo "export TF_ACC_TLS_CERT=\"${TLS_CERT}\""
+  echo "export TF_ACC_TLS_KEY=\"${TLS_KEY}\""
+  echo "export TF_ACC_TLS_CERT_PATH=\"$(native_path "${TLS_DIR}")\""
+  echo "export TF_ACC_GPU_NODE_LABEL=\"gpu=nvidia\""
+  echo "export TF_ACC_HARNESS_COMPOSE=\"$(native_path "${COMPOSE_FILE}")\""
+  echo "export TF_ACC_COMPOSE_CLI=\"$(native_path "$(command -v docker)")\""
+  echo "export TF_ACC_TERRAFORM_VERSION=\"${TF_VERSION}\""
+  if [ -n "${TF_PATH}" ]; then echo "export TF_ACC_TERRAFORM_PATH=\"${TF_PATH}\""; fi
+  echo "export TF_ACC_SEEDED_IMAGES=\"${SEEDED}\""
+  if [ -n "${PLUGIN_DIR}" ]; then
+    echo "export TF_ACC_PLUGIN_DIR=\"${PLUGIN_DIR}\""
+    echo "export TF_ACC_CSI_PLUGIN_DIR=\"${CSI_PLUGIN_DIR}\""
+    echo "export TF_ACC_CSI_PLUGIN=\"tfacc-csi\""
+  fi
+  if [ -n "${PLUGIN_REF}" ]; then echo "export TF_ACC_PLUGIN=\"${PLUGIN_REF}\""; fi
+  if [ -n "${INTERNET}" ]; then echo "export TPD_ACC_INTERNET=\"1\""; else echo "export TF_ACC_SKIP_INTERNET=1"; fi
 } > "${ENV_FILE}"
 
 echo "Wrote ${ENV_FILE}:"

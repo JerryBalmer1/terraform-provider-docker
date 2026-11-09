@@ -466,8 +466,8 @@ func TestAccImageBuildKit(t *testing.T) {
 	testAccPreCheck(t)
 	dir := t.TempDir()
 	imgTestWrite(t, dir, map[string]string{
-		"Dockerfile": "# syntax=docker/dockerfile:1\nFROM alpine:3.20\n" +
-			"RUN --mount=type=secret,id=token test \"$(cat /run/secrets/token)\" = tfacc-secret && echo ok > /ok\n",
+		"Dockerfile": hAccConfig("# syntax=docker/dockerfile:1\nFROM alpine:3.20\n" +
+			"RUN --mount=type=secret,id=token test \"$(cat /run/secrets/token)\" = tfacc-secret && echo ok > /ok\n"),
 	})
 	t.Setenv("TFACC_IMG_BK_TOKEN", "tfacc-secret")
 	cfg := fmt.Sprintf(`
@@ -484,7 +484,7 @@ resource "docker_image" "bk" {
   }
 }
 `, filepath.ToSlash(dir))
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             testAccImageCheckDestroy(t),
 		Steps: []resource.TestStep{{

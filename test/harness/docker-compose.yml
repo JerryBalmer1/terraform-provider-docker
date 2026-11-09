@@ -1,5 +1,6 @@
-# Test harness ONLY: a Docker-in-Docker swarm (one manager, three workers),
-# a registry:2, and a TLS-enabled standalone dind daemon, used by `make e2e`,
+# Test harness ONLY: a Docker-in-Docker swarm (one manager, four workers),
+# a registry:2, a Docker Hub pull-through cache and a TLS-enabled standalone
+# dind daemon, used by `make e2e`,
 # Invoke-Build TestAcc and the TestAcc* acceptance tests. This is the only
 # compose file in the repository; the provider itself never uses compose or
 # the docker CLI.
@@ -87,8 +88,25 @@ services:
     volumes:
       - worker3-data:/var/lib/docker
 
+  # Standby worker. The tests that join nodes themselves (docker_swarm_node,
+  # TestAccE2E*) use worker1-3, which must start outside any swarm. worker4 is
+  # the one Invoke-E2E -SwarmInit joins as a worker right after `swarm init`
+  # (scripts/harness-swarm-init.*), so the swarm pass has a ready worker for
+  # docker_node, docker_node_promote / docker_node_demote, docker_node_drain
+  # and global services. In the plain pass it stays an idle, unjoined daemon.
+  worker4:
+    <<: *dind
+    hostname: worker4
+    ports:
+      - "127.0.0.1:12381:2375"
+    volumes:
+      - worker4-data:/var/lib/docker
+
   # registry:2 with deletes enabled (docker_registry_image keep_remotely=false
-  # issues DELETE /v2/<repo>/manifests/<digest>). It runs inside the manager's
+  # issues DELETE /v2/<repo>/manifests/<digest>). harness-up seeds it with the
+  # Docker Hub images in seed-images.txt (busybox:1.36 ->
+  # manager:12380/busybox:1.36) and the tfacc no-op volume plugin, so the
+  # acceptance tests pull from here instead of Docker Hub. It runs inside the manager's
   # network namespace so one name, 127.0.0.1:12380, works from the host (the
   # provider's DELETE) and from the manager daemon (push/pull; loopback
   # registries are insecure by default). Workers use manager:12380.
@@ -178,6 +196,7 @@ volumes:
   worker1-data:
   worker2-data:
   worker3-data:
+  worker4-data:
   tlsnode-data:
   mirror-cache:
     external: true

@@ -247,13 +247,13 @@ func TestAccTag_basic(t *testing.T) {
 	testAccPreCheck(t)
 	c := testAccDockerClient(t)
 	target := "tfacc-tag/busybox:acc"
-	tfresource.Test(t, tfresource.TestCase{
+	hAccTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(*terraform.State) error {
 			if _, err := c.ImageInspect(context.Background(), target); !isNotFound(err) {
 				return fmt.Errorf("tag %s still exists (%v)", target, err)
 			}
-			if _, err := c.ImageInspect(context.Background(), "busybox:1.36"); err != nil {
+			if _, err := c.ImageInspect(context.Background(), hAccImage("busybox:1.36")); err != nil {
 				return fmt.Errorf("source image was removed: %v", err)
 			}
 			return nil

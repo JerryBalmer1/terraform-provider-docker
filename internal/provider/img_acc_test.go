@@ -19,7 +19,14 @@ import (
 // image data sources, checking the Pass 5 contract outputs.
 func TestAccImageContractOutputs(t *testing.T) {
 	testAccPreCheck(t)
-	resource.Test(t, resource.TestCase{
+	// The normalized reference: docker.io/library/busybox:1.36 for the Hub
+	// image, manager:12380/busybox:1.36 (already fully qualified) for the
+	// harness registry copy.
+	wantRef := actAccImage
+	if wantRef == "busybox:1.36" {
+		wantRef = "docker.io/library/" + wantRef
+	}
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: fmt.Sprintf(`
@@ -41,7 +48,7 @@ data "docker_images" "b" {
 `, actAccImage),
 			Check: resource.ComposeAggregateTestCheckFunc(
 				resource.TestMatchResourceAttr("docker_image.b", "id", regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)),
-				resource.TestCheckResourceAttr("docker_image.b", "image_ref", "docker.io/library/"+actAccImage),
+				resource.TestCheckResourceAttr("docker_image.b", "image_ref", wantRef),
 				resource.TestCheckResourceAttrSet("docker_image.b", "inspect_json_sha256"),
 				resource.TestCheckResourceAttrSet("docker_image.b", "engine_api_version"),
 				resource.TestCheckResourceAttrPair("data.docker_image.b", "id", "docker_image.b", "id"),
@@ -63,7 +70,7 @@ func TestAccImageBuildStages(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM "+actAccImage+" AS base\nRUN echo hi > /hi\nFROM base\nCMD [\"cat\", \"/hi\"]\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: fmt.Sprintf(`
@@ -94,7 +101,7 @@ func TestAccImageSearch(t *testing.T) {
 	if os.Getenv("TPD_ACC_INTERNET") == "" {
 		t.Skip("TPD_ACC_INTERNET not set; docker_image_search needs Docker Hub")
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: `
@@ -117,7 +124,7 @@ data "docker_image_search" "s" {
 func TestAccImageAttestations(t *testing.T) {
 	testAccPreCheck(t)
 	if os.Getenv("TPD_ACC_API_155") == "" {
-		resource.Test(t, resource.TestCase{
+		hAccTest(t, resource.TestCase{
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{{
 				Config: fmt.Sprintf(`
@@ -136,7 +143,7 @@ data "docker_image_attestations" "a" {
 		})
 		return
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: fmt.Sprintf(`
@@ -160,7 +167,7 @@ data "docker_image_attestations" "a" {
 func TestAccImageCommitAction(t *testing.T) {
 	testAccPreCheck(t)
 	out := filepath.ToSlash(filepath.Join(t.TempDir(), "commit.json"))
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_14_0)},
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{

@@ -551,7 +551,7 @@ EOT
 }
 `, filepath.ToSlash(dir), replicas)
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{Config: cfg(1), Check: resource.TestCheckResourceAttr("docker_compose.acc", "services.worker.#", "1")},
@@ -581,7 +581,7 @@ EOT
 func TestAccComposeSwarm(t *testing.T) {
 	testAccPreCheck(t)
 	_ = swarmAccManagerAddr(t) // skips unless DOCKER_HOST is a swarm manager
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
 			Config: `

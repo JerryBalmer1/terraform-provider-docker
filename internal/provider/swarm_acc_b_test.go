@@ -48,7 +48,7 @@ resource "docker_node" "n" {
 }
 `, node.Description.Hostname, avail, v)
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
@@ -86,7 +86,7 @@ func TestAccActionNodePromoteDemote_basic(t *testing.T) {
 	c := testAccDockerClient(t)
 	node := actAccPickNode(t, c)
 	if node.Spec.Role != swarm.NodeRoleWorker {
-		t.Skip("needs a ready worker node")
+		t.Skip("needs a ready worker node (Invoke-E2E -SwarmInit joins worker4 as one)")
 	}
 	t.Cleanup(func() {
 		worker := swarm.NodeRoleWorker
@@ -107,7 +107,7 @@ func TestAccActionNodePromoteDemote_basic(t *testing.T) {
 			return nil
 		}
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   swarmBActionVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -132,7 +132,7 @@ func TestAccActionSwarmRotateCA_basic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   swarmBActionVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{
@@ -177,7 +177,7 @@ func TestAccActionSwarmUnlockKey_basic(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "key.json")
 	rotate := actAccTrigger("docker_swarm_rotate_unlock_key", "k", fmt.Sprintf("    result_path = %q", filepath.ToSlash(out)))
 	unlock := actAccTrigger("docker_swarm_unlock", "u", `    unlock_key = "SWMKEY-1-unused-the-manager-is-not-locked"`)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		TerraformVersionChecks:   swarmBActionVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{{

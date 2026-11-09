@@ -487,7 +487,7 @@ resource "docker_container" "c" {
 `, name, nets)
 	}
 	var id string
-	tfresource.Test(t, tfresource.TestCase{
+	hAccTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             ctrP3CheckDestroy(t),
 		Steps: []tfresource.TestStep{
@@ -536,7 +536,7 @@ resource "docker_container" "c" {
 func TestAccContainerP5_gapAttributes(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-ctrgap")
-	tfresource.Test(t, tfresource.TestCase{
+	hAccTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             ctrP3CheckDestroy(t),
 		Steps: []tfresource.TestStep{{

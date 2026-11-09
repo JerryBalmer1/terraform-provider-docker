@@ -80,6 +80,12 @@ resource "docker_stack" "a" {
       target = "/data"
     }
 
+    # The task creates the volume on its node; the checks look for it
+    # through DOCKER_HOST (the manager), and the swarm pass also has worker4.
+    placement {
+      constraints = ["node.role==manager"]
+    }
+
     converge_config {
       timeout = "3m"
     }
@@ -103,7 +109,7 @@ resource "docker_stack" "a" {
   }
 }
 `, stack)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: resource.ComposeTestCheckFunc(
 			stackP3CheckGone(t, stack),
@@ -288,7 +294,7 @@ resource "docker_stack" "u" {
 			return nil
 		}
 	}
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy:             stackP3CheckGone(t, stack),
 		Steps: []resource.TestStep{

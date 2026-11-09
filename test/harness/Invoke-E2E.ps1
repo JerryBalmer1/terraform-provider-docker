@@ -4,8 +4,9 @@
   Run the provider's acceptance tests against the dind swarm harness.
 
 .DESCRIPTION
-  harness-up -> TF_ACC=1 + hosts from test/harness/.env ->
-  `go test ./internal/provider/ -run <Run> -count=1 -v -timeout <Timeout>`
+  harness-up -> TF_ACC=1 + hosts from test/harness/.env -> (harness-swarm-init
+  with -SwarmInit) ->
+  `go test ./internal/provider/ -run <Run> [-skip <Skip>] -count=1 -v -timeout <Timeout>`
   from the repository root, full output tee'd to -Log -> harness-down (in a
   finally block, unless -KeepUp). Exits with go test's exit code (1 if the
   harness could not be brought up).
@@ -13,6 +14,11 @@
 .PARAMETER Run
   go test -run regex. Default 'TestAccE2E' (the image -> service chain).
   Use 'TestAcc' for every acceptance test.
+
+.PARAMETER Skip
+  go test -skip regex (empty: none). Invoke-Build TestAcc passes the swarm
+  test regex here for the plain pass, so swarm-only tests run once, in the
+  -SwarmInit pass, instead of skipping in the plain one.
 
 .PARAMETER Timeout
   go test -timeout. Default '30m'.
@@ -22,11 +28,14 @@
   the repository root. Default test/harness/last-e2e.log.
 
 .PARAMETER SwarmInit
-  After harness-up, run `docker swarm init --advertise-addr <E2E_ADVERTISE_ADDR>` on the
-  harness manager (never on the host daemon). Needed by the tests that expect
-  DOCKER_HOST to already be a swarm manager (service, stack, secret, config,
-  swarm_node, node/nodes/swarm_tokens data sources). Leave it off for
-  TestAccE2E and TestAccSwarmInit, which need a manager outside any swarm.
+  After harness-up, run scripts/harness-swarm-init.ps1: `docker swarm init
+  --advertise-addr <E2E_ADVERTISE_ADDR>` on the harness manager (never on the
+  host daemon), join worker4 as a ready worker, and enable the tfacc CSI
+  plugin on the manager. Needed by the tests that expect DOCKER_HOST to
+  already be a swarm manager (service, stack, secret, config, swarm_node,
+  node/nodes/swarm_tokens data sources, node actions, cluster volumes). Leave
+  it off for TestAccE2E and TestAccSwarmInit, which need a manager outside any
+  swarm.
 
 .PARAMETER KeepUp
   Leave the harness running afterwards (tear it down later with
@@ -42,6 +51,7 @@
 [CmdletBinding()]
 param(
     [string]$Run = 'TestAccE2E',
+    [string]$Skip = '',
     [string]$Timeout = '30m',
     [string]$Log = 'test/harness/last-e2e.log',
     [switch]$KeepUp,
@@ -55,6 +65,7 @@ $RepoRoot   = (Resolve-Path (Join-Path $HarnessDir '../..')).Path
 $EnvFile    = Join-Path $HarnessDir '.env'
 $UpScript   = Join-Path $HarnessDir 'scripts/harness-up.ps1'
 $DownScript = Join-Path $HarnessDir 'scripts/harness-down.ps1'
+$SwarmScript = Join-Path $HarnessDir 'scripts/harness-swarm-init.ps1'
 $LogPath    = if ([System.IO.Path]::IsPathRooted($Log)) { $Log } else { Join-Path $RepoRoot $Log }
 
 # Pre-flight: fail fast, before touching compose or .env, if the host daemon is down.
@@ -96,21 +107,22 @@ try {
         throw "Invoke-E2E: refusing to run: DOCKER_HOST is '$env:DOCKER_HOST', not the harness manager"
     }
     if ($SwarmInit) {
-        $adv = if ($env:E2E_ADVERTISE_ADDR) { $env:E2E_ADVERTISE_ADDR } else { 'eth0' }
-        & docker -H $env:DOCKER_HOST swarm init --advertise-addr $adv | Out-Host
-        if ($LASTEXITCODE -ne 0) { throw "Invoke-E2E: swarm init on the harness manager failed (exit $LASTEXITCODE)" }
+        & $SwarmScript
     }
     $env:TF_ACC = '1'
 
     $logDir = Split-Path -Parent $LogPath
     if ($logDir -and -not (Test-Path -LiteralPath $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
 
-    Write-Host "Invoke-E2E: go test ./internal/provider/ -run $Run -count=1 -v -timeout $Timeout  (log: $LogPath)"
+    $goArgs = @('test', './internal/provider/', '-run', $Run)
+    if ($Skip) { $goArgs += @('-skip', $Skip) }
+    $goArgs += @('-count=1', '-v', '-timeout', $Timeout)
+    Write-Host "Invoke-E2E: go $($goArgs -join ' ')  (log: $LogPath)"
     Push-Location $RepoRoot
     try {
         # go writes to stderr too; do not let that trip ErrorActionPreference=Stop.
         $ErrorActionPreference = 'Continue'
-        & go test ./internal/provider/ -run $Run -count=1 -v -timeout $Timeout 2>&1 |
+        & go @goArgs 2>&1 |
             ForEach-Object { "$_" } |
             Tee-Object -FilePath $LogPath
         $testExit = $LASTEXITCODE

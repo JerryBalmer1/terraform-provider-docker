@@ -1,0 +1,14 @@
+# Docker Hub images that test/harness/scripts/harness-up.{ps1,sh} copy into
+# the harness registry (registry:2, 127.0.0.1:12380 from the host and the
+# manager, manager:12380 from every dind node). One reference per line, no
+# registry host. harness-up pulls each on the manager (through the Hub mirror),
+# pushes it as manager:12380/<ref>, removes both local tags again, and exports
+# the ones that worked as TF_ACC_SEEDED_IMAGES. The acceptance tests map these
+# references to their harness copies with hAccImage / hAccConfig
+# (internal/provider/h_harness_images_test.go). Add an image here when a test
+# starts using a new Docker Hub image.
+busybox:1.36
+alpine:3.20
+nginx:alpine
+nginx:1.27-alpine
+docker/dockerfile:1

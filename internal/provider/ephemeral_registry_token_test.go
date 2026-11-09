@@ -155,7 +155,7 @@ func TestP3NextLink(t *testing.T) {
 func TestAccRegistryTokenEphemeral(t *testing.T) {
 	testAccPreCheck(t)
 	reg := testAccRegistryHost(t)
-	resource.Test(t, resource.TestCase{
+	hAccTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccEphemeralFactories(),
 		TerraformVersionChecks:   []tfversion.TerraformVersionCheck{tfversion.SkipBelow(tfversion.Version1_10_0)},
 		Steps: []resource.TestStep{{
