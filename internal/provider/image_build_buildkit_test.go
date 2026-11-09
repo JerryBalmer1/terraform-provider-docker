@@ -490,7 +490,7 @@ resource "docker_image" "bk" {
 		Steps: []resource.TestStep{{
 			Config: cfg,
 			Check: resource.ComposeAggregateTestCheckFunc(
-				resource.TestMatchResourceAttr("docker_image.bk", "image_id", imgTestSHA),
+				resource.TestMatchResourceAttr("docker_image.bk", "id", imgTestSHA),
 				resource.TestCheckResourceAttr("docker_image.bk", "build.secrets.0.env", "TFACC_IMG_BK_TOKEN"),
 			),
 		}},

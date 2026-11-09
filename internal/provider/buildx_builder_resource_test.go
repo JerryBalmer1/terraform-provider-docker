@@ -31,22 +31,29 @@ import (
 )
 
 func bxbTestModel() bxbModel {
-	return bxbModel{
-		ID: types.StringUnknown(), Name: types.StringValue("ci"), Driver: types.StringValue(bxbDriverDockerContainer),
-		BuildkitFlags: types.StringNull(), BuildkitConfig: types.StringNull(), BuildkitConfigContent: types.StringValue("debug = true\n"),
+	m := bxbModel{
+		ID: types.StringUnknown(), Name: types.StringValue("ci"), Node: types.StringUnknown(), Append: types.BoolValue(false),
+		Driver: types.StringValue(bxbDriverDockerContainer), Platform: stringListValue([]string{"linux/amd64"}, true),
+		BuildkitdFlags: types.StringNull(), BuildkitdConfig: types.StringNull(), BuildkitdConfigContent: types.StringValue("debug = true\n"),
 		Bootstrap: types.BoolValue(true), KeepState: types.BoolValue(false), TCPPort: types.Int64Value(11234),
 		Endpoint: types.StringUnknown(), TCPAddress: types.StringUnknown(), ContainerName: types.StringUnknown(),
-		VolumeName: types.StringUnknown(), BuildkitVersion: types.StringUnknown(), Platforms: types.ListUnknown(types.StringType),
+		VolumeName: types.StringUnknown(), Platforms: types.ListUnknown(types.StringType), Labels: types.MapUnknown(types.StringType),
 		DockerContainer: &bxbContainerModel{
 			Image: types.StringNull(), Network: types.StringValue("host"), Env: stringMapValue(map[string]string{"HTTPS_PROXY": "http://p:3128"}, false),
-			RestartPolicy: types.StringNull(), Memory: types.Int64Value(1 << 30),
+			RestartPolicy: types.StringNull(), Memory: types.Int64Value(1 << 30), MemorySwap: types.Int64Value(2 << 30),
+			CPUQuota: types.Int64Value(50000), CPUPeriod: types.Int64Value(100000), CPUShares: types.Int64Value(512),
+			CpusetCpus: types.StringValue("0-1"), CpusetMems: types.StringValue("0"), CgroupParent: types.StringValue("/build"),
+			DefaultLoad: types.BoolValue(true),
 		},
 	}
+	m.contractSetUnknown()
+	return m
 }
 
 func TestBxbBuildCreate(t *testing.T) {
 	var diags diag.Diagnostics
-	cfg, hc := bxbBuildCreate(context.Background(), bxbTestModel(), &diags)
+	m := bxbTestModel()
+	cfg, hc := bxbBuildCreate(context.Background(), m, &diags)
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
@@ -59,6 +66,13 @@ func TestBxbBuildCreate(t *testing.T) {
 	if !hc.Privileged || hc.Init == nil || !*hc.Init || hc.RestartPolicy.Name != "unless-stopped" || hc.NetworkMode != "host" || hc.Memory != 1<<30 {
 		t.Errorf("host config: %+v", hc)
 	}
+	if hc.MemorySwap != 2<<30 || hc.CPUQuota != 50000 || hc.CPUPeriod != 100000 || hc.CPUShares != 512 || hc.CpusetCpus != "0-1" ||
+		hc.CpusetMems != "0" || hc.CgroupParent != "/build" {
+		t.Errorf("resource limits: %+v", hc.Resources)
+	}
+	if cfg.Labels[bxbLabelPlatforms] != "linux/amd64" || cfg.Labels[bxbLabelDefaultLoad] != "true" {
+		t.Errorf("labels: %v", cfg.Labels)
+	}
 	if len(hc.Mounts) != 1 || hc.Mounts[0].Source != "buildx_buildkit_ci0_state" || hc.Mounts[0].Target != bxbStateDir {
 		t.Errorf("mounts: %+v", hc.Mounts)
 	}
@@ -66,8 +80,13 @@ func TestBxbBuildCreate(t *testing.T) {
 		t.Errorf("ports: %+v", hc.PortBindings)
 	}
 
-	m := bxbTestModel()
-	m.BuildkitFlags, m.TCPPort, m.DockerContainer = types.StringValue(" --debug  --oci-worker-gc=false "), types.Int64Null(), nil
+	m = bxbTestModel()
+	m.Node = types.StringValue("ci7")
+	cfg, hc = bxbBuildCreate(context.Background(), m, &diags)
+	if hc.Mounts[0].Source != "buildx_buildkit_ci7_state" {
+		t.Errorf("node mount: %+v", hc.Mounts)
+	}
+	m.BuildkitdFlags, m.TCPPort, m.DockerContainer = types.StringValue(" --debug  --oci-worker-gc=false "), types.Int64Null(), nil
 	cfg, hc = bxbBuildCreate(context.Background(), m, &diags)
 	if strings.Join(cfg.Cmd, "|") != "--debug|--oci-worker-gc=false" || hc.PortBindings != nil || hc.NetworkMode != "" {
 		t.Errorf("custom flags: cmd=%q ports=%v", cfg.Cmd, hc.PortBindings)
@@ -153,6 +172,7 @@ type bxbFakeEngine struct {
 	volumes  map[string]bool
 	running  bool
 	removedC bool
+	others   []container.Summary
 }
 
 func (f *bxbFakeEngine) handler(w http.ResponseWriter, r *http.Request) {
@@ -166,6 +186,17 @@ func (f *bxbFakeEngine) handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	switch {
+	case r.Method == http.MethodGet && p == "/containers/json":
+		var list []container.Summary
+		if f.name != "" && !f.removedC {
+			st := container.StateCreated
+			if f.running {
+				st = container.StateRunning
+			}
+			list = append(list, container.Summary{ID: "bk0123456789", Names: []string{"/" + f.name}, Labels: f.created.Config.Labels, State: st})
+		}
+		list = append(list, f.others...)
+		_ = json.NewEncoder(w).Encode(list)
 	case r.Method == http.MethodGet && strings.HasPrefix(p, "/images/"):
 		_ = json.NewEncoder(w).Encode(map[string]any{"Id": "sha256:bk"})
 	case r.Method == http.MethodPost && p == "/volumes/create":
@@ -232,7 +263,12 @@ func TestBuildxBuilderFakeEngine(t *testing.T) {
 			Platforms:       []ocispecs.Platform{{OS: "linux", Architecture: "amd64"}, {OS: "linux", Architecture: "arm", Variant: "v7"}},
 		}, nil
 	}
-	t.Cleanup(func() { bxbReady = old })
+	oldW := bkWorkers
+	bkWorkers = func(context.Context, *providerData, bkNode) ([]*bkclient.WorkerInfo, error) {
+		return []*bkclient.WorkerInfo{{BuildkitVersion: bkclient.BuildkitVersion{Version: "v0.20.0"}, Labels: map[string]string{"org.mobyproject.buildkit.worker.executor": "oci"},
+			Platforms: []ocispecs.Platform{{OS: "linux", Architecture: "amd64"}, {OS: "linux", Architecture: "arm", Variant: "v7"}}}}, nil
+	}
+	t.Cleanup(func() { bxbReady = old; bkWorkers = oldW })
 
 	r := &buildxBuilderResource{pd: pd}
 	var sr resource.SchemaResponse
@@ -253,8 +289,12 @@ func TestBuildxBuilderFakeEngine(t *testing.T) {
 	wantTCP := fmt.Sprintf("tcp://%s:11234", bxbTCPHost(host))
 	if st.Endpoint.ValueString() != "docker-container://buildx_buildkit_ci0" || st.TCPAddress.ValueString() != wantTCP ||
 		st.BuildkitVersion.ValueString() != "v0.20.0" || !st.Platforms.Equal(stringListValue([]string{"linux/amd64", "linux/arm/v7"}, false)) ||
-		st.VolumeName.ValueString() != "buildx_buildkit_ci0_state" {
+		st.VolumeName.ValueString() != "buildx_buildkit_ci0_state" || st.Node.ValueString() != "ci0" || st.BuildxVersion.ValueString() != contractBuildxVersion {
 		t.Fatalf("state = %+v", st)
+	}
+
+	if !strings.Contains(st.InspectJSON.ValueString(), `"Name":"ci"`) || st.ContentSHA256.IsNull() || st.Builder.IsNull() {
+		t.Errorf("contract: inspect=%s sha=%s", st.InspectJSON.ValueString(), st.ContentSHA256)
 	}
 
 	// Refresh keeps everything; import (name only known through the container) recovers the name.
@@ -262,9 +302,27 @@ func TestBuildxBuilderFakeEngine(t *testing.T) {
 	r.Read(ctx, resource.ReadRequest{State: tfState(t, sr, &st)}, &rresp)
 	var after bxbModel
 	rresp.State.Get(ctx, &after)
-	if rresp.Diagnostics.HasError() || after.Name.ValueString() != "ci" || after.BuildkitVersion.ValueString() != "v0.20.0" {
+	if rresp.Diagnostics.HasError() || after.Name.ValueString() != "ci" || after.BuildkitVersion.ValueString() != "v0.20.0" ||
+		after.Labels.Elements()["org.mobyproject.buildkit.worker.executor"] == nil {
 		t.Errorf("read: %v %+v", rresp.Diagnostics, after)
 	}
+	// A second builder of the same name needs append; append needs a builder.
+	f.others = nil
+	again := bxbTestModel()
+	again.Node = types.StringValue("ci1")
+	if err := r.bxbCheckAppend(ctx, again); err == nil || !strings.Contains(err.Error(), "append = true") {
+		t.Errorf("duplicate builder: %v", err)
+	}
+	again.Append = types.BoolValue(true)
+	if err := r.bxbCheckAppend(ctx, again); err != nil {
+		t.Errorf("append: %v", err)
+	}
+	lone := bxbTestModel()
+	lone.Name, lone.Append = types.StringValue("other"), types.BoolValue(true)
+	if err := r.bxbCheckAppend(ctx, lone); err == nil {
+		t.Error("append without builder accepted")
+	}
+
 	imp := bxbModel{ID: st.ID}
 	bxbFromInspect(&imp, container.InspectResponse{ID: "bk0123456789", Name: "/buildx_buildkit_ci0",
 		HostConfig: f.created.HostConfig, Config: f.created.Config}, host)
@@ -305,8 +363,8 @@ func TestAccBuildxBuilder_basic(t *testing.T) {
 			{
 				Config: `
 resource "docker_buildx_builder" "b" {
-  name                    = "tfacc"
-  buildkit_config_content = "debug = true\n"
+  name                     = "tfacc"
+  buildkitd_config_content = "debug = true\n"
 }`,
 				Check: tfresource.ComposeAggregateTestCheckFunc(
 					tfresource.TestCheckResourceAttr("docker_buildx_builder.b", "endpoint", "docker-container://buildx_buildkit_tfacc0"),
@@ -319,7 +377,7 @@ resource "docker_buildx_builder" "b" {
 				ImportState:             true,
 				ImportStateId:           "tfacc",
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"buildkit_config_content", "buildkit_version", "platforms"},
+				ImportStateVerifyIgnore: []string{"buildkitd_config_content", "buildkit_version", "platforms", "labels", "builder", "inspect_json", "content_sha256"},
 			},
 		},
 	})
