@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -35,49 +36,45 @@ func p3eReadDS(t *testing.T, d datasource.DataSource, pd *providerData, cfg map[
 
 func TestP3ContainersDataSource(t *testing.T) {
 	f, pd := newP3eFake(t)
+	f.json("GET /version", map[string]string{"Version": "29.0.0", "ApiVersion": "1.47"})
 	f.json("GET /containers/json", []container.Summary{
 		{ID: "c2", Names: []string{"/web"}, Image: "nginx:1.27", State: "running", Labels: map[string]string{"app": "shop"},
 			Ports:           []container.PortSummary{{IP: mustAddr("0.0.0.0"), PrivatePort: 80, PublicPort: 8080, Type: "tcp"}},
 			NetworkSettings: &container.NetworkSettingsSummary{Networks: map[string]*network.EndpointSettings{"front": {}, "back": {}}}},
 		{ID: "c1", Names: []string{"/api"}, Image: "api:2", State: "exited", Created: 1700000000},
 	})
-	state, diags := p3eReadDS(t, NewP3ContainersDataSource(), pd, map[string]tftypes.Value{
+	state, diags := p3eReadDS(t, NewContainersDataSource(), pd, map[string]tftypes.Value{
 		"labels": p3eStrMap(map[string]string{"app": "shop"}),
 		"all":    tftypes.NewValue(tftypes.Bool, false),
 	})
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
-	var m struct {
-		Containers []struct {
-			ID       string            `tfsdk:"id"`
-			Name     string            `tfsdk:"name"`
-			Names    []string          `tfsdk:"names"`
-			Image    string            `tfsdk:"image"`
-			ImageID  string            `tfsdk:"image_id"`
-			Command  string            `tfsdk:"command"`
-			Created  string            `tfsdk:"created"`
-			State    string            `tfsdk:"state"`
-			Status   string            `tfsdk:"status"`
-			Labels   map[string]string `tfsdk:"labels"`
-			Networks []string          `tfsdk:"networks"`
-			Ports    []struct {
-				IP          string `tfsdk:"ip"`
-				PrivatePort int64  `tfsdk:"private_port"`
-				PublicPort  int64  `tfsdk:"public_port"`
-				Type        string `tfsdk:"type"`
-			} `tfsdk:"ports"`
-		} `tfsdk:"containers"`
+	ctx := context.Background()
+	var ids, names []string
+	state.GetAttribute(ctx, path.Root("ids"), &ids)
+	state.GetAttribute(ctx, path.Root("names"), &names)
+	if strings.Join(ids, ",") != "c1,c2" || strings.Join(names, ",") != "api,web" {
+		t.Errorf("ids = %v, names = %v", ids, names)
 	}
-	if d := state.GetAttribute(context.Background(), path.Root("containers"), &m.Containers); d.HasError() {
-		t.Fatal(d)
+	var raw, sum string
+	state.GetAttribute(ctx, path.Root("containers_json"), &raw)
+	state.GetAttribute(ctx, path.Root("content_sha256"), &sum)
+	var back []container.Summary
+	if err := json.Unmarshal([]byte(raw), &back); err != nil || len(back) != 2 || back[1].Ports[0].PublicPort != 8080 {
+		t.Errorf("containers_json = %s (%v)", raw, err)
 	}
-	cs := m.Containers
-	if len(cs) != 2 || cs[0].Name != "api" || cs[1].Name != "web" || cs[0].Created != "2023-11-14T22:13:20Z" {
-		t.Fatalf("containers = %+v", cs)
+	if len(sum) != 64 {
+		t.Errorf("content_sha256 = %q", sum)
 	}
-	if strings.Join(cs[1].Networks, ",") != "back,front" || cs[1].Ports[0].PublicPort != 8080 || cs[1].Labels["app"] != "shop" {
-		t.Errorf("web = %+v", cs[1])
+	var id0, img1, state1 string
+	var created0 float64
+	state.GetAttribute(ctx, path.Root("containers").AtListIndex(0).AtName("id"), &id0)
+	state.GetAttribute(ctx, path.Root("containers").AtListIndex(0).AtName("created"), &created0)
+	state.GetAttribute(ctx, path.Root("containers").AtListIndex(1).AtName("image"), &img1)
+	state.GetAttribute(ctx, path.Root("containers").AtListIndex(1).AtName("state"), &state1)
+	if id0 != "c1" || created0 != 1700000000 || img1 != "nginx:1.27" || state1 != "running" {
+		t.Errorf("containers[0].id=%q created=%v containers[1].image=%q state=%q", id0, created0, img1, state1)
 	}
 	args := p3eFilterArgs(t, f, "GET /containers/json")
 	if !filterExactMatch(args, "label", "app=shop") {
@@ -87,6 +84,14 @@ func TestP3ContainersDataSource(t *testing.T) {
 		if strings.Contains(s, "all=1") {
 			t.Errorf("all=false still listed all: %s", s)
 		}
+	}
+}
+
+func TestCopContainersListError(t *testing.T) {
+	_, pd := newP3eFake(t)
+	_, diags := p3eReadDS(t, NewContainersDataSource(), pd, map[string]tftypes.Value{})
+	if !diags.HasError() {
+		t.Fatal("expected an error when the list fails")
 	}
 }
 
@@ -110,7 +115,9 @@ data "docker_containers" "c" {
 `,
 			Check: resource.ComposeAggregateTestCheckFunc(
 				resource.TestCheckResourceAttr("data.docker_containers.c", "containers.#", "1"),
-				resource.TestCheckResourceAttr("data.docker_containers.c", "containers.0.name", "tfacc-containers-ds"),
+				resource.TestCheckResourceAttr("data.docker_containers.c", "names.0", "tfacc-containers-ds"),
+				resource.TestCheckResourceAttr("data.docker_containers.c", "containers.0.names.0", "/tfacc-containers-ds"),
+				resource.TestCheckResourceAttrPair("data.docker_containers.c", "ids.0", "docker_container.c", "id"),
 			),
 		}},
 	})

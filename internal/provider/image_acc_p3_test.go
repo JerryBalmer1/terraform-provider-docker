@@ -80,15 +80,15 @@ resource "docker_image" "outabs" {
 }
 
 data "docker_image" "rel" {
-  name = docker_image.rel.image_id
+  name = docker_image.rel.id
 }
 
 data "docker_image" "outrel" {
-  name = docker_image.outrel.image_id
+  name = docker_image.outrel.id
 }
 
 data "docker_image" "outabs" {
-  name = docker_image.outabs.image_id
+  name = docker_image.outabs.id
 }
 `, sfx, ctxRel, "../"+filepath.Base(dfRel)+"/Dockerfile.out", p3HCLPath(absDF))
 	resource.Test(t, resource.TestCase{
@@ -211,7 +211,7 @@ func regP3Manifest(reg, repo, ref string) (int, string, error) {
 }
 
 // TestAccRegistryImageP3_pushDeleteKeep: push to the harness registry with
-// push_retries; sha256_digest equals what the registry serves for the tag;
+// push_retries; digest equals what the registry serves for the tag;
 // on destroy keep_remotely=false DELETEs the manifest (404 afterwards) and
 // keep_remotely=true leaves it (Pass 2 map: L1 docker_registry_image push
 // digest, retries, keep_remotely DELETE).
@@ -244,7 +244,7 @@ resource "docker_registry_image" "del" {
   name          = docker_image.del.name
   keep_remotely = false
   push_retries  = 2
-  triggers      = { image = docker_image.del.image_id }
+  triggers      = { image = docker_image.del.id }
 }
 
 resource "docker_registry_image" "keep" {
@@ -264,7 +264,7 @@ resource "docker_registry_image" "keep" {
 	})
 	checkDigest := func(addr, repo string) resource.TestCheckFunc {
 		return func(s *terraform.State) error {
-			d, _ := p3Attr(s, addr, "sha256_digest")
+			d, _ := p3Attr(s, addr, "digest")
 			code, served, err := regP3Manifest(reg, repo, "1")
 			if err != nil {
 				return err
@@ -299,7 +299,7 @@ resource "docker_registry_image" "keep" {
 			{
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestMatchResourceAttr("docker_registry_image.del", "sha256_digest", imgTestSHA),
+					resource.TestMatchResourceAttr("docker_registry_image.del", "digest", imgTestSHA),
 					checkDigest("docker_registry_image.del", delRepo),
 					checkDigest("docker_registry_image.keep", keepRepo),
 					func(*terraform.State) error {

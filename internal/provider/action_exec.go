@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/client"
 )
 
@@ -26,20 +25,27 @@ var (
 // actExecDefaultTimeout bounds a docker_exec run when timeout is unset.
 const actExecDefaultTimeout = 5 * time.Minute
 
+// actExecMaxBytes caps each stream docker_exec keeps for its result.
+const actExecMaxBytes = 4 << 20
+
 // NewExecAction returns the docker_exec action.
 func NewExecAction() action.Action { return &execAction{} }
 
 type execAction struct{ actBase }
 
 type execActionModel struct {
-	Container  types.String `tfsdk:"container"`
-	Service    types.String `tfsdk:"service"`
-	Command    types.List   `tfsdk:"command"`
-	Env        types.Map    `tfsdk:"env"`
-	User       types.String `tfsdk:"user"`
-	Workdir    types.String `tfsdk:"workdir"`
-	Privileged types.Bool   `tfsdk:"privileged"`
-	Timeout    types.String `tfsdk:"timeout"`
+	ContainerID types.String `tfsdk:"container_id"`
+	ServiceID   types.String `tfsdk:"service_id"`
+	Command     types.List   `tfsdk:"command"`
+	Env         types.Map    `tfsdk:"env"`
+	EnvFile     types.List   `tfsdk:"env_file"`
+	User        types.String `tfsdk:"user"`
+	Workdir     types.String `tfsdk:"workdir"`
+	Privileged  types.Bool   `tfsdk:"privileged"`
+	TTY         types.Bool   `tfsdk:"tty"`
+	Detach      types.Bool   `tfsdk:"detach"`
+	Timeout     types.String `tfsdk:"timeout"`
+	ResultPath  types.String `tfsdk:"result_path"`
 }
 
 func (a *execAction) Metadata(_ context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
@@ -50,26 +56,35 @@ func (a *execAction) Schema(_ context.Context, _ action.SchemaRequest, resp *act
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Runs a command inside a running container, like `docker exec`, and fails when it exits non-zero. " +
 			"stdout and stderr are streamed line by line as action progress and to the provider log; on failure the error carries the exit code " +
-			"and the last 20 lines of output. Runs through the Engine exec API; no docker CLI is involved.",
+			"and the last 20 lines of output. The result object (`GET /exec/{id}/json`: `exit_code`, `pid`, `process_config`, ...) and the " +
+			"captured `stdout` / `stderr` (up to 4 MiB each, with their `*_sha256`) go to the final progress message and to `result_path`. " +
+			"Runs through the Engine exec API; no docker CLI is involved.",
 		Attributes: map[string]schema.Attribute{
-			"container": schema.StringAttribute{Optional: true, MarkdownDescription: "Name or ID of a running container, e.g. `docker_container.app.name`. Exactly one of `container` and `service`."},
-			"service": schema.StringAttribute{
+			"container_id": schema.StringAttribute{Optional: true, MarkdownDescription: "The running container to run the command in, by ID or name, e.g. `docker_container.app.id`. Exactly one of `container_id` and `service_id`."},
+			"service_id": schema.StringAttribute{
 				Optional: true,
-				MarkdownDescription: "Name of a Swarm service: the command runs in one running task container of it on the provider's daemon (the first by name). " +
-					"Pin the service to that node with a placement constraint. Exactly one of `container` and `service`.",
+				MarkdownDescription: "A Swarm service, by name: the command runs in one running task container of it on the provider's daemon (the first by name). " +
+					"Pin the service to that node with a placement constraint. Exactly one of `container_id` and `service_id`.",
 			},
 			"command": schema.ListAttribute{
 				Required: true, ElementType: types.StringType,
 				MarkdownDescription: "Command and arguments, exec form, e.g. `[\"sh\", \"-c\", \"echo hello\"]`. No shell is added.",
 			},
-			"env":        schema.MapAttribute{Optional: true, ElementType: types.StringType, MarkdownDescription: "Extra environment variables for the command."},
+			"env": schema.MapAttribute{Optional: true, ElementType: types.StringType, MarkdownDescription: "Extra environment variables for the command. They override `env_file` entries."},
+			"env_file": schema.ListAttribute{Optional: true, ElementType: types.StringType,
+				MarkdownDescription: "Local files of `KEY=VALUE` lines read on the machine running Terraform, like `docker exec --env-file`; `#` comments and blank lines are skipped and a bare `KEY` takes the value from Terraform's environment."},
 			"user":       schema.StringAttribute{Optional: true, MarkdownDescription: "User (and optional group) to run as, `name|uid[:group|gid]`. Default: the container's user."},
 			"workdir":    schema.StringAttribute{Optional: true, MarkdownDescription: "Working directory inside the container. Default: the container's working directory."},
 			"privileged": schema.BoolAttribute{Optional: true, MarkdownDescription: "Give the command extended privileges. Default `false`."},
+			"tty": schema.BoolAttribute{Optional: true,
+				MarkdownDescription: "Allocate a pseudo-TTY (`docker exec --tty`). Default `false`. With a TTY, stdout and stderr arrive merged in `stdout`."},
+			"detach": schema.BoolAttribute{Optional: true,
+				MarkdownDescription: "Start the command and return at once without waiting for it (`docker exec --detach`). Default `false`. Output is not captured and the exit code is not checked."},
 			"timeout": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "How long the command may run, as a Go duration (`30s`, `10m`). Default `5m`. On timeout the action fails; the process keeps running in the container.",
 			},
+			"result_path": actResultPathAttribute(),
 		},
 	}
 }
@@ -81,8 +96,9 @@ func (a *execAction) ValidateConfig(ctx context.Context, req action.ValidateConf
 		return
 	}
 	actDuration(m.Timeout, "timeout", &resp.Diagnostics)
-	if !m.Container.IsUnknown() && !m.Service.IsUnknown() && m.Container.IsNull() == m.Service.IsNull() {
-		resp.Diagnostics.AddAttributeError(path.Root("container"), "Exactly one of container and service", "Set container (a container name or ID) or service (a Swarm service name), not both and not neither.")
+	if !m.ContainerID.IsUnknown() && !m.ServiceID.IsUnknown() && m.ContainerID.IsNull() == m.ServiceID.IsNull() {
+		resp.Diagnostics.AddAttributeError(path.Root("container_id"), "Exactly one of container_id and service_id",
+			"Set container_id (a container ID or name) or service_id (a Swarm service name), not both and not neither.")
 	}
 	if !m.Command.IsUnknown() && !m.Command.IsNull() && len(m.Command.Elements()) == 0 {
 		resp.Diagnostics.AddAttributeError(path.Root("command"), "Empty command", "command needs at least one element.")
@@ -98,95 +114,83 @@ func (a *execAction) Invoke(ctx context.Context, req action.InvokeRequest, resp 
 	}
 	cmd := stringListFrom(ctx, m.Command, &resp.Diagnostics)
 	envMap := stringMapFrom(ctx, m.Env, &resp.Diagnostics)
+	envFiles := stringListFrom(ctx, m.EnvFile, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	env := make([]string, 0, len(envMap))
-	for k, v := range envMap {
-		env = append(env, k+"="+v)
+	fileEnv, err := copReadEnvFiles(envFiles)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("env_file"), "Cannot read env_file", err.Error())
+		return
 	}
-	sort.Strings(env)
-	ctr := m.Container.ValueString()
-	if svc := m.Service.ValueString(); svc != "" {
+	ctr := m.ContainerID.ValueString()
+	if svc := m.ServiceID.ValueString(); svc != "" {
 		ctr = actExecServiceContainer(ctx, c, svc, &resp.Diagnostics)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 	}
+	insp, _, err := copInspect(ctx, c, ctr)
+	if err != nil {
+		copInspectErr(&resp.Diagnostics, "docker_exec", ctr, err)
+		return
+	}
 	timeout := actTimeout(m.Timeout, actExecDefaultTimeout)
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	created, err := c.ExecCreate(ctx, ctr, client.ExecCreateOptions{
-		User:         m.User.ValueString(),
-		Privileged:   actBool(m.Privileged, false),
-		AttachStdout: true,
-		AttachStderr: true,
-		Env:          env,
-		WorkingDir:   m.Workdir.ValueString(),
-		Cmd:          cmd,
-	})
-	if err != nil {
-		resp.Diagnostics.AddError("docker_exec: cannot create exec", fmt.Sprintf("container %q: %v", ctr, err))
-		return
-	}
-	actProgress(ctx, resp, "exec %s in %s: %s", svcShortID(created.ID), ctr, strings.Join(cmd, " "))
-	hj, err := c.ExecAttach(ctx, created.ID, client.ExecAttachOptions{})
-	if err != nil {
-		resp.Diagnostics.AddError("docker_exec: cannot start exec", fmt.Sprintf("container %q: %v", ctr, err))
-		return
-	}
-	// Closing the hijacked connection unblocks StdCopy when ctx ends.
-	stop := context.AfterFunc(ctx, hj.Close)
-	defer stop()
-	defer hj.Close()
-
 	var tail []string
 	emit := func(s string) {
-		tflog.Info(ctx, s, map[string]any{"exec": created.ID})
+		tflog.Info(ctx, s, map[string]any{"container": insp.ID})
 		if resp.SendProgress != nil {
 			resp.SendProgress(action.InvokeProgressEvent{Message: s})
 		}
 	}
 	stdout := &actLineWriter{emit: emit, tail: &tail}
 	stderr := &actLineWriter{prefix: "stderr: ", emit: emit, tail: &tail}
-	_, cerr := stdcopy.StdCopy(stdout, stderr, hj.Reader)
+	detach := actBool(m.Detach, false)
+	actProgress(ctx, resp, "exec in %s: %s", ctr, strings.Join(cmd, " "))
+	out, err := copExecRun(ctx, c, copExecSpec{
+		Container: insp.ID,
+		Opts: client.ExecCreateOptions{
+			User:       m.User.ValueString(),
+			Privileged: actBool(m.Privileged, false),
+			TTY:        actBool(m.TTY, false),
+			Env:        copMergeEnv(fileEnv, envMap),
+			WorkingDir: m.Workdir.ValueString(),
+			Cmd:        cmd,
+		},
+		Detach:   detach,
+		Timeout:  timeout,
+		MaxBytes: actExecMaxBytes,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	})
 	stdout.Flush()
 	stderr.Flush()
-	if ctx.Err() != nil {
-		resp.Diagnostics.AddError("docker_exec: timed out",
-			fmt.Sprintf("command %q in container %q did not finish within %s.%s", strings.Join(cmd, " "), ctr, timeout, actExecTail(tail)))
-		return
-	}
-	if cerr != nil {
-		resp.Diagnostics.AddError("docker_exec: reading output failed", fmt.Sprintf("%v%s", cerr, actExecTail(tail)))
-		return
-	}
-
-	// The stream ends when the process exits; the exit code can lag a
-	// moment behind, so poll until Running is false.
-	var insp client.ExecInspectResult
-	werr := waitFor(ctx, timeout, 100*time.Millisecond, func(ctx context.Context) (bool, error) {
-		var err error
-		insp, err = c.ExecInspect(ctx, created.ID, client.ExecInspectOptions{})
-		if err != nil {
-			return false, err
+	if err != nil {
+		if errors.Is(err, errCopExecTimeout) {
+			resp.Diagnostics.AddError("docker_exec: timed out",
+				fmt.Sprintf("command %q in container %q did not finish within %s.%s", strings.Join(cmd, " "), ctr, timeout, actExecTail(tail)))
+			return
 		}
-		return !insp.Running, nil
-	})
-	if werr != nil {
-		if errors.Is(werr, context.DeadlineExceeded) {
-			werr = fmt.Errorf("exit code not available within %s", timeout)
-		}
-		resp.Diagnostics.AddError("docker_exec: cannot read exit code", werr.Error())
+		resp.Diagnostics.AddError("docker_exec failed", fmt.Sprintf("container %q: %v%s", ctr, err, actExecTail(tail)))
 		return
 	}
-	if insp.ExitCode != 0 {
+	if !detach && out.ExitCode != 0 {
 		resp.Diagnostics.AddError("docker_exec: command failed",
-			fmt.Sprintf("command %q in container %q exited with code %d.%s", strings.Join(cmd, " "), ctr, insp.ExitCode, actExecTail(tail)))
+			fmt.Sprintf("command %q in container %q exited with code %d.%s", strings.Join(cmd, " "), ctr, out.ExitCode, actExecTail(tail)))
 		return
 	}
-	actProgress(ctx, resp, "exec %s exited 0", svcShortID(created.ID))
+	if detach {
+		actProgress(ctx, resp, "exec %s started detached", copShortID(out.ExecID))
+	} else {
+		actProgress(ctx, resp, "exec %s exited 0", copShortID(out.ExecID))
+	}
+	actFinishResult(ctx, resp, a.pd, "engine:exec", map[string]any{
+		"exec_id":      out.ExecID,
+		"container_id": insp.ID,
+		"stdout":       out.Stdout,
+		"stderr":       out.Stderr,
+		"result":       out.Inspect,
+	}, m.ResultPath)
 }
 
 func actExecTail(tail []string) string {
@@ -208,7 +212,7 @@ func actExecServiceContainer(ctx context.Context, c *client.Client, svc string, 
 	list := listRes.Items
 	if len(list) == 0 {
 		diags.AddError("docker_exec: no running task", fmt.Sprintf("service %q has no running task container on this daemon. "+
-			"Pin it to the provider's node with a placement constraint, or use container.", svc))
+			"Pin it to the provider's node with a placement constraint, or use container_id.", svc))
 		return ""
 	}
 	sort.Slice(list, func(i, j int) bool { return strings.Join(list[i].Names, ",") < strings.Join(list[j].Names, ",") })

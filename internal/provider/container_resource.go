@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
@@ -54,49 +55,82 @@ type containerResource struct {
 }
 
 type containerResourceModel struct {
-	ID               types.String                `tfsdk:"id"`
-	Name             types.String                `tfsdk:"name"`
-	Image            types.String                `tfsdk:"image"`
-	ImageID          types.String                `tfsdk:"image_id"`
-	Command          types.List                  `tfsdk:"command"`
-	Entrypoint       types.List                  `tfsdk:"entrypoint"`
-	Env              types.Map                   `tfsdk:"env"`
-	Ports            []containerPortModel        `tfsdk:"ports"`
-	Mounts           []containerMountModel       `tfsdk:"mounts"`
-	NetworksAdvanced []containerNetworkModel     `tfsdk:"networks_advanced"`
-	Restart          types.String                `tfsdk:"restart"`
-	MaxRetryCount    types.Int64                 `tfsdk:"max_retry_count"`
-	Healthcheck      *containerHealthcheckModel  `tfsdk:"healthcheck"`
-	Labels           types.Map                   `tfsdk:"labels"`
-	Capabilities     *containerCapabilitiesModel `tfsdk:"capabilities"`
-	Privileged       types.Bool                  `tfsdk:"privileged"`
-	User             types.String                `tfsdk:"user"`
-	WorkingDir       types.String                `tfsdk:"working_dir"`
-	LogDriver        types.String                `tfsdk:"log_driver"`
-	LogOpts          types.Map                   `tfsdk:"log_opts"`
-	Ulimits          []containerUlimitModel      `tfsdk:"ulimits"`
-	Memory           types.Int64                 `tfsdk:"memory"`
-	MemorySwap       types.Int64                 `tfsdk:"memory_swap"`
-	CPUShares        types.Int64                 `tfsdk:"cpu_shares"`
-	NanoCPUs         types.Int64                 `tfsdk:"nano_cpus"`
-	MustRun          types.Bool                  `tfsdk:"must_run"`
-	Wait             types.Bool                  `tfsdk:"wait"`
-	WaitTimeout      types.String                `tfsdk:"wait_timeout"`
-	Running          types.Bool                  `tfsdk:"running"`
-	Hostname         types.String                `tfsdk:"hostname"`
-	DNS              types.List                  `tfsdk:"dns"`
-	DNSSearch        types.List                  `tfsdk:"dns_search"`
-	ExtraHosts       types.List                  `tfsdk:"extra_hosts"`
-	Devices          []containerDeviceModel      `tfsdk:"devices"`
-	Tty              types.Bool                  `tfsdk:"tty"`
-	StdinOpen        types.Bool                  `tfsdk:"stdin_open"`
-	StopSignal       types.String                `tfsdk:"stop_signal"`
-	StopTimeout      types.Int64                 `tfsdk:"stop_timeout"`
-	Sysctls          types.Map                   `tfsdk:"sysctls"`
-	SecurityOpt      types.Set                   `tfsdk:"security_opt"`
-	ReadOnly         types.Bool                  `tfsdk:"read_only"`
-	GPUs             types.String                `tfsdk:"gpus"`
-	Upload           []containerUploadModel      `tfsdk:"upload"`
+	ID                   types.String               `tfsdk:"id"`
+	Name                 types.String               `tfsdk:"name"`
+	Image                types.String               `tfsdk:"image"`
+	ImageID              types.String               `tfsdk:"image_id"`
+	Command              types.List                 `tfsdk:"command"`
+	Entrypoint           types.List                 `tfsdk:"entrypoint"`
+	Env                  types.Map                  `tfsdk:"env"`
+	Ports                []containerPortModel       `tfsdk:"ports"`
+	Mounts               []containerMountModel      `tfsdk:"mounts"`
+	Networks             types.Map                  `tfsdk:"networks"`
+	Restart              types.String               `tfsdk:"restart"`
+	MaximumRetryCount    types.Int64                `tfsdk:"maximum_retry_count"`
+	Healthcheck          *containerHealthcheckModel `tfsdk:"healthcheck"`
+	Labels               types.Map                  `tfsdk:"labels"`
+	CapAdd               types.Set                  `tfsdk:"cap_add"`
+	CapDrop              types.Set                  `tfsdk:"cap_drop"`
+	Privileged           types.Bool                 `tfsdk:"privileged"`
+	User                 types.String               `tfsdk:"user"`
+	WorkingDir           types.String               `tfsdk:"working_dir"`
+	Logging              *ctrLoggingModel           `tfsdk:"logging"`
+	Ulimits              []containerUlimitModel     `tfsdk:"ulimits"`
+	Memory               types.Int64                `tfsdk:"memory"`
+	MemorySwap           types.Int64                `tfsdk:"memory_swap"`
+	MemoryReservation    types.Int64                `tfsdk:"memory_reservation"`
+	CPUShares            types.Int64                `tfsdk:"cpu_shares"`
+	NanoCPUs             types.Int64                `tfsdk:"nano_cpus"`
+	CPUPeriod            types.Int64                `tfsdk:"cpu_period"`
+	CPUQuota             types.Int64                `tfsdk:"cpu_quota"`
+	CpusetCpus           types.String               `tfsdk:"cpuset_cpus"`
+	MustRun              types.Bool                 `tfsdk:"must_run"`
+	Wait                 types.Bool                 `tfsdk:"wait"`
+	WaitTimeout          types.String               `tfsdk:"wait_timeout"`
+	Running              types.Bool                 `tfsdk:"running"`
+	ExitCode             types.Int64                `tfsdk:"exit_code"`
+	Hostname             types.String               `tfsdk:"hostname"`
+	Domainname           types.String               `tfsdk:"domainname"`
+	DNS                  types.List                 `tfsdk:"dns"`
+	DNSSearch            types.List                 `tfsdk:"dns_search"`
+	DNSOptions           types.List                 `tfsdk:"dns_options"`
+	ExtraHosts           types.List                 `tfsdk:"extra_hosts"`
+	Devices              []containerDeviceModel     `tfsdk:"devices"`
+	DeviceCgroupRules    types.List                 `tfsdk:"device_cgroup_rules"`
+	DeviceRequests       []ctrDeviceRequestModel    `tfsdk:"device_requests"`
+	BlkioDeviceReadBps   []ctrThrottleModel         `tfsdk:"blkio_device_read_bps"`
+	BlkioDeviceWriteBps  []ctrThrottleModel         `tfsdk:"blkio_device_write_bps"`
+	BlkioDeviceReadIOps  []ctrThrottleModel         `tfsdk:"blkio_device_read_iops"`
+	BlkioDeviceWriteIOps []ctrThrottleModel         `tfsdk:"blkio_device_write_iops"`
+	Tty                  types.Bool                 `tfsdk:"tty"`
+	StdinOpen            types.Bool                 `tfsdk:"stdin_open"`
+	StopSignal           types.String               `tfsdk:"stop_signal"`
+	StopTimeout          types.Int64                `tfsdk:"stop_timeout"`
+	Sysctls              types.Map                  `tfsdk:"sysctls"`
+	SecurityOpt          types.Set                  `tfsdk:"security_opt"`
+	ReadOnly             types.Bool                 `tfsdk:"read_only"`
+	GPUs                 types.String               `tfsdk:"gpus"`
+	Files                []containerUploadModel     `tfsdk:"files"`
+	CgroupParent         types.String               `tfsdk:"cgroup_parent"`
+	CgroupnsMode         types.String               `tfsdk:"cgroupns_mode"`
+	GroupAdd             types.Set                  `tfsdk:"group_add"`
+	Init                 types.Bool                 `tfsdk:"init"`
+	IpcMode              types.String               `tfsdk:"ipc_mode"`
+	NetworkMode          types.String               `tfsdk:"network_mode"`
+	PidMode              types.String               `tfsdk:"pid_mode"`
+	Platform             types.String               `tfsdk:"platform"`
+	PublishAllPorts      types.Bool                 `tfsdk:"publish_all_ports"`
+	AutoRemove           types.Bool                 `tfsdk:"auto_remove"`
+	Runtime              types.String               `tfsdk:"runtime"`
+	ShmSize              types.Int64                `tfsdk:"shm_size"`
+	StorageOpt           types.Map                  `tfsdk:"storage_opt"`
+	Tmpfs                types.Map                  `tfsdk:"tmpfs"`
+	UsernsMode           types.String               `tfsdk:"userns_mode"`
+	VolumesFrom          types.List                 `tfsdk:"volumes_from"`
+
+	// Outputs contract (engine:container): inspect_json, inspect,
+	// engine_api_version, docker_server_version, content_sha256.
+	contractEngineContainer
 }
 
 func (r *containerResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -123,9 +157,10 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 		MarkdownDescription: "A single-host Docker container, created with `ContainerCreate`, attached to its networks and started. " +
 			"Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, " +
 			"working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. " +
-			"`name`, `restart`, `max_retry_count`, `memory`, `memory_swap`, `cpu_shares` and `nano_cpus` update in place " +
-			"(`ContainerRename`/`ContainerUpdate`); `upload` blocks are copied in with `CopyToContainer` before start. Every other argument forces " +
-			"a new container. Destroy force-removes the container " +
+			"`name`, `restart`, `maximum_retry_count`, `memory`, `memory_swap`, `memory_reservation`, `cpu_shares`, `nano_cpus`, " +
+			"`cpu_period`, `cpu_quota` and `cpuset_cpus` update in place (`ContainerRename`/`ContainerUpdate`); `networks` entries are " +
+			"connected and disconnected in place (`NetworkConnect`/`NetworkDisconnect`); `files` blocks are copied in with " +
+			"`PutContainerArchive` before start. Every other argument forces a new container. Destroy force-removes the container " +
 			"but keeps its volumes. Import by container name or ID.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -168,7 +203,7 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				MarkdownDescription: "Restart policy: `no` (default), `always`, `unless-stopped` or `on-failure`. Updated in place.",
 				Validators:          []validator.String{stringvalidator.OneOf(containerRestartPolicies...)},
 			},
-			"max_retry_count": schema.Int64Attribute{
+			"maximum_retry_count": schema.Int64Attribute{
 				Optional: true, Computed: true, Default: int64default.StaticInt64(0),
 				MarkdownDescription: "Maximum restart attempts for `restart = \"on-failure\"` (0 = unlimited). Ignored by other policies. Updated in place.",
 			},
@@ -190,17 +225,6 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"working_dir": schema.StringAttribute{
 				Optional: true, MarkdownDescription: "Working directory. Unset uses the image's. Changing this forces a new resource.",
 				PlanModifiers: rrStr,
-			},
-			"log_driver": schema.StringAttribute{
-				Optional: true, Computed: true,
-				MarkdownDescription: "Logging driver, e.g. `json-file`, `local`, `syslog`. Unset uses the daemon default (reported after create). " +
-					"Changing this forces a new resource.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()},
-			},
-			"log_opts": schema.MapAttribute{
-				ElementType: types.StringType, Optional: true, Computed: true,
-				MarkdownDescription: "Logging driver options, e.g. `{ max-size = \"10m\" }`. Unset uses the daemon defaults. Changing this forces a new resource.",
-				PlanModifiers:       []planmodifier.Map{mapplanmodifier.UseStateForUnknown(), mapplanmodifier.RequiresReplace()},
 			},
 			"memory": schema.Int64Attribute{
 				Optional: true, MarkdownDescription: "Memory limit in bytes. Updated in place; removing the limit forces a new resource.",
@@ -237,6 +261,7 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed:            true,
 				MarkdownDescription: "Whether the container was running at the last refresh. Planned `true` when `must_run` is set.",
 			},
+			"networks": ctrNetworksSchema(),
 			"hostname": schema.StringAttribute{
 				Optional: true,
 				MarkdownDescription: "Container hostname (`Config.Hostname`). Unset: the daemon uses the first 12 characters of the container ID, " +
@@ -311,9 +336,9 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				MarkdownDescription: "Published ports (`HostConfig.PortBindings`). Changing ports forces a new resource.",
 				PlanModifiers:       []planmodifier.List{listplanmodifier.RequiresReplace()},
 				NestedObject: schema.NestedBlockObject{Attributes: map[string]schema.Attribute{
-					"internal": schema.Int64Attribute{Required: true, MarkdownDescription: "Container port."},
-					"external": schema.Int64Attribute{Optional: true, MarkdownDescription: "Host port. Unset lets the daemon pick an ephemeral port."},
-					"ip":       schema.StringAttribute{Optional: true, MarkdownDescription: "Host IP to bind. Unset binds all interfaces."},
+					"container_port": schema.Int64Attribute{Required: true, MarkdownDescription: "Container port (the `PortBindings` key's port)."},
+					"host_port":      schema.Int64Attribute{Optional: true, MarkdownDescription: "Host port (`PortBinding.HostPort`). Unset lets the daemon pick an ephemeral port."},
+					"host_ip":        schema.StringAttribute{Optional: true, MarkdownDescription: "Host IP to bind (`PortBinding.HostIp`). Unset binds all interfaces."},
 					"protocol": schema.StringAttribute{
 						Optional: true, Computed: true, Default: stringdefault.StaticString("tcp"),
 						MarkdownDescription: "`tcp` (default), `udp` or `sctp`.",
@@ -335,7 +360,6 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 						Optional: true, Computed: true, Default: booldefault.StaticBool(false),
 						MarkdownDescription: "Mount read-only. Default `false`.",
 					},
-					"tmpfs_size": schema.Int64Attribute{Optional: true, MarkdownDescription: "tmpfs size in bytes (tmpfs only)."},
 					"selinux_relabel": schema.StringAttribute{
 						Optional: true,
 						MarkdownDescription: "SELinux relabel for a `bind` or named `volume` mount: `z` (shared label) or `Z` (private label), " +
@@ -343,18 +367,7 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 							"`Mounts` API has no relabel option. Forces replacement like any mounts change.",
 						Validators: []validator.String{stringvalidator.OneOf(containerSELinuxModes...)},
 					},
-				}},
-			},
-			"networks_advanced": schema.ListNestedBlock{
-				MarkdownDescription: "Networks to attach. The first is used at create (`NetworkMode`), the rest are connected before start. " +
-					"Without this block the container joins the daemon's default `bridge`. Changing networks forces a new resource.",
-				PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
-				NestedObject: schema.NestedBlockObject{Attributes: map[string]schema.Attribute{
-					"name":         schema.StringAttribute{Required: true, MarkdownDescription: "Network name or ID (e.g. a `docker_network`'s `name`)."},
-					"aliases":      schema.SetAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: "DNS aliases on this network."},
-					"ipv4_address": schema.StringAttribute{Optional: true, MarkdownDescription: "Static IPv4 address (needs a user-defined subnet)."},
-					"ipv6_address": schema.StringAttribute{Optional: true, MarkdownDescription: "Static IPv6 address (needs an IPv6-enabled network with a user-defined IPv6 subnet)."},
-				}},
+				}, Blocks: ctrMountOptionBlocks()},
 			},
 			"healthcheck": schema.SingleNestedBlock{
 				MarkdownDescription: "Healthcheck override. Without this block the image's healthcheck (if any) applies. Changing it forces a new resource.",
@@ -367,31 +380,25 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					"interval":     schema.StringAttribute{Optional: true, MarkdownDescription: "Time between checks, Go duration (e.g. `30s`)."},
 					"timeout":      schema.StringAttribute{Optional: true, MarkdownDescription: "Time before a check is considered hung."},
 					"start_period": schema.StringAttribute{Optional: true, MarkdownDescription: "Grace period before failures count."},
-					"retries":      schema.Int64Attribute{Optional: true, MarkdownDescription: "Consecutive failures before `unhealthy`."},
-				},
-			},
-			"capabilities": schema.SingleNestedBlock{
-				MarkdownDescription: "Linux capabilities to add or drop. Changing it forces a new resource.",
-				PlanModifiers:       []planmodifier.Object{objectplanmodifier.RequiresReplace()},
-				Attributes: map[string]schema.Attribute{
-					"add":  schema.SetAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: "Capabilities to add, e.g. `NET_ADMIN`."},
-					"drop": schema.SetAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: "Capabilities to drop, e.g. `ALL`."},
+					"start_interval": schema.StringAttribute{Optional: true,
+						MarkdownDescription: "Time between checks during the start period, Go duration (`StartInterval`)."},
+					"retries": schema.Int64Attribute{Optional: true, MarkdownDescription: "Consecutive failures before `unhealthy`."},
 				},
 			},
 			"devices": schema.ListNestedBlock{
 				MarkdownDescription: "Host devices mapped into the container (`HostConfig.Devices`, like `docker run --device`). Forces replacement.",
 				PlanModifiers:       []planmodifier.List{listplanmodifier.RequiresReplace()},
 				NestedObject: schema.NestedBlockObject{Attributes: map[string]schema.Attribute{
-					"host_path": schema.StringAttribute{Required: true, MarkdownDescription: "Device path on the host, e.g. `/dev/fuse`."},
-					"container_path": schema.StringAttribute{Optional: true,
-						MarkdownDescription: "Path inside the container. Unset uses `host_path`."},
-					"permissions": schema.StringAttribute{
+					"path_on_host": schema.StringAttribute{Required: true, MarkdownDescription: "Device path on the host, e.g. `/dev/fuse` (`PathOnHost`)."},
+					"path_in_container": schema.StringAttribute{Optional: true,
+						MarkdownDescription: "Path inside the container (`PathInContainer`). Unset uses `path_on_host`."},
+					"cgroup_permissions": schema.StringAttribute{
 						Optional: true, Computed: true, Default: stringdefault.StaticString(containerDefaultDevicePerms),
-						MarkdownDescription: "Cgroup permissions, a combination of `r` (read), `w` (write) and `m` (mknod). Default `rwm`.",
+						MarkdownDescription: "Cgroup permissions (`CgroupPermissions`), a combination of `r` (read), `w` (write) and `m` (mknod). Default `rwm`.",
 					},
 				}},
 			},
-			"upload": containerUploadBlockSchema(),
+			"files": containerUploadBlockSchema(),
 			"ulimits": schema.ListNestedBlock{
 				MarkdownDescription: "Resource ulimits. Changing them forces a new resource.",
 				PlanModifiers:       []planmodifier.List{listplanmodifier.RequiresReplace()},
@@ -403,15 +410,26 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 		},
 	}
+	for k, v := range ctrGapAttributes() {
+		resp.Schema.Attributes[k] = v
+	}
+	for k, v := range ctrGapBlocks() {
+		resp.Schema.Blocks[k] = v
+	}
+	contractAddResourceAttributes(resp.Schema.Attributes, "engine:container")
 }
 
 func (r *containerResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	r.pd = providerDataFrom(req.ProviderData, &resp.Diagnostics)
 }
 
-// ModifyPlan plans `running` (true when must_run) and keeps the computed
-// memory_swap stable while memory is unchanged.
+// ModifyPlan checks Engine API minimums of the config, plans `running`
+// (true when must_run) and keeps the computed memory_swap stable while
+// memory is unchanged.
 func (r *containerResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if !req.Config.Raw.IsNull() {
+		r.pd.gateAPISince(ctx, "docker_container", req.Config, &resp.Diagnostics)
+	}
 	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() {
 		return
 	}
@@ -428,14 +446,39 @@ func (r *containerResource) ModifyPlan(ctx context.Context, req resource.ModifyP
 		running = types.BoolValue(true)
 	}
 	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("running"), running)...)
+	if running.ValueBool() && containerKnown(state.Running) && !state.Running.ValueBool() {
+		containerPlanStartUnknown(ctx, req, resp)
+	}
 	if cfgSwap.IsNull() && plan.Memory.Equal(state.Memory) {
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("memory_swap"), state.MemorySwap)...)
 	}
 }
 
-// containerBuildCreate turns the plan into ContainerCreate arguments. It
-// returns the extra networks to connect after create.
-func containerBuildCreate(ctx context.Context, m containerResourceModel, diags *diag.Diagnostics) (*container.Config, *container.HostConfig, *network.NetworkingConfig, []containerNetworkModel) {
+// containerPlanStartUnknown marks the runtime outputs unknown when the
+// apply will start a stopped container (must_run). The framework only does
+// this for a plan that already differs from state, and here the only
+// difference is `running`, set by ModifyPlan: without it, the plan would
+// keep the stopped container's exit_code, inspect, inspect_json and
+// content_sha256, and the started container's values would be an
+// inconsistent result. id and image_id do not change on a start.
+func containerPlanStartUnknown(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	keep := map[string]bool{"id": true, "image_id": true, "running": true}
+	for name, a := range req.Plan.Schema.GetAttributes() {
+		if keep[name] || !a.IsComputed() || a.IsOptional() || a.IsRequired() {
+			continue
+		}
+		t := a.GetType()
+		v, err := t.ValueFromTerraform(ctx, tftypes.NewValue(t.TerraformType(ctx), tftypes.UnknownValue))
+		if err != nil {
+			resp.Diagnostics.AddError("Cannot plan container start", fmt.Sprintf("%s: %v", name, err))
+			return
+		}
+		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root(name), v)...)
+	}
+}
+
+// containerBuildCreate turns the plan into ContainerCreate arguments.
+func containerBuildCreate(ctx context.Context, m containerResourceModel, diags *diag.Diagnostics) (*container.Config, *container.HostConfig, *network.NetworkingConfig) {
 	cfg := &container.Config{
 		Image:      m.Image.ValueString(),
 		Cmd:        stringListFrom(ctx, m.Command, diags),
@@ -455,7 +498,7 @@ func containerBuildCreate(ctx context.Context, m containerResourceModel, diags *
 	}
 	hc := &container.HostConfig{
 		Privileged:     m.Privileged.ValueBool(),
-		RestartPolicy:  containerRestartPolicy(m.Restart.ValueString(), m.MaxRetryCount.ValueInt64()),
+		RestartPolicy:  containerRestartPolicy(m.Restart.ValueString(), m.MaximumRetryCount.ValueInt64()),
 		DNS:            containerParseDNS(stringListFrom(ctx, m.DNS, diags), diags),
 		DNSSearch:      stringListFrom(ctx, m.DNSSearch, diags),
 		ExtraHosts:     stringListFrom(ctx, m.ExtraHosts, diags),
@@ -476,10 +519,6 @@ func containerBuildCreate(ctx context.Context, m containerResourceModel, diags *
 	}
 	hc.CPUShares = m.CPUShares.ValueInt64()
 	hc.NanoCPUs = m.NanoCPUs.ValueInt64()
-	if d, ok := knownString(m.LogDriver); ok {
-		hc.LogConfig.Type = d
-	}
-	hc.LogConfig.Config = stringMapFrom(ctx, m.LogOpts, diags)
 
 	var err error
 	if cfg.ExposedPorts, hc.PortBindings, err = containerExpandPorts(m.Ports); err != nil {
@@ -506,25 +545,11 @@ func containerBuildCreate(ctx context.Context, m containerResourceModel, diags *
 			diags.AddAttributeError(path.Root("healthcheck"), "Invalid healthcheck", err.Error())
 		}
 	}
-	if m.Capabilities != nil {
-		hc.CapAdd = stringSetFrom(ctx, m.Capabilities.Add, diags)
-		hc.CapDrop = stringSetFrom(ctx, m.Capabilities.Drop, diags)
-	}
+	ctrApplyGap(ctx, m, cfg, hc, diags)
 
-	var netCfg *network.NetworkingConfig
-	var extra []containerNetworkModel
-	if len(m.NetworksAdvanced) > 0 {
-		first := m.NetworksAdvanced[0]
-		name := first.Name.ValueString()
-		hc.NetworkMode = container.NetworkMode(name)
-		es, err := containerEndpointSettings(stringSetFrom(ctx, first.Aliases, diags), first.IPv4Address.ValueString(), first.IPv6Address.ValueString())
-		if err != nil {
-			diags.AddAttributeError(path.Root("networks_advanced"), "Invalid networks_advanced", err.Error())
-		}
-		netCfg = &network.NetworkingConfig{EndpointsConfig: map[string]*network.EndpointSettings{name: es}}
-		extra = m.NetworksAdvanced[1:]
-	}
-	return cfg, hc, netCfg, extra
+	netCfg, mode := ctrNetworkingConfig(ctx, ctrNetworksFrom(ctx, m.Networks, diags), m.NetworkMode.ValueString(), diags)
+	hc.NetworkMode = container.NetworkMode(mode)
+	return cfg, hc, netCfg
 }
 
 // containerEnsureImage pulls ref when it is not present locally.
@@ -617,20 +642,25 @@ func (r *containerResource) Create(ctx context.Context, req resource.CreateReque
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	cfg, hc, netCfg, extra := containerBuildCreate(ctx, plan, &resp.Diagnostics)
+	cfg, hc, netCfg := containerBuildCreate(ctx, plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	uploads, err := containerPrepareUploads(plan.Upload)
+	platform, err := ctrParsePlatform(plan.Platform.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddAttributeError(path.Root("upload"), "Invalid upload", err.Error())
+		resp.Diagnostics.AddAttributeError(path.Root("platform"), "Invalid platform", err.Error())
+		return
+	}
+	uploads, err := containerPrepareUploads(plan.Files)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("files"), "Invalid files", err.Error())
 		return
 	}
 	if err := containerEnsureImage(ctx, r.pd, cfg.Image); err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("image"), "Cannot pull image", fmt.Sprintf("%s: %v", cfg.Image, err))
 		return
 	}
-	created, err := r.pd.Client.ContainerCreate(ctx, client.ContainerCreateOptions{Config: cfg, HostConfig: hc, NetworkingConfig: netCfg, Platform: nil, Name: plan.Name.ValueString()})
+	created, err := r.pd.Client.ContainerCreate(ctx, client.ContainerCreateOptions{Config: cfg, HostConfig: hc, NetworkingConfig: netCfg, Platform: platform, Name: plan.Name.ValueString()})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot create container", err.Error())
 		return
@@ -640,19 +670,8 @@ func (r *containerResource) Create(ctx context.Context, req resource.CreateReque
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), plan.ID)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, created.ID)...)
 
-	for _, n := range extra {
-		ep, err := containerEndpointSettings(stringSetFrom(ctx, n.Aliases, &resp.Diagnostics), n.IPv4Address.ValueString(), n.IPv6Address.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddAttributeError(path.Root("networks_advanced"), "Invalid networks_advanced", err.Error())
-			return
-		}
-		if _, err := r.pd.Client.NetworkConnect(ctx, n.Name.ValueString(), client.NetworkConnectOptions{Container: created.ID, EndpointConfig: ep}); err != nil {
-			resp.Diagnostics.AddError("Cannot connect container to network", fmt.Sprintf("%s: %v", n.Name.ValueString(), err))
-			return
-		}
-	}
 	if err := containerApplyUploads(ctx, r.pd, created.ID, uploads); err != nil {
-		resp.Diagnostics.AddAttributeError(path.Root("upload"), "Cannot upload file into container", err.Error())
+		resp.Diagnostics.AddAttributeError(path.Root("files"), "Cannot copy file into container", err.Error())
 		return
 	}
 	r.startAndWait(ctx, plan, &resp.Diagnostics)
@@ -691,7 +710,8 @@ func (r *containerResource) Read(ctx context.Context, req resource.ReadRequest, 
 }
 
 // refresh inspects the container and maps it onto prior (state on Read, plan
-// after Create/Update). found is false when the container is gone.
+// after Create/Update), including the outputs contract. found is false when
+// the container is gone.
 func (r *containerResource) refresh(ctx context.Context, prior containerResourceModel, diags *diag.Diagnostics) (containerResourceModel, bool) {
 	inspRes, err := r.pd.Client.ContainerInspect(ctx, prior.ID.ValueString(), client.ContainerInspectOptions{})
 	insp := inspRes.Container
@@ -710,7 +730,9 @@ func (r *containerResource) refresh(ctx context.Context, prior containerResource
 			Labels: ic.Labels, Healthcheck: ic.Healthcheck, StopSignal: ic.StopSignal,
 		}
 	}
-	return containerFromInspect(insp, imgCfg, prior), true
+	out := containerFromInspect(insp, imgCfg, prior)
+	diags.Append(ctrFillContract(ctx, r.pd, &out, inspRes.Raw, insp)...)
+	return out, true
 }
 
 // containerFromInspect maps ContainerInspect output onto prior. imgCfg is the
@@ -757,22 +779,14 @@ func containerFromInspect(insp container.InspectResponse, imgCfg *container.Conf
 	out.WorkingDir = containerStringRead(prior.WorkingDir, cfg.WorkingDir, img.WorkingDir)
 	out.Healthcheck = containerFlattenHealthcheck(cfg.Healthcheck, img.Healthcheck, prior.Healthcheck)
 
-	var priorAdd, priorDrop []string
-	if prior.Capabilities != nil {
-		priorAdd = containerSetStrings(prior.Capabilities.Add)
-		priorDrop = containerSetStrings(prior.Capabilities.Drop)
-	}
-	out.Capabilities = containerFlattenCapabilities(hc.CapAdd, hc.CapDrop, priorAdd, priorDrop, prior.Capabilities)
-
 	out.Ports = containerFlattenPorts(hc.PortBindings, prior.Ports)
 	out.Mounts = containerFlattenMounts(hc.Mounts, hc.Binds, prior.Mounts)
 	out.Ulimits = containerFlattenUlimits(hc.Ulimits, prior.Ulimits, importing)
+	var eps map[string]*network.EndpointSettings
 	if insp.NetworkSettings != nil {
-		id, name := out.ID.ValueString(), out.Name.ValueString()
-		out.NetworksAdvanced = containerFlattenNetworks(insp.NetworkSettings.Networks, string(hc.NetworkMode), id, name, prior.NetworksAdvanced)
-	} else if out.NetworksAdvanced == nil {
-		out.NetworksAdvanced = []containerNetworkModel{}
+		eps = insp.NetworkSettings.Networks
 	}
+	out.Networks = ctrFlattenNetworks(eps, string(hc.NetworkMode), containerKnown(prior.NetworkMode), out.ID.ValueString(), out.Name.ValueString(), prior.Networks)
 
 	rp := string(hc.RestartPolicy.Name)
 	if rp == "" {
@@ -781,18 +795,13 @@ func containerFromInspect(insp container.InspectResponse, imgCfg *container.Conf
 	out.Restart = types.StringValue(rp)
 	switch {
 	case rp == "on-failure":
-		out.MaxRetryCount = types.Int64Value(int64(hc.RestartPolicy.MaximumRetryCount))
-	case containerKnown(prior.MaxRetryCount):
-		out.MaxRetryCount = prior.MaxRetryCount // ignored by the daemon for other policies
+		out.MaximumRetryCount = types.Int64Value(int64(hc.RestartPolicy.MaximumRetryCount))
+	case containerKnown(prior.MaximumRetryCount):
+		out.MaximumRetryCount = prior.MaximumRetryCount // ignored by the daemon for other policies
 	default:
-		out.MaxRetryCount = types.Int64Value(0)
+		out.MaximumRetryCount = types.Int64Value(0)
 	}
 	out.Privileged = types.BoolValue(hc.Privileged)
-	out.LogDriver = stringOrNull(hc.LogConfig.Type)
-	if out.LogDriver.IsNull() && containerKnown(prior.LogDriver) {
-		out.LogDriver = prior.LogDriver
-	}
-	out.LogOpts = containerMapValue(prior.LogOpts, hc.LogConfig.Config)
 	out.Memory = containerInt64Read(prior.Memory, hc.Memory)
 	out.MemorySwap = types.Int64Value(hc.MemorySwap)
 	out.CPUShares = containerInt64Read(prior.CPUShares, hc.CPUShares)
@@ -810,7 +819,7 @@ func containerFromInspect(insp container.InspectResponse, imgCfg *container.Conf
 	out.Sysctls = containerSysctlsRead(prior.Sysctls, hc.Sysctls, importing)
 	out.SecurityOpt = containerSecurityOptRead(prior.SecurityOpt, hc.SecurityOpt)
 	out.ReadOnly = types.BoolValue(hc.ReadonlyRootfs)
-	out.GPUs = containerFlattenGPUs(hc.DeviceRequests, prior.GPUs)
+	ctrReadGap(insp, cfg, hc, prior, &out, importing)
 
 	if !containerKnown(out.MustRun) {
 		out.MustRun = types.BoolValue(true)
@@ -854,10 +863,12 @@ func (r *containerResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 	}
 
-	if !plan.Restart.Equal(state.Restart) || !plan.MaxRetryCount.Equal(state.MaxRetryCount) ||
+	if !plan.Restart.Equal(state.Restart) || !plan.MaximumRetryCount.Equal(state.MaximumRetryCount) ||
 		!plan.Memory.Equal(state.Memory) || !plan.MemorySwap.Equal(state.MemorySwap) ||
-		!plan.CPUShares.Equal(state.CPUShares) || !plan.NanoCPUs.Equal(state.NanoCPUs) {
-		uc := container.UpdateConfig{RestartPolicy: containerRestartPolicy(plan.Restart.ValueString(), plan.MaxRetryCount.ValueInt64())}
+		!plan.CPUShares.Equal(state.CPUShares) || !plan.NanoCPUs.Equal(state.NanoCPUs) ||
+		!plan.CPUPeriod.Equal(state.CPUPeriod) || !plan.CPUQuota.Equal(state.CPUQuota) ||
+		!plan.CpusetCpus.Equal(state.CpusetCpus) || !plan.MemoryReservation.Equal(state.MemoryReservation) {
+		uc := container.UpdateConfig{RestartPolicy: containerRestartPolicy(plan.Restart.ValueString(), plan.MaximumRetryCount.ValueInt64())}
 		uc.Memory = plan.Memory.ValueInt64()
 		if v, ok := knownInt64(plan.MemorySwap); ok {
 			uc.MemorySwap = v
@@ -868,21 +879,32 @@ func (r *containerResource) Update(ctx context.Context, req resource.UpdateReque
 		}
 		uc.CPUShares = plan.CPUShares.ValueInt64()
 		uc.NanoCPUs = plan.NanoCPUs.ValueInt64()
+		uc.CPUPeriod = plan.CPUPeriod.ValueInt64()
+		uc.CPUQuota = plan.CPUQuota.ValueInt64()
+		uc.CpusetCpus = plan.CpusetCpus.ValueString()
+		uc.MemoryReservation = plan.MemoryReservation.ValueInt64()
 		if _, err := r.pd.Client.ContainerUpdate(ctx, id, client.ContainerUpdateOptions{Resources: &uc.Resources, RestartPolicy: &uc.RestartPolicy}); err != nil {
 			resp.Diagnostics.AddError("Cannot update container", err.Error())
 			return
 		}
 	}
 
-	if !containerUploadsEqual(plan.Upload, state.Upload) {
+	if !plan.Networks.Equal(state.Networks) {
+		ctrUpdateNetworks(ctx, r.pd, id, ctrNetworksFrom(ctx, plan.Networks, &resp.Diagnostics), ctrNetworksFrom(ctx, state.Networks, &resp.Diagnostics), &resp.Diagnostics)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	if !containerUploadsEqual(plan.Files, state.Files) {
 		// Reached only for a stopped container (containerUploadReplaceIf).
-		uploads, err := containerPrepareUploads(plan.Upload)
+		uploads, err := containerPrepareUploads(plan.Files)
 		if err != nil {
-			resp.Diagnostics.AddAttributeError(path.Root("upload"), "Invalid upload", err.Error())
+			resp.Diagnostics.AddAttributeError(path.Root("files"), "Invalid files", err.Error())
 			return
 		}
 		if err := containerApplyUploads(ctx, r.pd, id, uploads); err != nil {
-			resp.Diagnostics.AddAttributeError(path.Root("upload"), "Cannot upload file into container", err.Error())
+			resp.Diagnostics.AddAttributeError(path.Root("files"), "Cannot copy file into container", err.Error())
 			return
 		}
 	}

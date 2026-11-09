@@ -26,7 +26,7 @@ func TestRegistryImageDataSourceSchema(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatal(resp.Diagnostics)
 	}
-	for _, a := range []string{"name", "id", "sha256_digest"} {
+	for _, a := range []string{"name", "id", "digest", "image_digest_ref", "platforms", "inspect_json"} {
 		if _, ok := resp.Schema.Attributes[a]; !ok {
 			t.Errorf("missing attribute %s", a)
 		}
@@ -45,7 +45,7 @@ data "docker_registry_image" "alpine" {
 }
 `,
 			Check: resource.ComposeAggregateTestCheckFunc(
-				resource.TestMatchResourceAttr("data.docker_registry_image.alpine", "sha256_digest", imgTestSHA),
+				resource.TestMatchResourceAttr("data.docker_registry_image.alpine", "digest", imgTestSHA),
 			),
 		}},
 	})

@@ -19,5 +19,8 @@ action "docker_image_import" "rootfs" {
     tag        = "v1"
     changes    = ["CMD [\"/bin/sh\"]", "ENV LANG=C.UTF-8"]
     message    = "imported by Terraform"
+
+    # The new image ID and reference, for a later run: jsondecode(file(...)).id
+    result_path = "${path.module}/out/import-result.json"
   }
 }

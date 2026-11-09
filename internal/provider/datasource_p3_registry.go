@@ -41,6 +41,18 @@ type p3Registry struct {
 	repo       string
 	user, pass string
 	authz      string // cached Authorization header value
+	// apiVersion is the last Docker-Distribution-API-Version header seen
+	// (contract output distribution_api_version).
+	apiVersion string
+}
+
+// regNoteAPIVersion records the Docker-Distribution-API-Version header.
+func (r *p3Registry) regNoteAPIVersion(resp *http.Response) {
+	if resp != nil {
+		if v := resp.Header.Get("Docker-Distribution-API-Version"); v != "" {
+			r.apiVersion = v
+		}
+	}
 }
 
 func newP3Registry(pd *providerData, domain, repo string, insecure bool) *p3Registry {
@@ -72,17 +84,21 @@ func (r *p3Registry) send(ctx context.Context, p string, accept []string) (*http
 		return r.hc.Do(req)
 	}
 	if r.base != "" {
-		return do(r.base)
+		resp, err := do(r.base)
+		r.regNoteAPIVersion(resp)
+		return resp, err
 	}
 	resp, err := do("https://" + r.host)
 	if err == nil {
 		r.base = "https://" + r.host
+		r.regNoteAPIVersion(resp)
 		return resp, nil
 	}
 	var netErr net.Error
 	if registryImageIsLocal(r.host) && (errors.As(err, &netErr) || strings.Contains(err.Error(), "HTTP response to HTTPS client")) {
 		if resp, err2 := do("http://" + r.host); err2 == nil {
 			r.base = "http://" + r.host
+			r.regNoteAPIVersion(resp)
 			return resp, nil
 		}
 	}

@@ -5,5 +5,9 @@ data "docker_containers" "shop" {
 }
 
 output "shop_containers" {
-  value = [for c in data.docker_containers.shop.containers : "${c.name} (${c.status})"]
+  value = [for c in data.docker_containers.shop.containers : "${trimprefix(c.names[0], "/")} (${c.status})"]
+}
+
+output "shop_container_ids" {
+  value = data.docker_containers.shop.ids
 }

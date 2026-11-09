@@ -1,3 +1,5 @@
+# With alias set, changing name later upgrades the plugin in place
+# (docker plugin upgrade) instead of replacing it.
 resource "docker_plugin" "sshfs" {
   name  = "vieux/sshfs:latest"
   alias = "sshfs"

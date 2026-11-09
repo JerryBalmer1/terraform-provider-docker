@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"sort"
 	"strings"
 	"time"
 
@@ -15,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/client"
 )
 
@@ -35,15 +32,16 @@ type execOutputEphemeral struct {
 }
 
 type execOutputModel struct {
-	Container types.String `tfsdk:"container"`
-	Command   types.List   `tfsdk:"command"`
-	User      types.String `tfsdk:"user"`
-	Workdir   types.String `tfsdk:"workdir"`
-	Env       types.Map    `tfsdk:"env"`
-	Timeout   types.String `tfsdk:"timeout"`
-	Stdout    types.String `tfsdk:"stdout"`
-	Stderr    types.String `tfsdk:"stderr"`
-	ExitCode  types.Int64  `tfsdk:"exit_code"`
+	ContainerID types.String `tfsdk:"container_id"`
+	Command     types.List   `tfsdk:"command"`
+	User        types.String `tfsdk:"user"`
+	Workdir     types.String `tfsdk:"workdir"`
+	Env         types.Map    `tfsdk:"env"`
+	Privileged  types.Bool   `tfsdk:"privileged"`
+	Timeout     types.String `tfsdk:"timeout"`
+	ExecID      types.String `tfsdk:"exec_id"`
+	ExitCode    types.Int64  `tfsdk:"exit_code"`
+	contractEngineExecOutput
 }
 
 func (e *execOutputEphemeral) Metadata(_ context.Context, req ephemeral.MetadataRequest, resp *ephemeral.MetadataResponse) {
@@ -52,28 +50,28 @@ func (e *execOutputEphemeral) Metadata(_ context.Context, req ephemeral.Metadata
 
 func (e *execOutputEphemeral) Schema(_ context.Context, _ ephemeral.SchemaRequest, resp *ephemeral.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Runs a command in a running container (`docker exec`) and returns its standard output as an ephemeral value that is never written to plan or state. " +
+		MarkdownDescription: "Runs a command in a running container (`docker exec`) and returns its standard output and error as ephemeral values that are never written to plan or state. " +
 			"A non-zero exit code is an error that carries the command's stderr. Use it to read a generated credential or setting out of a container during a run; " +
-			"the command runs on every plan and apply, so it must be safe to repeat.",
-		Attributes: map[string]schema.Attribute{
-			"container": schema.StringAttribute{Required: true, MarkdownDescription: "Container name or ID; it must be running."},
+			"the command runs on every plan and apply, so it must be safe to repeat. `result` holds the Engine's exec inspect (`GET /exec/{id}/json`).",
+		Attributes: contractAddEphemeralAttributes(map[string]schema.Attribute{
+			"container_id": schema.StringAttribute{Required: true, MarkdownDescription: "The container to run the command in, by ID or name; it must be running."},
 			"command": schema.ListAttribute{
 				ElementType:         types.StringType,
 				Required:            true,
 				Validators:          []validator.List{listvalidator.SizeAtLeast(1)},
 				MarkdownDescription: "Command and arguments, exec form, e.g. `[\"cat\", \"/run/secrets/token\"]`. Use `[\"sh\", \"-c\", \"...\"]` for shell syntax.",
 			},
-			"user":    schema.StringAttribute{Optional: true, MarkdownDescription: "User to run as (`name`, `uid` or `uid:gid`). Default: the container's user."},
-			"workdir": schema.StringAttribute{Optional: true, MarkdownDescription: "Working directory inside the container."},
-			"env":     schema.MapAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: "Extra environment variables for the command."},
-			"timeout": schema.StringAttribute{Optional: true, MarkdownDescription: "Maximum run time as a Go duration, e.g. `30s`. Default `60s`."},
-			"stdout":  schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "Standard output of the command, exactly as written (up to 4 MiB)."},
-			"stderr":  schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "Standard error of the command (up to 4 MiB)."},
+			"user":       schema.StringAttribute{Optional: true, MarkdownDescription: "User to run as (`name`, `uid` or `uid:gid`). Default: the container's user."},
+			"workdir":    schema.StringAttribute{Optional: true, MarkdownDescription: "Working directory inside the container."},
+			"env":        schema.MapAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: "Extra environment variables for the command."},
+			"privileged": schema.BoolAttribute{Optional: true, MarkdownDescription: "Give the command extended privileges. Default `false`."},
+			"timeout":    schema.StringAttribute{Optional: true, MarkdownDescription: "Maximum run time as a Go duration, e.g. `30s`. Default `60s`."},
+			"exec_id":    schema.StringAttribute{Computed: true, MarkdownDescription: "ID of the exec instance (`POST /containers/{id}/exec`)."},
 			"exit_code": schema.Int64Attribute{
 				Computed:            true,
 				MarkdownDescription: "Exit code of the command; always 0, because any other code fails the read.",
 			},
-		},
+		}, "engine:exec-output"),
 	}
 }
 
@@ -120,78 +118,39 @@ func (e *execOutputEphemeral) Open(ctx context.Context, req ephemeral.OpenReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	env := make([]string, 0, len(envMap))
-	for k, v := range envMap {
-		env = append(env, k+"="+v)
-	}
-	sort.Strings(env)
-
-	stdout, stderr, code, err := execOutputRun(ctx, e.pd, m.Container.ValueString(), client.ExecCreateOptions{
-		Cmd: cmd, User: m.User.ValueString(), WorkingDir: m.Workdir.ValueString(), Env: env,
-		AttachStdout: true, AttachStderr: true,
-	}, timeout)
+	ref := m.ContainerID.ValueString()
+	insp, _, err := copInspect(ctx, e.pd.Client, ref)
 	if err != nil {
-		resp.Diagnostics.AddError("Cannot run command in container", fmt.Sprintf("%s: %v", m.Container.ValueString(), err))
+		copInspectErr(&resp.Diagnostics, "docker_exec_output", ref, err)
 		return
 	}
-	if code != 0 {
-		msg := strings.TrimSpace(stderr)
+	out, err := copExecRun(ctx, e.pd.Client, copExecSpec{
+		Container: insp.ID,
+		Opts: client.ExecCreateOptions{
+			Cmd: cmd, User: m.User.ValueString(), WorkingDir: m.Workdir.ValueString(), Env: copMergeEnv(nil, envMap),
+			Privileged: m.Privileged.ValueBool(),
+		},
+		Timeout:  timeout,
+		MaxBytes: execOutputMaxBytes,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot run command in container", fmt.Sprintf("%s: %v", ref, err))
+		return
+	}
+	if out.ExitCode != 0 {
+		msg := strings.TrimSpace(out.Stderr)
 		if msg == "" {
 			msg = "(no stderr)"
 		}
 		resp.Diagnostics.AddError("Command failed in container",
-			fmt.Sprintf("%q in %s exited with code %d: %s", strings.Join(cmd, " "), m.Container.ValueString(), code, msg))
+			fmt.Sprintf("%q in %s exited with code %d: %s", strings.Join(cmd, " "), ref, out.ExitCode, msg))
 		return
 	}
-	m.Stdout = types.StringValue(stdout)
-	m.Stderr = types.StringValue(stderr)
-	m.ExitCode = types.Int64Value(int64(code))
+	m.ExecID = types.StringValue(out.ExecID)
+	m.ExitCode = types.Int64Value(int64(out.ExitCode))
+	resp.Diagnostics.Append(m.contractFill(ctx, e.pd, contractFillInput{
+		Raw:    map[string][]byte{"stdout": []byte(out.Stdout), "stderr": []byte(out.Stderr)},
+		Result: map[string]any{"result": out.Inspect},
+	})...)
 	resp.Diagnostics.Append(resp.Result.Set(ctx, &m)...)
-}
-
-// execOutputRun creates, attaches and inspects one exec, returning captured
-// stdout, stderr and the exit code.
-func execOutputRun(ctx context.Context, pd *providerData, ctr string, opts client.ExecCreateOptions, timeout time.Duration) (string, string, int, error) {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	created, err := pd.Client.ExecCreate(ctx, ctr, opts)
-	if err != nil {
-		return "", "", 0, err
-	}
-	att, err := pd.Client.ExecAttach(ctx, created.ID, client.ExecAttachOptions{})
-	if err != nil {
-		return "", "", 0, fmt.Errorf("attaching to exec %s: %w", created.ID, err)
-	}
-	defer att.Close()
-	outBuf := &cappedBuffer{max: execOutputMaxBytes}
-	errBuf := &cappedBuffer{max: execOutputMaxBytes}
-	done := make(chan error, 1)
-	go func() {
-		// Without a TTY the stream is multiplexed: demux it.
-		_, err := stdcopy.StdCopy(outBuf, errBuf, att.Reader)
-		done <- err
-	}()
-	select {
-	case err = <-done:
-	case <-ctx.Done():
-		att.Close()
-		return "", "", 0, fmt.Errorf("command did not finish within %s", timeout)
-	}
-	if err != nil && err != io.EOF {
-		return "", "", 0, fmt.Errorf("reading exec output: %w", err)
-	}
-	// The exit code can lag the stream end by a moment.
-	var code int
-	err = waitFor(ctx, timeout, 200*time.Millisecond, func(ctx context.Context) (bool, error) {
-		insp, err := pd.Client.ExecInspect(ctx, created.ID, client.ExecInspectOptions{})
-		if err != nil {
-			return false, err
-		}
-		code = insp.ExitCode
-		return !insp.Running, nil
-	})
-	if err != nil {
-		return "", "", 0, fmt.Errorf("inspecting exec %s: %w", created.ID, err)
-	}
-	return outBuf.String(), errBuf.String(), code, nil
 }

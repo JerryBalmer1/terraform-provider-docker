@@ -3,18 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
-	"io"
-	"regexp"
-	"strings"
+	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/client"
 )
 
@@ -23,64 +17,50 @@ var (
 	_ datasource.DataSourceWithConfigure = (*p3LogsDS)(nil)
 )
 
-// p3LogsMaxBytes caps how much log output one read keeps.
-const p3LogsMaxBytes = 16 << 20
-
-// NewP3LogsDataSource returns the docker_logs data source.
-func NewP3LogsDataSource() datasource.DataSource { return &p3LogsDS{} }
+// NewContainerLogsDataSource returns the docker_container_logs data source
+// (DECISIONS Q6; logs contract: logs, log_entries, tail, since).
+func NewContainerLogsDataSource() datasource.DataSource { return &p3LogsDS{} }
 
 type p3LogsDS struct {
 	pd *providerData
 }
 
 type p3LogsModel struct {
-	Container      types.String `tfsdk:"container"`
-	Tail           types.String `tfsdk:"tail"`
-	Since          types.String `tfsdk:"since"`
-	Until          types.String `tfsdk:"until"`
-	Timestamps     types.Bool   `tfsdk:"timestamps"`
-	Details        types.Bool   `tfsdk:"details"`
-	ShowStdout     types.Bool   `tfsdk:"show_stdout"`
-	ShowStderr     types.Bool   `tfsdk:"show_stderr"`
-	ID             types.String `tfsdk:"id"`
-	LogsListString types.List   `tfsdk:"logs_list_string"`
+	Container   types.String `tfsdk:"container"`
+	Tail        types.Int64  `tfsdk:"tail"`
+	Since       types.String `tfsdk:"since"`
+	Until       types.String `tfsdk:"until"`
+	Details     types.Bool   `tfsdk:"details"`
+	Stdout      types.Bool   `tfsdk:"stdout"`
+	Stderr      types.Bool   `tfsdk:"stderr"`
+	ID          types.String `tfsdk:"id"`
+	ContainerID types.String `tfsdk:"container_id"`
+	contractEngineContainerLogs
 }
 
 func (d *p3LogsDS) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_logs"
+	resp.TypeName = req.ProviderTypeName + "_container_logs"
 }
 
 func (d *p3LogsDS) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	until := logSinceAttribute()
+	until.MarkdownDescription = "Only lines before this time (Engine `until`): an RFC 3339 timestamp, a UNIX timestamp or a duration before now such as `10m`."
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Reads a container's logs (`GET /containers/{id}/logs`) as a list of lines. " +
-			"Output of containers without a TTY is demultiplexed, so lines carry no stream headers; stdout and stderr are interleaved in the order the daemon returns them. " +
-			"The read does not follow the log, and keeps at most 16 MiB.",
-		Attributes: map[string]schema.Attribute{
-			"container": schema.StringAttribute{Required: true, MarkdownDescription: "Container name or ID."},
-			"tail": schema.StringAttribute{
-				Optional:            true,
-				Validators:          []validator.String{stringvalidator.RegexMatches(regexp.MustCompile(`^(all|[0-9]+)$`), "must be `all` or a number of lines")},
-				MarkdownDescription: "Number of lines to read from the end of the log, or `all`. Default `all`.",
-			},
-			"since": schema.StringAttribute{
-				Optional:            true,
-				MarkdownDescription: "Only lines after this time: RFC 3339 timestamp, Unix timestamp, or a duration relative to now such as `10m`.",
-			},
-			"until": schema.StringAttribute{
-				Optional:            true,
-				MarkdownDescription: "Only lines before this time, same formats as `since`.",
-			},
-			"timestamps":  schema.BoolAttribute{Optional: true, MarkdownDescription: "Prefix every line with its RFC 3339 timestamp. Default `false`."},
-			"details":     schema.BoolAttribute{Optional: true, MarkdownDescription: "Add the extra attributes the log driver records (for example labels) to each line. Default `false`."},
-			"show_stdout": schema.BoolAttribute{Optional: true, MarkdownDescription: "Include standard output. Default `true`."},
-			"show_stderr": schema.BoolAttribute{Optional: true, MarkdownDescription: "Include standard error. Default `true`."},
-			"id":          schema.StringAttribute{Computed: true, MarkdownDescription: "Container ID."},
-			"logs_list_string": schema.ListAttribute{
-				ElementType:         types.StringType,
-				Computed:            true,
-				MarkdownDescription: "Log lines without their trailing newline.",
-			},
-		},
+		MarkdownDescription: "Reads a container's logs (`GET /containers/{id}/logs`), like `docker container logs --timestamps`. " +
+			"`log_entries` holds one object per line (`timestamp`, `stream`, `source`, `message`) and `logs` the same lines as text. " +
+			"Output of containers without a TTY is demultiplexed into `stdout` / `stderr` entries; a TTY container's lines have stream `combined`. " +
+			"The read does not follow the log and keeps the last `tail` lines (default 1000).",
+		Attributes: contractAddDataSourceAttributes(map[string]schema.Attribute{
+			"container":    schema.StringAttribute{Required: true, MarkdownDescription: "The container whose logs are read, by ID or name."},
+			"tail":         logTailAttribute(),
+			"since":        logSinceAttribute(),
+			"until":        until,
+			"details":      schema.BoolAttribute{Optional: true, MarkdownDescription: "Add the extra attributes the log driver records (for example labels) to each message (Engine `details`). Default `false`."},
+			"stdout":       schema.BoolAttribute{Optional: true, MarkdownDescription: "Include standard output (Engine `stdout`). Default `true`."},
+			"stderr":       schema.BoolAttribute{Optional: true, MarkdownDescription: "Include standard error (Engine `stderr`). Default `true`."},
+			"id":           schema.StringAttribute{Computed: true, MarkdownDescription: "Container ID (the same value as `container_id`)."},
+			"container_id": schema.StringAttribute{Computed: true, MarkdownDescription: "ID of the container the logs were read from."},
+		}, "engine:container-logs"),
 	}
 }
 
@@ -105,17 +85,29 @@ func (d *p3LogsDS) Read(ctx context.Context, req datasource.ReadRequest, resp *d
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	now := time.Now()
+	since, err := logSinceQuery(m.Since.ValueString(), now)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("since"), "Invalid since", err.Error())
+		return
+	}
+	until, err := logSinceQuery(m.Until.ValueString(), now)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("until"), "Invalid until", err.Error())
+		return
+	}
+	tail := logTailValue(m.Tail)
 	opts := client.ContainerLogsOptions{
-		ShowStdout: p3BoolOr(m.ShowStdout, true),
-		ShowStderr: p3BoolOr(m.ShowStderr, true),
-		Since:      m.Since.ValueString(),
-		Until:      m.Until.ValueString(),
-		Timestamps: p3BoolOr(m.Timestamps, false),
+		ShowStdout: p3BoolOr(m.Stdout, true),
+		ShowStderr: p3BoolOr(m.Stderr, true),
+		Since:      since,
+		Until:      until,
+		Timestamps: true,
 		Details:    p3BoolOr(m.Details, false),
-		Tail:       m.Tail.ValueString(),
+		Tail:       logTailQuery(tail),
 	}
 	if !opts.ShowStdout && !opts.ShowStderr {
-		resp.Diagnostics.AddAttributeError(path.Root("show_stdout"), "No log stream selected", "At least one of show_stdout and show_stderr must be true.")
+		resp.Diagnostics.AddAttributeError(path.Root("stdout"), "No log stream selected", "At least one of stdout and stderr must be true.")
 		return
 	}
 	inspRes, err := d.pd.Client.ContainerInspect(ctx, m.Container.ValueString(), client.ContainerInspectOptions{})
@@ -131,45 +123,14 @@ func (d *p3LogsDS) Read(ctx context.Context, req datasource.ReadRequest, resp *d
 	}
 	defer rc.Close()
 	tty := insp.Config != nil && insp.Config.Tty
-	text, err := p3ReadLogs(rc, tty)
+	entries, err := logReadEntries(rc, tty, copName(insp.Name))
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot read container logs", err.Error())
 		return
 	}
-	lines := p3SplitLines(text)
-	vals := make([]attr.Value, 0, len(lines))
-	for _, l := range lines {
-		vals = append(vals, types.StringValue(l))
-	}
+	entries = logApplyTail(entries, tail)
 	m.ID = types.StringValue(insp.ID)
-	m.LogsListString = types.ListValueMust(types.StringType, vals)
+	m.ContainerID = types.StringValue(insp.ID)
+	resp.Diagnostics.Append(m.contractFill(ctx, d.pd, logFillInput(entries))...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
-}
-
-// p3ReadLogs reads a log stream: raw for TTY containers, otherwise the
-// multiplexed stdout/stderr frames demuxed into one buffer in order.
-func p3ReadLogs(r io.Reader, tty bool) (string, error) {
-	buf := &cappedBuffer{max: p3LogsMaxBytes}
-	var err error
-	if tty {
-		_, err = io.Copy(buf, r)
-	} else {
-		_, err = stdcopy.StdCopy(buf, buf, r)
-	}
-	if err != nil {
-		return "", err
-	}
-	return buf.String(), nil
-}
-
-// p3SplitLines splits on newlines, dropping a trailing empty line and CRs.
-func p3SplitLines(s string) []string {
-	if s == "" {
-		return []string{}
-	}
-	lines := strings.Split(strings.TrimSuffix(s, "\n"), "\n")
-	for i, l := range lines {
-		lines[i] = strings.TrimSuffix(l, "\r")
-	}
-	return lines
 }

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
@@ -93,7 +95,11 @@ func TestRegistryTokenEphemeralBearer(t *testing.T) {
 	}
 	var m registryTokenModel
 	res.Get(context.Background(), &m)
-	if m.Token.ValueString() != "tok:repository:org/app:pull,push" || m.ExpiresIn.ValueInt64() != 300 ||
+	var tok types.String
+	res.GetAttribute(context.Background(), path.Root("token").AtName("token"), &tok)
+	var tokIssued types.String
+	res.GetAttribute(context.Background(), path.Root("token").AtName("issued_at"), &tokIssued)
+	if tok.ValueString() != "tok:repository:org/app:pull,push" || tokIssued.ValueString() != "2026-11-04T10:00:00Z" || !m.DistributionAPIVersion.IsNull() || m.ExpiresIn.ValueInt64() != 300 ||
 		m.IssuedAt.ValueString() != "2026-11-04T10:00:00Z" || m.ExpiresAt.ValueString() != "2026-11-04T10:05:00Z" || m.Service.ValueString() != "fake-registry" {
 		t.Errorf("got %+v", m)
 	}

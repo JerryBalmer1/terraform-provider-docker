@@ -18,9 +18,9 @@ import (
 )
 
 type containerDeviceModel struct {
-	HostPath      types.String `tfsdk:"host_path"`
-	ContainerPath types.String `tfsdk:"container_path"`
-	Permissions   types.String `tfsdk:"permissions"`
+	PathOnHost        types.String `tfsdk:"path_on_host"`
+	PathInContainer   types.String `tfsdk:"path_in_container"`
+	CgroupPermissions types.String `tfsdk:"cgroup_permissions"`
 }
 
 // containerDefaultDevicePerms is the cgroup permission string the docker CLI
@@ -31,26 +31,26 @@ const containerDefaultDevicePerms = "rwm"
 // `docker run --gpus`).
 const containerGPUDriver = "nvidia"
 
-// containerExpandDevices builds HostConfig.Devices. container_path defaults
-// to host_path and permissions to "rwm", like `docker run --device`.
+// containerExpandDevices builds HostConfig.Devices. path_in_container
+// defaults to path_on_host and cgroup_permissions to "rwm", like `docker run --device`.
 func containerExpandDevices(in []containerDeviceModel) ([]container.DeviceMapping, error) {
 	if len(in) == 0 {
 		return nil, nil
 	}
 	out := make([]container.DeviceMapping, 0, len(in))
 	for i, d := range in {
-		host := d.HostPath.ValueString()
+		host := d.PathOnHost.ValueString()
 		if host == "" {
-			return nil, fmt.Errorf("devices[%d].host_path is required", i)
+			return nil, fmt.Errorf("devices[%d].path_on_host is required", i)
 		}
 		dm := container.DeviceMapping{PathOnHost: host, PathInContainer: host, CgroupPermissions: containerDefaultDevicePerms}
-		if v, ok := knownString(d.ContainerPath); ok && v != "" {
+		if v, ok := knownString(d.PathInContainer); ok && v != "" {
 			dm.PathInContainer = v
 		}
-		if v, ok := knownString(d.Permissions); ok && v != "" {
+		if v, ok := knownString(d.CgroupPermissions); ok && v != "" {
 			for _, c := range v {
 				if c != 'r' && c != 'w' && c != 'm' {
-					return nil, fmt.Errorf("devices[%d].permissions %q: only the letters r, w and m are allowed", i, v)
+					return nil, fmt.Errorf("devices[%d].cgroup_permissions %q: only the letters r, w and m are allowed", i, v)
 				}
 			}
 			dm.CgroupPermissions = v
@@ -61,34 +61,34 @@ func containerExpandDevices(in []containerDeviceModel) ([]container.DeviceMappin
 }
 
 func containerDeviceKey(d containerDeviceModel) string {
-	cp := d.ContainerPath.ValueString()
+	cp := d.PathInContainer.ValueString()
 	if cp == "" {
-		cp = d.HostPath.ValueString()
+		cp = d.PathOnHost.ValueString()
 	}
-	return d.HostPath.ValueString() + "|" + cp
+	return d.PathOnHost.ValueString() + "|" + cp
 }
 
 // containerFlattenDevices maps HostConfig.Devices back to blocks, ordered like
-// prior. container_path stays null when it equals host_path and the prior
+// prior. path_in_container stays null when it equals path_on_host and the prior
 // entry did not set it.
 func containerFlattenDevices(in []container.DeviceMapping, prior []containerDeviceModel) []containerDeviceModel {
 	priorCP := map[string]types.String{}
 	for _, p := range prior {
-		priorCP[containerDeviceKey(p)] = p.ContainerPath
+		priorCP[containerDeviceKey(p)] = p.PathInContainer
 	}
 	got := make([]containerDeviceModel, 0, len(in))
 	for _, d := range in {
 		m := containerDeviceModel{
-			HostPath:      types.StringValue(d.PathOnHost),
-			ContainerPath: types.StringValue(d.PathInContainer),
-			Permissions:   types.StringValue(d.CgroupPermissions),
+			PathOnHost:        types.StringValue(d.PathOnHost),
+			PathInContainer:   types.StringValue(d.PathInContainer),
+			CgroupPermissions: types.StringValue(d.CgroupPermissions),
 		}
 		if d.CgroupPermissions == "" {
-			m.Permissions = types.StringValue(containerDefaultDevicePerms)
+			m.CgroupPermissions = types.StringValue(containerDefaultDevicePerms)
 		}
 		pcp, seen := priorCP[containerDeviceKey(m)]
 		if d.PathInContainer == "" || (d.PathInContainer == d.PathOnHost && (!seen || !containerKnown(pcp))) {
-			m.ContainerPath = types.StringNull()
+			m.PathInContainer = types.StringNull()
 		}
 		got = append(got, m)
 	}

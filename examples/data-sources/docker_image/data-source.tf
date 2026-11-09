@@ -4,7 +4,7 @@ data "docker_image" "nginx" {
 }
 
 output "nginx_image_id" {
-  value = data.docker_image.nginx.image_id
+  value = data.docker_image.nginx.id
 }
 
 output "nginx_labels" {

@@ -4,5 +4,5 @@ data "docker_registry_image" "alpine" {
 }
 
 output "alpine_digest" {
-  value = data.docker_registry_image.alpine.sha256_digest
+  value = data.docker_registry_image.alpine.digest
 }

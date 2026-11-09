@@ -63,10 +63,10 @@ func TestAccActionExec_basic(t *testing.T) {
 	ok := `
 action "docker_exec" "marker" {
   config {
-    container = docker_container.c.name
-    command   = ["sh", "-c", "echo out; echo err >&2; echo $GREETING > /tmp/marker"]
-    env       = { GREETING = "hello" }
-    workdir   = "/tmp"
+    container_id = docker_container.c.name
+    command      = ["sh", "-c", "echo out; echo err >&2; echo $GREETING > /tmp/marker"]
+    env          = { GREETING = "hello" }
+    workdir      = "/tmp"
   }
 }
 
@@ -83,8 +83,8 @@ resource "terraform_data" "marker" {
 	fail := ok + `
 action "docker_exec" "fail" {
   config {
-    container = docker_container.c.name
-    command   = ["sh", "-c", "echo about to fail; exit 3"]
+    container_id = docker_container.c.name
+    command      = ["sh", "-c", "echo about to fail; exit 3"]
   }
 }
 
@@ -134,8 +134,8 @@ func TestAccActionContainerExport_basic(t *testing.T) {
 			Config: actAccContainer(name, fmt.Sprintf(`
 action "docker_container_export" "x" {
   config {
-    container = docker_container.c.id
-    path      = %q
+    container_id = docker_container.c.id
+    output       = %q
   }
 }
 
@@ -188,18 +188,18 @@ resource "docker_image" "b" {
 action "docker_image_save" "s" {
   config {
     images = [docker_image.b.name]
-    path   = %[2]q
+    output = %[2]q
   }
 }
 
 action "docker_image_load" "l" {
   config {
-    path = %[2]q
+    input = %[2]q
   }
 }
 
 resource "terraform_data" "save" {
-  input = docker_image.b.image_id
+  input = docker_image.b.id
   lifecycle {
     action_trigger {
       events  = [after_create]
@@ -213,7 +213,7 @@ resource "terraform_data" "save" {
 	// second step, once the save has written the archive.
 	load := `
 resource "terraform_data" "load" {
-  input      = docker_image.b.image_id
+  input      = docker_image.b.id
   depends_on = [terraform_data.save]
   lifecycle {
     action_trigger {

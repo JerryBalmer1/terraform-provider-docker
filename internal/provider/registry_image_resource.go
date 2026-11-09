@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -30,7 +31,11 @@ var (
 	_ resource.Resource                = (*registryImageResource)(nil)
 	_ resource.ResourceWithConfigure   = (*registryImageResource)(nil)
 	_ resource.ResourceWithImportState = (*registryImageResource)(nil)
+	_ resource.ResourceWithModifyPlan  = (*registryImageResource)(nil)
 )
+
+// regImageItem is the inventory item of docker_registry_image.
+const regImageItem = "engine:registry-image"
 
 // NewRegistryImageResource returns the docker_registry_image resource.
 func NewRegistryImageResource() resource.Resource { return &registryImageResource{} }
@@ -46,7 +51,11 @@ type registryImageResourceModel struct {
 	Triggers           types.Map    `tfsdk:"triggers"`
 	PushRetries        types.Int64  `tfsdk:"push_retries"`
 	InsecureSkipVerify types.Bool   `tfsdk:"insecure_skip_verify"`
-	Sha256Digest       types.String `tfsdk:"sha256_digest"`
+	Digest             types.String `tfsdk:"digest"`
+	ImageRef           types.String `tfsdk:"image_ref"`
+	ImageDigestRef     types.String `tfsdk:"image_digest_ref"`
+	Platforms          types.List   `tfsdk:"platforms"`
+	contractEngineRegistryImage
 }
 
 func (r *registryImageResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -56,9 +65,9 @@ func (r *registryImageResource) Metadata(_ context.Context, req resource.Metadat
 func (r *registryImageResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Pushes an image that exists on the provider's daemon (typically a `docker_image`) to its registry, " +
-			"using the provider's `registry_auth` credentials. Read refreshes `sha256_digest` from the registry. " +
-			"A push only happens on create: tie `triggers` to the source image (e.g. `docker_image.app.image_id`) so a rebuilt image is pushed again.",
-		Attributes: map[string]schema.Attribute{
+			"using the provider's `registry_auth` credentials. Read refreshes `digest` and the distribution outputs from the registry " +
+			"(`GET /distribution/<name>/json`). A push only happens on create: tie `triggers` to the source image (e.g. `docker_image.app.id`) so a rebuilt image is pushed again.",
+		Attributes: contractAddResourceAttributes(map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "The pushed reference (same as `name`).",
@@ -67,7 +76,7 @@ func (r *registryImageResource) Schema(_ context.Context, _ resource.SchemaReque
 			"name": schema.StringAttribute{
 				Required: true,
 				MarkdownDescription: "Local image reference to push, including registry host and tag (e.g. `registry.example.com/team/app:1.2`; " +
-					"no tag means `latest`). The image must already exist on the daemon under this name. Changing this forces a new resource.",
+					"no tag means `latest`). The image must already exist on the daemon under this name. Forces replacement.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"keep_remotely": schema.BoolAttribute{
@@ -81,7 +90,7 @@ func (r *registryImageResource) Schema(_ context.Context, _ resource.SchemaReque
 			"triggers": schema.MapAttribute{
 				Optional:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "Arbitrary string map; any change pushes the image again. Changing this forces a new resource.",
+				MarkdownDescription: "Arbitrary string map; any change pushes the image again. Forces replacement.",
 				PlanModifiers:       []planmodifier.Map{mapplanmodifier.RequiresReplace()},
 			},
 			"push_retries": schema.Int64Attribute{
@@ -97,13 +106,69 @@ func (r *registryImageResource) Schema(_ context.Context, _ resource.SchemaReque
 				MarkdownDescription: "Skip TLS verification when the provider itself talks to the registry (only for the delete on destroy; " +
 					"pushes go through the daemon and follow its insecure-registries setting). Default `false`.",
 			},
-			"sha256_digest": schema.StringAttribute{
+			"digest": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Manifest digest (`sha256:...`) of the pushed image, from the push result or the registry.",
+				MarkdownDescription: "Manifest (or index) digest (`sha256:...`) of the pushed image in the registry (DistributionInspect `Descriptor.digest`).",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-		},
+			"image_ref": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "The pushed reference, normalized to `<registry>/<repository>:<tag>`.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"image_digest_ref": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Pinned reference `<registry>/<repository>@<digest>`, safe to hand to a deploy tool.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"platforms": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Computed:            true,
+				MarkdownDescription: "Platforms in the pushed manifest as `os/arch[/variant]`.",
+				PlanModifiers:       []planmodifier.List{listplanmodifier.UseStateForUnknown()},
+			},
+		}, regImageItem),
 	}
+}
+
+// ModifyPlan keeps the contract outputs of the state on an in-place update
+// (only keep_remotely, push_retries and insecure_skip_verify change in
+// place; nothing is pushed).
+func (r *registryImageResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+		return
+	}
+	var plan, st registryImageResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &st)...)
+	if resp.Diagnostics.HasError() || len(resp.RequiresReplace) > 0 || !plan.Name.Equal(st.Name) || !plan.Triggers.Equal(st.Triggers) {
+		return
+	}
+	plan.contractEngineRegistryImage = st.contractEngineRegistryImage
+	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
+}
+
+// regImageRefresh fills the digest, references, platforms and contract
+// outputs of m from a DistributionInspect of its name.
+func (r *registryImageResource) regImageRefresh(ctx context.Context, m *registryImageResourceModel, auth string) error {
+	name := m.Name.ValueString()
+	di, err := r.pd.Client.DistributionInspect(ctx, name, client.DistributionInspectOptions{EncodedRegistryAuth: auth})
+	if err != nil {
+		return err
+	}
+	digest := di.Descriptor.Digest.String()
+	m.Digest = types.StringValue(digest)
+	m.ImageRef, m.ImageDigestRef = regRefValues(name, digest)
+	m.Platforms = regOCIPlatforms(di.Platforms)
+	fill, err := regDistributionFill(di.DistributionInspect, "distribution_json")
+	if err != nil {
+		return err
+	}
+	diags := m.contractFill(ctx, r.pd, fill)
+	if diags.HasError() {
+		return fmt.Errorf("outputs contract: %v", diags)
+	}
+	return nil
 }
 
 func (r *registryImageResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -200,16 +265,19 @@ func (r *registryImageResource) Create(ctx context.Context, req resource.CreateR
 		resp.Diagnostics.AddError("Image push failed", fmt.Sprintf("%s: %v", name, err))
 		return
 	}
-	if digest == "" {
-		di, err := r.pd.Client.DistributionInspect(ctx, name, client.DistributionInspectOptions{EncodedRegistryAuth: auth})
-		if err != nil {
+	plan.ID = types.StringValue(name)
+	if err := r.regImageRefresh(ctx, &plan, auth); err != nil {
+		if digest == "" {
 			resp.Diagnostics.AddError("Pushed, but cannot read the digest", fmt.Sprintf("%s: %v", name, err))
 			return
 		}
-		digest = di.Descriptor.Digest.String()
+		resp.Diagnostics.AddWarning("Pushed, but cannot inspect the image in the registry",
+			fmt.Sprintf("%s: %v. digest comes from the push; the distribution outputs stay null until the next refresh.", name, err))
+		plan.Digest = types.StringValue(digest)
+		plan.ImageRef, plan.ImageDigestRef = regRefValues(name, digest)
+		plan.Platforms = types.ListNull(types.StringType)
+		plan.contractSetNull()
 	}
-	plan.ID = types.StringValue(name)
-	plan.Sha256Digest = types.StringValue(digest)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -241,8 +309,7 @@ func (r *registryImageResource) Read(ctx context.Context, req resource.ReadReque
 		resp.Diagnostics.AddError("Invalid image reference", err.Error())
 		return
 	}
-	di, err := r.pd.Client.DistributionInspect(ctx, name, client.DistributionInspectOptions{EncodedRegistryAuth: auth})
-	if err != nil {
+	if err := r.regImageRefresh(ctx, &st, auth); err != nil {
 		if registryImageNotFound(err) {
 			tflog.Warn(ctx, "image gone from registry; removing from state", map[string]any{"name": name})
 			resp.State.RemoveResource(ctx)
@@ -252,7 +319,6 @@ func (r *registryImageResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 	st.ID = types.StringValue(name)
-	st.Sha256Digest = types.StringValue(di.Descriptor.Digest.String())
 	if st.KeepRemotely.IsNull() {
 		st.KeepRemotely = types.BoolValue(false)
 	}
@@ -273,7 +339,8 @@ func (r *registryImageResource) Update(ctx context.Context, req resource.UpdateR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	plan.ID, plan.Sha256Digest = st.ID, st.Sha256Digest
+	plan.ID, plan.Digest, plan.ImageRef, plan.ImageDigestRef, plan.Platforms = st.ID, st.Digest, st.ImageRef, st.ImageDigestRef, st.Platforms
+	plan.contractEngineRegistryImage = st.contractEngineRegistryImage
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -289,12 +356,12 @@ func (r *registryImageResource) Delete(ctx context.Context, req resource.DeleteR
 	name := st.Name.ValueString()
 	cfg, _, err := r.pd.registryAuthConfigFor(name)
 	if err == nil {
-		err = registryImageDeleteRemote(ctx, name, st.Sha256Digest.ValueString(), cfg.Username, cfg.Password, st.InsecureSkipVerify.ValueBool())
+		err = registryImageDeleteRemote(ctx, name, st.Digest.ValueString(), cfg.Username, cfg.Password, st.InsecureSkipVerify.ValueBool())
 	}
 	if err != nil {
 		resp.Diagnostics.AddWarning("Image not deleted from registry",
 			fmt.Sprintf("%s was removed from Terraform state, but deleting %s from the registry failed: %v. "+
-				"Delete it manually or set keep_remotely = true.", name, st.Sha256Digest.ValueString(), err))
+				"Delete it manually or set keep_remotely = true.", name, st.Digest.ValueString(), err))
 	}
 }
 

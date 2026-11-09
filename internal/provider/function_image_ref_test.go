@@ -140,7 +140,7 @@ func TestImageRefFunctionRunNulls(t *testing.T) {
 func TestFunctionDefinitions(t *testing.T) {
 	ctx := context.Background()
 	names := map[string]bool{}
-	for _, nf := range laneFunctions() {
+	for _, nf := range genFunctions() {
 		f := nf()
 		var mr function.MetadataResponse
 		f.Metadata(ctx, function.MetadataRequest{}, &mr)

@@ -5,6 +5,8 @@ package provider
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"os"
 	"strings"
@@ -45,6 +47,15 @@ func actStreamProgress(ctx context.Context, resp *action.InvokeResponse) func(js
 	}
 }
 
+// imgPlatformAttr is the optional platform argument of load / save.
+func imgPlatformAttr(cli string) schema.StringAttribute {
+	return schema.StringAttribute{
+		Optional: true,
+		MarkdownDescription: "Only this platform of multi-platform images, `os[/arch[/variant]]` (`" + cli + " --platform`; " +
+			"API 1.48+ with the containerd image store). Default: all platforms.",
+	}
+}
+
 // ---------------------------------------------------------------------------
 // docker_image_import
 
@@ -60,6 +71,7 @@ type imageImportActionModel struct {
 	Changes    types.List   `tfsdk:"changes"`
 	Message    types.String `tfsdk:"message"`
 	Platform   types.String `tfsdk:"platform"`
+	ResultPath types.String `tfsdk:"result_path"`
 }
 
 func (a *imageImportAction) Metadata(_ context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
@@ -70,7 +82,8 @@ func (a *imageImportAction) Schema(_ context.Context, _ action.SchemaRequest, re
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Creates an image from a filesystem tarball, like `docker import`. " +
 			"The source is a local tar file (streamed by the provider) or an `http(s)://` URL (fetched by the daemon). " +
-			"The image is not tracked in state; manage its lifetime yourself.",
+			"The image is not tracked in state; manage its lifetime yourself. The result object holds `id`, `image_ref` and " +
+			"`result.image` (size, created, architecture, os and variant of the new image).",
 		Attributes: map[string]schema.Attribute{
 			"source": schema.StringAttribute{
 				Required:            true,
@@ -82,8 +95,9 @@ func (a *imageImportAction) Schema(_ context.Context, _ action.SchemaRequest, re
 				Optional: true, ElementType: types.StringType,
 				MarkdownDescription: "Dockerfile instructions applied to the image config, e.g. `[\"CMD [\\\"/bin/sh\\\"]\", \"ENV A=b\"]` (`docker import --change`).",
 			},
-			"message":  schema.StringAttribute{Optional: true, MarkdownDescription: "Commit message recorded in the image history."},
-			"platform": schema.StringAttribute{Optional: true, MarkdownDescription: "Platform of the imported image, `os[/arch[/variant]]`, e.g. `linux/amd64`. Default: the daemon's."},
+			"message":     schema.StringAttribute{Optional: true, MarkdownDescription: "Commit message recorded in the image history."},
+			"platform":    schema.StringAttribute{Optional: true, MarkdownDescription: "Platform of the imported image, `os[/arch[/variant]]`, e.g. `linux/amd64`. Default: the daemon's."},
+			"result_path": actResultPathAttribute(),
 		},
 	}
 }
@@ -153,13 +167,25 @@ func (a *imageImportAction) Invoke(ctx context.Context, req action.InvokeRequest
 		return
 	}
 	name := id
+	values := map[string]any{"id": id}
 	if ref != "" {
 		if tag == "" {
 			tag = "latest"
 		}
+		values["image_ref"] = imgNormalizedRef(ref + ":" + tag)
 		name = ref + ":" + tag + " (" + id + ")"
 	}
 	actProgress(ctx, resp, "imported image %s", name)
+	if id != "" {
+		if insp, err := c.ImageInspect(ctx, id); err == nil {
+			values["result"] = map[string]any{"image": map[string]any{
+				"size": insp.Size, "created": insp.Created, "architecture": insp.Architecture, "os": insp.Os, "variant": insp.Variant,
+			}}
+		} else {
+			resp.Diagnostics.AddWarning("docker_image_import: cannot inspect the new image", err.Error())
+		}
+	}
+	actFinishResult(ctx, resp, a.pd, "engine:image-import", values, m.ResultPath)
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +197,9 @@ func NewImageLoadAction() action.Action { return &imageLoadAction{} }
 type imageLoadAction struct{ actBase }
 
 type imageLoadActionModel struct {
-	Path types.String `tfsdk:"path"`
+	Input      types.String `tfsdk:"input"`
+	Platform   types.String `tfsdk:"platform"`
+	ResultPath types.String `tfsdk:"result_path"`
 }
 
 func (a *imageLoadAction) Metadata(_ context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
@@ -181,12 +209,28 @@ func (a *imageLoadAction) Metadata(_ context.Context, req action.MetadataRequest
 func (a *imageLoadAction) Schema(_ context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Loads images from a local tar archive into the daemon, like `docker load`. " +
-			"The archive is what `docker save` or the `docker_image_save` action writes; the loaded image names are reported as progress. " +
-			"The images are not tracked in state.",
+			"The archive is what `docker save` or the `docker_image_save` action writes; the loaded image names are reported as progress " +
+			"and in the result object (`loaded_images`, `result.archive_size`). The images are not tracked in state.",
 		Attributes: map[string]schema.Attribute{
-			"path": schema.StringAttribute{Required: true, MarkdownDescription: "Local path of the image archive (optionally gzip/bzip2/xz compressed). `~` expands to the home directory."},
+			"input": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "Local path of the image archive (optionally gzip/bzip2/xz compressed), like `docker load --input`. `~` expands to the home directory.",
+			},
+			"platform":    imgPlatformAttr("docker load"),
+			"result_path": actResultPathAttribute(),
 		},
 	}
+}
+
+// imgLoadedImage returns the reference or ID of a "Loaded image: ..." line.
+func imgLoadedImage(line string) (string, bool) {
+	line = strings.TrimSpace(line)
+	for _, pfx := range []string{"Loaded image ID: ", "Loaded image: "} {
+		if strings.HasPrefix(line, pfx) {
+			return strings.TrimSpace(strings.TrimPrefix(line, pfx)), true
+		}
+	}
+	return "", false
 }
 
 func (a *imageLoadAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
@@ -196,20 +240,34 @@ func (a *imageLoadAction) Invoke(ctx context.Context, req action.InvokeRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	p := m.Path.ValueString()
+	p := m.Input.ValueString()
 	f, err := os.Open(expandHome(p))
 	if err != nil {
-		resp.Diagnostics.AddAttributeError(path.Root("path"), "docker_image_load: cannot open archive", err.Error())
+		resp.Diagnostics.AddAttributeError(path.Root("input"), "docker_image_load: cannot open archive", err.Error())
 		return
 	}
 	defer f.Close()
+	var size int64
+	if fi, err := f.Stat(); err == nil {
+		size = fi.Size()
+	}
+	opts := []client.ImageLoadOption{client.ImageLoadWithQuiet(true)}
+	if pl := m.Platform.ValueString(); pl != "" {
+		opts = append(opts, client.ImageLoadWithPlatforms(platformFromString(pl)))
+	}
 	actProgress(ctx, resp, "loading images from %s", p)
-	lr, err := c.ImageLoad(ctx, f, client.ImageLoadWithQuiet(true))
+	lr, err := c.ImageLoad(ctx, f, opts...)
 	if err != nil {
 		resp.Diagnostics.AddError("docker_image_load failed", err.Error())
 		return
 	}
 	defer lr.Close()
+	loaded := []string{}
+	note := func(line string) {
+		if ref, ok := imgLoadedImage(line); ok {
+			loaded = append(loaded, ref)
+		}
+	}
 	// The v0 client no longer reports the response Content-Type; current
 	// daemons always answer with a JSON message stream, older ones with
 	// plain text. Peek at the first byte to tell them apart.
@@ -218,14 +276,24 @@ func (a *imageLoadAction) Invoke(ctx context.Context, req action.InvokeRequest, 
 		b, _ := io.ReadAll(br)
 		for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
 			if l != "" {
+				note(l)
 				actProgress(ctx, resp, "%s", l)
 			}
 		}
-		return
+	} else {
+		progress := actStreamProgress(ctx, resp)
+		if _, err := imgDecodeStream(br, func(msg jsonstream.Message) {
+			note(msg.Stream)
+			progress(msg)
+		}); err != nil {
+			resp.Diagnostics.AddError("docker_image_load failed", err.Error())
+			return
+		}
 	}
-	if _, err := imgDecodeStream(br, actStreamProgress(ctx, resp)); err != nil {
-		resp.Diagnostics.AddError("docker_image_load failed", err.Error())
-	}
+	actFinishResult(ctx, resp, a.pd, "engine:image-load", map[string]any{
+		"loaded_images": loaded,
+		"result":        map[string]any{"archive_size": size},
+	}, m.ResultPath)
 }
 
 // ---------------------------------------------------------------------------
@@ -237,8 +305,10 @@ func NewImageSaveAction() action.Action { return &imageSaveAction{} }
 type imageSaveAction struct{ actBase }
 
 type imageSaveActionModel struct {
-	Images types.List   `tfsdk:"images"`
-	Path   types.String `tfsdk:"path"`
+	Images     types.List   `tfsdk:"images"`
+	Output     types.String `tfsdk:"output"`
+	Platform   types.String `tfsdk:"platform"`
+	ResultPath types.String `tfsdk:"result_path"`
 }
 
 func (a *imageSaveAction) Metadata(_ context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
@@ -248,13 +318,19 @@ func (a *imageSaveAction) Metadata(_ context.Context, req action.MetadataRequest
 func (a *imageSaveAction) Schema(_ context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Writes one or more images to a local tar archive, like `docker save`. " +
-			"The archive keeps every tag and can be loaded with `docker load` or the `docker_image_load` action; it is written to a temporary name and renamed into place.",
+			"The archive keeps every tag and can be loaded with `docker load` or the `docker_image_load` action; it is written to a temporary name and renamed into place. " +
+			"The result object holds `images`, `path`, `archive_sha256` and `result.archive_size`.",
 		Attributes: map[string]schema.Attribute{
 			"images": schema.ListAttribute{
 				Required: true, ElementType: types.StringType,
 				MarkdownDescription: "Image names, tags or IDs to save, e.g. `[docker_image.app.name]`. All must exist on the daemon.",
 			},
-			"path": schema.StringAttribute{Required: true, MarkdownDescription: "Local tar file to write. Parent directories are created; an existing file is replaced."},
+			"output": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "Local tar file to write, like `docker save --output`. Parent directories are created; an existing file is replaced.",
+			},
+			"platform":    imgPlatformAttr("docker save"),
+			"result_path": actResultPathAttribute(),
 		},
 	}
 }
@@ -281,18 +357,29 @@ func (a *imageSaveAction) Invoke(ctx context.Context, req action.InvokeRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	p := m.Path.ValueString()
+	p := m.Output.ValueString()
+	var opts []client.ImageSaveOption
+	if pl := m.Platform.ValueString(); pl != "" {
+		opts = append(opts, client.ImageSaveWithPlatforms(platformFromString(pl)))
+	}
 	actProgress(ctx, resp, "saving %s to %s", strings.Join(imgs, ", "), p)
-	rc, err := c.ImageSave(ctx, imgs)
+	rc, err := c.ImageSave(ctx, imgs, opts...)
 	if err != nil {
 		resp.Diagnostics.AddError("docker_image_save failed", err.Error())
 		return
 	}
 	defer rc.Close()
-	n, err := actWriteFile(p, rc, func(w int64) { actProgress(ctx, resp, "saved %s", actHumanSize(uint64(w))) })
+	hash := sha256.New()
+	n, err := actWriteFile(p, io.TeeReader(rc, hash), func(w int64) { actProgress(ctx, resp, "saved %s", actHumanSize(uint64(w))) })
 	if err != nil {
 		resp.Diagnostics.AddError("docker_image_save failed", err.Error())
 		return
 	}
 	actProgress(ctx, resp, "saved %d image(s): %s written to %s", len(imgs), actHumanSize(uint64(n)), p)
+	actFinishResult(ctx, resp, a.pd, "engine:image-save", map[string]any{
+		"images":         imgs,
+		"path":           p,
+		"archive_sha256": hex.EncodeToString(hash.Sum(nil)),
+		"result":         map[string]any{"archive_size": n},
+	}, m.ResultPath)
 }

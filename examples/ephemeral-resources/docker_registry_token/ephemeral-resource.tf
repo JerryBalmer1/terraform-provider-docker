@@ -21,6 +21,6 @@ ephemeral "docker_registry_token" "app" {
 # write-only secret for a service that pulls from ghcr.io itself.
 resource "docker_secret" "ghcr_token" {
   name            = "ghcr-pull-token"
-  data_wo         = base64encode(ephemeral.docker_registry_token.app.token)
+  data_wo         = base64encode(ephemeral.docker_registry_token.app.token.token)
   data_wo_version = 1
 }

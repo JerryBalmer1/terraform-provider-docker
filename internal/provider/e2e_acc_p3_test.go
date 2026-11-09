@@ -60,9 +60,9 @@ resource "docker_swarm_node" "w2" {
 
 resource "docker_service" "web" {
   name     = "dp-web-%[1]s"
-  image    = docker_image.web.repo_digest
+  image    = docker_image.web.image_digest_ref
   replicas = 1
-  networks = [docker_network.dp.id]
+  networks = { (docker_network.dp.name) = {} }
 
   placement {
     constraints = ["node.hostname==worker1"]
@@ -80,7 +80,7 @@ resource "docker_service" "probe" {
   image             = "busybox:1.36"
   mode              = "replicated_job"
   total_completions = 1
-  networks          = [docker_network.dp.id]
+  networks          = { (docker_network.dp.name) = {} }
   command           = ["sh", "-c", "for i in $(seq 1 45); do wget -q -T 3 -O /dev/null http://dp-web-%[1]s/ && echo DATAPLANE-OK && exit 0; sleep 2; done; exit 1"]
 
   restart_policy {
@@ -164,8 +164,8 @@ func TestAccE2EOverlayDataPlane(t *testing.T) {
 			{
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestMatchResourceAttr("docker_image.web", "repo_digest", regexp.MustCompile(`^nginx@sha256:[0-9a-f]{64}$`)),
-					resource.TestCheckResourceAttrPair("docker_service.web", "image", "docker_image.web", "repo_digest"),
+					resource.TestMatchResourceAttr("docker_image.web", "image_digest_ref", regexp.MustCompile(`^nginx@sha256:[0-9a-f]{64}$`)),
+					resource.TestCheckResourceAttrPair("docker_service.web", "image", "docker_image.web", "image_digest_ref"),
 					resource.TestCheckResourceAttr("docker_service.probe", "mode", "replicated_job"),
 					resource.TestCheckResourceAttr("docker_service.agent", "mode", "global"),
 					func(s *terraform.State) error {

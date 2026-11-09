@@ -5,11 +5,8 @@ package provider
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -21,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Media types the manifests data source asks for, index types first.
@@ -41,85 +39,6 @@ var p3ManifestAttrTypes = map[string]attr.Type{
 	"architecture": types.StringType,
 	"variant":      types.StringType,
 	"os_version":   types.StringType,
-}
-
-type p3Platform struct {
-	Architecture string `json:"architecture"`
-	OS           string `json:"os"`
-	OSVersion    string `json:"os.version"`
-	Variant      string `json:"variant"`
-}
-
-type p3Descriptor struct {
-	MediaType string      `json:"mediaType"`
-	Digest    string      `json:"digest"`
-	Size      int64       `json:"size"`
-	Platform  *p3Platform `json:"platform"`
-}
-
-type p3Manifest struct {
-	MediaType string         `json:"mediaType"`
-	Manifests []p3Descriptor `json:"manifests"`
-	Config    *p3Descriptor  `json:"config"`
-}
-
-// p3ManifestEntry is one per-platform image manifest.
-type p3ManifestEntry struct {
-	p3Descriptor
-	Platform p3Platform
-}
-
-// p3FetchManifests reads ref of the registry's repository. For an index or
-// manifest list it returns its entries; for a single image manifest it
-// returns that manifest, with its platform read from the image config blob.
-func p3FetchManifests(ctx context.Context, r *p3Registry, ref string) (digest, mediaType string, entries []p3ManifestEntry, err error) {
-	resp, err := r.get(ctx, "/v2/"+r.repo+"/manifests/"+ref, p3ManifestAccept...)
-	if err != nil {
-		return "", "", nil, err
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-	if err != nil {
-		return "", "", nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", "", nil, fmt.Errorf("GET manifest %s:%s: %s: %s", r.repo, ref, resp.Status, strings.TrimSpace(string(body)))
-	}
-	var m p3Manifest
-	if err := json.Unmarshal(body, &m); err != nil {
-		return "", "", nil, fmt.Errorf("decoding manifest: %w", err)
-	}
-	mediaType = m.MediaType
-	if mediaType == "" {
-		mediaType, _, _ = strings.Cut(resp.Header.Get("Content-Type"), ";")
-	}
-	digest = resp.Header.Get("Docker-Content-Digest")
-	if digest == "" {
-		digest = fmt.Sprintf("sha256:%x", sha256.Sum256(body))
-	}
-	switch mediaType {
-	case p3MediaOCIIndex, p3MediaDockerList:
-		for _, d := range m.Manifests {
-			e := p3ManifestEntry{p3Descriptor: d}
-			if d.Platform != nil {
-				e.Platform = *d.Platform
-			}
-			entries = append(entries, e)
-		}
-		return digest, mediaType, entries, nil
-	case p3MediaOCIManifest, p3MediaDockerManif2:
-		e := p3ManifestEntry{p3Descriptor: p3Descriptor{MediaType: mediaType, Digest: digest, Size: int64(len(body))}}
-		if m.Config != nil && m.Config.Digest != "" {
-			var plat p3Platform
-			if _, err := r.getJSON(ctx, "/v2/"+r.repo+"/blobs/"+m.Config.Digest, &plat); err != nil {
-				return "", "", nil, fmt.Errorf("reading image config: %w", err)
-			}
-			e.Platform = plat
-		}
-		return digest, mediaType, []p3ManifestEntry{e}, nil
-	default:
-		return "", "", nil, fmt.Errorf("unsupported manifest media type %q", mediaType)
-	}
 }
 
 // p3FetchTags lists every tag of the repository, following Link pagination.
@@ -170,8 +89,8 @@ var (
 	_ datasource.DataSourceWithConfigure = (*p3RegistryManifestsDS)(nil)
 )
 
-// NewP3RegistryImageManifestsDataSource returns docker_registry_image_manifests.
-func NewP3RegistryImageManifestsDataSource() datasource.DataSource { return &p3RegistryManifestsDS{} }
+// NewRegistryImageManifestsDataSource returns docker_registry_image_manifests.
+func NewRegistryImageManifestsDataSource() datasource.DataSource { return &p3RegistryManifestsDS{} }
 
 type p3RegistryManifestsDS struct {
 	pd *providerData
@@ -180,10 +99,19 @@ type p3RegistryManifestsDS struct {
 type p3RegistryManifestsModel struct {
 	Name               types.String `tfsdk:"name"`
 	InsecureSkipVerify types.Bool   `tfsdk:"insecure_skip_verify"`
+	Attestations       types.Bool   `tfsdk:"attestations"`
 	Digest             types.String `tfsdk:"digest"`
 	MediaType          types.String `tfsdk:"media_type"`
+	ImageRef           types.String `tfsdk:"image_ref"`
+	ImageDigestRef     types.String `tfsdk:"image_digest_ref"`
+	Platforms          types.List   `tfsdk:"platforms"`
 	Manifests          types.List   `tfsdk:"manifests"`
+	contractBuildxImagetoolsInspect
 }
+
+// regManifestsItem is the primary inventory item of
+// docker_registry_image_manifests (cli-only:manifest-inspect shares it).
+const regManifestsItem = "buildx:imagetools-inspect"
 
 func (d *p3RegistryManifestsDS) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_registry_image_manifests"
@@ -194,20 +122,33 @@ func (d *p3RegistryManifestsDS) Schema(_ context.Context, _ datasource.SchemaReq
 		return schema.StringAttribute{Computed: true, MarkdownDescription: desc}
 	}
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Reads the per-platform manifests of a multi-platform image straight from its registry, with the provider's `registry_auth`. " +
-			"For a manifest list or OCI index every entry is listed (attestation manifests appear with platform `unknown`); " +
+		MarkdownDescription: "Reads the manifest of an image straight from its registry, with the provider's `registry_auth`, like `docker buildx imagetools inspect` or `docker manifest inspect`. " +
+			"For a manifest list or OCI index every entry is listed (attestation manifests appear with platform `unknown/unknown`) and, unless `attestations = false`, " +
+			"each platform's image config and its SLSA provenance and SPDX SBOM attestations are read too; " +
 			"a single-platform image gives one entry whose platform comes from its config blob. Nothing is pulled.",
-		Attributes: map[string]schema.Attribute{
+		Attributes: contractAddDataSourceAttributes(map[string]schema.Attribute{
 			"name": schema.StringAttribute{Required: true, MarkdownDescription: "Image reference, e.g. `nginx:1.27` or `ghcr.io/org/app@sha256:...` (no tag means `latest`)."},
 			"insecure_skip_verify": schema.BoolAttribute{
 				Optional:            true,
 				MarkdownDescription: "Skip TLS certificate verification of the registry.",
 			},
-			"digest":     c("Digest of the top-level manifest (index, list or image manifest)."),
-			"media_type": c("Media type of the top-level manifest."),
+			"attestations": schema.BoolAttribute{
+				Optional: true,
+				MarkdownDescription: "Read the image config and the attestations of every platform of an index (two to four extra requests per platform). " +
+					"Default `true`; `false` reads only the top-level document, and `image_config_json`, `provenance_json` and `sbom_json` stay null for an index.",
+			},
+			"digest":           c("Digest of the top-level manifest (index, list or image manifest)."),
+			"media_type":       c("Media type of the top-level manifest."),
+			"image_ref":        c("Normalized reference, e.g. `docker.io/library/alpine:latest`."),
+			"image_digest_ref": c("Pinned reference `<registry>/<repository>@sha256:...`, safe to hand to a deploy tool."),
+			"platforms": schema.ListAttribute{
+				ElementType:         types.StringType,
+				Computed:            true,
+				MarkdownDescription: "Platforms as `os/arch[/variant]`, in registry order, excluding attestation manifests.",
+			},
 			"manifests": schema.ListNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: "Image manifests, in registry order.",
+				MarkdownDescription: "Entries of the top-level document, in registry order (one entry for a single image manifest).",
 				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
 					"digest":       c("Manifest digest; pin a platform with `<repo>@<digest>`."),
 					"media_type":   c("Manifest media type."),
@@ -218,7 +159,7 @@ func (d *p3RegistryManifestsDS) Schema(_ context.Context, _ datasource.SchemaReq
 					"os_version":   c("OS version (Windows images); empty when none."),
 				}},
 			},
-		},
+		}, regManifestsItem),
 	}
 }
 
@@ -242,27 +183,93 @@ func (d *p3RegistryManifestsDS) Read(ctx context.Context, req datasource.ReadReq
 		ref = p.Tag
 	}
 	r := newP3Registry(d.pd, p.Registry, p.Repository, m.InsecureSkipVerify.ValueBool())
-	digest, mediaType, entries, err := p3FetchManifests(ctx, r, ref)
+	shallow := !m.Attestations.IsNull() && !m.Attestations.ValueBool()
+	in, err := regInspect(ctx, r, ref, shallow)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot read image manifests from registry", fmt.Sprintf("%s: %v", m.Name.ValueString(), err))
 		return
 	}
-	vals := make([]attr.Value, 0, len(entries))
-	for _, e := range entries {
+	top := in.Top
+	var vals []attr.Value
+	addRow := func(dg, mt string, size int64, plat *ocispec.Platform) {
+		if plat == nil {
+			plat = &ocispec.Platform{}
+		}
 		vals = append(vals, types.ObjectValueMust(p3ManifestAttrTypes, map[string]attr.Value{
-			"digest":       types.StringValue(e.Digest),
-			"media_type":   types.StringValue(e.MediaType),
-			"size":         types.Int64Value(e.Size),
-			"os":           types.StringValue(e.Platform.OS),
-			"architecture": types.StringValue(e.Platform.Architecture),
-			"variant":      types.StringValue(e.Platform.Variant),
-			"os_version":   types.StringValue(e.Platform.OSVersion),
+			"digest":       types.StringValue(dg),
+			"media_type":   types.StringValue(mt),
+			"size":         types.Int64Value(size),
+			"os":           types.StringValue(plat.OS),
+			"architecture": types.StringValue(plat.Architecture),
+			"variant":      types.StringValue(plat.Variant),
+			"os_version":   types.StringValue(plat.OSVersion),
 		}))
 	}
-	m.Digest = types.StringValue(digest)
-	m.MediaType = types.StringValue(mediaType)
+	if top.isIndex() {
+		for _, e := range top.Doc.Manifests {
+			addRow(e.Digest, e.MediaType, e.Size, e.Platform)
+		}
+	} else {
+		var plat ocispec.Platform
+		if in.SingleCfg != nil {
+			_ = json.Unmarshal(in.SingleCfg, &plat)
+		}
+		addRow(top.Digest, top.MediaType, int64(len(top.Body)), &plat)
+	}
+	m.Digest = types.StringValue(top.Digest)
+	m.MediaType = types.StringValue(top.MediaType)
 	m.Manifests = types.ListValueMust(types.ObjectType{AttrTypes: p3ManifestAttrTypes}, vals)
+	imageRef, digestRef := regRefs(m.Name.ValueString(), top.Digest)
+	m.ImageRef = types.StringValue(imageRef)
+	m.ImageDigestRef = types.StringValue(digestRef)
+	m.Platforms = regStringList(in.Platforms)
+	fill, err := regManifestsFillInput(in)
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot encode registry manifests", err.Error())
+		return
+	}
+	resp.Diagnostics.Append(m.contractFill(ctx, d.pd, fill)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
+}
+
+// regManifestsFillInput maps an inspection onto the contract outputs.
+func regManifestsFillInput(in *regInspection) (contractFillInput, error) {
+	top := in.Top
+	raw := map[string][]byte{"manifest_json": top.Body}
+	var manifest map[string]any
+	if err := json.Unmarshal(top.Body, &manifest); err != nil {
+		return contractFillInput{}, err
+	}
+	manifest["digest"] = top.Digest
+	manifest["size"] = len(top.Body)
+	structured := map[string]any{"manifest": manifest, "image_config": nil}
+	switch {
+	case !top.isIndex() && in.SingleCfg != nil:
+		raw["image_config_json"] = in.SingleCfg
+		structured["image_config"] = json.RawMessage(in.SingleCfg)
+	case top.isIndex() && len(in.Configs) > 0:
+		b, err := regMarshal(in.Configs)
+		if err != nil {
+			return contractFillInput{}, err
+		}
+		raw["image_config_json"] = b
+		if len(in.Configs) == 1 {
+			for _, v := range in.Configs {
+				structured["image_config"] = v
+			}
+		}
+	}
+	for name, src := range map[string]map[string]any{"provenance_json": in.Provenance, "sbom_json": in.SBOM} {
+		if len(src) == 0 {
+			continue
+		}
+		b, err := regMarshal(src)
+		if err != nil {
+			return contractFillInput{}, err
+		}
+		raw[name] = b
+	}
+	return contractFillInput{Raw: raw, Structured: structured}, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -273,8 +280,11 @@ var (
 	_ datasource.DataSourceWithConfigure = (*p3RegistryTagsDS)(nil)
 )
 
-// NewP3RegistryImageTagsDataSource returns docker_registry_image_tags.
-func NewP3RegistryImageTagsDataSource() datasource.DataSource { return &p3RegistryTagsDS{} }
+// regTagsItem is the inventory item of docker_registry_image_tags.
+const regTagsItem = "engine:registry-image-tags"
+
+// NewRegistryImageTagsDataSource returns docker_registry_image_tags.
+func NewRegistryImageTagsDataSource() datasource.DataSource { return &p3RegistryTagsDS{} }
 
 type p3RegistryTagsDS struct {
 	pd *providerData
@@ -286,6 +296,7 @@ type p3RegistryTagsModel struct {
 	PageSize           types.Int64  `tfsdk:"page_size"`
 	Repository         types.String `tfsdk:"repository"`
 	Tags               types.List   `tfsdk:"tags"`
+	contractEngineRegistryImageTags
 }
 
 func (d *p3RegistryTagsDS) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -295,8 +306,9 @@ func (d *p3RegistryTagsDS) Metadata(_ context.Context, req datasource.MetadataRe
 func (d *p3RegistryTagsDS) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Lists every tag of a repository straight from its registry (`GET /v2/<name>/tags/list`), following pagination, with the provider's `registry_auth`. " +
-			"Tags come back in the registry's order, which for distribution-based registries is lexical.",
-		Attributes: map[string]schema.Attribute{
+			"Tags come back in the registry's order, which for distribution-based registries is lexical. " +
+			"`tags_json` holds the pages merged into one `{name, tags}` document.",
+		Attributes: contractAddDataSourceAttributes(map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Required:            true,
 				MarkdownDescription: "Repository, e.g. `nginx`, `ghcr.io/org/app` or `localhost:5000/app`. A tag or digest in it is ignored.",
@@ -309,7 +321,7 @@ func (d *p3RegistryTagsDS) Schema(_ context.Context, _ datasource.SchemaRequest,
 			},
 			"repository": schema.StringAttribute{Computed: true, MarkdownDescription: "Normalized `registry/repository`, e.g. `docker.io/library/nginx`."},
 			"tags":       schema.ListAttribute{ElementType: types.StringType, Computed: true, MarkdownDescription: "The tags."},
-		},
+		}, regTagsItem),
 	}
 }
 
@@ -340,5 +352,12 @@ func (d *p3RegistryTagsDS) Read(ctx context.Context, req datasource.ReadRequest,
 	}
 	m.Repository = types.StringValue(p.Registry + "/" + p.Repository)
 	m.Tags = types.ListValueMust(types.StringType, vals)
+	raw, err := regMarshal(map[string]any{"name": p.Repository, "tags": tags})
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot encode tags", err.Error())
+		return
+	}
+	resp.Diagnostics.Append(m.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"tags_json": raw}})...)
+	m.DistributionAPIVersion = regStringOrNull(r.apiVersion)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

@@ -1,6 +1,6 @@
 package provider
 
-// Pass 3: docker_container `upload` blocks and `mounts.selinux_relabel`.
+// Pass 3: docker_container `files` blocks (`upload` before Pass 5, Q9) and `mounts.selinux_relabel`.
 //
 // Uploads are written with CopyToContainer (PUT /containers/{id}/archive)
 // from a single-file tar built in memory, after ContainerCreate and before
@@ -28,11 +28,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	fwpath "github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -41,37 +39,34 @@ import (
 	"github.com/moby/moby/client"
 )
 
-// containerUploadModel is one upload block.
+// containerUploadModel is one files block (Q9; formerly `upload`).
 type containerUploadModel struct {
-	File          types.String `tfsdk:"file"`
+	Path          types.String `tfsdk:"path"`
 	Content       types.String `tfsdk:"content"`
 	ContentBase64 types.String `tfsdk:"content_base64"`
 	Source        types.String `tfsdk:"source"`
 	SourceHash    types.String `tfsdk:"source_hash"`
-	Executable    types.Bool   `tfsdk:"executable"`
-	Permissions   types.String `tfsdk:"permissions"`
-	Owner         types.Int64  `tfsdk:"owner"`
-	Group         types.Int64  `tfsdk:"group"`
+	Mode          types.String `tfsdk:"mode"`
+	UID           types.Int64  `tfsdk:"uid"`
+	GID           types.Int64  `tfsdk:"gid"`
 }
 
-const (
-	containerUploadModeDefault    = 0o644
-	containerUploadModeExecutable = 0o744
-)
+const containerUploadModeDefault = 0o644
 
 var containerSELinuxModes = []string{"z", "Z"}
 
-// containerUploadBlockSchema is the docker_container upload block.
+// containerUploadBlockSchema is the docker_container files block.
 func containerUploadBlockSchema() schema.ListNestedBlock {
 	sib := func(name string) fwpath.Expression { return fwpath.MatchRelative().AtParent().AtName(name) }
 	return schema.ListNestedBlock{
-		MarkdownDescription: "Files written into the container with `CopyToContainer` after create and before start (like `docker cp`). " +
-			"Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `file` must already exist " +
-			"in the image. Uploads are not read back from the daemon. Changing an upload forces a new container, unless the container " +
-			"is stopped (`must_run = false` and not running), in which case the files are copied in place.",
+		MarkdownDescription: "Files written into the container with `PutContainerArchive` after create and before start (like `docker cp`). " +
+			"Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `path` must already exist " +
+			"in the image. Files are not read back from the daemon. Changing a file forces a new container, unless the container " +
+			"is stopped (`must_run = false` and not running), in which case the files are copied in place. " +
+			"To copy files into a running container at any time use the `docker_container_cp` action.",
 		PlanModifiers: []planmodifier.List{containerUploadReplaceIf()},
 		NestedObject: schema.NestedBlockObject{Attributes: map[string]schema.Attribute{
-			"file": schema.StringAttribute{
+			"path": schema.StringAttribute{
 				Required:            true,
 				MarkdownDescription: "Absolute path of the file inside the container, e.g. `/etc/app/config.json`.",
 				Validators: []validator.String{stringvalidator.RegexMatches(containerUploadAbsRe,
@@ -95,22 +90,16 @@ func containerUploadBlockSchema() schema.ListNestedBlock {
 				Optional:            true,
 				MarkdownDescription: "Any string that changes when the `source` file changes, e.g. `filesha256(\"app.conf\")`. Only used to trigger a re-upload.",
 			},
-			"executable": schema.BoolAttribute{
-				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				MarkdownDescription: "Upload with mode `0744` instead of `0644`. Default `false`. Conflicts with `permissions`.",
-				Validators:          []validator.Bool{boolvalidator.ConflictsWith(sib("permissions"))},
-			},
-			"permissions": schema.StringAttribute{
+			"mode": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "File mode as an octal string, e.g. `\"0640\"` or `\"755\"`. Default `0644`. Conflicts with `executable`.",
-				Validators: []validator.String{stringvalidator.RegexMatches(containerUploadPermRe, "must be an octal mode such as 0644"),
-					stringvalidator.ConflictsWith(sib("executable"))},
+				MarkdownDescription: "File mode as an octal string, e.g. `\"0640\"` or `\"0755\"` for an executable. Unset uploads with `0644`.",
+				Validators:          []validator.String{stringvalidator.RegexMatches(containerUploadPermRe, "must be an octal mode such as 0644")},
 			},
-			"owner": schema.Int64Attribute{
+			"uid": schema.Int64Attribute{
 				Optional:            true,
 				MarkdownDescription: "Numeric user ID that owns the file. Default `0`.",
 			},
-			"group": schema.Int64Attribute{
+			"gid": schema.Int64Attribute{
 				Optional:            true,
 				MarkdownDescription: "Numeric group ID that owns the file. Default `0`.",
 			},
@@ -121,7 +110,7 @@ func containerUploadBlockSchema() schema.ListNestedBlock {
 // containerUploadReplaceIf forces replacement on an upload change unless the
 // prior container is stopped and the plan does not require it to run.
 func containerUploadReplaceIf() planmodifier.List {
-	desc := "Changing an upload forces a new container unless the container is stopped and must_run is false."
+	desc := "Changing files forces a new container unless the container is stopped and must_run is false."
 	return listplanmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
 		var mustRun, running types.Bool
 		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, fwpath.Root("must_run"), &mustRun)...)
@@ -181,29 +170,23 @@ func containerUploadContent(u containerUploadModel) ([]byte, error) {
 	return data, nil
 }
 
-// containerUploadMode returns the file mode for one upload.
+// containerUploadMode returns the file mode for one files block.
 func containerUploadMode(u containerUploadModel) (int64, error) {
-	if p, ok := knownString(u.Permissions); ok && p != "" {
-		if u.Executable.ValueBool() {
-			return 0, errors.New("executable and permissions conflict")
-		}
+	if p, ok := knownString(u.Mode); ok && p != "" {
 		m, err := strconv.ParseUint(p, 8, 32)
 		if err != nil || m > 0o7777 {
-			return 0, fmt.Errorf("permissions %q: want an octal mode such as 0644", p)
+			return 0, fmt.Errorf("mode %q: want an octal mode such as 0644", p)
 		}
 		return int64(m), nil
-	}
-	if u.Executable.ValueBool() {
-		return containerUploadModeExecutable, nil
 	}
 	return containerUploadModeDefault, nil
 }
 
 // containerUploadTar builds a one-file tar for u.
 func containerUploadTar(u containerUploadModel, now time.Time) (containerUploadItem, error) {
-	file := u.File.ValueString()
+	file := u.Path.ValueString()
 	if !strings.HasPrefix(file, "/") || strings.HasSuffix(file, "/") {
-		return containerUploadItem{}, fmt.Errorf("file %q must be an absolute path to a file", file)
+		return containerUploadItem{}, fmt.Errorf("path %q must be an absolute path to a file", file)
 	}
 	file = path.Clean(file)
 	data, err := containerUploadContent(u)
@@ -221,8 +204,8 @@ func containerUploadTar(u containerUploadModel, now time.Time) (containerUploadI
 		Name:     path.Base(file),
 		Mode:     mode,
 		Size:     int64(len(data)),
-		Uid:      int(u.Owner.ValueInt64()),
-		Gid:      int(u.Group.ValueInt64()),
+		Uid:      int(u.UID.ValueInt64()),
+		Gid:      int(u.GID.ValueInt64()),
 		ModTime:  now,
 		Format:   tar.FormatPAX,
 	}
@@ -246,7 +229,7 @@ func containerPrepareUploads(in []containerUploadModel) ([]containerUploadItem, 
 	for i, u := range in {
 		it, err := containerUploadTar(u, now)
 		if err != nil {
-			return nil, fmt.Errorf("upload[%d]: %w", i, err)
+			return nil, fmt.Errorf("files[%d]: %w", i, err)
 		}
 		out = append(out, it)
 	}
@@ -309,7 +292,6 @@ func containerFlattenBinds(binds []string) []containerMountModel {
 			Source:         types.StringValue(src),
 			Target:         types.StringValue(dst),
 			ReadOnly:       types.BoolValue(false),
-			TmpfsSize:      types.Int64Null(),
 			SelinuxRelabel: types.StringNull(),
 		}
 		if !strings.HasPrefix(src, "/") {
@@ -337,9 +319,9 @@ func containerUploadsEqual(a, b []containerUploadModel) bool {
 	}
 	for i := range a {
 		x, y := a[i], b[i]
-		if !x.File.Equal(y.File) || !x.Content.Equal(y.Content) || !x.ContentBase64.Equal(y.ContentBase64) ||
-			!x.Source.Equal(y.Source) || !x.SourceHash.Equal(y.SourceHash) || !x.Executable.Equal(y.Executable) ||
-			!x.Permissions.Equal(y.Permissions) || !x.Owner.Equal(y.Owner) || !x.Group.Equal(y.Group) {
+		if !x.Path.Equal(y.Path) || !x.Content.Equal(y.Content) || !x.ContentBase64.Equal(y.ContentBase64) ||
+			!x.Source.Equal(y.Source) || !x.SourceHash.Equal(y.SourceHash) || !x.Mode.Equal(y.Mode) ||
+			!x.UID.Equal(y.UID) || !x.GID.Equal(y.GID) {
 			return false
 		}
 	}

@@ -16,44 +16,6 @@ import (
 	"github.com/moby/moby/api/types/volume"
 )
 
-func TestContainerExportAction(t *testing.T) {
-	f := swarmNewFakeEngine(t)
-	f.handle("GET /containers/web/export", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("TARDATA"))
-	})
-	out := filepath.Join(t.TempDir(), "sub", "web.tar")
-	res := actInvoke(t, f, NewContainerExportAction(), map[string]tftypes.Value{"container": actTfStr("web"), "path": actTfStr(out)})
-	if res.Diags.HasError() {
-		t.Fatal(res.errText())
-	}
-	b, err := os.ReadFile(out)
-	if err != nil || string(b) != "TARDATA" {
-		t.Fatalf("file: %q %v", b, err)
-	}
-	if !actHasProgress(res, "written to") {
-		t.Errorf("progress: %q", res.Progress)
-	}
-	left, _ := os.ReadDir(filepath.Dir(out))
-	if len(left) != 1 {
-		t.Errorf("temporary files left behind: %v", left)
-	}
-}
-
-func TestContainerExportActionError(t *testing.T) {
-	f := swarmNewFakeEngine(t)
-	f.handle("GET /containers/web/export", func(w http.ResponseWriter, r *http.Request) {
-		swarmFakeError(w, http.StatusNotFound, "No such container: web")
-	})
-	out := filepath.Join(t.TempDir(), "web.tar")
-	res := actInvoke(t, f, NewContainerExportAction(), map[string]tftypes.Value{"container": actTfStr("web"), "path": actTfStr(out)})
-	if !strings.Contains(res.errText(), "No such container") {
-		t.Fatalf("got %q", res.errText())
-	}
-	if _, err := os.Stat(out); !os.IsNotExist(err) {
-		t.Error("no file should be written on error")
-	}
-}
-
 func TestImageImportActionFile(t *testing.T) {
 	f := swarmNewFakeEngine(t)
 	src := filepath.Join(t.TempDir(), "rootfs.tar")
@@ -130,7 +92,7 @@ func TestImageLoadAction(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"stream":"Loaded image: busybox:1.36\n"}` + "\n"))
 	})
-	res := actInvoke(t, f, NewImageLoadAction(), map[string]tftypes.Value{"path": actTfStr(src)})
+	res := actInvoke(t, f, NewImageLoadAction(), map[string]tftypes.Value{"input": actTfStr(src)})
 	if res.Diags.HasError() {
 		t.Fatal(res.errText())
 	}
@@ -144,7 +106,7 @@ func TestImageLoadAction(t *testing.T) {
 
 func TestImageLoadActionMissingFile(t *testing.T) {
 	f := swarmNewFakeEngine(t)
-	res := actInvoke(t, f, NewImageLoadAction(), map[string]tftypes.Value{"path": actTfStr(filepath.Join(t.TempDir(), "nope.tar"))})
+	res := actInvoke(t, f, NewImageLoadAction(), map[string]tftypes.Value{"input": actTfStr(filepath.Join(t.TempDir(), "nope.tar"))})
 	if !strings.Contains(res.errText(), "cannot open archive") {
 		t.Fatalf("got %q", res.errText())
 	}
@@ -161,7 +123,7 @@ func TestImageSaveAction(t *testing.T) {
 	if err := os.WriteFile(out, []byte("old"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res := actInvoke(t, f, NewImageSaveAction(), map[string]tftypes.Value{"images": actTfList("a:1", "b:2"), "path": actTfStr(out)})
+	res := actInvoke(t, f, NewImageSaveAction(), map[string]tftypes.Value{"images": actTfList("a:1", "b:2"), "output": actTfStr(out)})
 	if res.Diags.HasError() {
 		t.Fatal(res.errText())
 	}
@@ -171,7 +133,7 @@ func TestImageSaveAction(t *testing.T) {
 	if b, _ := os.ReadFile(out); string(b) != "SAVED" {
 		t.Errorf("file %q", b)
 	}
-	d := actValidate(t, NewImageSaveAction(), map[string]tftypes.Value{"images": tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, []tftypes.Value{}), "path": actTfStr(out)})
+	d := actValidate(t, NewImageSaveAction(), map[string]tftypes.Value{"images": tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, []tftypes.Value{}), "output": actTfStr(out)})
 	if d.ErrorsCount() != 1 {
 		t.Errorf("empty images: %v", d)
 	}
@@ -238,7 +200,7 @@ func TestSystemPruneActionSelective(t *testing.T) {
 		"containers":  actTfBool(false),
 		"networks":    actTfBool(false),
 		"volumes":     actTfBool(true),
-		"all_images":  actTfBool(true),
+		"all":         actTfBool(true),
 		"build_cache": actTfBool(false),
 		"filters":     actTfMap(map[string]string{"label": "env=test", "until": "1h"}),
 	})

@@ -11,10 +11,10 @@ resource "docker_registry_image" "app" {
   keep_remotely = true
   push_retries  = 5
   triggers = {
-    image_id = docker_image.app.image_id
+    image_id = docker_image.app.id
   }
 }
 
 output "app_digest" {
-  value = docker_registry_image.app.sha256_digest
+  value = docker_registry_image.app.image_digest_ref
 }

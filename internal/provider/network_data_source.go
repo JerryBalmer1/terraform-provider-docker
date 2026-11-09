@@ -31,11 +31,21 @@ type networkDataSourceModel struct {
 	Internal   types.Bool   `tfsdk:"internal"`
 	Attachable types.Bool   `tfsdk:"attachable"`
 	Ingress    types.Bool   `tfsdk:"ingress"`
-	IPv6       types.Bool   `tfsdk:"ipv6"`
+	EnableIPv6 types.Bool   `tfsdk:"enable_ipv6"`
 	IPAMDriver types.String `tfsdk:"ipam_driver"`
 	IPAMConfig types.List   `tfsdk:"ipam_config"`
 	Options    types.Map    `tfsdk:"options"`
 	Labels     types.Map    `tfsdk:"labels"`
+	Containers types.Map    `tfsdk:"containers"`
+	contractEngineNetworkData
+}
+
+var networkDataContainerAttrTypes = map[string]attr.Type{
+	"name":         types.StringType,
+	"endpoint_id":  types.StringType,
+	"mac_address":  types.StringType,
+	"ipv4_address": types.StringType,
+	"ipv6_address": types.StringType,
 }
 
 var networkDataIPAMAttrTypes = map[string]attr.Type{
@@ -51,8 +61,9 @@ func (d *networkDataSource) Metadata(_ context.Context, req datasource.MetadataR
 
 func (d *networkDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Looks up an existing Docker network (e.g. `bridge`, `host`, or one created outside Terraform) by name or ID.",
-		Attributes: map[string]schema.Attribute{
+		MarkdownDescription: "Looks up an existing Docker network (e.g. `bridge`, `host`, or one created outside Terraform) by name or ID (`GET /networks/{id}`). " +
+			"`containers` lists the containers attached on this daemon; `inspect` holds the whole response.",
+		Attributes: contractAddDataSourceAttributes(map[string]schema.Attribute{
 			"name":        schema.StringAttribute{Required: true, MarkdownDescription: "Network name, ID or unique ID prefix."},
 			"id":          schema.StringAttribute{Computed: true, MarkdownDescription: "Network ID."},
 			"driver":      schema.StringAttribute{Computed: true, MarkdownDescription: "Network driver."},
@@ -60,7 +71,7 @@ func (d *networkDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 			"internal":    schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether external access is restricted."},
 			"attachable":  schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether standalone containers can attach (overlay)."},
 			"ingress":     schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether this is the Swarm ingress network."},
-			"ipv6":        schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether IPv6 is enabled."},
+			"enable_ipv6": schema.BoolAttribute{Computed: true, MarkdownDescription: "Whether IPv6 is enabled (`EnableIPv6`)."},
 			"ipam_driver": schema.StringAttribute{Computed: true, MarkdownDescription: "IPAM driver."},
 			"ipam_config": schema.ListNestedAttribute{
 				Computed: true, MarkdownDescription: "IPAM pools, including daemon-assigned ones.",
@@ -73,7 +84,18 @@ func (d *networkDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 			},
 			"options": schema.MapAttribute{ElementType: types.StringType, Computed: true, MarkdownDescription: "Driver options."},
 			"labels":  schema.MapAttribute{ElementType: types.StringType, Computed: true, MarkdownDescription: "Network labels."},
-		},
+			"containers": schema.MapNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Containers attached to the network on this daemon, keyed by container ID (`Containers` in `GET /networks/{id}`).",
+				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+					"name":         schema.StringAttribute{Computed: true, MarkdownDescription: "Container name."},
+					"endpoint_id":  schema.StringAttribute{Computed: true, MarkdownDescription: "Endpoint ID of the attachment."},
+					"mac_address":  schema.StringAttribute{Computed: true, MarkdownDescription: "MAC address of the endpoint."},
+					"ipv4_address": schema.StringAttribute{Computed: true, MarkdownDescription: "IPv4 address with prefix length, e.g. `172.19.0.2/16`."},
+					"ipv6_address": schema.StringAttribute{Computed: true, MarkdownDescription: "IPv6 address with prefix length, empty without IPv6."},
+				}},
+			},
+		}, "engine:network-data"),
 	}
 }
 
@@ -100,12 +122,28 @@ func networkDataFromInspect(n network.Inspect, name types.String) networkDataSou
 		Internal:   types.BoolValue(n.Internal),
 		Attachable: types.BoolValue(n.Attachable),
 		Ingress:    types.BoolValue(n.Ingress),
-		IPv6:       types.BoolValue(n.EnableIPv6),
+		EnableIPv6: types.BoolValue(n.EnableIPv6),
 		IPAMDriver: types.StringValue(n.IPAM.Driver),
 		IPAMConfig: types.ListValueMust(types.ObjectType{AttrTypes: networkDataIPAMAttrTypes}, pools),
 		Options:    stringMapValue(n.Options, false),
 		Labels:     stringMapValue(n.Labels, false),
+		Containers: networkDataContainers(n.Containers),
 	}
+}
+
+// networkDataContainers maps the inspect Containers map.
+func networkDataContainers(in map[string]network.EndpointResource) types.Map {
+	vals := map[string]attr.Value{}
+	for id, e := range in {
+		vals[id] = types.ObjectValueMust(networkDataContainerAttrTypes, map[string]attr.Value{
+			"name":         types.StringValue(e.Name),
+			"endpoint_id":  types.StringValue(e.EndpointID),
+			"mac_address":  types.StringValue(e.MacAddress.String()),
+			"ipv4_address": types.StringValue(prefixString(e.IPv4Address)),
+			"ipv6_address": types.StringValue(prefixString(e.IPv6Address)),
+		})
+	}
+	return types.MapValueMust(types.ObjectType{AttrTypes: networkDataContainerAttrTypes}, vals)
 }
 
 func (d *networkDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -124,7 +162,7 @@ func (d *networkDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		resp.Diagnostics.AddError("Cannot inspect network", err.Error())
 		return
 	}
-	n := nRes.Network
-	state := networkDataFromInspect(n, cfg.Name)
+	state := networkDataFromInspect(nRes.Network, cfg.Name)
+	resp.Diagnostics.Append(state.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": nRes.Raw}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

@@ -48,7 +48,10 @@ func ctrP3Inspect(t *testing.T, s *terraform.State, addr string) (container.Insp
 	return res.Container, err
 }
 
-var ctrP3Ignore = []string{"wait", "wait_timeout", "must_run"}
+// ctrP3Ignore lists what import cannot verify: arguments that only steer
+// apply, logging (reported on import, unset in these configs) and the
+// inspect outputs (re-read at import time).
+var ctrP3Ignore = []string{"wait", "wait_timeout", "must_run", "logging", "inspect_json", "inspect", "content_sha256"}
 
 // TestAccContainerP3_capabilities: cap add/drop written in mixed spellings
 // (lower case, CAP_ prefix) round-trip without drift and import verifies
@@ -67,10 +70,8 @@ resource "docker_container" "c" {
   image   = "busybox:1.36"
   command = ["sleep", "3600"]
 
-  capabilities {
-    add  = ["NET_ADMIN", "cap_sys_time"]
-    drop = ["CAP_MKNOD"]
-  }
+  cap_add  = ["NET_ADMIN", "cap_sys_time"]
+  cap_drop = ["CAP_MKNOD"]
 }
 `, name),
 				Check: func(s *terraform.State) error {
@@ -102,20 +103,20 @@ resource "docker_container" "c" {
 				ResourceName:            "docker_container.c",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: append([]string{"capabilities.add"}, ctrP3Ignore...),
+				ImportStateVerifyIgnore: append([]string{"cap_add"}, ctrP3Ignore...),
 				ImportStateCheck: func(is []*terraform.InstanceState) error {
 					if len(is) != 1 {
 						return fmt.Errorf("%d instances imported", len(is))
 					}
 					var got []string
 					for k, v := range is[0].Attributes {
-						if strings.HasPrefix(k, "capabilities.add.") && k != "capabilities.add.#" {
+						if strings.HasPrefix(k, "cap_add.") && k != "cap_add.#" {
 							got = append(got, strings.TrimPrefix(strings.ToUpper(v), "CAP_"))
 						}
 					}
 					sort.Strings(got)
 					if strings.Join(got, ",") != "NET_ADMIN,SYS_TIME" {
-						return fmt.Errorf("imported capabilities.add %v", got)
+						return fmt.Errorf("imported cap_add %v", got)
 					}
 					return nil
 				},
@@ -271,13 +272,13 @@ resource "docker_container" "c" {
   read_only    = true
 
   devices {
-    host_path      = "/dev/null"
-    container_path = "/dev/tfacc-null"
-    permissions    = "rw"
+    path_on_host       = "/dev/null"
+    path_in_container  = "/dev/tfacc-null"
+    cgroup_permissions = "rw"
   }
 
   devices {
-    host_path = "/dev/zero"
+    path_on_host = "/dev/zero"
   }
 
   mounts {
@@ -392,7 +393,7 @@ resource "docker_container" "c" {
 	})
 }
 
-// TestAccContainerP3_ipv6Address: networks_advanced.ipv6_address on an
+// TestAccContainerP3_ipv6Address: networks[*].ipv6_address on an
 // IPv6-enabled bridge network (Pass 2 P2-C IPv6 static address). Skips when
 // the daemon cannot create an IPv6 network.
 func TestAccContainerP3_ipv6Address(t *testing.T) {
@@ -415,7 +416,7 @@ func TestAccContainerP3_ipv6Address(t *testing.T) {
 				Config: fmt.Sprintf(`
 resource "docker_network" "v6" {
   name = "%[1]s-net"
-  ipv6 = true
+  enable_ipv6 = true
 
   ipam_config {
     subnet = "10.77.0.0/24"
@@ -431,10 +432,11 @@ resource "docker_container" "c" {
   image   = "busybox:1.36"
   command = ["sleep", "3600"]
 
-  networks_advanced {
-    name         = docker_network.v6.name
-    ipv4_address = "10.77.0.10"
-    ipv6_address = "fd00:77::10"
+  networks = {
+    (docker_network.v6.name) = {
+      ipv4_address = "10.77.0.10"
+      ipv6_address = "fd00:77::10"
+    }
   }
 }
 `, name),

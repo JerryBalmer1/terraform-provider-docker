@@ -123,13 +123,13 @@ func TestImagePlanContextDigest(t *testing.T) {
 func TestImageApplyInspect(t *testing.T) {
 	m := imageResourceModel{Name: types.StringNull(), KeepLocally: types.BoolNull(), ForceRemove: types.BoolNull()}
 	imgApplyInspect(&m, image.InspectResponse{ID: "sha256:1", RepoTags: []string{"nginx:1"}, RepoDigests: []string{"nginx@sha256:2"}})
-	if m.ID.ValueString() != "sha256:1" || m.ImageID.ValueString() != "sha256:1" || m.Name.ValueString() != "nginx:1" ||
-		m.RepoDigest.ValueString() != "nginx@sha256:2" || m.KeepLocally.ValueBool() || m.KeepLocally.IsNull() {
+	if m.ID.ValueString() != "sha256:1" || m.Name.ValueString() != "nginx:1" || m.ImageRef.ValueString() != "docker.io/library/nginx:1" ||
+		m.ImageDigestRef.ValueString() != "nginx@sha256:2" || m.Digest.ValueString() != "sha256:2" || m.KeepLocally.ValueBool() || m.KeepLocally.IsNull() {
 		t.Errorf("model: %+v", m)
 	}
 	m2 := imageResourceModel{Name: types.StringValue("app:dev")}
 	imgApplyInspect(&m2, image.InspectResponse{ID: "sha256:9"})
-	if m2.Name.ValueString() != "app:dev" || !m2.RepoDigest.IsNull() {
+	if m2.Name.ValueString() != "app:dev" || !m2.ImageDigestRef.IsNull() || !m2.Digest.IsNull() {
 		t.Errorf("built image: %+v", m2)
 	}
 }
@@ -137,7 +137,7 @@ func TestImageApplyInspect(t *testing.T) {
 func TestImageDataSourceApply(t *testing.T) {
 	m := imageDataSourceModel{Name: types.StringValue("nginx")}
 	imgDataSourceApply(&m, image.InspectResponse{ID: "sha256:1", RepoTags: []string{"nginx:latest"}})
-	if m.ID.ValueString() != "sha256:1" || len(m.RepoTags.Elements()) != 1 || m.Labels.IsNull() || !m.RepoDigest.IsNull() {
+	if m.ID.ValueString() != "sha256:1" || len(m.RepoTags.Elements()) != 1 || m.Labels.IsNull() || !m.ImageDigestRef.IsNull() {
 		t.Errorf("model: %+v", m)
 	}
 }
@@ -238,7 +238,7 @@ func testAccImageCheckDestroy(t *testing.T) resource.TestCheckFunc {
 				continue
 			}
 			name := rs.Primary.Attributes["name"]
-			if insp, err := c.ImageInspect(context.Background(), name); err == nil && insp.ID == rs.Primary.Attributes["image_id"] {
+			if insp, err := c.ImageInspect(context.Background(), name); err == nil && insp.ID == rs.Primary.Attributes["id"] {
 				return fmt.Errorf("image %s still present", name)
 			} else if err != nil && !isNotFound(err) {
 				return err
@@ -264,11 +264,11 @@ data "docker_image" "alpine" {
 }
 `,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestMatchResourceAttr("docker_image.alpine", "image_id", imgTestSHA),
-					resource.TestCheckResourceAttrPair("docker_image.alpine", "id", "docker_image.alpine", "image_id"),
-					resource.TestCheckResourceAttrSet("docker_image.alpine", "repo_digest"),
+					resource.TestMatchResourceAttr("docker_image.alpine", "id", imgTestSHA),
+					resource.TestCheckResourceAttrSet("docker_image.alpine", "image_digest_ref"),
+					resource.TestCheckResourceAttrSet("docker_image.alpine", "inspect_json_sha256"),
 					resource.TestCheckNoResourceAttr("docker_image.alpine", "context_digest"),
-					resource.TestCheckResourceAttrPair("data.docker_image.alpine", "image_id", "docker_image.alpine", "image_id"),
+					resource.TestCheckResourceAttrPair("data.docker_image.alpine", "id", "docker_image.alpine", "id"),
 				),
 			},
 			{
@@ -301,7 +301,7 @@ resource "docker_image" "app" {
   }
 }
 data "docker_image" "app" {
-  name = docker_image.app.image_id
+  name = docker_image.app.id
 }
 `, filepath.ToSlash(dir))
 	var firstID string
@@ -312,12 +312,12 @@ data "docker_image" "app" {
 			{
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestMatchResourceAttr("docker_image.app", "image_id", imgTestSHA),
+					resource.TestMatchResourceAttr("docker_image.app", "id", imgTestSHA),
 					resource.TestMatchResourceAttr("docker_image.app", "context_digest", imgTestSHA),
 					resource.TestCheckResourceAttr("data.docker_image.app", "labels.tfacc", "1"),
 					resource.TestCheckResourceAttr("data.docker_image.app", "labels."+labelManagedBy, labelManagedByValue),
 					func(s *terraform.State) error {
-						firstID = s.RootModule().Resources["docker_image.app"].Primary.Attributes["image_id"]
+						firstID = s.RootModule().Resources["docker_image.app"].Primary.Attributes["id"]
 						return nil
 					},
 				),
@@ -327,7 +327,7 @@ data "docker_image" "app" {
 				PreConfig: func() { imgTestWrite(t, dir, map[string]string{"hello.txt": "v2"}) },
 				Config:    cfg,
 				Check: func(s *terraform.State) error {
-					if id := s.RootModule().Resources["docker_image.app"].Primary.Attributes["image_id"]; id == firstID {
+					if id := s.RootModule().Resources["docker_image.app"].Primary.Attributes["id"]; id == firstID {
 						return fmt.Errorf("image not rebuilt after context edit (%s)", id)
 					}
 					return nil

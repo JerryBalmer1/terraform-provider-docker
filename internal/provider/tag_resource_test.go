@@ -129,7 +129,9 @@ func TestTagResourceFakeEngine(t *testing.T) {
 	r.Schema(ctx, resource.SchemaRequest{}, &sr)
 
 	plan := tagResourceModel{ID: types.StringUnknown(), SourceImage: types.StringValue("app:1"),
-		TargetImage: types.StringValue("registry.local:5000/app:prod"), SourceImageID: types.StringUnknown()}
+		TargetImage: types.StringValue("registry.local:5000/app:prod"), SourceImageID: types.StringUnknown(),
+		ImageRef: types.StringUnknown(), RepoDigests: types.ListUnknown(types.StringType), Triggers: types.MapNull(types.StringType)}
+	plan.contractSetUnknown()
 	cresp := resource.CreateResponse{State: tfState(t, sr, nil)}
 	r.Create(ctx, resource.CreateRequest{Plan: tfPlan(t, sr, plan)}, &cresp)
 	if cresp.Diagnostics.HasError() {
@@ -137,7 +139,8 @@ func TestTagResourceFakeEngine(t *testing.T) {
 	}
 	var st tagResourceModel
 	cresp.State.Get(ctx, &st)
-	if st.SourceImageID.ValueString() != "sha256:a" || st.ID.ValueString() != "sha256:a.registry.local:5000/app:prod" ||
+	if st.SourceImageID.ValueString() != "sha256:a" || st.ID.ValueString() != "sha256:a" ||
+		st.ImageRef.ValueString() != "registry.local:5000/app:prod" || st.InspectJSON.IsNull() || st.ContentSHA256.IsNull() ||
 		f.tags["registry.local:5000/app:prod"] != "sha256:a" {
 		t.Fatalf("after create: state=%+v tags=%v", st, f.tags)
 	}
@@ -174,7 +177,9 @@ func TestTagResourceFakeEngine(t *testing.T) {
 	// Source given by ID and the target is the image's only tag: kept with a warning.
 	f.removed = nil
 	only := tagResourceModel{ID: types.StringValue("x"), SourceImage: types.StringValue("sha256:c"),
-		TargetImage: types.StringValue("solo:1"), SourceImageID: types.StringValue("sha256:c")}
+		TargetImage: types.StringValue("solo:1"), SourceImageID: types.StringValue("sha256:c"),
+		ImageRef: types.StringNull(), RepoDigests: types.ListNull(types.StringType), Triggers: types.MapNull(types.StringType)}
+	only.contractSetNull()
 	f.tags["solo:1"] = "sha256:c"
 	dresp = resource.DeleteResponse{State: tfState(t, sr, &only)}
 	r.Delete(ctx, resource.DeleteRequest{State: tfState(t, sr, &only)}, &dresp)
@@ -266,7 +271,7 @@ resource "docker_tag" "t" {
 }
 `, target),
 			Check: tfresource.ComposeAggregateTestCheckFunc(
-				tfresource.TestCheckResourceAttrPair("docker_tag.t", "source_image_id", "docker_image.src", "image_id"),
+				tfresource.TestCheckResourceAttrPair("docker_tag.t", "source_image_id", "docker_image.src", "id"),
 			),
 		}},
 	})

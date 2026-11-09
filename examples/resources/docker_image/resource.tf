@@ -11,7 +11,7 @@ data "docker_registry_image" "redis" {
 
 resource "docker_image" "redis" {
   name     = data.docker_registry_image.redis.name
-  triggers = { digest = data.docker_registry_image.redis.sha256_digest }
+  triggers = { digest = data.docker_registry_image.redis.digest }
 }
 
 # Build from a local context. Editing any file in ./app that .dockerignore
@@ -31,6 +31,37 @@ resource "docker_image" "app" {
       "org.opencontainers.image.source" = "https://github.com/example/app"
     }
     pull = true
+
+    # Classic-builder resource limits and extra tags.
+    memory      = 2147483648
+    shm_size    = 268435456
+    network     = "host"
+    tags        = ["registry.example.com/team/app:latest"]
+    extra_hosts = ["internal.example.com:10.0.0.5"]
+    ulimits = {
+      nofile = { soft = 65536, hard = 65536 }
+    }
+  }
+}
+
+# Hand-off values: the digest reference for a pinned deployment, the image ID
+# and the stages the Dockerfile declares.
+output "app_image" {
+  value = {
+    id     = docker_image.app.id
+    ref    = docker_image.app.image_ref
+    pinned = docker_image.app.image_digest_ref
+    stages = [for s in docker_image.app.stages : s.name]
+  }
+}
+
+# Build from a Git repository the daemon fetches (classic builder only).
+resource "docker_image" "remote" {
+  name = "example/hello:git"
+
+  build {
+    remote     = "https://github.com/docker-library/hello-world.git#master:amd64/hello-world"
+    dockerfile = "Dockerfile"
   }
 }
 
@@ -52,6 +83,11 @@ resource "docker_image" "web" {
     }
 
     platforms = ["linux/arm64"]
+
+    # Export cache and attach attestations.
+    cache_to   = ["type=inline"]
+    provenance = "min"
+    sbom       = true
 
     secrets {
       id  = "npm_token"

@@ -42,18 +42,20 @@ type networkIPAMConfigModel struct {
 }
 
 type networkResourceModel struct {
-	ID         types.String             `tfsdk:"id"`
-	Name       types.String             `tfsdk:"name"`
-	Driver     types.String             `tfsdk:"driver"`
-	Attachable types.Bool               `tfsdk:"attachable"`
-	Internal   types.Bool               `tfsdk:"internal"`
-	IPv6       types.Bool               `tfsdk:"ipv6"`
-	Ingress    types.Bool               `tfsdk:"ingress"`
-	IPAMDriver types.String             `tfsdk:"ipam_driver"`
-	IPAMConfig []networkIPAMConfigModel `tfsdk:"ipam_config"`
-	Options    types.Map                `tfsdk:"options"`
-	Labels     types.Map                `tfsdk:"labels"`
-	Scope      types.String             `tfsdk:"scope"`
+	ID          types.String             `tfsdk:"id"`
+	Name        types.String             `tfsdk:"name"`
+	Driver      types.String             `tfsdk:"driver"`
+	Attachable  types.Bool               `tfsdk:"attachable"`
+	Internal    types.Bool               `tfsdk:"internal"`
+	EnableIPv6  types.Bool               `tfsdk:"enable_ipv6"`
+	Ingress     types.Bool               `tfsdk:"ingress"`
+	IPAMDriver  types.String             `tfsdk:"ipam_driver"`
+	IPAMConfig  []networkIPAMConfigModel `tfsdk:"ipam_config"`
+	IPAMOptions types.Map                `tfsdk:"ipam_options"`
+	Options     types.Map                `tfsdk:"options"`
+	Labels      types.Map                `tfsdk:"labels"`
+	Scope       types.String             `tfsdk:"scope"`
+	contractEngineNetwork
 }
 
 func (r *networkResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -67,7 +69,7 @@ func (r *networkResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 		MarkdownDescription: "A Docker network (`NetworkCreate`): a local `bridge`/`macvlan`/`ipvlan` network, or a Swarm-scoped `overlay` " +
 			"network when the daemon is a Swarm manager. Docker networks cannot be changed after creation, so every argument forces " +
 			"a new network. Import by network name or ID.",
-		Attributes: map[string]schema.Attribute{
+		Attributes: contractAddResourceAttributes(map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true, MarkdownDescription: "Network ID.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -92,9 +94,9 @@ func (r *networkResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				MarkdownDescription: "Restrict external access to the network. Changing this forces a new resource.",
 				PlanModifiers:       rrBool,
 			},
-			"ipv6": schema.BoolAttribute{
+			"enable_ipv6": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				MarkdownDescription: "Enable IPv6. Changing this forces a new resource.",
+				MarkdownDescription: "Enable IPv6 on the network (`EnableIPv6`). Changing this forces a new resource.",
 				PlanModifiers:       rrBool,
 			},
 			"ingress": schema.BoolAttribute{
@@ -106,6 +108,11 @@ func (r *networkResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Optional: true, Computed: true, Default: stringdefault.StaticString("default"),
 				MarkdownDescription: "IPAM driver. Default `default`. Changing this forces a new resource.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"ipam_options": schema.MapAttribute{
+				ElementType: types.StringType, Optional: true,
+				MarkdownDescription: "IPAM driver options (`IPAM.Options`), e.g. for a third-party IPAM plugin. Changing this forces a new resource.",
+				PlanModifiers:       rrMap,
 			},
 			"options": schema.MapAttribute{
 				ElementType: types.StringType, Optional: true,
@@ -122,12 +129,16 @@ func (r *networkResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Computed: true, MarkdownDescription: "`local` or `swarm`, as reported by the daemon.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-		},
+		}, "engine:network"),
 		Blocks: map[string]schema.Block{
 			"ipam_config": schema.ListNestedBlock{
 				MarkdownDescription: "Static IPAM pools. Without this block the daemon assigns a subnet itself (not reported in state). " +
-					"Changing this forces a new resource.",
-				PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplace()},
+					"Forces replacement when a configured value differs from the network's: a missing block, or an argument left unset in a " +
+					"pool, accepts what the network already has (e.g. the daemon-assigned pool a kreuzwerker/docker state records) and only " +
+					"drops it from state.",
+				PlanModifiers: []planmodifier.List{listplanmodifier.RequiresReplaceIf(networkIPAMRequiresReplace,
+					"Forces replacement when a configured IPAM value differs from the network's.",
+					"Forces replacement when a configured IPAM value differs from the network's.")},
 				NestedObject: schema.NestedBlockObject{Attributes: map[string]schema.Attribute{
 					"subnet":   schema.StringAttribute{Optional: true, MarkdownDescription: "Subnet in CIDR form, e.g. `10.20.0.0/24`."},
 					"ip_range": schema.StringAttribute{Optional: true, MarkdownDescription: "Sub-range to allocate container IPs from."},
@@ -139,6 +150,38 @@ func (r *networkResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				}},
 			},
 		},
+	}
+}
+
+// networkIPAMRequiresReplace: the pools in state are the network's (after
+// a create, the configured ones; after an import or a move from
+// kreuzwerker/docker, every pool the daemon reports, gateway included). A
+// config without ipam_config, or a pool argument left unset, means "the
+// daemon's choice", which the existing network satisfies; only a configured
+// value that differs, or a different number of configured pools, needs a
+// new network.
+func networkIPAMRequiresReplace(ctx context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
+	if req.StateValue.IsNull() || req.ConfigValue.IsUnknown() || len(req.ConfigValue.Elements()) == 0 {
+		return
+	}
+	var cfg, state []networkIPAMConfigModel
+	resp.Diagnostics.Append(req.ConfigValue.ElementsAs(ctx, &cfg, false)...)
+	resp.Diagnostics.Append(req.StateValue.ElementsAs(ctx, &state, false)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if len(cfg) != len(state) {
+		resp.RequiresReplace = true
+		return
+	}
+	differs := func(c, s types.String) bool { return !c.IsNull() && (c.IsUnknown() || !c.Equal(s)) }
+	for i := range cfg {
+		c, st := cfg[i], state[i]
+		if differs(c.Subnet, st.Subnet) || differs(c.IPRange, st.IPRange) || differs(c.Gateway, st.Gateway) ||
+			(!c.AuxAddress.IsNull() && (c.AuxAddress.IsUnknown() || !c.AuxAddress.Equal(st.AuxAddress))) {
+			resp.RequiresReplace = true
+			return
+		}
 	}
 }
 
@@ -224,7 +267,7 @@ func networkFromInspect(n network.Inspect, prior networkResourceModel) networkRe
 	}
 	out.Attachable = types.BoolValue(n.Attachable)
 	out.Internal = types.BoolValue(n.Internal)
-	out.IPv6 = types.BoolValue(n.EnableIPv6)
+	out.EnableIPv6 = types.BoolValue(n.EnableIPv6)
 	out.Ingress = types.BoolValue(n.Ingress)
 	ipamDriver := n.IPAM.Driver
 	if ipamDriver == "" {
@@ -232,6 +275,7 @@ func networkFromInspect(n network.Inspect, prior networkResourceModel) networkRe
 	}
 	out.IPAMDriver = types.StringValue(ipamDriver)
 	out.IPAMConfig = networkFlattenIPAM(n.IPAM.Config, prior.IPAMConfig, importing)
+	out.IPAMOptions = containerMapValue(prior.IPAMOptions, n.IPAM.Options)
 	opts := n.Options
 	if !importing {
 		opts = containerSubtractDefaults(n.Options, nil, containerMapKeys(prior.Options), true)
@@ -257,7 +301,8 @@ func (r *networkResource) Create(ctx context.Context, req resource.CreateRequest
 		resp.Diagnostics.AddAttributeError(path.Root("ipam_config"), "Invalid ipam_config", err.Error())
 		return
 	}
-	ipv6 := plan.IPv6.ValueBool()
+	ipam.Options = stringMapFrom(ctx, plan.IPAMOptions, &resp.Diagnostics)
+	ipv6 := plan.EnableIPv6.ValueBool()
 	opts := client.NetworkCreateOptions{
 		Driver:     plan.Driver.ValueString(),
 		Attachable: plan.Attachable.ValueBool(),
@@ -279,13 +324,14 @@ func (r *networkResource) Create(ctx context.Context, req resource.CreateRequest
 	plan.ID = types.StringValue(created.ID)
 	nRes, err := r.pd.Client.NetworkInspect(ctx, created.ID, client.NetworkInspectOptions{})
 	if err != nil {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), plan.ID)...)
+		plan.contractSetNull()
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 		resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, created.ID)...)
 		resp.Diagnostics.AddError("Cannot inspect network", err.Error())
 		return
 	}
-	n := nRes.Network
-	state := networkFromInspect(n, plan)
+	state := networkFromInspect(nRes.Network, plan)
+	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": nRes.Raw}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
@@ -307,17 +353,26 @@ func (r *networkResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 	state := networkFromInspect(n, prior)
+	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": nRes.Raw}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
-// Update is only reached for no-op plans: every argument forces replacement.
+// Update is only reached for no-op plans (every argument forces
+// replacement); it re-reads the network so the contract outputs are known.
 func (r *networkResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan networkResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
+	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
+	nRes, err := r.pd.Client.NetworkInspect(ctx, plan.ID.ValueString(), client.NetworkInspectOptions{})
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot inspect network", err.Error())
+		return
+	}
+	plan = networkFromInspect(nRes.Network, plan)
+	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": nRes.Raw}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }

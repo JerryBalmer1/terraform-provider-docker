@@ -194,7 +194,7 @@ resource "docker_registry_image" "app" {
   name          = docker_image.app.name
   keep_remotely = false
   push_retries  = 1
-  triggers      = { image = docker_image.app.image_id }
+  triggers      = { image = docker_image.app.id }
 }
 data "docker_registry_image" "app" {
   name       = docker_registry_image.app.name
@@ -207,8 +207,8 @@ data "docker_registry_image" "app" {
 			{
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestMatchResourceAttr("docker_registry_image.app", "sha256_digest", imgTestSHA),
-					resource.TestCheckResourceAttrPair("data.docker_registry_image.app", "sha256_digest", "docker_registry_image.app", "sha256_digest"),
+					resource.TestMatchResourceAttr("docker_registry_image.app", "digest", imgTestSHA),
+					resource.TestCheckResourceAttrPair("data.docker_registry_image.app", "digest", "docker_registry_image.app", "digest"),
 				),
 			},
 			{

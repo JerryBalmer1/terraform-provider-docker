@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -123,4 +126,50 @@ resource "docker_network" "test" {
 			},
 		},
 	})
+}
+
+// TestNetworkIPAMRequiresReplace: a missing ipam_config block or an unset
+// pool argument accepts the network's pools (a moved kreuzwerker state
+// records the daemon-assigned pool and gateway); a configured value that
+// differs forces replacement.
+func TestNetworkIPAMRequiresReplace(t *testing.T) {
+	ctx := context.Background()
+	objType := types.ObjectType{AttrTypes: map[string]attr.Type{
+		"subnet": types.StringType, "ip_range": types.StringType, "gateway": types.StringType, "aux_address": types.MapType{ElemType: types.StringType},
+	}}
+	pool := func(subnet, gateway string) attr.Value {
+		s, g := types.StringNull(), types.StringNull()
+		if subnet != "" {
+			s = types.StringValue(subnet)
+		}
+		if gateway != "" {
+			g = types.StringValue(gateway)
+		}
+		return types.ObjectValueMust(objType.AttrTypes, map[string]attr.Value{
+			"subnet": s, "ip_range": types.StringNull(), "gateway": g, "aux_address": types.MapNull(types.StringType),
+		})
+	}
+	list := func(vs ...attr.Value) types.List { return types.ListValueMust(objType, vs) }
+	state := list(pool("172.20.0.0/16", "172.20.0.1"))
+	for name, tc := range map[string]struct {
+		cfg  types.List
+		want bool
+	}{
+		"no block":      {list(), false},
+		"null block":    {types.ListNull(objType), false},
+		"subnet only":   {list(pool("172.20.0.0/16", "")), false},
+		"same pool":     {list(pool("172.20.0.0/16", "172.20.0.1")), false},
+		"other subnet":  {list(pool("10.1.0.0/24", "")), true},
+		"other gateway": {list(pool("172.20.0.0/16", "172.20.0.9")), true},
+		"one more pool": {list(pool("172.20.0.0/16", ""), pool("10.1.0.0/24", "")), true},
+	} {
+		var resp listplanmodifier.RequiresReplaceIfFuncResponse
+		networkIPAMRequiresReplace(ctx, planmodifier.ListRequest{ConfigValue: tc.cfg, StateValue: state, PlanValue: tc.cfg}, &resp)
+		if resp.Diagnostics.HasError() {
+			t.Fatalf("%s: %v", name, resp.Diagnostics)
+		}
+		if resp.RequiresReplace != tc.want {
+			t.Errorf("%s: RequiresReplace = %v, want %v", name, resp.RequiresReplace, tc.want)
+		}
+	}
 }

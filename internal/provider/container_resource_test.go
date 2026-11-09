@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
@@ -23,30 +24,33 @@ func TestContainerBuildCreate(t *testing.T) {
 		Entrypoint: types.ListNull(types.StringType),
 		Env:        stringMapValue(map[string]string{"A": "1"}, false),
 		Labels:     stringMapValue(map[string]string{"team": "web"}, false),
-		Ports:      []containerPortModel{{Internal: types.Int64Value(80), External: types.Int64Value(8080), Protocol: types.StringValue("tcp")}},
-		NetworksAdvanced: []containerNetworkModel{
-			{Name: types.StringValue("front"), Aliases: stringSetValue([]string{"www"}, false), IPv4Address: types.StringValue("10.0.0.9")},
-			{Name: types.StringValue("back"), Aliases: types.SetNull(types.StringType), IPv4Address: types.StringNull()},
-		},
-		Restart:       types.StringValue("on-failure"),
-		MaxRetryCount: types.Int64Value(4),
+		Ports:      []containerPortModel{{ContainerPort: types.Int64Value(80), HostPort: types.Int64Value(8080), Protocol: types.StringValue("tcp")}},
+		Networks: types.MapValueMust(types.ObjectType{AttrTypes: ctrNetworkAttrTypes}, map[string]attr.Value{
+			"front": ctrNetworkObject(t, func() ctrNetworkModel {
+				n := ctrNullNetwork()
+				n.Aliases, n.IPv4Address = stringSetValue([]string{"www"}, false), types.StringValue("10.0.0.9")
+				return n
+			}()),
+			"back": ctrNetworkObject(t, ctrNullNetwork()),
+		}),
+		Restart:           types.StringValue("on-failure"),
+		MaximumRetryCount: types.Int64Value(4),
 		Healthcheck: &containerHealthcheckModel{
 			Test: stringListValue([]string{"CMD", "true"}, false), Interval: types.StringValue("10s"),
 			Timeout: types.StringNull(), StartPeriod: types.StringNull(), Retries: types.Int64Null(),
 		},
-		Capabilities: &containerCapabilitiesModel{Add: stringSetValue([]string{"NET_ADMIN"}, false), Drop: types.SetNull(types.StringType)},
-		Privileged:   types.BoolValue(false),
-		User:         types.StringNull(),
-		WorkingDir:   types.StringValue("/app"),
-		LogDriver:    types.StringUnknown(),
-		LogOpts:      types.MapUnknown(types.StringType),
-		Memory:       types.Int64Value(64 << 20),
-		MemorySwap:   types.Int64Unknown(),
-		CPUShares:    types.Int64Null(),
-		NanoCPUs:     types.Int64Value(500000000),
+		CapAdd:     stringSetValue([]string{"NET_ADMIN"}, false),
+		CapDrop:    types.SetNull(types.StringType),
+		Privileged: types.BoolValue(false),
+		User:       types.StringNull(),
+		WorkingDir: types.StringValue("/app"),
+		Memory:     types.Int64Value(64 << 20),
+		MemorySwap: types.Int64Unknown(),
+		CPUShares:  types.Int64Null(),
+		NanoCPUs:   types.Int64Value(500000000),
 	}
 	var diags diag.Diagnostics
-	cfg, hc, netCfg, extra := containerBuildCreate(ctx, m, &diags)
+	cfg, hc, netCfg := containerBuildCreate(ctx, m, &diags)
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
@@ -65,9 +69,10 @@ func TestContainerBuildCreate(t *testing.T) {
 	if hc.Memory != 64<<20 || hc.MemorySwap != 0 || hc.NanoCPUs != 500000000 || hc.LogConfig.Type != "" {
 		t.Errorf("resources/log: mem=%d swap=%d nano=%d log=%q", hc.Memory, hc.MemorySwap, hc.NanoCPUs, hc.LogConfig.Type)
 	}
-	if string(hc.NetworkMode) != "front" || addrString(netCfg.EndpointsConfig["front"].IPAMConfig.IPv4Address) != "10.0.0.9" ||
-		netCfg.EndpointsConfig["front"].Aliases[0] != "www" || len(extra) != 1 || extra[0].Name.ValueString() != "back" {
-		t.Errorf("networks: mode=%s cfg=%+v extra=%+v", hc.NetworkMode, netCfg, extra)
+	// Every endpoint is configured at create; NetworkMode is the first key.
+	if string(hc.NetworkMode) != "back" || addrString(netCfg.EndpointsConfig["front"].IPAMConfig.IPv4Address) != "10.0.0.9" ||
+		netCfg.EndpointsConfig["front"].Aliases[0] != "www" || len(netCfg.EndpointsConfig) != 2 {
+		t.Errorf("networks: mode=%s cfg=%+v", hc.NetworkMode, netCfg)
 	}
 	if len(hc.CapAdd) != 1 || len(hc.PortBindings) != 1 || len(cfg.ExposedPorts) != 1 {
 		t.Errorf("caps/ports: %v %v %v", hc.CapAdd, hc.PortBindings, cfg.ExposedPorts)
@@ -105,7 +110,7 @@ resource "docker_container" "test" {
   memory  = %[3]d
 
   ports {
-    internal = 8080
+    container_port = 8080
   }
 
   mounts {
@@ -115,14 +120,15 @@ resource "docker_container" "test" {
   }
 
   mounts {
-    type       = "tmpfs"
-    target     = "/scratch"
-    tmpfs_size = 1048576
+    type   = "tmpfs"
+    target = "/scratch"
+    tmpfs_options {
+      size_bytes = 1048576
+    }
   }
 
-  networks_advanced {
-    name    = docker_network.n.name
-    aliases = ["app"]
+  networks = {
+    (docker_network.n.name) = { aliases = ["app"] }
   }
 
   healthcheck {
@@ -178,7 +184,7 @@ resource "docker_container" "test" {
 				ResourceName:            "docker_container.test",
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"wait", "wait_timeout", "healthcheck", "ulimits"},
+				ImportStateVerifyIgnore: append([]string{"healthcheck", "ulimits"}, ctrP3Ignore...),
 			},
 		},
 	})
@@ -209,29 +215,27 @@ resource "docker_container" "c" {
   name  = "plan"
   image = "nginx:1.27"
   ports {
-    internal = 80
+    container_port = 80
   }
   mounts {
     type   = "volume"
     source = docker_volume.v.name
     target = "/data"
   }
-  networks_advanced {
-    name = docker_network.n.name
+  networks = {
+    (docker_network.n.name) = {}
   }
   healthcheck {
     test = ["CMD", "true"]
   }
-  capabilities {
-    add = ["NET_ADMIN"]
-  }
+  cap_add = ["NET_ADMIN"]
   ulimits {
     name = "nofile"
     soft = 1
     hard = 2
   }
   devices {
-    host_path = "/dev/fuse"
+    path_on_host = "/dev/fuse"
   }
   hostname     = "plan"
   dns          = ["1.1.1.1"]

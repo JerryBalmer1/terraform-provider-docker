@@ -59,6 +59,7 @@ type pluginResourceModel struct {
 	EnableTimeout       types.Int64        `tfsdk:"enable_timeout"`
 	ForceDestroy        types.Bool         `tfsdk:"force_destroy"`
 	ForceDisable        types.Bool         `tfsdk:"force_disable"`
+	contractEnginePlugin
 }
 
 type pluginGrantModel struct {
@@ -78,8 +79,11 @@ func (r *pluginResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 		MarkdownDescription: "A managed Docker Engine plugin installed from a registry, like `docker plugin install`. " +
 			"The privileges the plugin asks for (`GET /plugins/privileges`) must be granted with `grant_all_permissions` or " +
 			"`grant_permissions` blocks, otherwise install fails and lists them. `enabled` and `env` change in place (the plugin is " +
-			"disabled for `PluginSet` and re-enabled); `name` and `alias` force a new resource. Import by plugin ID or name.",
-		Attributes: map[string]schema.Attribute{
+			"disabled for `PluginSet` and re-enabled). With `alias` set, a changed `name` upgrades the plugin in place " +
+			"(`docker plugin upgrade`: disable, `PluginUpgrade`, re-enable), keeping its local name and settings; without `alias`, a changed " +
+			"`name` forces a new resource, since the local name is derived from it. A changed `alias` always forces a new resource. " +
+			"Import by plugin ID or name.",
+		Attributes: contractAddResourceAttributes(map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true, MarkdownDescription: "Plugin ID.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -87,8 +91,10 @@ func (r *pluginResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"name": schema.StringAttribute{
 				Required: true,
 				MarkdownDescription: "Plugin reference to install from a registry, e.g. `vieux/sshfs:latest` or `ghcr.io/org/plugin:1.0` " +
-					"(`registry_auth` credentials apply). Changing this forces a new resource.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+					"(`registry_auth` credentials apply). With `alias` set, a change upgrades the plugin in place (`PluginUpgrade`); " +
+					"without `alias`, changing this forces replacement.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIf(pluginNameRequiresReplace,
+					"Forces replacement unless alias is set.", "Forces replacement unless `alias` is set.")},
 			},
 			"plugin_reference": schema.StringAttribute{
 				Computed: true, MarkdownDescription: "Fully qualified reference the daemon installed from, e.g. `docker.io/vieux/sshfs:latest`.",
@@ -124,9 +130,9 @@ func (r *pluginResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			},
 			"force_disable": schema.BoolAttribute{
 				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				MarkdownDescription: "Disable the plugin even while it is in use (`docker plugin disable -f`), for env updates and destroy. Default `false`.",
+				MarkdownDescription: "Disable the plugin even while it is in use (`docker plugin disable -f`), for env updates, upgrades and destroy. Default `false`.",
 			},
-		},
+		}, "engine:plugin"),
 		Blocks: map[string]schema.Block{
 			"grant_permissions": schema.SetNestedBlock{
 				MarkdownDescription: "Privileges to grant, one block per privilege name, e.g. `name = \"network\"`, `value = [\"host\"]`. " +
@@ -296,8 +302,8 @@ func (r *pluginResource) Create(ctx context.Context, req resource.CreateRequest,
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-// readInto refreshes m from PluginInspectWithRaw. It returns false when the
-// plugin is gone.
+// readInto refreshes m (and its contract outputs) from PluginInspect. It
+// returns false when the plugin is gone.
 func (r *pluginResource) readInto(ctx context.Context, m *pluginResourceModel, diags *diag.Diagnostics) bool {
 	pRes, err := r.pd.Client.PluginInspect(ctx, m.ID.ValueString(), client.PluginInspectOptions{})
 	p := pRes.Plugin
@@ -309,7 +315,36 @@ func (r *pluginResource) readInto(ctx context.Context, m *pluginResourceModel, d
 		return false
 	}
 	pluginApply(m, &p)
+	diags.Append(m.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": pRes.Raw}})...)
 	return true
+}
+
+// pluginNameRequiresReplace: a changed name upgrades in place only when the
+// local name is pinned by alias.
+func pluginNameRequiresReplace(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+	var alias types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("alias"), &alias)...)
+	resp.RequiresReplace = alias.IsNull()
+}
+
+// pluginUpgrade runs PluginUpgrade for a changed name. The plugin must be
+// disabled; the caller re-enables it.
+func (r *pluginResource) pluginUpgrade(ctx context.Context, id string, plan pluginResourceModel) error {
+	ref := plan.Name.ValueString()
+	auth, err := r.pd.registryAuthFor(ref)
+	if err != nil {
+		return err
+	}
+	rc, err := r.pd.Client.PluginUpgrade(ctx, id, client.PluginUpgradeOptions{
+		RemoteRef:             ref,
+		RegistryAuth:          auth,
+		AcceptAllPermissions:  plan.GrantAllPermissions.ValueBool(),
+		AcceptPermissionsFunc: pluginAcceptFunc(plan.GrantAllPermissions.ValueBool(), plan.GrantPermissions),
+	})
+	if err != nil {
+		return err
+	}
+	return pluginDrain(rc)
 }
 
 // pluginApply maps an inspected plugin onto m.
@@ -365,7 +400,22 @@ func (r *pluginResource) Update(ctx context.Context, req resource.UpdateRequest,
 	id := state.ID.ValueString()
 	plan.ID = state.ID
 	enabled := state.Enabled.ValueBool()
+	upgrade := plan.Name.ValueString() != state.Name.ValueString() && pluginFamiliar(plan.Name.ValueString()) != pluginFamiliar(state.Name.ValueString())
 	envChanged := containerKnown(plan.Env) && !plan.Env.Equal(state.Env)
+	if upgrade {
+		if enabled {
+			if _, err := r.pd.Client.PluginDisable(ctx, id, client.PluginDisableOptions{Force: plan.ForceDisable.ValueBool()}); err != nil {
+				resp.Diagnostics.AddError("Cannot disable plugin for upgrade", err.Error())
+				return
+			}
+			enabled = false
+		}
+		if err := r.pluginUpgrade(ctx, id, plan); err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root("name"), "Cannot upgrade plugin",
+				fmt.Sprintf("%s -> %s: %v (the plugin is left disabled)", state.Name.ValueString(), plan.Name.ValueString(), err))
+			return
+		}
+	}
 	if envChanged {
 		if enabled {
 			if _, err := r.pd.Client.PluginDisable(ctx, id, client.PluginDisableOptions{Force: plan.ForceDisable.ValueBool()}); err != nil {

@@ -36,8 +36,9 @@ func TestP3RegistryImageManifestsIndex(t *testing.T) {
 		  {"mediaType":%q,"digest":%q,"size":501,"platform":{"architecture":"arm64","os":"linux","variant":"v8"}}]}`,
 			p3MediaOCIIndex, p3MediaOCIManifest, dA, p3MediaOCIManifest, dB)
 	})
-	state, diags := p3eReadDS(t, NewP3RegistryImageManifestsDataSource(), p3eRegistryPD(reg.host()), map[string]tftypes.Value{
-		"name": p3eStr(reg.host() + "/org/app:1.0"),
+	state, diags := p3eReadDS(t, NewRegistryImageManifestsDataSource(), p3eRegistryPD(reg.host()), map[string]tftypes.Value{
+		"name":         p3eStr(reg.host() + "/org/app:1.0"),
+		"attestations": tftypes.NewValue(tftypes.Bool, false),
 	})
 	if diags.HasError() {
 		t.Fatal(diags)
@@ -73,7 +74,7 @@ func TestP3RegistryImageManifestsSingle(t *testing.T) {
 	reg.handle("/v2/library/solo/blobs/"+cfgDigest, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"architecture":"amd64","os":"windows","os.version":"10.0.20348.1"}`))
 	})
-	state, diags := p3eReadDS(t, NewP3RegistryImageManifestsDataSource(), p3eRegistryPD(reg.host()), map[string]tftypes.Value{
+	state, diags := p3eReadDS(t, NewRegistryImageManifestsDataSource(), p3eRegistryPD(reg.host()), map[string]tftypes.Value{
 		"name": p3eStr(reg.host() + "/library/solo"),
 	})
 	if diags.HasError() {
@@ -89,10 +90,10 @@ func TestP3RegistryImageManifestsSingle(t *testing.T) {
 
 func TestP3RegistryImageManifestsNotFound(t *testing.T) {
 	reg := newP3eFakeRegistry(t, "none")
-	_, diags := p3eReadDS(t, NewP3RegistryImageManifestsDataSource(), &providerData{}, map[string]tftypes.Value{
+	_, diags := p3eReadDS(t, NewRegistryImageManifestsDataSource(), &providerData{}, map[string]tftypes.Value{
 		"name": p3eStr(reg.host() + "/nope:1"),
 	})
-	if !diags.HasError() || !strings.Contains(diags[0].Detail(), "404") {
+	if !diags.HasError() || !strings.Contains(diags[0].Detail(), "not found") {
 		t.Fatalf("diags = %v", diags)
 	}
 }
@@ -113,7 +114,7 @@ func TestP3RegistryImageTagsPaginated(t *testing.T) {
 			_, _ = w.Write([]byte(`{"name":"org/app","tags":["e"]}`))
 		}
 	})
-	state, diags := p3eReadDS(t, NewP3RegistryImageTagsDataSource(), p3eRegistryPD(reg.host()), map[string]tftypes.Value{
+	state, diags := p3eReadDS(t, NewRegistryImageTagsDataSource(), p3eRegistryPD(reg.host()), map[string]tftypes.Value{
 		"name":      p3eStr(reg.host() + "/org/app:ignored"),
 		"page_size": tftypes.NewValue(tftypes.Number, 2),
 	})

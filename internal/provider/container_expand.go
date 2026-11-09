@@ -20,6 +20,7 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,42 +34,60 @@ import (
 	"net/netip"
 )
 
+// containerPortModel is one ports block (PortBindings: the PortMap key's
+// port and protocol, PortBinding.HostIp / HostPort).
 type containerPortModel struct {
-	Internal types.Int64  `tfsdk:"internal"`
-	External types.Int64  `tfsdk:"external"`
-	IP       types.String `tfsdk:"ip"`
-	Protocol types.String `tfsdk:"protocol"`
+	ContainerPort types.Int64  `tfsdk:"container_port"`
+	HostPort      types.Int64  `tfsdk:"host_port"`
+	HostIP        types.String `tfsdk:"host_ip"`
+	Protocol      types.String `tfsdk:"protocol"`
 }
 
 type containerMountModel struct {
-	Type      types.String `tfsdk:"type"`
-	Source    types.String `tfsdk:"source"`
-	Target    types.String `tfsdk:"target"`
-	ReadOnly  types.Bool   `tfsdk:"read_only"`
-	TmpfsSize types.Int64  `tfsdk:"tmpfs_size"`
+	Type     types.String `tfsdk:"type"`
+	Source   types.String `tfsdk:"source"`
+	Target   types.String `tfsdk:"target"`
+	ReadOnly types.Bool   `tfsdk:"read_only"`
 	// SelinuxRelabel ("z" or "Z") sends the entry as a HostConfig.Binds
 	// string instead of a mount.Mount (container_upload.go).
-	SelinuxRelabel types.String `tfsdk:"selinux_relabel"`
+	SelinuxRelabel types.String           `tfsdk:"selinux_relabel"`
+	TmpfsOptions   *ctrTmpfsOptionsModel  `tfsdk:"tmpfs_options"`
+	BindOptions    *ctrBindOptionsModel   `tfsdk:"bind_options"`
+	VolumeOptions  *ctrVolumeOptionsModel `tfsdk:"volume_options"`
 }
 
-type containerNetworkModel struct {
-	Name        types.String `tfsdk:"name"`
-	Aliases     types.Set    `tfsdk:"aliases"`
-	IPv4Address types.String `tfsdk:"ipv4_address"`
-	IPv6Address types.String `tfsdk:"ipv6_address"`
+// ctrTmpfsOptionsModel is mounts.tmpfs_options (mount.TmpfsOptions).
+type ctrTmpfsOptionsModel struct {
+	SizeBytes types.Int64  `tfsdk:"size_bytes"`
+	Mode      types.String `tfsdk:"mode"`
+}
+
+// ctrBindOptionsModel is mounts.bind_options (mount.BindOptions).
+type ctrBindOptionsModel struct {
+	Propagation types.String `tfsdk:"propagation"`
+}
+
+// ctrVolumeOptionsModel is mounts.volume_options (mount.VolumeOptions).
+type ctrVolumeOptionsModel struct {
+	NoCopy       types.Bool            `tfsdk:"no_copy"`
+	Labels       types.Map             `tfsdk:"labels"`
+	Subpath      types.String          `tfsdk:"subpath"`
+	DriverConfig *ctrDriverConfigModel `tfsdk:"driver_config"`
+}
+
+// ctrDriverConfigModel is mounts.volume_options.driver_config (mount.Driver).
+type ctrDriverConfigModel struct {
+	Name    types.String `tfsdk:"name"`
+	Options types.Map    `tfsdk:"options"`
 }
 
 type containerHealthcheckModel struct {
-	Test        types.List   `tfsdk:"test"`
-	Interval    types.String `tfsdk:"interval"`
-	Timeout     types.String `tfsdk:"timeout"`
-	StartPeriod types.String `tfsdk:"start_period"`
-	Retries     types.Int64  `tfsdk:"retries"`
-}
-
-type containerCapabilitiesModel struct {
-	Add  types.Set `tfsdk:"add"`
-	Drop types.Set `tfsdk:"drop"`
+	Test          types.List   `tfsdk:"test"`
+	Interval      types.String `tfsdk:"interval"`
+	Timeout       types.String `tfsdk:"timeout"`
+	StartPeriod   types.String `tfsdk:"start_period"`
+	StartInterval types.String `tfsdk:"start_interval"`
+	Retries       types.Int64  `tfsdk:"retries"`
 }
 
 type containerUlimitModel struct {
@@ -254,9 +273,9 @@ func containerExpandPorts(ports []containerPortModel) (network.PortSet, network.
 	set := network.PortSet{}
 	pm := network.PortMap{}
 	for i, p := range ports {
-		internal, ok := knownInt64(p.Internal)
+		internal, ok := knownInt64(p.ContainerPort)
 		if !ok || internal < 1 || internal > 65535 {
-			return nil, nil, fmt.Errorf("ports[%d].internal must be 1-65535", i)
+			return nil, nil, fmt.Errorf("ports[%d].container_port must be 1-65535", i)
 		}
 		port, ok := network.PortFrom(uint16(internal), network.IPProtocol(containerPortProtocol(p)))
 		if !ok {
@@ -264,13 +283,13 @@ func containerExpandPorts(ports []containerPortModel) (network.PortSet, network.
 		}
 		set[port] = struct{}{}
 		b := network.PortBinding{}
-		if ext, ok := knownInt64(p.External); ok && ext > 0 {
+		if ext, ok := knownInt64(p.HostPort); ok && ext > 0 {
 			b.HostPort = strconv.FormatInt(ext, 10)
 		}
-		if ip, ok := knownString(p.IP); ok && ip != "" {
+		if ip, ok := knownString(p.HostIP); ok && ip != "" {
 			addr, err := netip.ParseAddr(ip)
 			if err != nil {
-				return nil, nil, fmt.Errorf("ports[%d].ip: %q is not an IP address", i, ip)
+				return nil, nil, fmt.Errorf("ports[%d].host_ip: %q is not an IP address", i, ip)
 			}
 			b.HostIP = addr
 		}
@@ -280,7 +299,7 @@ func containerExpandPorts(ports []containerPortModel) (network.PortSet, network.
 }
 
 func containerPortKey(p containerPortModel) string {
-	return fmt.Sprintf("%05d/%s/%s/%d", p.Internal.ValueInt64(), containerPortProtocol(p), p.IP.ValueString(), p.External.ValueInt64())
+	return fmt.Sprintf("%05d/%s/%s/%d", p.ContainerPort.ValueInt64(), containerPortProtocol(p), p.HostIP.ValueString(), p.HostPort.ValueInt64())
 }
 
 // containerFlattenPorts maps HostConfig.PortBindings back to blocks, ordered
@@ -293,14 +312,14 @@ func containerFlattenPorts(pm network.PortMap, prior []containerPortModel) []con
 		}
 		for _, b := range bindings {
 			m := containerPortModel{
-				Internal: types.Int64Value(int64(port.Num())),
-				External: types.Int64Null(),
-				IP:       stringOrNull(addrString(b.HostIP)),
-				Protocol: types.StringValue(string(port.Proto())),
+				ContainerPort: types.Int64Value(int64(port.Num())),
+				HostPort:      types.Int64Null(),
+				HostIP:        stringOrNull(addrString(b.HostIP)),
+				Protocol:      types.StringValue(string(port.Proto())),
 			}
 			if b.HostPort != "" {
 				if n, err := strconv.ParseInt(b.HostPort, 10, 64); err == nil {
-					m.External = types.Int64Value(n)
+					m.HostPort = types.Int64Value(n)
 				}
 			}
 			got = append(got, m)
@@ -349,16 +368,50 @@ func containerExpandMountsBinds(in []containerMountModel) ([]mount.Mount, []stri
 			if mm.Source != "" {
 				return nil, nil, fmt.Errorf("mounts[%d]: a tmpfs mount takes no source", i)
 			}
-			if sz, ok := knownInt64(m.TmpfsSize); ok && sz > 0 {
-				mm.TmpfsOptions = &mount.TmpfsOptions{SizeBytes: sz}
-			}
 		default:
 			return nil, nil, fmt.Errorf("mounts[%d].type %q: must be bind, volume or tmpfs", i, t)
 		}
-		if mm.Type != mount.TypeTmpfs && containerKnown(m.TmpfsSize) && m.TmpfsSize.ValueInt64() != 0 {
-			return nil, nil, fmt.Errorf("mounts[%d].tmpfs_size only applies to type tmpfs", i)
+		if o := m.TmpfsOptions; o != nil {
+			if mm.Type != mount.TypeTmpfs {
+				return nil, nil, fmt.Errorf("mounts[%d].tmpfs_options only applies to type tmpfs", i)
+			}
+			to := &mount.TmpfsOptions{}
+			if sz, ok := knownInt64(o.SizeBytes); ok {
+				to.SizeBytes = sz
+			}
+			if ms, ok := knownString(o.Mode); ok && ms != "" {
+				mode, err := ctrParseMode(ms)
+				if err != nil {
+					return nil, nil, fmt.Errorf("mounts[%d].tmpfs_options.mode: %w", i, err)
+				}
+				to.Mode = ctrFileMode(mode)
+			}
+			if to.SizeBytes != 0 || to.Mode != 0 {
+				mm.TmpfsOptions = to
+			}
+		}
+		if o := m.BindOptions; o != nil {
+			if mm.Type != mount.TypeBind {
+				return nil, nil, fmt.Errorf("mounts[%d].bind_options only applies to type bind", i)
+			}
+			if p, ok := knownString(o.Propagation); ok && p != "" {
+				mm.BindOptions = &mount.BindOptions{Propagation: mount.Propagation(p)}
+			}
+		}
+		if o := m.VolumeOptions; o != nil {
+			if mm.Type != mount.TypeVolume {
+				return nil, nil, fmt.Errorf("mounts[%d].volume_options only applies to type volume", i)
+			}
+			vo := &mount.VolumeOptions{NoCopy: o.NoCopy.ValueBool(), Subpath: o.Subpath.ValueString(), Labels: ctrStringMap(o.Labels)}
+			if dc := o.DriverConfig; dc != nil && dc.Name.ValueString() != "" {
+				vo.DriverConfig = &mount.Driver{Name: dc.Name.ValueString(), Options: ctrStringMap(dc.Options)}
+			}
+			mm.VolumeOptions = vo
 		}
 		if rl, ok := knownString(m.SelinuxRelabel); ok && rl != "" {
+			if mm.TmpfsOptions != nil || mm.BindOptions != nil || mm.VolumeOptions != nil {
+				return nil, nil, fmt.Errorf("mounts[%d]: selinux_relabel cannot be combined with tmpfs_options, bind_options or volume_options", i)
+			}
 			spec, err := containerBindSpec(i, m, rl)
 			if err != nil {
 				return nil, nil, err
@@ -376,26 +429,159 @@ func containerMountKey(m containerMountModel) string {
 }
 
 // containerFlattenMounts maps HostConfig.Mounts and HostConfig.Binds back to
-// blocks.
+// blocks. An option block is reported when the daemon holds a value for it,
+// or when the prior entry with the same key had the block (so an empty block
+// the user wrote does not show as drift).
 func containerFlattenMounts(in []mount.Mount, binds []string, prior []containerMountModel) []containerMountModel {
+	priorBy := map[string]containerMountModel{}
+	for _, p := range prior {
+		priorBy[containerMountKey(p)] = p
+	}
 	got := make([]containerMountModel, 0, len(in)+len(binds))
 	for _, m := range in {
 		mm := containerMountModel{
-			Type:      types.StringValue(string(m.Type)),
-			Source:    stringOrNull(m.Source),
-			Target:    types.StringValue(m.Target),
-			ReadOnly:  types.BoolValue(m.ReadOnly),
-			TmpfsSize: types.Int64Null(),
+			Type:     types.StringValue(string(m.Type)),
+			Source:   stringOrNull(m.Source),
+			Target:   types.StringValue(m.Target),
+			ReadOnly: types.BoolValue(m.ReadOnly),
 
 			SelinuxRelabel: types.StringNull(),
 		}
-		if m.TmpfsOptions != nil && m.TmpfsOptions.SizeBytes > 0 {
-			mm.TmpfsSize = types.Int64Value(m.TmpfsOptions.SizeBytes)
+		p := priorBy[containerMountKey(mm)]
+		mm.TmpfsOptions = ctrFlattenTmpfsOptions(m.TmpfsOptions, p.TmpfsOptions)
+		if o := m.BindOptions; (o != nil && o.Propagation != "") || p.BindOptions != nil {
+			bo := &ctrBindOptionsModel{Propagation: types.StringNull()}
+			if o != nil {
+				bo.Propagation = stringOrNull(string(o.Propagation))
+			}
+			mm.BindOptions = bo
 		}
+		mm.VolumeOptions = ctrFlattenVolumeOptions(m.VolumeOptions, p.VolumeOptions)
 		got = append(got, mm)
 	}
 	got = append(got, containerFlattenBinds(binds)...)
 	return containerOrderByPrior(prior, got, containerMountKey)
+}
+
+func ctrFlattenTmpfsOptions(o *mount.TmpfsOptions, prior *ctrTmpfsOptionsModel) *ctrTmpfsOptionsModel {
+	if (o == nil || (o.SizeBytes == 0 && o.Mode == 0)) && prior == nil {
+		return nil
+	}
+	if o == nil {
+		o = &mount.TmpfsOptions{}
+	}
+	p := prior
+	if p == nil {
+		p = &ctrTmpfsOptionsModel{SizeBytes: types.Int64Null(), Mode: types.StringNull()}
+	}
+	return &ctrTmpfsOptionsModel{
+		SizeBytes: containerInt64Read(p.SizeBytes, o.SizeBytes),
+		Mode:      ctrModeValue(p.Mode, ctrModeBits(o.Mode)),
+	}
+}
+
+func ctrFlattenVolumeOptions(o *mount.VolumeOptions, prior *ctrVolumeOptionsModel) *ctrVolumeOptionsModel {
+	if o == nil && prior == nil {
+		return nil
+	}
+	if o == nil {
+		o = &mount.VolumeOptions{}
+	}
+	p := prior
+	if p == nil {
+		p = &ctrVolumeOptionsModel{NoCopy: types.BoolNull(), Labels: types.MapNull(types.StringType), Subpath: types.StringNull()}
+	}
+	vo := &ctrVolumeOptionsModel{
+		NoCopy:  types.BoolValue(o.NoCopy),
+		Labels:  containerMapValue(p.Labels, o.Labels),
+		Subpath: stringOrNull(o.Subpath),
+	}
+	if !o.NoCopy && !containerKnown(p.NoCopy) {
+		vo.NoCopy = types.BoolNull()
+	}
+	if o.DriverConfig != nil || p.DriverConfig != nil {
+		dc := &ctrDriverConfigModel{Name: types.StringNull(), Options: types.MapNull(types.StringType)}
+		var pdc ctrDriverConfigModel
+		if p.DriverConfig != nil {
+			pdc = *p.DriverConfig
+		}
+		if o.DriverConfig != nil {
+			dc.Name = stringOrNull(o.DriverConfig.Name)
+			dc.Options = containerMapValue(pdc.Options, o.DriverConfig.Options)
+		}
+		vo.DriverConfig = dc
+	}
+	return vo
+}
+
+// ctrParseMode parses an octal file mode such as "0644" or "1777".
+func ctrParseMode(s string) (uint32, error) {
+	m, err := strconv.ParseUint(s, 8, 32)
+	if err != nil || m > 0o7777 {
+		return 0, fmt.Errorf("%q: want an octal mode such as 0644", s)
+	}
+	return uint32(m), nil
+}
+
+// ctrFileMode turns octal permission bits (with setuid/setgid/sticky in
+// 0o7000) into an os.FileMode.
+func ctrFileMode(mode uint32) os.FileMode {
+	fm := os.FileMode(mode & 0o777)
+	if mode&0o4000 != 0 {
+		fm |= os.ModeSetuid
+	}
+	if mode&0o2000 != 0 {
+		fm |= os.ModeSetgid
+	}
+	if mode&0o1000 != 0 {
+		fm |= os.ModeSticky
+	}
+	return fm
+}
+
+// ctrModeBits is the inverse of ctrFileMode.
+func ctrModeBits(fm os.FileMode) uint32 {
+	m := uint32(fm.Perm())
+	if fm&os.ModeSetuid != 0 {
+		m |= 0o4000
+	}
+	if fm&os.ModeSetgid != 0 {
+		m |= 0o2000
+	}
+	if fm&os.ModeSticky != 0 {
+		m |= 0o1000
+	}
+	return m
+}
+
+// ctrModeValue renders mode as a 4-digit octal string, keeping the prior
+// spelling when it parses to the same value. 0 gives null unless the prior
+// was set.
+func ctrModeValue(prior types.String, mode uint32) types.String {
+	if s, ok := knownString(prior); ok {
+		if pm, err := ctrParseMode(s); err == nil && pm == mode {
+			return prior
+		}
+	}
+	if mode == 0 && !containerKnown(prior) {
+		return types.StringNull()
+	}
+	return types.StringValue(fmt.Sprintf("%04o", mode))
+}
+
+// ctrStringMap converts a known map(string) attribute to a Go map (nil when
+// null, unknown or empty).
+func ctrStringMap(m types.Map) map[string]string {
+	if !containerKnown(m) || len(m.Elements()) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(m.Elements()))
+	for k, v := range m.Elements() {
+		if s, ok := v.(types.String); ok {
+			out[k] = s.ValueString()
+		}
+	}
+	return out
 }
 
 // ---------------------------------------------------------------------------
@@ -450,6 +636,7 @@ func containerExpandHealthcheck(test []string, h *containerHealthcheckModel) (*c
 		{"interval", h.Interval, &hc.Interval},
 		{"timeout", h.Timeout, &hc.Timeout},
 		{"start_period", h.StartPeriod, &hc.StartPeriod},
+		{"start_interval", h.StartInterval, &hc.StartInterval},
 	} {
 		if *d.dst, err = parseDurationOr(d.v.ValueString(), 0); err != nil {
 			return nil, fmt.Errorf("healthcheck.%s: %w", d.name, err)
@@ -480,7 +667,7 @@ func containerHealthEqual(a, b *container.HealthConfig) bool {
 		return a == nil && b == nil
 	}
 	return containerStringsEqual(a.Test, b.Test) && a.Interval == b.Interval && a.Timeout == b.Timeout &&
-		a.StartPeriod == b.StartPeriod && a.Retries == b.Retries
+		a.StartPeriod == b.StartPeriod && a.StartInterval == b.StartInterval && a.Retries == b.Retries
 }
 
 // containerFlattenHealthcheck maps Config.Healthcheck to the block. With no
@@ -494,14 +681,15 @@ func containerFlattenHealthcheck(got, imageDefault *container.HealthConfig, prio
 	}
 	p := prior
 	if p == nil {
-		p = &containerHealthcheckModel{Retries: types.Int64Null()}
+		p = &containerHealthcheckModel{Retries: types.Int64Null(), StartInterval: types.StringNull()}
 	}
 	return &containerHealthcheckModel{
-		Test:        stringListValue(got.Test, false),
-		Interval:    containerDurationValue(p.Interval, got.Interval),
-		Timeout:     containerDurationValue(p.Timeout, got.Timeout),
-		StartPeriod: containerDurationValue(p.StartPeriod, got.StartPeriod),
-		Retries:     containerInt64Read(p.Retries, int64(got.Retries)),
+		Test:          stringListValue(got.Test, false),
+		Interval:      containerDurationValue(p.Interval, got.Interval),
+		Timeout:       containerDurationValue(p.Timeout, got.Timeout),
+		StartPeriod:   containerDurationValue(p.StartPeriod, got.StartPeriod),
+		StartInterval: containerDurationValue(p.StartInterval, got.StartInterval),
+		Retries:       containerInt64Read(p.Retries, int64(got.Retries)),
 	}
 }
 
@@ -525,27 +713,11 @@ func containerCapSet(prior types.Set, priorVals, got []string) types.Set {
 	return containerSetValue(prior, got)
 }
 
-// containerFlattenCapabilities maps CapAdd/CapDrop to the block, keeping the
-// prior spelling when the daemon normalised capability names.
-func containerFlattenCapabilities(add, drop, priorAdd, priorDrop []string, prior *containerCapabilitiesModel) *containerCapabilitiesModel {
-	if prior == nil && len(add) == 0 && len(drop) == 0 {
-		return nil
-	}
-	p := prior
-	if p == nil {
-		p = &containerCapabilitiesModel{Add: types.SetNull(types.StringType), Drop: types.SetNull(types.StringType)}
-	}
-	return &containerCapabilitiesModel{
-		Add:  containerCapSet(p.Add, priorAdd, add),
-		Drop: containerCapSet(p.Drop, priorDrop, drop),
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Networks
 
-// containerEndpointSettings builds the endpoint config for one
-// networks_advanced entry.
+// containerEndpointSettings builds an endpoint config from aliases and
+// static addresses (docker_compose local mode uses it too).
 func containerEndpointSettings(aliases []string, ipv4, ipv6 string) (*network.EndpointSettings, error) {
 	ep := &network.EndpointSettings{Aliases: aliases}
 	if ipv4 != "" || ipv6 != "" {
@@ -569,64 +741,6 @@ func containerNetworkMatches(ref, key, networkID string) bool {
 		return true
 	}
 	return len(ref) >= 12 && strings.HasPrefix(networkID, ref)
-}
-
-// containerFlattenNetworks maps NetworkSettings.Networks to blocks. The
-// default network the daemon attaches when networks_advanced is empty
-// (HostConfig.NetworkMode "default"/"bridge"/"host"/"none") is not reported
-// unless the prior state lists it. Aliases the daemon adds (container name,
-// ID, short ID) are dropped.
-func containerFlattenNetworks(eps map[string]*network.EndpointSettings, networkMode, containerID, containerName string, prior []containerNetworkModel) []containerNetworkModel {
-	keys := make([]string, 0, len(eps))
-	for k := range eps {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	used := map[string]bool{}
-	out := make([]containerNetworkModel, 0, len(eps))
-
-	flat := func(name types.String, priorAliases types.Set, ep *network.EndpointSettings) containerNetworkModel {
-		var aliases []string
-		short := containerID
-		if len(short) > 12 {
-			short = short[:12]
-		}
-		for _, a := range ep.Aliases {
-			if a == containerName || a == containerID || a == short {
-				continue
-			}
-			aliases = append(aliases, a)
-		}
-		ipv4, ipv6 := "", ""
-		if ep.IPAMConfig != nil {
-			ipv4, ipv6 = addrString(ep.IPAMConfig.IPv4Address), addrString(ep.IPAMConfig.IPv6Address)
-		}
-		return containerNetworkModel{Name: name, Aliases: containerSetValue(priorAliases, aliases), IPv4Address: stringOrNull(ipv4), IPv6Address: stringOrNull(ipv6)}
-	}
-
-	for _, p := range prior {
-		ref := p.Name.ValueString()
-		for _, k := range keys {
-			ep := eps[k]
-			if used[k] || ep == nil || !containerNetworkMatches(ref, k, ep.NetworkID) {
-				continue
-			}
-			used[k] = true
-			out = append(out, flat(p.Name, p.Aliases, ep))
-			break
-		}
-	}
-	for _, k := range keys {
-		ep := eps[k]
-		if used[k] || ep == nil {
-			continue
-		}
-		if containerIsDefaultNetwork(k, networkMode) {
-			continue
-		}
-		out = append(out, flat(types.StringValue(k), types.SetNull(types.StringType), ep))
-	}
-	return out
 }
 
 // containerIsDefaultNetwork reports whether endpoint key is the built-in

@@ -13,7 +13,8 @@ resource "docker_image" "app" {
 #   terraform apply -invoke=action.docker_image_save.bundle
 action "docker_image_save" "bundle" {
   config {
-    images = [docker_image.app.name]
-    path   = "${path.module}/out/images.tar"
+    images      = [docker_image.app.name]
+    output      = "${path.module}/out/images.tar"
+    result_path = "${path.module}/out/save-result.json"
   }
 }

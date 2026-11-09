@@ -37,6 +37,10 @@ type volumeResourceModel struct {
 	DriverOpts types.Map    `tfsdk:"driver_opts"`
 	Labels     types.Map    `tfsdk:"labels"`
 	Mountpoint types.String `tfsdk:"mountpoint"`
+	// ClusterVolumeSpec is the Swarm cluster (CSI) volume spec; ClusterVolumeID its swarm object ID.
+	ClusterVolumeSpec types.Object `tfsdk:"cluster_volume_spec"`
+	ClusterVolumeID   types.String `tfsdk:"cluster_volume_id"`
+	contractEngineVolume
 }
 
 func (r *volumeResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -45,9 +49,10 @@ func (r *volumeResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (r *volumeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "A local Docker volume (`VolumeCreate`). Volumes cannot be changed after creation, so every argument forces " +
-			"a new volume (and its data is lost). Destroy fails while a container still uses the volume. Import by volume name.",
-		Attributes: map[string]schema.Attribute{
+		MarkdownDescription: "A Docker volume (`VolumeCreate`). Volumes cannot be changed after creation, so every argument except " +
+			"`cluster_volume_spec.availability` forces a new volume (and its data is lost). Destroy fails while a container still uses the volume. Import by volume name. " +
+			"Swarm cluster (CSI) volumes are created with `cluster_volume_spec` (their `availability` updates in place). The raw `inspect_json` output is sensitive because driver options can hold credentials.",
+		Attributes: contractAddResourceAttributes(map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true, MarkdownDescription: "Volume name (volumes have no separate ID).",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -73,11 +78,16 @@ func (r *volumeResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				MarkdownDescription: "Volume labels. Changing this forces a new resource.",
 				PlanModifiers:       []planmodifier.Map{mapplanmodifier.RequiresReplace()},
 			},
+			"cluster_volume_spec": objClusterVolumeSpecAttribute(),
+			"cluster_volume_id": schema.StringAttribute{
+				Computed: true, MarkdownDescription: "Swarm object ID of a cluster volume (`ClusterVolume.ID`); null for a local volume.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"mountpoint": schema.StringAttribute{
 				Computed: true, MarkdownDescription: "Host path of the volume's data, as reported by the driver.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-		},
+		}, "engine:volume"),
 	}
 }
 
@@ -94,6 +104,7 @@ func volumeFromInspect(v volume.Volume, prior volumeResourceModel) volumeResourc
 	out.DriverOpts = containerMapValue(prior.DriverOpts, v.Options)
 	out.Labels = containerMapValue(prior.Labels, userLabels(v.Labels, false))
 	out.Mountpoint = types.StringValue(v.Mountpoint)
+	out.ClusterVolumeSpec, out.ClusterVolumeID = objClusterVolumeState(prior.ClusterVolumeSpec, v.ClusterVolume)
 	return out
 }
 
@@ -113,6 +124,15 @@ func (r *volumeResource) Create(ctx context.Context, req resource.CreateRequest,
 		Driver:     plan.Driver.ValueString(),
 		DriverOpts: stringMapFrom(ctx, plan.DriverOpts, &resp.Diagnostics),
 		Labels:     mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue}),
+
+		ClusterVolumeSpec: objExpandClusterVolumeSpec(ctx, plan.ClusterVolumeSpec, &resp.Diagnostics),
+	}
+	if opts.ClusterVolumeSpec != nil {
+		if ok, have, err := r.pd.APIVersionAtLeast(ctx, "1.42"); err == nil && !ok {
+			resp.Diagnostics.AddAttributeError(path.Root("cluster_volume_spec"), "Engine API too old",
+				fmt.Sprintf("cluster_volume_spec needs Docker Engine API 1.42 or later; the daemon negotiated %s.", have))
+			return
+		}
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -137,6 +157,16 @@ func (r *volumeResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 	state := volumeFromInspect(v.Volume, plan)
+	vRes, err := r.pd.Client.VolumeInspect(ctx, v.Volume.Name, client.VolumeInspectOptions{})
+	if err != nil {
+		state.contractSetNull()
+		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+		resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
+		resp.Diagnostics.AddError("Cannot inspect volume", err.Error())
+		return
+	}
+	state = volumeFromInspect(vRes.Volume, state)
+	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": vRes.Raw}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
@@ -158,17 +188,42 @@ func (r *volumeResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 	state := volumeFromInspect(v, prior)
+	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": vRes.Raw}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
-// Update is only reached for no-op plans: every argument forces replacement.
+// Update applies a changed cluster_volume_spec.availability (VolumeUpdate,
+// the only in-place change; every other argument forces replacement) and
+// re-reads the volume so the contract outputs are known.
 func (r *volumeResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan volumeResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
+	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
+	vRes, err := r.pd.Client.VolumeInspect(ctx, plan.ID.ValueString(), client.VolumeInspectOptions{})
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot inspect volume", err.Error())
+		return
+	}
+	if cv := vRes.Volume.ClusterVolume; cv != nil {
+		want := objExpandClusterVolumeSpec(ctx, plan.ClusterVolumeSpec, &resp.Diagnostics)
+		if want != nil && want.Availability != cv.Spec.Availability {
+			spec := cv.Spec
+			spec.Availability = want.Availability
+			if _, err := r.pd.Client.VolumeUpdate(ctx, cv.ID, client.VolumeUpdateOptions{Version: cv.Version, Spec: &spec}); err != nil {
+				resp.Diagnostics.AddError("Cannot update cluster volume availability", err.Error())
+				return
+			}
+			if vRes, err = r.pd.Client.VolumeInspect(ctx, plan.ID.ValueString(), client.VolumeInspectOptions{}); err != nil {
+				resp.Diagnostics.AddError("Cannot inspect volume", err.Error())
+				return
+			}
+		}
+	}
+	plan = volumeFromInspect(vRes.Volume, plan)
+	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": vRes.Raw}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }

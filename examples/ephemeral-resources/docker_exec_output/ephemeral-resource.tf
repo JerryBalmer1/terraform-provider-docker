@@ -7,9 +7,9 @@ resource "docker_container" "app" {
 # Read the token out of the container during the run; it never reaches plan
 # or state. A non-zero exit code (say, the file is not there yet) fails the run.
 ephemeral "docker_exec_output" "admin_token" {
-  container = docker_container.app.id
-  command   = ["cat", "/var/lib/app/admin-token"]
-  timeout   = "30s"
+  container_id = docker_container.app.id
+  command      = ["cat", "/var/lib/app/admin-token"]
+  timeout      = "30s"
 }
 
 # Share it with swarm services as a write-only secret.

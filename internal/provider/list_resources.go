@@ -243,7 +243,7 @@ func NewConfigListResource() list.ListResource {
 			listNameFilter("configs"),
 			listLabelsFilter("configs", "label"),
 		},
-		newResource: NewDockerConfigResource,
+		newResource: NewConfigResource,
 		fetch: func(ctx context.Context, c *client.Client, q listQuery) ([]listItem, error) {
 			csRes, err := c.ConfigList(ctx, client.ConfigListOptions{Filters: q.Filters})
 			if err != nil {

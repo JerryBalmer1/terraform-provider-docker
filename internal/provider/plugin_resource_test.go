@@ -80,6 +80,21 @@ func (f *pluginFakeEngine) handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(pl)
+	case r.Method == http.MethodPost && strings.HasSuffix(p, "/upgrade"):
+		ref := strings.TrimSuffix(strings.TrimPrefix(p, "/"), "/upgrade")
+		pl := f.find(ref)
+		if pl == nil {
+			notFound(ref)
+			return
+		}
+		f.calls = append(f.calls, "upgrade")
+		if pl.Enabled {
+			w.WriteHeader(http.StatusConflict)
+			fmt.Fprint(w, `{"message":"plugin must be disabled before upgrading"}`)
+			return
+		}
+		pl.PluginReference = "docker.io/" + pluginFamiliar(q.Get("remote"))
+		_, _ = io.WriteString(w, `{"status":"Upgraded"}`+"\n")
 	case r.Method == http.MethodPost && (strings.HasSuffix(p, "/set") || strings.HasSuffix(p, "/enable") || strings.HasSuffix(p, "/disable")):
 		i := strings.LastIndex(p, "/")
 		ref, op := strings.TrimPrefix(p[:i], "/"), p[i+1:]
@@ -149,12 +164,14 @@ func pluginFake(t *testing.T) (*pluginFakeEngine, *providerData) {
 }
 
 func pluginTestModel(grants ...pluginGrantModel) pluginResourceModel {
-	return pluginResourceModel{
+	m := pluginResourceModel{
 		ID: types.StringUnknown(), Name: types.StringValue("vieux/sshfs"), PluginReference: types.StringUnknown(),
 		Alias: types.StringValue("sshfs"), Enabled: types.BoolValue(true), GrantAllPermissions: types.BoolNull(),
 		GrantPermissions: grants, Env: stringSetValue([]string{"DEBUG=1"}, false),
 		EnableTimeout: types.Int64Value(90), ForceDestroy: types.BoolValue(false), ForceDisable: types.BoolValue(false),
 	}
+	m.contractSetUnknown()
+	return m
 }
 
 func pluginGrant(name string, values ...string) pluginGrantModel {
@@ -251,6 +268,7 @@ func TestPluginResourceFakeEngine(t *testing.T) {
 	ds.Schema(ctx, datasource.SchemaRequest{}, &dsr)
 	dm := pluginDataSourceModel{ID: types.StringNull(), Alias: types.StringValue("sshfs"), Name: types.StringUnknown(),
 		PluginReference: types.StringUnknown(), Enabled: types.BoolUnknown(), Env: types.SetUnknown(types.StringType)}
+	dm.contractSetUnknown()
 	cfg := tfsdk.Config{Schema: dsr.Schema, Raw: tftypes.NewValue(dsr.Schema.Type().TerraformType(ctx), nil)}
 	dst := tfsdk.State{Schema: dsr.Schema, Raw: tftypes.NewValue(dsr.Schema.Type().TerraformType(ctx), nil)}
 	if d := dst.Set(ctx, &dm); d.HasError() {

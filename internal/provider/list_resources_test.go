@@ -102,7 +102,7 @@ func TestListResourcesMetadataAndSchemas(t *testing.T) {
 	ctx := context.Background()
 	want := map[string]bool{"docker_container": true, "docker_image": true, "docker_network": true, "docker_volume": true,
 		"docker_swarm_node": true, "docker_service": true, "docker_secret": true, "docker_config": true}
-	for _, nf := range laneListResources() {
+	for _, nf := range genListResources() {
 		l := nf()
 		var mr resource.MetadataResponse
 		l.Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "docker"}, &mr)
@@ -237,7 +237,7 @@ func TestListIncludeResource(t *testing.T) {
 		t.Errorf("secret object = %+v", sm)
 	}
 
-	run = p3eRunList(t, NewConfigListResource(), NewDockerConfigResource, pd, nil, true, 0)
+	run = p3eRunList(t, NewConfigListResource(), NewConfigResource, pd, nil, true, 0)
 	var cm dockerConfigResourceModel
 	if d := run.results[0].Resource.Get(ctx, &cm); d.HasError() {
 		t.Fatal(d)

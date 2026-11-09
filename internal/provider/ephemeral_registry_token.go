@@ -11,6 +11,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// regTokenItem is the inventory item of docker_registry_token.
+const regTokenItem = "engine:registry-token"
+
 var (
 	_ ephemeral.EphemeralResource              = (*registryTokenEphemeral)(nil)
 	_ ephemeral.EphemeralResourceWithConfigure = (*registryTokenEphemeral)(nil)
@@ -29,12 +32,12 @@ type registryTokenModel struct {
 	Registry           types.String `tfsdk:"registry"`
 	Scope              types.String `tfsdk:"scope"`
 	InsecureSkipVerify types.Bool   `tfsdk:"insecure_skip_verify"`
-	Token              types.String `tfsdk:"token"`
 	ExpiresIn          types.Int64  `tfsdk:"expires_in"`
 	IssuedAt           types.String `tfsdk:"issued_at"`
 	ExpiresAt          types.String `tfsdk:"expires_at"`
 	Realm              types.String `tfsdk:"realm"`
 	Service            types.String `tfsdk:"service"`
+	contractEngineRegistryToken
 }
 
 func (e *registryTokenEphemeral) Metadata(_ context.Context, req ephemeral.MetadataRequest, resp *ephemeral.MetadataResponse) {
@@ -42,28 +45,30 @@ func (e *registryTokenEphemeral) Metadata(_ context.Context, req ephemeral.Metad
 }
 
 func (e *registryTokenEphemeral) Schema(_ context.Context, _ ephemeral.SchemaRequest, resp *ephemeral.SchemaResponse) {
+	attrs := map[string]schema.Attribute{
+		"registry": schema.StringAttribute{
+			Required:            true,
+			MarkdownDescription: "Registry host, e.g. `ghcr.io`, `localhost:5000` or `docker.io` (Docker Hub).",
+		},
+		"scope": schema.StringAttribute{
+			Optional: true,
+			MarkdownDescription: "Token scope, e.g. `repository:org/app:pull,push`; several scopes separated by spaces. " +
+				"Omitted: the token carries no repository scope (enough for the catalog on some registries, or to prove the credentials).",
+		},
+		"insecure_skip_verify": schema.BoolAttribute{Optional: true, MarkdownDescription: "Skip TLS certificate verification of the registry and token service."},
+		"expires_in":           schema.Int64Attribute{Computed: true, MarkdownDescription: "Token lifetime in seconds (60 when the token service does not say); the same value as `token.expires_in`."},
+		"issued_at":            schema.StringAttribute{Computed: true, MarkdownDescription: "RFC 3339 time the token was issued; the same value as `token.issued_at`."},
+		"expires_at":           schema.StringAttribute{Computed: true, MarkdownDescription: "RFC 3339 time the token expires."},
+		"realm":                schema.StringAttribute{Computed: true, MarkdownDescription: "Token service URL from the challenge."},
+		"service":              schema.StringAttribute{Computed: true, MarkdownDescription: "Service name from the challenge."},
+	}
+	contractAddEphemeralAttributes(attrs, regTokenItem)
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Obtains a short-lived registry bearer token, as an ephemeral value that is never written to plan or state. " +
 			"The provider pings `GET /v2/` on the registry, follows its `WWW-Authenticate: Bearer` challenge to the token service and " +
-			"authenticates with the matching `registry_auth` entry (anonymous when none matches). Registries that use Basic auth issue no token and are an error.",
-		Attributes: map[string]schema.Attribute{
-			"registry": schema.StringAttribute{
-				Required:            true,
-				MarkdownDescription: "Registry host, e.g. `ghcr.io`, `localhost:5000` or `docker.io` (Docker Hub).",
-			},
-			"scope": schema.StringAttribute{
-				Optional: true,
-				MarkdownDescription: "Token scope, e.g. `repository:org/app:pull,push`; several scopes separated by spaces. " +
-					"Omitted: the token carries no repository scope (enough for the catalog on some registries, or to prove the credentials).",
-			},
-			"insecure_skip_verify": schema.BoolAttribute{Optional: true, MarkdownDescription: "Skip TLS certificate verification of the registry and token service."},
-			"token":                schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "The bearer token. Send it as `Authorization: Bearer <token>`."},
-			"expires_in":           schema.Int64Attribute{Computed: true, MarkdownDescription: "Token lifetime in seconds (60 when the token service does not say)."},
-			"issued_at":            schema.StringAttribute{Computed: true, MarkdownDescription: "RFC 3339 time the token was issued."},
-			"expires_at":           schema.StringAttribute{Computed: true, MarkdownDescription: "RFC 3339 time the token expires."},
-			"realm":                schema.StringAttribute{Computed: true, MarkdownDescription: "Token service URL from the challenge."},
-			"service":              schema.StringAttribute{Computed: true, MarkdownDescription: "Service name from the challenge."},
-		},
+			"authenticates with the matching `registry_auth` entry (anonymous when none matches). Registries that use Basic auth issue no token and are an error. " +
+			"The bearer token is `token.token`; send it as `Authorization: Bearer <token>`.",
+		Attributes: attrs,
 	}
 }
 
@@ -88,7 +93,10 @@ func (e *registryTokenEphemeral) Open(ctx context.Context, req ephemeral.OpenReq
 		resp.Diagnostics.AddError("Cannot obtain registry token", fmt.Sprintf("%s: %v", reg, err))
 		return
 	}
-	m.Token = types.StringValue(tok.Token)
+	resp.Diagnostics.Append(m.contractFill(ctx, e.pd, contractFillInput{Structured: map[string]any{
+		"token": map[string]any{"token": tok.Token, "expires_in": tok.ExpiresIn, "issued_at": tok.IssuedAt.Format(time.RFC3339)},
+	}})...)
+	m.DistributionAPIVersion = regStringOrNull(r.apiVersion)
 	m.ExpiresIn = types.Int64Value(tok.ExpiresIn)
 	m.IssuedAt = types.StringValue(tok.IssuedAt.Format(time.RFC3339))
 	m.ExpiresAt = types.StringValue(tok.IssuedAt.Add(time.Duration(tok.ExpiresIn) * time.Second).Format(time.RFC3339))

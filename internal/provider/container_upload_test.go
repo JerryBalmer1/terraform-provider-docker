@@ -30,9 +30,8 @@ import (
 
 func ctrUpload(file string) containerUploadModel {
 	return containerUploadModel{
-		File: types.StringValue(file), Content: types.StringNull(), ContentBase64: types.StringNull(), Source: types.StringNull(),
-		SourceHash: types.StringNull(), Executable: types.BoolValue(false), Permissions: types.StringNull(),
-		Owner: types.Int64Null(), Group: types.Int64Null(),
+		Path: types.StringValue(file), Content: types.StringNull(), ContentBase64: types.StringNull(), Source: types.StringNull(),
+		SourceHash: types.StringNull(), Mode: types.StringNull(), UID: types.Int64Null(), GID: types.Int64Null(),
 	}
 }
 
@@ -63,7 +62,7 @@ func TestContainerUploadTar(t *testing.T) {
 
 	u := ctrUpload("/etc/app/app.conf")
 	u.Content = types.StringValue("hello")
-	u.Owner, u.Group = types.Int64Value(1000), types.Int64Value(2000)
+	u.UID, u.GID = types.Int64Value(1000), types.Int64Value(2000)
 	it, err := containerUploadTar(u, now)
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +74,7 @@ func TestContainerUploadTar(t *testing.T) {
 
 	u = ctrUpload("/bin/run.sh")
 	u.ContentBase64 = types.StringValue(base64.StdEncoding.EncodeToString([]byte{0, 1, 2}))
-	u.Executable = types.BoolValue(true)
+	u.Mode = types.StringValue("0744")
 	it, err = containerUploadTar(u, now)
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +85,7 @@ func TestContainerUploadTar(t *testing.T) {
 
 	u = ctrUpload("/opt/x")
 	u.Source = types.StringValue(src)
-	u.Permissions = types.StringValue("0600")
+	u.Mode = types.StringValue("0600")
 	it, err = containerUploadTar(u, now)
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +94,7 @@ func TestContainerUploadTar(t *testing.T) {
 		t.Errorf("source upload: hdr=%+v data=%q", h, data)
 	}
 
-	u.Permissions = types.StringValue("755")
+	u.Mode = types.StringValue("755")
 	if m, err := containerUploadMode(u); err != nil || m != 0o755 {
 		t.Errorf("mode 755: %o %v", m, err)
 	}
@@ -110,16 +109,11 @@ func TestContainerUploadErrors(t *testing.T) {
 		},
 		"bad base64":  func(u *containerUploadModel) { u.ContentBase64 = types.StringValue("!!") },
 		"missing src": func(u *containerUploadModel) { u.Source = types.StringValue(filepath.Join(t.TempDir(), "nope")) },
-		"relative":    func(u *containerUploadModel) { u.Content = types.StringValue("a"); u.File = types.StringValue("etc/x") },
-		"dir":         func(u *containerUploadModel) { u.Content = types.StringValue("a"); u.File = types.StringValue("/etc/") },
-		"bad perms": func(u *containerUploadModel) {
+		"relative":    func(u *containerUploadModel) { u.Content = types.StringValue("a"); u.Path = types.StringValue("etc/x") },
+		"dir":         func(u *containerUploadModel) { u.Content = types.StringValue("a"); u.Path = types.StringValue("/etc/") },
+		"bad mode": func(u *containerUploadModel) {
 			u.Content = types.StringValue("a")
-			u.Permissions = types.StringValue("0999")
-		},
-		"exec+perms": func(u *containerUploadModel) {
-			u.Content = types.StringValue("a")
-			u.Permissions = types.StringValue("0644")
-			u.Executable = types.BoolValue(true)
+			u.Mode = types.StringValue("0999")
 		},
 	}
 	for name, mod := range cases {
@@ -195,23 +189,76 @@ type ctrFakeEngine struct {
 	created container.CreateRequest
 	running bool
 	uploads map[string][]byte // archive path -> tar
+
+	createQuery string
+	networks    map[string]*network.EndpointSettings
+	gone        bool
 }
 
 func (f *ctrFakeEngine) handler(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	p := r.URL.Path
-	if i := strings.Index(p, "/containers/"); i >= 0 {
-		p = p[i:]
-	} else if i := strings.Index(p, "/images/"); i >= 0 {
-		p = p[i:]
+	for _, pre := range []string{"/containers/", "/images/", "/networks/", "/version"} {
+		if i := strings.Index(p, pre); i >= 0 {
+			p = p[i:]
+			break
+		}
 	}
 	switch {
+	case r.Method == http.MethodGet && p == "/version":
+		_ = json.NewEncoder(w).Encode(map[string]any{"Version": "29.0.0", "ApiVersion": "1.52"})
+	case r.Method == http.MethodPost && strings.HasPrefix(p, "/networks/") && (strings.HasSuffix(p, "/connect") || strings.HasSuffix(p, "/disconnect")):
+		parts := strings.Split(p, "/")
+		f.calls = append(f.calls, parts[3]+":"+parts[2])
+		var body struct {
+			Container      string
+			EndpointConfig *network.EndpointSettings
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if f.networks == nil {
+			f.networks = map[string]*network.EndpointSettings{}
+		}
+		if parts[3] == "connect" {
+			ep := body.EndpointConfig
+			if ep == nil {
+				ep = &network.EndpointSettings{}
+			}
+			ep.NetworkID = "n-" + parts[2]
+			f.networks[parts[2]] = ep
+		} else {
+			delete(f.networks, strings.TrimPrefix(parts[2], "n-"))
+		}
+		w.WriteHeader(http.StatusOK)
+	case r.Method == http.MethodDelete && strings.HasPrefix(p, "/containers/"):
+		f.calls = append(f.calls, "remove")
+		if f.gone {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(w, `{"message":"No such container"}`)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	case r.Method == http.MethodPost && strings.HasSuffix(p, "/update"):
+		f.calls = append(f.calls, "update")
+		_ = json.NewEncoder(w).Encode(map[string]any{})
+	case f.gone && strings.HasPrefix(p, "/containers/") && strings.HasSuffix(p, "/json"):
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, `{"message":"No such container"}`)
 	case r.Method == http.MethodGet && strings.HasPrefix(p, "/images/"):
 		_ = json.NewEncoder(w).Encode(map[string]any{"Id": "sha256:img", "Config": map[string]any{}})
 	case r.Method == http.MethodPost && p == "/containers/create":
 		f.calls = append(f.calls, "create")
 		_ = json.NewDecoder(r.Body).Decode(&f.created)
+		f.createQuery = r.URL.RawQuery
+		f.networks = map[string]*network.EndpointSettings{}
+		if f.created.NetworkingConfig != nil {
+			for k, v := range f.created.NetworkingConfig.EndpointsConfig {
+				cp := *v
+				cp.NetworkID = "n-" + k
+				cp.IPAddress = mustAddr("10.9.0.2")
+				f.networks[k] = &cp
+			}
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"Id": "c0ffee0123456789"})
 	case r.Method == http.MethodPut && strings.HasSuffix(p, "/archive"):
 		f.calls = append(f.calls, "upload:"+r.URL.Query().Get("path"))
@@ -232,7 +279,7 @@ func (f *ctrFakeEngine) handler(w http.ResponseWriter, r *http.Request) {
 			ID: "c0ffee0123456789", Name: "/up", Image: "sha256:img",
 			State: &container.State{Running: f.running, Status: map[bool]container.ContainerState{true: "running", false: "created"}[f.running]}, HostConfig: hc,
 			Config:          f.created.Config,
-			NetworkSettings: &container.NetworkSettings{Networks: map[string]*network.EndpointSettings{}},
+			NetworkSettings: &container.NetworkSettings{Networks: f.networks},
 		})
 	default:
 		w.WriteHeader(http.StatusNotImplemented)
@@ -256,13 +303,17 @@ func ctrUploadModel() containerResourceModel {
 	m := containerP2Model()
 	m.ID, m.ImageID, m.Running = types.StringUnknown(), types.StringUnknown(), types.BoolUnknown()
 	m.Name = types.StringValue("up")
-	m.NetworksAdvanced = []containerNetworkModel{}
+	m.Networks = types.MapNull(types.ObjectType{AttrTypes: ctrNetworkAttrTypes})
+	m.NetworkMode = types.StringNull()
 	m.GPUs = types.StringNull()
-	m.LogDriver, m.LogOpts = types.StringUnknown(), types.MapUnknown(types.StringType)
+	m.DeviceRequests = []ctrDeviceRequestModel{}
+	m.Logging = &ctrLoggingModel{Driver: types.StringUnknown(), Options: types.MapUnknown(types.StringType)}
 	m.MemorySwap = types.Int64Unknown()
+	m.ExitCode = types.Int64Unknown()
 	u := ctrUpload("/etc/app.conf")
 	u.Content = types.StringValue("v1")
-	m.Upload = []containerUploadModel{u}
+	m.Files = []containerUploadModel{u}
+	m.contractSetUnknown()
 	return m
 }
 
@@ -299,8 +350,15 @@ func TestContainerUploadFakeEngine(t *testing.T) {
 	}
 	var state containerResourceModel
 	resp.Diagnostics.Append(resp.State.Get(ctx, &state)...)
-	if len(state.Upload) != 1 || state.Upload[0].Content.ValueString() != "v1" || len(state.Mounts) != 3 {
-		t.Fatalf("state: upload=%+v mounts=%+v", state.Upload, state.Mounts)
+	if len(state.Files) != 1 || state.Files[0].Content.ValueString() != "v1" || len(state.Mounts) != 4 {
+		t.Fatalf("state: files=%+v mounts=%+v", state.Files, state.Mounts)
+	}
+	if !strings.Contains(state.InspectJSON.ValueString(), "c0ffee0123456789") || len(state.ContentSHA256.ValueString()) != 64 ||
+		state.DockerServerVersion.ValueString() != "29.0.0" || state.Inspect.IsNull() {
+		t.Errorf("contract outputs: json=%d sha=%q version=%v", len(state.InspectJSON.ValueString()), state.ContentSHA256.ValueString(), state.DockerServerVersion)
+	}
+	if !strings.Contains(f.createQuery, "platform=linux") {
+		t.Errorf("platform not sent: %q", f.createQuery)
 	}
 
 	// Stopped container with must_run = false: Update re-uploads in place
@@ -312,7 +370,7 @@ func TestContainerUploadFakeEngine(t *testing.T) {
 	next := state
 	u := ctrUpload("/etc/app.conf")
 	u.Content = types.StringValue("v2")
-	next.Upload = []containerUploadModel{u}
+	next.Files = []containerUploadModel{u}
 	st := tfsdk.State{Schema: sr.Schema, Raw: tftypes.NewValue(sr.Schema.Type().TerraformType(ctx), nil)}
 	if d := st.Set(ctx, &state); d.HasError() {
 		t.Fatal(d)
@@ -343,11 +401,11 @@ func TestContainerUploadPlan(t *testing.T) {
 resource "docker_container" "u" {
   name  = "u"
   image = "busybox:1.36"
-  upload {
-    file        = "/etc/motd"
-    content     = "hi"
-    permissions = "0600"
-    owner       = 1000
+  files {
+    path = "/etc/motd"
+    content = "hi"
+    mode = "0600"
+    uid = 1000
   }
   mounts {
     type            = "bind"
@@ -363,8 +421,8 @@ resource "docker_container" "u" {
 resource "docker_container" "u" {
   name  = "u"
   image = "busybox:1.36"
-  upload {
-    file           = "/etc/motd"
+  files {
+    path           = "/etc/motd"
     content        = "hi"
     content_base64 = "aGk="
   }
@@ -377,14 +435,13 @@ resource "docker_container" "u" {
 resource "docker_container" "u" {
   name  = "u"
   image = "busybox:1.36"
-  upload {
-    file        = "/etc/motd"
-    content     = "hi"
-    executable  = true
-    permissions = "0600"
+  files {
+    path    = "/etc/motd"
+    content = "hi"
+    mode    = "rwx"
   }
 }`,
-				ExpectError: mustRegexpT(t, `(?s)Invalid Attribute Combination`),
+				ExpectError: mustRegexpT(t, `(?s)octal mode`),
 			},
 			{
 				PlanOnly: true,
@@ -409,11 +466,11 @@ func TestContainerUploadDiagnosticsPath(t *testing.T) {
 	// containerBuildCreate must accept relabel mounts and route them to Binds.
 	m := containerP2Model()
 	var diags diag.Diagnostics
-	_, hc, _, _ := containerBuildCreate(context.Background(), m, &diags)
+	_, hc, _ := containerBuildCreate(context.Background(), m, &diags)
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
-	if len(hc.Mounts) != 1 || len(hc.Binds) != 2 {
+	if len(hc.Mounts) != 2 || len(hc.Binds) != 2 {
 		t.Errorf("mounts=%+v binds=%v", hc.Mounts, hc.Binds)
 	}
 }

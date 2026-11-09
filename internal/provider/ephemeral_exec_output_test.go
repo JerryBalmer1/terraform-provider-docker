@@ -22,6 +22,8 @@ import (
 // p3eFakeExec wires create/start/inspect of one exec into f. start hijacks
 // the connection and writes stdout/stderr multiplexed like the daemon.
 func p3eFakeExec(f *p3eFake, ctr, stdout, stderr string, exitCode int, got *client.ExecCreateOptions) {
+	f.json("GET /version", map[string]string{"Version": "29.0.0", "ApiVersion": "1.47"})
+	f.json("GET /containers/"+ctr+"/json", container.InspectResponse{ID: ctr, Name: "/" + ctr})
 	f.on("POST /containers/"+ctr+"/exec", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(got)
 		p3eWriteJSON(w, http.StatusCreated, container.ExecCreateResponse{ID: "ex1"})
@@ -57,10 +59,10 @@ func TestExecOutputEphemeralOpen(t *testing.T) {
 	var got client.ExecCreateOptions
 	p3eFakeExec(f, "web", "tok-123\n", "warn: x\n", 0, &got)
 	res, diags := p3eOpenEphemeral(t, NewExecOutputEphemeralResource(), pd, map[string]tftypes.Value{
-		"container": p3eStr("web"),
-		"command":   tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, []tftypes.Value{p3eStr("cat"), p3eStr("/token")}),
-		"user":      p3eStr("1000"),
-		"env":       p3eStrMap(map[string]string{"B": "2", "A": "1"}),
+		"container_id": p3eStr("web"),
+		"command":      tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, []tftypes.Value{p3eStr("cat"), p3eStr("/token")}),
+		"user":         p3eStr("1000"),
+		"env":          p3eStrMap(map[string]string{"B": "2", "A": "1"}),
 	})
 	if diags.HasError() {
 		t.Fatal(diags)
@@ -80,8 +82,8 @@ func TestExecOutputEphemeralNonZeroExit(t *testing.T) {
 	var got client.ExecCreateOptions
 	p3eFakeExec(f, "web", "", "cat: /nope: No such file\n", 1, &got)
 	_, diags := p3eOpenEphemeral(t, NewExecOutputEphemeralResource(), pd, map[string]tftypes.Value{
-		"container": p3eStr("web"),
-		"command":   tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, []tftypes.Value{p3eStr("cat"), p3eStr("/nope")}),
+		"container_id": p3eStr("web"),
+		"command":      tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, []tftypes.Value{p3eStr("cat"), p3eStr("/nope")}),
 	})
 	if !diags.HasError() || !strings.Contains(diags[0].Detail(), "exited with code 1") || !strings.Contains(diags[0].Detail(), "No such file") {
 		t.Fatalf("diags = %v", diags)
@@ -91,9 +93,9 @@ func TestExecOutputEphemeralNonZeroExit(t *testing.T) {
 func TestExecOutputEphemeralBadTimeout(t *testing.T) {
 	_, pd := newP3eFake(t)
 	_, diags := p3eOpenEphemeral(t, NewExecOutputEphemeralResource(), pd, map[string]tftypes.Value{
-		"container": p3eStr("web"),
-		"command":   tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, []tftypes.Value{p3eStr("true")}),
-		"timeout":   p3eStr("soon"),
+		"container_id": p3eStr("web"),
+		"command":      tftypes.NewValue(tftypes.List{ElementType: tftypes.String}, []tftypes.Value{p3eStr("true")}),
+		"timeout":      p3eStr("soon"),
 	})
 	if !diags.HasError() {
 		t.Fatal("expected invalid timeout")
@@ -123,8 +125,8 @@ resource "docker_container" "exec" {
 }
 
 ephemeral "docker_exec_output" "token" {
-  container = docker_container.exec.id
-  command   = ["cat", "/tmp/token"]
+  container_id = docker_container.exec.id
+  command      = ["cat", "/tmp/token"]
 }
 
 provider "echo" {

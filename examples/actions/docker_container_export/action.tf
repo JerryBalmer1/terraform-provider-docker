@@ -15,7 +15,8 @@ resource "docker_container" "build" {
 #   terraform apply -invoke=action.docker_container_export.rootfs
 action "docker_container_export" "rootfs" {
   config {
-    container = docker_container.build.id
-    path      = "${path.module}/out/rootfs.tar"
+    container_id = docker_container.build.id
+    output       = "${path.module}/out/rootfs.tar"
+    result_path  = "${path.module}/out/rootfs.json"
   }
 }

@@ -13,6 +13,7 @@ resource "terraform_data" "bundle" {
 #   terraform apply -invoke=action.docker_image_load.bundle
 action "docker_image_load" "bundle" {
   config {
-    path = "${path.module}/images.tar"
+    input       = "${path.module}/images.tar"
+    result_path = "${path.module}/out/load-result.json"
   }
 }

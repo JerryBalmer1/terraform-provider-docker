@@ -32,6 +32,7 @@ type pluginDataSourceModel struct {
 	PluginReference types.String `tfsdk:"plugin_reference"`
 	Enabled         types.Bool   `tfsdk:"enabled"`
 	Env             types.Set    `tfsdk:"env"`
+	contractEnginePluginData
 }
 
 func (d *pluginDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -41,9 +42,9 @@ func (d *pluginDataSource) Metadata(_ context.Context, req datasource.MetadataRe
 func (d *pluginDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	one := []validator.String{stringvalidator.ExactlyOneOf(path.MatchRoot("id"), path.MatchRoot("alias"))}
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Looks up a managed plugin installed on the provider's daemon by `id` or `alias` (`PluginInspectWithRaw`). " +
-			"Fails if no such plugin exists.",
-		Attributes: map[string]schema.Attribute{
+		MarkdownDescription: "Looks up a managed plugin installed on the provider's daemon by `id` or `alias` (`GET /plugins/{name}/json`). " +
+			"Fails if no such plugin exists. The raw `inspect_json` output is sensitive because plugin settings can hold credentials.",
+		Attributes: contractAddDataSourceAttributes(map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Optional: true, Computed: true, Validators: one,
 				MarkdownDescription: "Plugin ID (or unique ID prefix). Exactly one of `id` and `alias` is required.",
@@ -64,7 +65,7 @@ func (d *pluginDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 				ElementType: types.StringType, Computed: true,
 				MarkdownDescription: "Current plugin settings as `KEY=VALUE`.",
 			},
-		},
+		}, "engine:plugin-data"),
 	}
 }
 
@@ -75,7 +76,7 @@ func (d *pluginDataSource) Configure(_ context.Context, req datasource.Configure
 func (d *pluginDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var m pluginDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
-	if resp.Diagnostics.HasError() || d.pd == nil {
+	if resp.Diagnostics.HasError() || d.pd == nil || !d.pd.gateItemAPI(ctx, "engine:plugin-data", &resp.Diagnostics) {
 		return
 	}
 	ref := m.ID.ValueString()
@@ -92,5 +93,6 @@ func (d *pluginDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	rm.Alias = m.Alias
 	pluginApply(&rm, &p)
 	m.ID, m.Alias, m.Name, m.PluginReference, m.Enabled, m.Env = rm.ID, rm.Alias, rm.Name, rm.PluginReference, rm.Enabled, rm.Env
+	resp.Diagnostics.Append(m.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": pRes.Raw}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

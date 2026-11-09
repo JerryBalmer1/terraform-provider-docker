@@ -30,6 +30,7 @@ type volumeDataSourceModel struct {
 	Labels     types.Map    `tfsdk:"labels"`
 	Mountpoint types.String `tfsdk:"mountpoint"`
 	Scope      types.String `tfsdk:"scope"`
+	contractEngineVolumeData
 }
 
 func (d *volumeDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -38,8 +39,9 @@ func (d *volumeDataSource) Metadata(_ context.Context, req datasource.MetadataRe
 
 func (d *volumeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Looks up an existing Docker volume by name.",
-		Attributes: map[string]schema.Attribute{
+		MarkdownDescription: "Looks up an existing Docker volume by name (`GET /volumes/{name}`). " +
+			"The raw `inspect_json` output is sensitive because driver options can hold credentials.",
+		Attributes: contractAddDataSourceAttributes(map[string]schema.Attribute{
 			"name":        schema.StringAttribute{Required: true, MarkdownDescription: "Volume name."},
 			"id":          schema.StringAttribute{Computed: true, MarkdownDescription: "Volume name (volumes have no separate ID)."},
 			"driver":      schema.StringAttribute{Computed: true, MarkdownDescription: "Volume driver."},
@@ -47,7 +49,7 @@ func (d *volumeDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 			"labels":      schema.MapAttribute{ElementType: types.StringType, Computed: true, MarkdownDescription: "Volume labels."},
 			"mountpoint":  schema.StringAttribute{Computed: true, MarkdownDescription: "Host path of the volume data."},
 			"scope":       schema.StringAttribute{Computed: true, MarkdownDescription: "`local` or `global`."},
-		},
+		}, "engine:volume-data"),
 	}
 }
 
@@ -78,7 +80,7 @@ func (d *volumeDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		resp.Diagnostics.AddError("Cannot find volume", err.Error())
 		return
 	}
-	v := vRes.Volume
-	state := volumeDataFromInspect(v)
+	state := volumeDataFromInspect(vRes.Volume)
+	resp.Diagnostics.Append(state.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": vRes.Raw}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

@@ -10,9 +10,11 @@ import (
 	"fmt"
 
 	"github.com/distribution/reference"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -37,7 +39,14 @@ type tagResourceModel struct {
 	SourceImage   types.String `tfsdk:"source_image"`
 	TargetImage   types.String `tfsdk:"target_image"`
 	SourceImageID types.String `tfsdk:"source_image_id"`
+	ImageRef      types.String `tfsdk:"image_ref"`
+	RepoDigests   types.List   `tfsdk:"repo_digests"`
+	Triggers      types.Map    `tfsdk:"triggers"`
+	contractEngineTag
 }
+
+// tagItem is the inventory item of docker_tag.
+const tagItem = "engine:tag"
 
 func (r *tagResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_tag"
@@ -45,33 +54,51 @@ func (r *tagResource) Metadata(_ context.Context, req resource.MetadataRequest, 
 
 func (r *tagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	replace := []planmodifier.String{stringplanmodifier.RequiresReplace()}
+	keep := []planmodifier.String{stringplanmodifier.UseStateForUnknown()}
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Adds a tag to an image already on the provider's daemon, like `docker tag SOURCE TARGET`. " +
 			"Create calls `ImageTag`; refresh inspects `target_image` and plans a re-tag when the tag is gone or now points at a different " +
 			"image than `source_image`. Destroy untags `target_image` only (`ImageRemove` on the tag, never by ID); when it is the image's " +
 			"only tag it is left in place with a warning, so the source image is never removed. Every argument forces a new resource.",
-		Attributes: map[string]schema.Attribute{
+		Attributes: contractAddResourceAttributes(map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "`<source_image_id>.<target_image>`.",
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				MarkdownDescription: "ID (`sha256:...`) of the tagged image, the image `source_image` resolved to.",
+				PlanModifiers:       keep,
+			},
+			"image_ref": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "The new tag in normalized `registry/repository:tag` form (implicit `latest` added).",
+				PlanModifiers:       keep,
+			},
+			"repo_digests": schema.ListAttribute{
+				Computed:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "Repository digest references (`repo@sha256:...`) the daemon knows for the tagged image (`RepoDigests`).",
+			},
+			"triggers": schema.MapAttribute{
+				Optional:    true,
+				ElementType: types.StringType,
+				MarkdownDescription: "Arbitrary string map; any change re-applies the tag (for example after `source_image` was rebuilt under the same name). " +
+					"Forces replacement.",
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.RequiresReplace()},
 			},
 			"source_image": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "Existing image to tag: a name, `name:tag`, or image ID (e.g. a `docker_image`'s `image_id`). Changing this forces a new resource.",
+				MarkdownDescription: "Existing image to tag: a name, `name:tag`, or image ID (e.g. a `docker_image`'s `id`). Forces replacement.",
 				PlanModifiers:       replace,
 			},
 			"target_image": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "New reference, `repository[:tag]` (no tag means `latest`), e.g. `registry.example.com/app:1.0`. Changing this forces a new resource.",
+				MarkdownDescription: "New reference, `repository[:tag]` (no tag means `latest`), e.g. `registry.example.com/app:1.0`. Forces replacement.",
 				PlanModifiers:       replace,
 			},
 			"source_image_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "ID (`sha256:...`) of the image `source_image` resolved to when the tag was set.",
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers:       keep,
 			},
-		},
+		}, tagItem),
 	}
 }
 
@@ -126,7 +153,8 @@ func (r *tagResource) Create(ctx context.Context, req resource.CreateRequest, re
 		return
 	}
 	plan.SourceImageID = types.StringValue(insp.ID)
-	plan.ID = types.StringValue(insp.ID + "." + tgt)
+	plan.ID = types.StringValue(insp.ID)
+	resp.Diagnostics.Append(tagFillOutputs(ctx, r.pd, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -165,13 +193,23 @@ func (r *tagResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 		resp.State.RemoveResource(ctx)
 		return
 	}
+	if state.ID.ValueString() != state.SourceImageID.ValueString() && state.SourceImageID.ValueString() != "" {
+		state.ID = state.SourceImageID // state written before Pass 5: id was "<image id>.<target>"
+	}
+	resp.Diagnostics.Append(tagFillOutputs(ctx, r.pd, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *tagResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	// Every argument forces replacement; nothing to do in place.
-	var plan tagResourceModel
+	var plan, st tagResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &st)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	plan.ID, plan.SourceImageID, plan.ImageRef, plan.RepoDigests = st.ID, st.SourceImageID, st.ImageRef, st.RepoDigests
+	plan.contractEngineTag = st.contractEngineTag
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -238,4 +276,22 @@ func tagHasOtherTag(tags []string, target string) bool {
 		}
 	}
 	return false
+}
+
+// tagFillOutputs fills image_ref, repo_digests and the contract outputs from
+// GET /images/{target}/json.
+func tagFillOutputs(ctx context.Context, pd *providerData, m *tagResourceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+	tgt := m.TargetImage.ValueString()
+	m.ImageRef = stringOrNull(imgNormalizedRef(tgt))
+	insp, raw, err := imgInspectRaw(ctx, pd, tgt, false)
+	if err != nil {
+		diags.AddError("Cannot inspect tag", fmt.Sprintf("%s: %v", tgt, err))
+		m.RepoDigests = types.ListNull(types.StringType)
+		m.contractSetNull()
+		return diags
+	}
+	m.RepoDigests = stringListValue(insp.RepoDigests, false)
+	diags.Append(m.contractFill(ctx, pd, contractFillInput{Raw: map[string][]byte{"inspect_json": raw}})...)
+	return diags
 }

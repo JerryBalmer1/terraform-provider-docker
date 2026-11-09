@@ -16,45 +16,61 @@ import (
 
 func p3eLogsFake(t *testing.T, tty bool) (*p3eFake, *providerData) {
 	f, pd := newP3eFake(t)
+	f.json("GET /version", map[string]string{"Version": "29.0.0", "ApiVersion": "1.47"})
 	f.json("GET /containers/web/json", container.InspectResponse{
 		ID:     "cid1",
+		Name:   "/web",
 		Config: &container.Config{Tty: tty},
 	})
 	f.on("GET /containers/cid1/logs", func(w http.ResponseWriter, _ *http.Request) {
 		if tty {
 			w.Header().Set("Content-Type", "application/vnd.docker.raw-stream")
-			_, _ = w.Write([]byte("tty one\r\ntty two\r\n"))
+			_, _ = w.Write([]byte("2026-01-02T03:04:05.000000001Z tty one\r\n2026-01-02T03:04:06.000000001Z tty two\r\n"))
 			return
 		}
 		w.Header().Set("Content-Type", "application/vnd.docker.multiplexed-stream")
-		_, _ = newTestStdWriter(w, stdcopy.Stdout).Write([]byte("out one\n"))
-		_, _ = newTestStdWriter(w, stdcopy.Stderr).Write([]byte("err one\n"))
-		_, _ = newTestStdWriter(w, stdcopy.Stdout).Write([]byte("out two\n"))
+		_, _ = newTestStdWriter(w, stdcopy.Stdout).Write([]byte("2026-01-02T03:04:05.000000001Z out one\n"))
+		_, _ = newTestStdWriter(w, stdcopy.Stderr).Write([]byte("2026-01-02T03:04:06.000000001Z err one\n"))
+		_, _ = newTestStdWriter(w, stdcopy.Stdout).Write([]byte("2026-01-02T03:04:07.000000001Z out two\n"))
 	})
 	return f, pd
 }
 
+// p3eLogLines returns "<stream>:<message>" per log entry.
 func p3eLogLines(t *testing.T, cfg map[string]tftypes.Value, pd *providerData) []string {
 	t.Helper()
-	state, diags := p3eReadDS(t, NewP3LogsDataSource(), pd, cfg)
+	state, diags := p3eReadDS(t, NewContainerLogsDataSource(), pd, cfg)
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
-	var lines []string
-	state.GetAttribute(context.Background(), path.Root("logs_list_string"), &lines)
+	var entries []struct {
+		Timestamp string `tfsdk:"timestamp"`
+		Stream    string `tfsdk:"stream"`
+		Source    string `tfsdk:"source"`
+		Message   string `tfsdk:"message"`
+	}
+	if d := state.GetAttribute(context.Background(), path.Root("log_entries"), &entries); d.HasError() {
+		t.Fatal(d)
+	}
+	lines := []string{}
+	for _, e := range entries {
+		if e.Source != "web" || e.Timestamp == "" {
+			t.Errorf("entry %+v: want source web and a timestamp", e)
+		}
+		lines = append(lines, e.Stream+":"+e.Message)
+	}
 	return lines
 }
 
 func TestP3LogsDemux(t *testing.T) {
 	f, pd := p3eLogsFake(t, false)
 	got := p3eLogLines(t, map[string]tftypes.Value{
-		"container":   p3eStr("web"),
-		"tail":        p3eStr("50"),
-		"since":       p3eStr("10m"),
-		"timestamps":  tftypes.NewValue(tftypes.Bool, true),
-		"show_stderr": tftypes.NewValue(tftypes.Bool, true),
+		"container": p3eStr("web"),
+		"tail":      tftypes.NewValue(tftypes.Number, 50),
+		"since":     p3eStr("10m"),
+		"stderr":    tftypes.NewValue(tftypes.Bool, true),
 	}, pd)
-	if want := []string{"out one", "err one", "out two"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"stdout:out one", "stderr:err one", "stdout:out two"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("lines = %q, want %q", got, want)
 	}
 	var q string
@@ -73,33 +89,66 @@ func TestP3LogsDemux(t *testing.T) {
 func TestP3LogsTTY(t *testing.T) {
 	_, pd := p3eLogsFake(t, true)
 	got := p3eLogLines(t, map[string]tftypes.Value{"container": p3eStr("web")}, pd)
-	if want := []string{"tty one", "tty two"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"combined:tty one", "combined:tty two"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("lines = %q, want %q", got, want)
 	}
 }
 
 func TestP3LogsNoStream(t *testing.T) {
 	_, pd := p3eLogsFake(t, false)
-	_, diags := p3eReadDS(t, NewP3LogsDataSource(), pd, map[string]tftypes.Value{
-		"container":   p3eStr("web"),
-		"show_stdout": tftypes.NewValue(tftypes.Bool, false),
-		"show_stderr": tftypes.NewValue(tftypes.Bool, false),
+	_, diags := p3eReadDS(t, NewContainerLogsDataSource(), pd, map[string]tftypes.Value{
+		"container": p3eStr("web"),
+		"stdout":    tftypes.NewValue(tftypes.Bool, false),
+		"stderr":    tftypes.NewValue(tftypes.Bool, false),
 	})
 	if !diags.HasError() {
 		t.Fatal("expected an error with both streams off")
 	}
 }
 
-func TestP3SplitLines(t *testing.T) {
-	for in, want := range map[string][]string{
-		"":         {},
-		"a":        {"a"},
-		"a\nb\n":   {"a", "b"},
-		"a\r\n\nb": {"a", "", "b"},
-	} {
-		if got := p3SplitLines(in); !reflect.DeepEqual(got, want) {
-			t.Errorf("p3SplitLines(%q) = %q, want %q", in, got, want)
+func TestCopLogsTailAndRaw(t *testing.T) {
+	f, pd := p3eLogsFake(t, false)
+	state, diags := p3eReadDS(t, NewContainerLogsDataSource(), pd, map[string]tftypes.Value{
+		"container": p3eStr("web"),
+		"tail":      tftypes.NewValue(tftypes.Number, 2),
+	})
+	if diags.HasError() {
+		t.Fatal(diags)
+	}
+	var logs, id, sum, ver string
+	state.GetAttribute(context.Background(), path.Root("logs"), &logs)
+	state.GetAttribute(context.Background(), path.Root("container_id"), &id)
+	state.GetAttribute(context.Background(), path.Root("content_sha256"), &sum)
+	state.GetAttribute(context.Background(), path.Root("docker_server_version"), &ver)
+	if id != "cid1" || len(sum) != 64 || ver != "29.0.0" {
+		t.Errorf("container_id=%q content_sha256=%q docker_server_version=%q", id, sum, ver)
+	}
+	if strings.Contains(logs, "out one") || !strings.Contains(logs, "err one") || !strings.Contains(logs, "out two") {
+		t.Errorf("tail 2 kept the wrong lines: %q", logs)
+	}
+	for _, s := range f.requests() {
+		if strings.HasPrefix(s, "GET /containers/cid1/logs?") && !strings.Contains(s, "tail=2") {
+			t.Errorf("query %q lacks tail=2", s)
 		}
+	}
+}
+
+func TestCopLogsBadUntil(t *testing.T) {
+	_, pd := p3eLogsFake(t, false)
+	_, diags := p3eReadDS(t, NewContainerLogsDataSource(), pd, map[string]tftypes.Value{
+		"container": p3eStr("web"),
+		"until":     p3eStr("yesterday"),
+	})
+	if !diags.HasError() {
+		t.Fatal("expected an error for until = yesterday")
+	}
+}
+
+func TestCopLogsMissingContainer(t *testing.T) {
+	_, pd := p3eLogsFake(t, false)
+	_, diags := p3eReadDS(t, NewContainerLogsDataSource(), pd, map[string]tftypes.Value{"container": p3eStr("nope")})
+	if !diags.HasError() {
+		t.Fatal("expected an error for a missing container")
 	}
 }
 
@@ -115,14 +164,15 @@ resource "docker_container" "logs" {
   command = ["sh", "-c", "echo hello-logs; echo oops >&2; sleep 3600"]
 }
 
-data "docker_logs" "l" {
+data "docker_container_logs" "l" {
   container  = docker_container.logs.id
   depends_on = [docker_container.logs]
 }
 `,
 			Check: resource.ComposeAggregateTestCheckFunc(
-				resource.TestCheckTypeSetElemAttr("data.docker_logs.l", "logs_list_string.*", "hello-logs"),
-				resource.TestCheckTypeSetElemAttr("data.docker_logs.l", "logs_list_string.*", "oops"),
+				resource.TestCheckTypeSetElemNestedAttrs("data.docker_container_logs.l", "log_entries.*", map[string]string{"stream": "stdout", "message": "hello-logs"}),
+				resource.TestCheckTypeSetElemNestedAttrs("data.docker_container_logs.l", "log_entries.*", map[string]string{"stream": "stderr", "message": "oops"}),
+				resource.TestCheckResourceAttrSet("data.docker_container_logs.l", "content_sha256"),
 			),
 		}},
 	})
