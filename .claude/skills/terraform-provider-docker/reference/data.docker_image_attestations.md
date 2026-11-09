@@ -11,7 +11,7 @@ Reads the in-toto attestations (SBOM, provenance) stored with a local image (`GE
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `attestations` | `list(object)` | computed |  |  | The GET /images/{name}/attestations response as a nested object, field by field. |
-| `attestations_json` | `string` | computed |  | yes | The exact Engine API GET /images/{name}/attestations response as JSON. |
+| `attestations_json` | `string` | computed |  | yes | The Engine API GET /images/{name}/attestations response as JSON; entries in the Engine's order. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `content_sha256` | `string` | computed |  |  | sha256 of attestations_json. |
 | `digests` | `list(string)` | computed |  |  | Digests of the attestation manifests (`Descriptor.digest`), in response order. |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |

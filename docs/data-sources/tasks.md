@@ -48,7 +48,7 @@ data "docker_tasks" "on_worker1" {
 - `ids` (List of String) IDs of the matching objects, in the order of `tasks`.
 - `names` (List of String) Names of the matching objects, in the order of `tasks`.
 - `tasks` (Attributes List) Every task returned by the list endpoint, each mirroring Task field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans. (see [below for nested schema](#nestedatt--tasks))
-- `tasks_json` (String, Sensitive) The exact list response (JSON array of Task) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.
+- `tasks_json` (String, Sensitive) The Engine API GET /tasks response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.
 
 <a id="nestedatt--tasks"></a>
 ### Nested Schema for `tasks`

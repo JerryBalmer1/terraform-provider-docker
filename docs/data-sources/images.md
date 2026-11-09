@@ -44,7 +44,7 @@ output "nginx_image_ids" {
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `ids` (List of String) IDs of the listed images, sorted.
 - `images` (Attributes List) The GET /images/json response as a nested object, field by field. (see [below for nested schema](#nestedatt--images))
-- `images_json` (String) The exact Engine API GET /images/json response as JSON.
+- `images_json` (String) The Engine API GET /images/json response as JSON; entries sorted by ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 
 <a id="nestedatt--images"></a>
 ### Nested Schema for `images`

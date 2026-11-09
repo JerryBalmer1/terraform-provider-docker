@@ -21,7 +21,7 @@ Reads the current manifest digest and platforms of an image tag from its registr
 | `image_ref` | `string` | computed |  |  | Normalized `<registry>/<repository>:<tag>` of `name`. |
 | `insecure_skip_verify` | `bool` | optional |  |  | Accepted for configurations migrated from other providers; it has no effect. The read goes through the daemon, which follows its own `insecure-registries` setting. |
 | `inspect` | `object` | computed |  |  | Full DistributionInspect, field by field. |
-| `inspect_json` | `string` | computed |  |  | The Engine API response body as JSON. |
+| `inspect_json` | `string` | computed |  |  | The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `labels` | `map(string)` | computed |  |  | Always null: the distribution endpoint returns no image config. Present so both image data sources share one shape. |
 | `manifests` | `list(object)` | computed |  |  | Per-platform manifests in one shape for both data sources; `filled_by` on each field says which side fills it. |
 | `name` | `string` | required |  |  | Image reference in the registry, e.g. `nginx:1.27` or `ghcr.io/org/app:main` (no tag means `latest`). |

@@ -18,7 +18,7 @@ Lists the swarm's nodes (`GET /nodes`) through the provider's Docker host (which
 | `name` | `string` | optional |  |  | Only objects whose name matches (Engine `name` filter, a prefix/substring match). |
 | `names` | `list(string)` | computed |  |  | Names of the matching objects, in the order of `nodes`. |
 | `nodes` | `list(object)` | computed |  |  | Every node returned by the list endpoint, each mirroring Node field by field (snake_case). |
-| `nodes_json` | `string` | computed |  |  | The exact list response (JSON array of Node) as returned by the Engine API. |
+| `nodes_json` | `string` | computed |  |  | The Engine API GET /nodes response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `role` | `string` | optional |  |  | Only list nodes with this role: `worker` or `manager`. |
 
 ### `nodes`

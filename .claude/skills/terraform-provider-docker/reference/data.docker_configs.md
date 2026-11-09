@@ -11,7 +11,7 @@ Lists the swarm's configs (`GET /configs`), sorted by name, with their content (
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `configs` | `list(object)` | computed |  |  | Every config returned by the list endpoint, each mirroring Config field by field (snake_case). |
-| `configs_json` | `string` | computed |  |  | The exact list response (JSON array of Config) as returned by the Engine API. |
+| `configs_json` | `string` | computed |  |  | The Engine API GET /configs response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `content_sha256` | `string` | computed |  |  | SHA-256 of configs_json; changes whenever the object changes. |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
 | `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |

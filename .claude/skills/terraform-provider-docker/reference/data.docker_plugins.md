@@ -18,7 +18,7 @@ Lists the managed plugins installed on the provider's Docker host (`GET /plugins
 | `ids` | `list(string)` | computed |  |  | IDs of the listed plugins, in the order of `plugins`. |
 | `names` | `list(string)` | computed |  |  | Names of the listed plugins (e.g. `vieux/sshfs:latest`), in the order of `plugins`. |
 | `plugins` | `list(object)` | computed |  |  | The GET /plugins response as a nested object, field by field. |
-| `plugins_json` | `string` | computed |  | yes | The exact Engine API GET /plugins response as JSON. |
+| `plugins_json` | `string` | computed |  | yes | The Engine API GET /plugins response as JSON; entries sorted by name. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 
 ### `plugins`
 

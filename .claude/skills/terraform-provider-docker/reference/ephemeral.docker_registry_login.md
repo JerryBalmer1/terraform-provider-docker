@@ -27,7 +27,7 @@ ephemeral "docker_registry_login" "<name>" {
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `auth` | `object` | computed |  |  | The POST /auth response as a nested object, field by field. |
-| `auth_json` | `string` | computed |  | yes | The exact Engine API POST /auth response as JSON. |
+| `auth_json` | `string` | computed |  | yes | The Engine API POST /auth response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `content_sha256` | `string` | computed |  |  | sha256 of auth_json. |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |

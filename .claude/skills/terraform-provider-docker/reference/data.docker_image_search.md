@@ -17,7 +17,7 @@ Searches Docker Hub (or the registry named in `term`) through the daemon, like `
 | `limit` | `number` | optional |  |  | Maximum number of results (`--limit`), 1 to 100. Default: the registry's (25 on Docker Hub). |
 | `names` | `list(string)` | computed |  |  | Repository names found, in result order. |
 | `results` | `list(object)` | computed |  |  | The GET /images/search response as a nested object, field by field. |
-| `results_json` | `string` | computed |  |  | The exact Engine API GET /images/search response as JSON. |
+| `results_json` | `string` | computed |  |  | The Engine API GET /images/search response as JSON; results in the Engine's order. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `stars` | `number` | optional |  |  | Only images with at least this many stars (`--filter stars`). |
 | `term` | `string` | required |  |  | Search term, e.g. `nginx` or `registry.example.com/team`. |
 

@@ -21,7 +21,7 @@ Lists swarm tasks (`GET /tasks`), like `docker service ps`, `docker node ps` and
 | `node_id` | `string` | optional |  |  | Only tasks on this node (ID or name; Engine `node` filter). |
 | `service_id` | `string` | optional |  |  | Only tasks of this service (ID or name; Engine `service` filter). |
 | `tasks` | `list(object)` | computed |  |  | Every task returned by the list endpoint, each mirroring Task field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans. |
-| `tasks_json` | `string` | computed |  | yes | The exact list response (JSON array of Task) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans. |
+| `tasks_json` | `string` | computed |  | yes | The Engine API GET /tasks response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans. |
 
 ### `tasks`
 

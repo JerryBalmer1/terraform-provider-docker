@@ -15,7 +15,7 @@ Reads the swarm the provider's Docker host manages (`GET /swarm`): ID, spec, joi
 | `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
 | `id` | `string` | computed |  |  | Swarm cluster ID (`ClusterInfo.ID`). |
 | `inspect` | `object` | computed |  |  | The swarm (its ClusterInfo part) inspect response as a nested object mirroring ClusterInfo field by field (snake_case). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here. |
-| `inspect_json` | `string` | computed |  |  | The exact Engine API inspect response for the swarm (its ClusterInfo part), as JSON. JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here. |
+| `inspect_json` | `string` | computed |  |  | The Engine API GET /swarm (its ClusterInfo part) response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here. |
 | `join_tokens` | `object` | computed |  | yes | Swarm.JoinTokens (worker and manager join tokens). Sensitive: anyone holding a token can join the swarm. |
 | `labels` | `map(string)` | computed |  |  | Labels on the swarm (`Spec.Labels`). |
 | `manager_join_token` | `string` | computed |  | yes | Token that joins a node as a manager. |

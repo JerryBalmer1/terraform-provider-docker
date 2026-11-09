@@ -36,7 +36,7 @@ output "engine" {
 - `id` (String) ID of the daemon that answered (`ID` in `GET /info`).
 - `platform_name` (String) Platform name of the daemon, e.g. `Docker Engine - Community`.
 - `version` (Attributes) The GET /version response as a nested object, field by field. (see [below for nested schema](#nestedatt--version))
-- `version_json` (String) The exact Engine API GET /version response as JSON.
+- `version_json` (String) The Engine API GET /version response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 
 <a id="nestedatt--version"></a>
 ### Nested Schema for `version`

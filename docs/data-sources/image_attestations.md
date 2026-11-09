@@ -42,7 +42,7 @@ output "sbom_digests" {
 ### Read-Only
 
 - `attestations` (Attributes List) The GET /images/{name}/attestations response as a nested object, field by field. (see [below for nested schema](#nestedatt--attestations))
-- `attestations_json` (String, Sensitive) The exact Engine API GET /images/{name}/attestations response as JSON.
+- `attestations_json` (String, Sensitive) The Engine API GET /images/{name}/attestations response as JSON; entries in the Engine's order. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 - `content_sha256` (String) sha256 of attestations_json.
 - `digests` (List of String) Digests of the attestation manifests (`Descriptor.digest`), in response order.
 - `docker_server_version` (String) Docker Engine version from GET /version.

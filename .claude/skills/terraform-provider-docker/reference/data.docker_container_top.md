@@ -17,7 +17,7 @@ Lists the processes running in a container, like `docker container top`. `top.ti
 | `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `ps_args` | `string` | optional |  |  | Arguments for `ps` on the host (Engine `ps_args`), e.g. `aux`. Default `-ef`. |
 | `top` | `object` | computed |  |  | The GET /containers/{id}/top response as a nested object, field by field. |
-| `top_json` | `string` | computed |  |  | The exact Engine API GET /containers/{id}/top response as JSON. |
+| `top_json` | `string` | computed |  |  | The Engine API GET /containers/{id}/top response as JSON; process rows in the order ps printed them. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 
 ### `top`
 

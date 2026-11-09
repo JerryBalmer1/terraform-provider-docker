@@ -11,7 +11,7 @@ Lists the filesystem changes of a container against its image, like `docker cont
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `changes` | `list(object)` | computed |  |  | The GET /containers/{id}/changes response as a nested object, field by field. |
-| `changes_json` | `string` | computed |  |  | The exact Engine API GET /containers/{id}/changes response as JSON. |
+| `changes_json` | `string` | computed |  |  | The Engine API GET /containers/{id}/changes response as JSON; entries sorted by Path. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `container` | `string` | required |  |  | The container to read, by ID or name. |
 | `container_id` | `string` | computed |  |  | ID of the container the changes were read from. |
 | `content_sha256` | `string` | computed |  |  | sha256 of changes_json. |

@@ -34,7 +34,7 @@ output "nginx_configs" {
 ### Read-Only
 
 - `configs` (Attributes List) Every config returned by the list endpoint, each mirroring Config field by field (snake_case). (see [below for nested schema](#nestedatt--configs))
-- `configs_json` (String) The exact list response (JSON array of Config) as returned by the Engine API.
+- `configs_json` (String) The Engine API GET /configs response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 - `content_sha256` (String) SHA-256 of configs_json; changes whenever the object changes.
 - `docker_server_version` (String) Docker Engine version of the daemon the provider talked to (GET /version Version).
 - `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).

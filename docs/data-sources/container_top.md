@@ -41,7 +41,7 @@ output "web_processes" {
 - `docker_server_version` (String) Docker Engine version from GET /version.
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `top` (Attributes) The GET /containers/{id}/top response as a nested object, field by field. (see [below for nested schema](#nestedatt--top))
-- `top_json` (String) The exact Engine API GET /containers/{id}/top response as JSON.
+- `top_json` (String) The Engine API GET /containers/{id}/top response as JSON; process rows in the order ps printed them. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 
 <a id="nestedatt--top"></a>
 ### Nested Schema for `top`

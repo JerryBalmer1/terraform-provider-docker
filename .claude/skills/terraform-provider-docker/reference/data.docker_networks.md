@@ -21,7 +21,7 @@ Lists the networks on the provider's Docker host (`GET /networks`), like `docker
 | `name` | `string` | optional |  |  | Only networks whose name matches (Engine `name` filter, a substring match). |
 | `names` | `list(string)` | computed |  |  | Names of the listed networks, in the order of `networks`. |
 | `networks` | `list(object)` | computed |  |  | The GET /networks response as a nested object, field by field. |
-| `networks_json` | `string` | computed |  |  | The exact Engine API GET /networks response as JSON. |
+| `networks_json` | `string` | computed |  |  | The Engine API GET /networks response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `scope` | `string` | optional |  |  | Only networks of this scope: `local`, `swarm` or `global`. |
 | `type` | `string` | optional |  |  | `custom` lists only user-defined networks, `builtin` only the predefined `bridge`, `host` and `none`. |
 

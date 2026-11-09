@@ -54,7 +54,7 @@ output "app_digest" {
 - `content_sha256` (String) sha256 of distribution_json.
 - `digest` (String) Manifest (or index) digest (`sha256:...`) of the pushed image in the registry (DistributionInspect `Descriptor.digest`).
 - `distribution` (Attributes) The GET /distribution/{name}/json response as a nested object, field by field. (see [below for nested schema](#nestedatt--distribution))
-- `distribution_json` (String) The exact Engine API GET /distribution/{name}/json response as JSON.
+- `distribution_json` (String) The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 - `docker_server_version` (String) Docker Engine version from GET /version.
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `id` (String) The pushed reference (same as `name`).

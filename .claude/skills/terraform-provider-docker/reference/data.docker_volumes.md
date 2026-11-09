@@ -19,7 +19,7 @@ Lists the volumes on the provider's Docker host (`GET /volumes`), like `docker v
 | `name` | `string` | optional |  |  | Only volumes whose name matches (Engine `name` filter, a substring match). |
 | `names` | `list(string)` | computed |  |  | Names of the listed volumes, sorted. |
 | `volumes` | `object` | computed |  |  | The GET /volumes response as a nested object, field by field. |
-| `volumes_json` | `string` | computed |  | yes | The exact Engine API GET /volumes response as JSON. |
+| `volumes_json` | `string` | computed |  | yes | The Engine API GET /volumes response as JSON; Volumes sorted by name. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 
 ### `volumes`
 

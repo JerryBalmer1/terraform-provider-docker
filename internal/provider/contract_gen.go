@@ -3359,7 +3359,7 @@ var contractItems = map[string]*contractItem{
 		ID: "engine:container-changes", Kind: "data_source", Name: "docker_container_changes", MinAPI: "",
 		Outputs: []contractOutput{
 			{Name: "container_id", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "ID of the inspected container."},
-			{Name: "changes_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact Engine API GET /containers/{id}/changes response as JSON.", Serializes: "changes"},
+			{Name: "changes_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /containers/{id}/changes response as JSON; entries sorted by Path. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "changes"},
 			{Name: "changes", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "The GET /containers/{id}/changes response as a nested object, field by field.", FieldsComplete: true, Fields: []contractField{
 				{Name: "path", Upstream: "Path", TFType: "string"},
 				{Name: "kind", Upstream: "Kind", TFType: "number"},
@@ -3570,7 +3570,7 @@ var contractItems = map[string]*contractItem{
 		Outputs: []contractOutput{
 			{Name: "container_id", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "ID of the container the file was read from."},
 			{Name: "path", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Path inside the container."},
-			{Name: "stat_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The decoded X-Docker-Container-Path-Stat header (HEAD /containers/{id}/archive) as JSON.", Serializes: "stat"},
+			{Name: "stat_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The decoded X-Docker-Container-Path-Stat header (HEAD /containers/{id}/archive) as JSON. Re-encoded, not byte-exact: the client decodes the header, so this is the decoded value written as canonical JSON (keys sorted, compact).", Serializes: "stat"},
 			{Name: "stat", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: false, Description: "The path stat as a nested object. Keys come from the base64 JSON in the header (moby container.PathStat); swagger documents the header but not its keys.", FieldsComplete: true, Fields: []contractField{
 				{Name: "name", Upstream: "name", TFType: "string"},
 				{Name: "size", Upstream: "size", TFType: "number"},
@@ -3858,7 +3858,7 @@ var contractItems = map[string]*contractItem{
 		ID: "engine:container-top", Kind: "data_source", Name: "docker_container_top", MinAPI: "",
 		Outputs: []contractOutput{
 			{Name: "container_id", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "ID of the inspected container."},
-			{Name: "top_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact Engine API GET /containers/{id}/top response as JSON.", Serializes: "top"},
+			{Name: "top_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /containers/{id}/top response as JSON; process rows in the order ps printed them. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "top"},
 			{Name: "top", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: false, Description: "The GET /containers/{id}/top response as a nested object, field by field.", FieldsComplete: true, Fields: []contractField{
 				{Name: "titles", Upstream: "Titles", TFType: "list(string)"},
 				{Name: "processes", Upstream: "Processes", TFType: "list(list(string))"},
@@ -3945,7 +3945,7 @@ var contractItems = map[string]*contractItem{
 		ID: "engine:containers", Kind: "data_source", Name: "docker_containers", MinAPI: "",
 		Outputs: []contractOutput{
 			{Name: "ids", Category: "identity", TFType: "list(string)", Sensitive: false, KnownAfterApply: false, Description: "IDs of the listed containers."},
-			{Name: "containers_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact Engine API GET /containers/json response as JSON.", Serializes: "containers"},
+			{Name: "containers_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /containers/json response as JSON; entries sorted by first name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "containers"},
 			{Name: "containers", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "The GET /containers/json response as a nested object, field by field.", FieldsComplete: false, Fields: []contractField{
 				{Name: "id", Upstream: "Id", TFType: "string"},
 				{Name: "names", Upstream: "Names", TFType: "list(string)"},
@@ -4227,7 +4227,7 @@ var contractItems = map[string]*contractItem{
 		Outputs: []contractOutput{
 			{Name: "image_ref", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The image reference whose attestations were read."},
 			{Name: "digests", Category: "identity", TFType: "list(string)", Sensitive: false, KnownAfterApply: false, Description: "Digests of the attestation manifests (AttestationStatement.Descriptor.digest)."},
-			{Name: "attestations_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The exact Engine API GET /images/{name}/attestations response as JSON.", Serializes: "attestations"},
+			{Name: "attestations_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The Engine API GET /images/{name}/attestations response as JSON; entries in the Engine's order. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "attestations"},
 			{Name: "attestations", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "The GET /images/{name}/attestations response as a nested object, field by field.", FieldsComplete: false, Fields: []contractField{
 				{Name: "descriptor", Upstream: "Descriptor", TFType: "object({...})", Fields: []contractField{
 					{Name: "media_type", Upstream: "mediaType", TFType: "string"},
@@ -4417,7 +4417,7 @@ var contractItems = map[string]*contractItem{
 		ID: "engine:image-history", Kind: "data_source", Name: "docker_image_history", MinAPI: "",
 		Outputs: []contractOutput{
 			{Name: "id", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "ID of the image (first history entry)."},
-			{Name: "history_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The exact Engine API GET /images/{name}/history response as JSON.", Serializes: "history"},
+			{Name: "history_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The Engine API GET /images/{name}/history response as JSON; layers in the Engine's order (newest first). Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "history"},
 			{Name: "history", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "The GET /images/{name}/history response as a nested object, field by field.", FieldsComplete: true, Fields: []contractField{
 				{Name: "id", Upstream: "Id", TFType: "string"},
 				{Name: "created", Upstream: "Created", TFType: "number"},
@@ -4504,7 +4504,7 @@ var contractItems = map[string]*contractItem{
 		ID: "engine:image-search", Kind: "data_source", Name: "docker_image_search", MinAPI: "",
 		Outputs: []contractOutput{
 			{Name: "names", Category: "identity", TFType: "list(string)", Sensitive: false, KnownAfterApply: false, Description: "Repository names found."},
-			{Name: "results_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact Engine API GET /images/search response as JSON.", Serializes: "results"},
+			{Name: "results_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /images/search response as JSON; results in the Engine's order. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "results"},
 			{Name: "results", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "The GET /images/search response as a nested object, field by field.", FieldsComplete: true, Fields: []contractField{
 				{Name: "description", Upstream: "description", TFType: "string"},
 				{Name: "is_official", Upstream: "is_official", TFType: "bool"},
@@ -4521,7 +4521,7 @@ var contractItems = map[string]*contractItem{
 		ID: "engine:images", Kind: "data_source", Name: "docker_images", MinAPI: "",
 		Outputs: []contractOutput{
 			{Name: "ids", Category: "identity", TFType: "list(string)", Sensitive: false, KnownAfterApply: false, Description: "IDs of the listed images."},
-			{Name: "images_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact Engine API GET /images/json response as JSON.", Serializes: "images"},
+			{Name: "images_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /images/json response as JSON; entries sorted by ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "images"},
 			{Name: "images", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "The GET /images/json response as a nested object, field by field.", FieldsComplete: false, Fields: []contractField{
 				{Name: "id", Upstream: "Id", TFType: "string"},
 				{Name: "parent_id", Upstream: "ParentId", TFType: "string"},
@@ -4562,7 +4562,7 @@ var contractItems = map[string]*contractItem{
 		Outputs: []contractOutput{
 			{Name: "id", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Daemon ID."},
 			{Name: "name", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Daemon host name."},
-			{Name: "info_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact Engine API GET /info response as JSON.", Serializes: "info"},
+			{Name: "info_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /info response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "info"},
 			{Name: "info", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: false, Description: "The GET /info response as a nested object, field by field.", FieldsComplete: false, Fields: []contractField{
 				{Name: "id", Upstream: "ID", TFType: "string"},
 				{Name: "containers", Upstream: "Containers", TFType: "number"},
@@ -4796,7 +4796,7 @@ var contractItems = map[string]*contractItem{
 		ID: "engine:networks", Kind: "data_source", Name: "docker_networks", MinAPI: "",
 		Outputs: []contractOutput{
 			{Name: "ids", Category: "identity", TFType: "list(string)", Sensitive: false, KnownAfterApply: false, Description: "IDs of the listed networks."},
-			{Name: "networks_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact Engine API GET /networks response as JSON.", Serializes: "networks"},
+			{Name: "networks_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /networks response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "networks"},
 			{Name: "networks", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "The GET /networks response as a nested object, field by field.", FieldsComplete: false, Fields: []contractField{
 				{Name: "name", Upstream: "Name", TFType: "string"},
 				{Name: "id", Upstream: "Id", TFType: "string"},
@@ -4945,7 +4945,7 @@ var contractItems = map[string]*contractItem{
 		ID: "engine:plugins", Kind: "data_source", Name: "docker_plugins", MinAPI: "1.25",
 		Outputs: []contractOutput{
 			{Name: "ids", Category: "identity", TFType: "list(string)", Sensitive: false, KnownAfterApply: false, Description: "IDs of the listed plugins."},
-			{Name: "plugins_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The exact Engine API GET /plugins response as JSON.", Serializes: "plugins"},
+			{Name: "plugins_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The Engine API GET /plugins response as JSON; entries sorted by name. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "plugins"},
 			{Name: "plugins", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "The GET /plugins response as a nested object, field by field.", FieldsComplete: false, Fields: []contractField{
 				{Name: "id", Upstream: "Id", TFType: "string"},
 				{Name: "name", Upstream: "Name", TFType: "string"},
@@ -4985,7 +4985,7 @@ var contractItems = map[string]*contractItem{
 		Outputs: []contractOutput{
 			{Name: "server_address", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Registry the credentials were checked against."},
 			{Name: "username", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "User name the login was made with."},
-			{Name: "auth_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The exact Engine API POST /auth response as JSON.", Serializes: "auth"},
+			{Name: "auth_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The Engine API POST /auth response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "auth"},
 			{Name: "auth", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: false, Description: "The POST /auth response as a nested object, field by field.", FieldsComplete: true, Fields: []contractField{
 				{Name: "status", Upstream: "Status", TFType: "string"},
 				{Name: "identity_token", Upstream: "IdentityToken", TFType: "string", Sensitive: true},
@@ -5003,7 +5003,7 @@ var contractItems = map[string]*contractItem{
 			{Name: "digest", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "Manifest (or index) digest in the registry after push (DistributionInspect.Descriptor.digest)."},
 			{Name: "image_digest_ref", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "Pinned reference repo@sha256:..."},
 			{Name: "platforms", Category: "identity", TFType: "list(string)", Sensitive: false, KnownAfterApply: true, Description: "Platforms in the pushed manifest as os/arch[/variant]."},
-			{Name: "distribution_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "The exact Engine API GET /distribution/{name}/json response as JSON.", Serializes: "distribution"},
+			{Name: "distribution_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "distribution"},
 			{Name: "distribution", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: true, Description: "The GET /distribution/{name}/json response as a nested object, field by field.", FieldsComplete: false, Fields: []contractField{
 				{Name: "descriptor", Upstream: "Descriptor", TFType: "object({...})", Fields: []contractField{
 					{Name: "media_type", Upstream: "mediaType", TFType: "string"},
@@ -5099,7 +5099,7 @@ var contractItems = map[string]*contractItem{
 					{Name: "variant", Upstream: "variant", TFType: "string"},
 				}},
 			}},
-			{Name: "inspect_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API response body as JSON.", Serializes: "inspect"},
+			{Name: "inspect_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "inspect"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "inspect_json"},
 			{Name: "engine_api_version", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Engine API version the provider negotiated with the daemon for this read/build."},
 			{Name: "docker_server_version", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Docker Engine version reported by GET /version."},
@@ -5135,7 +5135,7 @@ var contractItems = map[string]*contractItem{
 		ID: "engine:system-df", Kind: "data_source", Name: "docker_system_df", MinAPI: "",
 		Outputs: []contractOutput{
 			{Name: "id", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "ID of the daemon the usage was read from (GET /info ID)."},
-			{Name: "df_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact Engine API GET /system/df response as JSON.", Serializes: "df"},
+			{Name: "df_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /system/df response as JSON; with verbose, each Items list sorted by ID (volumes by Name). Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "df"},
 			{Name: "df", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: false, Description: "The GET /system/df response as a nested object, field by field.", FieldsComplete: true, Fields: []contractField{
 				{Name: "image_usage", Upstream: "ImageUsage", TFType: "object({...})", Fields: []contractField{
 					{Name: "active_count", Upstream: "ActiveCount", TFType: "number"},
@@ -5273,7 +5273,7 @@ var contractItems = map[string]*contractItem{
 		Outputs: []contractOutput{
 			{Name: "id", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "ID of the daemon answering (GET /info ID)."},
 			{Name: "platform_name", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Platform.Name of the daemon (e.g. Docker Engine - Community)."},
-			{Name: "version_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact Engine API GET /version response as JSON.", Serializes: "version"},
+			{Name: "version_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /version response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "version"},
 			{Name: "version", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: false, Description: "The GET /version response as a nested object, field by field.", FieldsComplete: true, Fields: []contractField{
 				{Name: "platform", Upstream: "Platform", TFType: "object({...})", Fields: []contractField{
 					{Name: "name", Upstream: "Name", TFType: "string"},
@@ -5388,7 +5388,7 @@ var contractItems = map[string]*contractItem{
 		ID: "engine:volumes", Kind: "data_source", Name: "docker_volumes", MinAPI: "1.21",
 		Outputs: []contractOutput{
 			{Name: "names", Category: "identity", TFType: "list(string)", Sensitive: false, KnownAfterApply: false, Description: "Names of the listed volumes."},
-			{Name: "volumes_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The exact Engine API GET /volumes response as JSON.", Serializes: "volumes"},
+			{Name: "volumes_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The Engine API GET /volumes response as JSON; Volumes sorted by name. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "volumes"},
 			{Name: "volumes", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: false, Description: "The GET /volumes response as a nested object, field by field.", FieldsComplete: false, Fields: []contractField{
 				{Name: "volumes", Upstream: "Volumes", TFType: "list(object({...}))", Fields: []contractField{
 					{Name: "name", Upstream: "Name", TFType: "string"},
@@ -5472,7 +5472,7 @@ var contractItems = map[string]*contractItem{
 	"swarm:configs": {
 		ID: "swarm:configs", Kind: "data_source", Name: "docker_configs", MinAPI: "",
 		Outputs: []contractOutput{
-			{Name: "configs_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact list response (JSON array of Config) as returned by the Engine API.", Serializes: "configs"},
+			{Name: "configs_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /configs response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "configs"},
 			{Name: "configs", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "Every config returned by the list endpoint, each mirroring Config field by field (snake_case).", FieldsComplete: true, Fields: []contractField{
 				{Name: "id", Upstream: "ID", TFType: "string"},
 				{Name: "version", Upstream: "Version", TFType: "object({...})", Fields: []contractField{
@@ -5736,7 +5736,7 @@ var contractItems = map[string]*contractItem{
 	"swarm:nodes": {
 		ID: "swarm:nodes", Kind: "data_source", Name: "docker_nodes", MinAPI: "",
 		Outputs: []contractOutput{
-			{Name: "nodes_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact list response (JSON array of Node) as returned by the Engine API.", Serializes: "nodes"},
+			{Name: "nodes_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /nodes response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).", Serializes: "nodes"},
 			{Name: "nodes", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "Every node returned by the list endpoint, each mirroring Node field by field (snake_case).", FieldsComplete: true, Fields: []contractField{
 				{Name: "id", Upstream: "ID", TFType: "string"},
 				{Name: "version", Upstream: "Version", TFType: "object({...})", Fields: []contractField{
@@ -5873,7 +5873,7 @@ var contractItems = map[string]*contractItem{
 	"swarm:secrets": {
 		ID: "swarm:secrets", Kind: "data_source", Name: "docker_secrets", MinAPI: "1.25",
 		Outputs: []contractOutput{
-			{Name: "secrets_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact list response (JSON array of Secret) as returned by the Engine API. Not sensitive: Data is never returned by SecretList.", Serializes: "secrets"},
+			{Name: "secrets_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /secrets response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Not sensitive: Data is never returned by SecretList.", Serializes: "secrets"},
 			{Name: "secrets", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "Every secret returned by the list endpoint, each mirroring Secret field by field (snake_case). Not sensitive: Data is never returned by SecretList.", FieldsComplete: true, Fields: []contractField{
 				{Name: "id", Upstream: "ID", TFType: "string"},
 				{Name: "version", Upstream: "Version", TFType: "object({...})", Fields: []contractField{
@@ -6616,7 +6616,7 @@ var contractItems = map[string]*contractItem{
 	"swarm:services": {
 		ID: "swarm:services", Kind: "data_source", Name: "docker_services", MinAPI: "",
 		Outputs: []contractOutput{
-			{Name: "services_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The exact list response (JSON array of Service) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.", Serializes: "services"},
+			{Name: "services_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The Engine API GET /services response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.", Serializes: "services"},
 			{Name: "services", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "Every service returned by the list endpoint, each mirroring Service field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.", FieldsComplete: true, Fields: []contractField{
 				{Name: "id", Upstream: "ID", TFType: "string"},
 				{Name: "version", Upstream: "Version", TFType: "object({...})", Fields: []contractField{
@@ -6924,7 +6924,7 @@ var contractItems = map[string]*contractItem{
 	"swarm:swarm-data": {
 		ID: "swarm:swarm-data", Kind: "data_source", Name: "docker_swarm", MinAPI: "",
 		Outputs: []contractOutput{
-			{Name: "inspect_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The exact Engine API inspect response for the swarm (its ClusterInfo part), as JSON. JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.", Serializes: "inspect"},
+			{Name: "inspect_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The Engine API GET /swarm (its ClusterInfo part) response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.", Serializes: "inspect"},
 			{Name: "inspect", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: false, Description: "The swarm (its ClusterInfo part) inspect response as a nested object mirroring ClusterInfo field by field (snake_case). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.", FieldsComplete: true, Fields: []contractField{
 				{Name: "id", Upstream: "ID", TFType: "string"},
 				{Name: "version", Upstream: "Version", TFType: "object({...})", Fields: []contractField{
@@ -6997,7 +6997,7 @@ var contractItems = map[string]*contractItem{
 	"swarm:swarm-init": {
 		ID: "swarm:swarm-init", Kind: "resource", Name: "docker_swarm_init", MinAPI: "",
 		Outputs: []contractOutput{
-			{Name: "inspect_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "The exact Engine API inspect response for the swarm (its ClusterInfo part), as JSON. JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.", Serializes: "inspect"},
+			{Name: "inspect_json", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "The Engine API GET /swarm (its ClusterInfo part) response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.", Serializes: "inspect"},
 			{Name: "inspect", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: true, Description: "The swarm (its ClusterInfo part) inspect response as a nested object mirroring ClusterInfo field by field (snake_case). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.", FieldsComplete: true, Fields: []contractField{
 				{Name: "id", Upstream: "ID", TFType: "string"},
 				{Name: "version", Upstream: "Version", TFType: "object({...})", Fields: []contractField{
@@ -7529,7 +7529,7 @@ var contractItems = map[string]*contractItem{
 	"swarm:tasks": {
 		ID: "swarm:tasks", Kind: "data_source", Name: "docker_tasks", MinAPI: "",
 		Outputs: []contractOutput{
-			{Name: "tasks_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The exact list response (JSON array of Task) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.", Serializes: "tasks"},
+			{Name: "tasks_json", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "The Engine API GET /tasks response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.", Serializes: "tasks"},
 			{Name: "tasks", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "Every task returned by the list endpoint, each mirroring Task field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.", FieldsComplete: true, Fields: []contractField{
 				{Name: "id", Upstream: "ID", TFType: "string"},
 				{Name: "version", Upstream: "Version", TFType: "object({...})", Fields: []contractField{

@@ -43,7 +43,7 @@ output "manager_ids" {
 - `ids` (List of String) IDs of the matching objects, in the order of `nodes`.
 - `names` (List of String) Names of the matching objects, in the order of `nodes`.
 - `nodes` (Attributes List) Every node returned by the list endpoint, each mirroring Node field by field (snake_case). (see [below for nested schema](#nestedatt--nodes))
-- `nodes_json` (String) The exact list response (JSON array of Node) as returned by the Engine API.
+- `nodes_json` (String) The Engine API GET /nodes response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 
 <a id="nestedatt--nodes"></a>
 ### Nested Schema for `nodes`

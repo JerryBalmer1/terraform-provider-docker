@@ -84,7 +84,7 @@ They are provenance: re-running one on the current files fails or doubles its ed
   `shape_mappings` for logging and networks; row patches; the gap rows the lanes implemented); `renames_summary.py` prints
   its counts. `p5_shape_fields.py` adds `input_attr` to the logging / networks fields of the structured-output maps.
 - `status` is computed: merge.py reads `internal/provider/registry_gen.go` (generated from inventory.json by tools/registrygen)
-  and the `STUB(pass5)` marker lines in `internal/provider/*.go`. After a name change run `Invoke-Build Inventory, RegistryGen, Inventory`.
+  and the `STUB(pass5) <id>` (missing) and `PARTIAL(pass5) <id> <note>` (partial) marker lines in `internal/provider/*.go`. After a name change run `Invoke-Build Inventory, RegistryGen, Inventory`.
 - `renames.json`: every kreuzwerker v4.6.0 attribute and every Pass 5 rename of ours,
   `{type, kreuzwerker_attr, previous_attr, our_attr, transform, upstream, reason}`.
 - `pass5/ownership.json`: which lane owns each file under internal/provider, examples and test during Pass 5.

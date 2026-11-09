@@ -36,7 +36,7 @@ output "daemon" {
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `id` (String) Daemon ID (`ID` in `GET /info`).
 - `info` (Attributes) The GET /info response as a nested object, field by field. (see [below for nested schema](#nestedatt--info))
-- `info_json` (String) The exact Engine API GET /info response as JSON.
+- `info_json` (String) The Engine API GET /info response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 - `name` (String) Host name of the daemon (`Name` in `GET /info`).
 
 <a id="nestedatt--info"></a>

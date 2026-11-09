@@ -38,7 +38,7 @@ output "shop_secret_names" {
 - `ids` (List of String) IDs of the matching objects, in the order of `secrets`.
 - `names` (List of String) Names of the matching objects, in the order of `secrets`.
 - `secrets` (Attributes List) Every secret returned by the list endpoint, each mirroring Secret field by field (snake_case). Not sensitive: Data is never returned by SecretList. (see [below for nested schema](#nestedatt--secrets))
-- `secrets_json` (String) The exact list response (JSON array of Secret) as returned by the Engine API. Not sensitive: Data is never returned by SecretList.
+- `secrets_json` (String) The Engine API GET /secrets response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Not sensitive: Data is never returned by SecretList.
 
 <a id="nestedatt--secrets"></a>
 ### Nested Schema for `secrets`

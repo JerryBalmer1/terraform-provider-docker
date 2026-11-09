@@ -51,7 +51,7 @@ locals {
 ### Read-Only
 
 - `auth` (Attributes) The POST /auth response as a nested object, field by field. (see [below for nested schema](#nestedatt--auth))
-- `auth_json` (String, Sensitive) The exact Engine API POST /auth response as JSON.
+- `auth_json` (String, Sensitive) The Engine API POST /auth response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 - `content_sha256` (String) sha256 of auth_json.
 - `docker_server_version` (String) Docker Engine version from GET /version.
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).

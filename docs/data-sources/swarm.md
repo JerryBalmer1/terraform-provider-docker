@@ -34,7 +34,7 @@ output "data_path_port" {
 - `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).
 - `id` (String) Swarm cluster ID (`ClusterInfo.ID`).
 - `inspect` (Attributes) The swarm (its ClusterInfo part) inspect response as a nested object mirroring ClusterInfo field by field (snake_case). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here. (see [below for nested schema](#nestedatt--inspect))
-- `inspect_json` (String) The exact Engine API inspect response for the swarm (its ClusterInfo part), as JSON. JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.
+- `inspect_json` (String) The Engine API GET /swarm (its ClusterInfo part) response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.
 - `join_tokens` (Attributes, Sensitive) Swarm.JoinTokens (worker and manager join tokens). Sensitive: anyone holding a token can join the swarm. (see [below for nested schema](#nestedatt--join_tokens))
 - `labels` (Map of String) Labels on the swarm (`Spec.Labels`).
 - `manager_join_token` (String, Sensitive) Token that joins a node as a manager.

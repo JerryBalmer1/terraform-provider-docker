@@ -15,7 +15,7 @@ Reads daemon and host information from the provider's Docker host (`GET /info`),
 | `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `id` | `string` | computed |  |  | Daemon ID (`ID` in `GET /info`). |
 | `info` | `object` | computed |  |  | The GET /info response as a nested object, field by field. |
-| `info_json` | `string` | computed |  |  | The exact Engine API GET /info response as JSON. |
+| `info_json` | `string` | computed |  |  | The Engine API GET /info response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `name` | `string` | computed |  |  | Host name of the daemon (`Name` in `GET /info`). |
 
 ### `info`

@@ -18,7 +18,7 @@ Reads a path inside a container: its stat (name, size, mode, mtime, link target)
 | `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `path` | `string` | required |  |  | Absolute path inside the container, e.g. `/etc/nginx/nginx.conf`. |
 | `stat` | `object` | computed |  |  | The path stat as a nested object. Keys come from the base64 JSON in the header (moby container.PathStat); swagger documents the header but not its keys. |
-| `stat_json` | `string` | computed |  |  | The decoded X-Docker-Container-Path-Stat header (HEAD /containers/{id}/archive) as JSON. |
+| `stat_json` | `string` | computed |  |  | The decoded X-Docker-Container-Path-Stat header (HEAD /containers/{id}/archive) as JSON. Re-encoded, not byte-exact: the client decodes the header, so this is the decoded value written as canonical JSON (keys sorted, compact). |
 | `stat_json_sha256` | `string` | computed |  |  | sha256 of stat_json. |
 
 ### `stat`

@@ -42,7 +42,7 @@ output "shop_container_ids" {
 ### Read-Only
 
 - `containers` (Attributes List) The GET /containers/json response as a nested object, field by field. (see [below for nested schema](#nestedatt--containers))
-- `containers_json` (String) The exact Engine API GET /containers/json response as JSON.
+- `containers_json` (String) The Engine API GET /containers/json response as JSON; entries sorted by first name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 - `content_sha256` (String) sha256 of containers_json.
 - `docker_server_version` (String) Docker Engine version from GET /version.
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).

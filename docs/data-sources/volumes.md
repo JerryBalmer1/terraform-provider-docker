@@ -40,7 +40,7 @@ output "unused_volume_names" {
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `names` (List of String) Names of the listed volumes, sorted.
 - `volumes` (Attributes) The GET /volumes response as a nested object, field by field. (see [below for nested schema](#nestedatt--volumes))
-- `volumes_json` (String, Sensitive) The exact Engine API GET /volumes response as JSON.
+- `volumes_json` (String, Sensitive) The Engine API GET /volumes response as JSON; Volumes sorted by name. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 
 <a id="nestedatt--volumes"></a>
 ### Nested Schema for `volumes`

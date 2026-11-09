@@ -33,7 +33,7 @@ ITEM:
   "min_api": "1.41",                        // only where a source states it (swagger text, api/docs/CHANGELOG.md); else null
   // status / status_note / registered / stub_files are COMPUTED by merge.py (Pass 5) and must not appear in a
   // fragment: missing = not registered in internal/provider/registry_gen.go or a STUB(pass5) stub; partial =
-  // registered with a `STUB(pass5) <id> partial: <note>` marker in internal/provider/*.go; exists = registered, no marker.
+  // registered with a `// PARTIAL(pass5) <id> <note>` marker in internal/provider/*.go (a documented sub-feature absent or a no-op; the note is required); exists = registered, no marker. validate.py S1 fails on missing, never on partial.
   "decisions": ["Q1"],                      // optional: the DECISIONS.md questions that shaped the item
   "previous_name": "docker_logs",           // optional: the name before Pass 5 (skip_previous_name on items that became skips)
   "cli_only": false,                        // true when it appears in a CLI but has NO Engine API endpoint (client-side: compose, stack deploy, context, trust, manifest, buildx bake...)

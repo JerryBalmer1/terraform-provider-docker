@@ -45,7 +45,7 @@ output "generated_conf_size" {
 - `docker_server_version` (String) Docker Engine version from GET /version.
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `stat` (Attributes) The path stat as a nested object. Keys come from the base64 JSON in the header (moby container.PathStat); swagger documents the header but not its keys. (see [below for nested schema](#nestedatt--stat))
-- `stat_json` (String) The decoded X-Docker-Container-Path-Stat header (HEAD /containers/{id}/archive) as JSON.
+- `stat_json` (String) The decoded X-Docker-Container-Path-Stat header (HEAD /containers/{id}/archive) as JSON. Re-encoded, not byte-exact: the client decodes the header, so this is the decoded value written as canonical JSON (keys sorted, compact).
 - `stat_json_sha256` (String) sha256 of stat_json.
 
 <a id="nestedatt--stat"></a>

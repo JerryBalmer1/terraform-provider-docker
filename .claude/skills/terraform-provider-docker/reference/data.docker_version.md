@@ -16,7 +16,7 @@ Reads the Docker Engine version, API version range and component versions of the
 | `id` | `string` | computed |  |  | ID of the daemon that answered (`ID` in `GET /info`). |
 | `platform_name` | `string` | computed |  |  | Platform name of the daemon, e.g. `Docker Engine - Community`. |
 | `version` | `object` | computed |  |  | The GET /version response as a nested object, field by field. |
-| `version_json` | `string` | computed |  |  | The exact Engine API GET /version response as JSON. |
+| `version_json` | `string` | computed |  |  | The Engine API GET /version response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 
 ### `version`
 

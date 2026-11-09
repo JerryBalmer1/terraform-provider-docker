@@ -14,7 +14,7 @@ Reads the layer history of a local image, like `docker image history` (`GET /ima
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `history` | `list(object)` | computed |  |  | The GET /images/{name}/history response as a nested object, field by field. |
-| `history_json` | `string` | computed |  | yes | The exact Engine API GET /images/{name}/history response as JSON. |
+| `history_json` | `string` | computed |  | yes | The Engine API GET /images/{name}/history response as JSON; layers in the Engine's order (newest first). Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `id` | `string` | computed |  |  | ID of the image (the first history entry). |
 | `name` | `string` | required |  |  | Image name, tag or ID, e.g. `nginx:1.27`. |
 | `platform` | `string` | optional |  |  | Platform of a multi-platform image to read, `os[/arch[/variant]]`. Default: the daemon's platform. Needs API 1.48+ (containerd image store). |

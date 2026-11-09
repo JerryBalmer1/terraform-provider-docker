@@ -46,7 +46,7 @@ output "alpine_digest" {
 - `image_digest_ref` (String) Pinned reference `<registry>/<repository>@<digest>`.
 - `image_ref` (String) Normalized `<registry>/<repository>:<tag>` of `name`.
 - `inspect` (Attributes) Full DistributionInspect, field by field. (see [below for nested schema](#nestedatt--inspect))
-- `inspect_json` (String) The Engine API response body as JSON.
+- `inspect_json` (String) The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 - `labels` (Map of String) Always null: the distribution endpoint returns no image config. Present so both image data sources share one shape.
 - `manifests` (Attributes List) Per-platform manifests in one shape for both data sources; `filled_by` on each field says which side fills it. (see [below for nested schema](#nestedatt--manifests))
 - `platforms` (List of String) Platforms of the image as `os/arch[/variant]` (DistributionInspect `Platforms`).

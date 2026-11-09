@@ -18,7 +18,7 @@ Lists the swarm's secrets (`GET /secrets`), sorted by name; the provider's host 
 | `name` | `string` | optional |  |  | Only objects whose name matches (Engine `name` filter, a prefix/substring match). |
 | `names` | `list(string)` | computed |  |  | Names of the matching objects, in the order of `secrets`. |
 | `secrets` | `list(object)` | computed |  |  | Every secret returned by the list endpoint, each mirroring Secret field by field (snake_case). Not sensitive: Data is never returned by SecretList. |
-| `secrets_json` | `string` | computed |  |  | The exact list response (JSON array of Secret) as returned by the Engine API. Not sensitive: Data is never returned by SecretList. |
+| `secrets_json` | `string` | computed |  |  | The Engine API GET /secrets response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Not sensitive: Data is never returned by SecretList. |
 
 ### `secrets`
 

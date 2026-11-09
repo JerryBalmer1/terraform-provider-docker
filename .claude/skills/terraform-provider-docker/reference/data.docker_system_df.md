@@ -12,7 +12,7 @@ Reads disk usage by images, containers, volumes and build cache on the provider'
 |---|---|---|---|---|---|
 | `content_sha256` | `string` | computed |  |  | sha256 of df_json. |
 | `df` | `object` | computed |  |  | The GET /system/df response as a nested object, field by field. |
-| `df_json` | `string` | computed |  |  | The exact Engine API GET /system/df response as JSON. |
+| `df_json` | `string` | computed |  |  | The Engine API GET /system/df response as JSON; with verbose, each Items list sorted by ID (volumes by Name). Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `id` | `string` | computed |  |  | ID of the daemon the usage was read from (`ID` in `GET /info`). |

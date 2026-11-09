@@ -36,7 +36,7 @@ output "reclaimable_bytes" {
 
 - `content_sha256` (String) sha256 of df_json.
 - `df` (Attributes) The GET /system/df response as a nested object, field by field. (see [below for nested schema](#nestedatt--df))
-- `df_json` (String) The exact Engine API GET /system/df response as JSON.
+- `df_json` (String) The Engine API GET /system/df response as JSON; with verbose, each Items list sorted by ID (volumes by Name). Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 - `docker_server_version` (String) Docker Engine version from GET /version.
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `id` (String) ID of the daemon the usage was read from (`ID` in `GET /info`).

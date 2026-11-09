@@ -51,7 +51,7 @@ output "first_network_subnets" {
 - `ids` (List of String) IDs of the listed networks, in the order of `networks`.
 - `names` (List of String) Names of the listed networks, in the order of `networks`.
 - `networks` (Attributes List) The GET /networks response as a nested object, field by field. (see [below for nested schema](#nestedatt--networks))
-- `networks_json` (String) The exact Engine API GET /networks response as JSON.
+- `networks_json` (String) The Engine API GET /networks response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 
 <a id="nestedatt--networks"></a>
 ### Nested Schema for `networks`

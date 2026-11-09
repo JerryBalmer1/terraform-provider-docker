@@ -45,7 +45,7 @@ output "official_redis" {
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `names` (List of String) Repository names found, in result order.
 - `results` (Attributes List) The GET /images/search response as a nested object, field by field. (see [below for nested schema](#nestedatt--results))
-- `results_json` (String) The exact Engine API GET /images/search response as JSON.
+- `results_json` (String) The Engine API GET /images/search response as JSON; results in the Engine's order. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 
 <a id="nestedatt--results"></a>
 ### Nested Schema for `results`

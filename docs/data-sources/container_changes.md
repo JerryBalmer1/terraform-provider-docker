@@ -33,7 +33,7 @@ output "added_paths" {
 ### Read-Only
 
 - `changes` (Attributes List) The GET /containers/{id}/changes response as a nested object, field by field. (see [below for nested schema](#nestedatt--changes))
-- `changes_json` (String) The exact Engine API GET /containers/{id}/changes response as JSON.
+- `changes_json` (String) The Engine API GET /containers/{id}/changes response as JSON; entries sorted by Path. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
 - `container_id` (String) ID of the container the changes were read from.
 - `content_sha256` (String) sha256 of changes_json.
 - `docker_server_version` (String) Docker Engine version from GET /version.

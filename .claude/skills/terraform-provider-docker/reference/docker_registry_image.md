@@ -13,7 +13,7 @@ Pushes an image that exists on the provider's daemon (typically a `docker_image`
 | `content_sha256` | `string` | computed |  |  | sha256 of distribution_json. |
 | `digest` | `string` | computed |  |  | Manifest (or index) digest (`sha256:...`) of the pushed image in the registry (DistributionInspect `Descriptor.digest`). |
 | `distribution` | `object` | computed |  |  | The GET /distribution/{name}/json response as a nested object, field by field. |
-| `distribution_json` | `string` | computed |  |  | The exact Engine API GET /distribution/{name}/json response as JSON. |
+| `distribution_json` | `string` | computed |  |  | The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `id` | `string` | computed |  |  | The pushed reference (same as `name`). |

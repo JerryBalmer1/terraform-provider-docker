@@ -13,7 +13,7 @@ Lists containers on the provider's Docker host (`GET /containers/json`), like `d
 | `all` | `bool` | optional |  |  | Include stopped containers. Default `true`; `false` lists only running ones, like `docker ps`. |
 | `ancestor` | `string` | optional |  |  | Only containers created from this image or a descendant of it. |
 | `containers` | `list(object)` | computed |  |  | The GET /containers/json response as a nested object, field by field. |
-| `containers_json` | `string` | computed |  |  | The exact Engine API GET /containers/json response as JSON. |
+| `containers_json` | `string` | computed |  |  | The Engine API GET /containers/json response as JSON; entries sorted by first name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `content_sha256` | `string` | computed |  |  | sha256 of containers_json. |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |

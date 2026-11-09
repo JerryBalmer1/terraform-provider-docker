@@ -18,7 +18,7 @@ Lists the images in the provider's daemon image store, like `docker image ls` (`
 | `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `ids` | `list(string)` | computed |  |  | IDs of the listed images, sorted. |
 | `images` | `list(object)` | computed |  |  | The GET /images/json response as a nested object, field by field. |
-| `images_json` | `string` | computed |  |  | The exact Engine API GET /images/json response as JSON. |
+| `images_json` | `string` | computed |  |  | The Engine API GET /images/json response as JSON; entries sorted by ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `labels` | `map(string)` | optional |  |  | Only images carrying every one of these labels; an empty value matches any value (`label` filter). |
 | `reference` | `string` | optional |  |  | Only images whose reference matches this pattern, e.g. `nginx` or `ghcr.io/org/*:1.*` (`reference` filter). |
 | `since` | `string` | optional |  |  | Only images created after this image (name or ID) (`since` filter). |
