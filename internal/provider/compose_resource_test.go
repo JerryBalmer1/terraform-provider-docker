@@ -66,7 +66,7 @@ func composeTestDir(t *testing.T) string {
 func composeTestConfig(host, dir, tag, extra string) string {
 	return svcFakeConfig(host, fmt.Sprintf(`
 resource "docker_compose" "shop" {
-  working_dir = %q
+  project_directory = %q
   env         = { DB_PW = "s3cret" }
   content     = <<-EOT
 %s
@@ -96,7 +96,7 @@ func TestComposeFakeLocalLifecycle(t *testing.T) {
 				Config: composeTestConfig(host, dir, "1.27", cache),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("docker_compose.shop", "id", "shop"),
-					resource.TestCheckResourceAttr("docker_compose.shop", "project_name", "shop"),
+					resource.TestCheckResourceAttr("docker_compose.shop", "name", "shop"),
 					resource.TestCheckResourceAttr("docker_compose.shop", "mode", "local"),
 					resource.TestCheckResourceAttr("docker_compose.shop", "services.%", "3"),
 					resource.TestCheckResourceAttr("docker_compose.shop", "services.cache.#", "2"),
@@ -123,7 +123,8 @@ func TestComposeFakeLocalLifecycle(t *testing.T) {
 						if _, ok := web.Nets["shop_back"]; !ok {
 							return fmt.Errorf("web not connected to back: %v", web.Nets)
 						}
-						if got := web.Nets["shop_front"].Aliases; len(got) == 0 || got[0] != "web" {
+						// compose: the container name, then the service name.
+						if got := web.Nets["shop_front"].Aliases; len(got) != 2 || got[0] != "shop-web-1" || got[1] != "web" {
 							return fmt.Errorf("web aliases %v", got)
 						}
 						// config from a file: read-only bind mount
@@ -140,8 +141,9 @@ func TestComposeFakeLocalLifecycle(t *testing.T) {
 						if got := db.Files["/run/secrets/db_pw"]; got != "s3cret|444|0:0" {
 							return fmt.Errorf("db files %v", db.Files)
 						}
-						if db.Host.Mounts[0].Source != "shop_pgdata" {
-							return fmt.Errorf("db mounts %+v", db.Host.Mounts)
+						// A plain named volume goes through Binds, like compose.
+						if len(db.Host.Binds) != 1 || db.Host.Binds[0] != "shop_pgdata:/var/lib/postgresql/data:rw" || len(db.Host.Mounts) != 0 {
+							return fmt.Errorf("db binds %v mounts %+v", db.Host.Binds, db.Host.Mounts)
 						}
 						if pb := web.Host.PortBindings[network.MustParsePort("80/tcp")]; len(pb) != 1 || pb[0].HostPort != "8080" {
 							return fmt.Errorf("web ports %v", web.Host.PortBindings)
@@ -210,7 +212,7 @@ func TestComposeFakeLocalLifecycle(t *testing.T) {
 				ImportStateVerify: false,
 				ImportStateCheck: func(states []*terraform.InstanceState) error {
 					a := states[0].Attributes
-					if a["project_name"] != "shop" || a["mode"] != "local" || a["services.%"] != "2" {
+					if a["name"] != "shop" || a["mode"] != "local" || a["services.%"] != "2" {
 						return fmt.Errorf("import attributes %v", a)
 					}
 					return nil
@@ -261,7 +263,7 @@ networks:
 	cfg := func(profiles string) string {
 		return svcFakeConfig(host, fmt.Sprintf(`
 resource "docker_compose" "p" {
-  project_name = "demo"
+  name = "demo"
   files        = [%q, %q]
   env_file     = ["vars.env"]
   profiles     = %s
@@ -310,21 +312,21 @@ resource "docker_compose" "p" {
 func TestComposePlanErrors(t *testing.T) {
 	_, host := newComposeFakeEngine(t)
 	for name, tc := range map[string]struct{ body, want string }{
-		"neither": {`resource "docker_compose" "x" { project_name = "x" }`, `(?s)one of.*content.*files`},
+		"neither": {`resource "docker_compose" "x" { name = "x" }`, `(?s)one of.*content.*files`},
 		"both": {`resource "docker_compose" "x" {
   content = "services: {}"
   files   = ["a.yml"]
 }`, `(?s)content.*files`},
 		"bad yaml": {`resource "docker_compose" "x" {
-  project_name = "x"
+  name = "x"
   content = "services:\n  a:\n    image: [1"
 }`, `Invalid compose project`},
-		"build only": {`resource "docker_compose" "x" {
-  project_name = "x"
-  content = "services:\n  a:\n    build: ."
-}`, `does not build images`},
+		"no image no build": {`resource "docker_compose" "x" {
+  name = "x"
+  content = "services:\n  a:\n    command: [x]"
+}`, `Invalid compose project`},
 		"external secret local": {`resource "docker_compose" "x" {
-  project_name = "x"
+  name = "x"
   content = "services:\n  a:\n    image: busybox\n    secrets: [s]\nsecrets:\n  s: {external: true}"
 }`, `external secrets and configs exist only in\s+Swarm`},
 		"bad mode": {`resource "docker_compose" "x" {
@@ -353,7 +355,7 @@ func TestComposeFakeSwarmLifecycle(t *testing.T) {
 		return svcFakeConfig(host, fmt.Sprintf(`
 resource "docker_compose" "s" {
   mode         = "swarm"
-  project_name = "app"
+  name = "app"
   env          = { PW = %q }
   content      = <<-EOT
 services:
@@ -515,8 +517,8 @@ func TestAccComposeLocal(t *testing.T) {
 	cfg := func(replicas int) string {
 		return fmt.Sprintf(`
 resource "docker_compose" "acc" {
-  project_name = "tfacc-compose"
-  working_dir  = %q
+  name = "tfacc-compose"
+  project_directory = %q
   env          = { MSG = "hello" }
   content      = <<-EOT
 services:
@@ -585,7 +587,7 @@ func TestAccComposeSwarm(t *testing.T) {
 			Config: `
 resource "docker_compose" "acc" {
   mode         = "swarm"
-  project_name = "tfacccompose"
+  name = "tfacccompose"
   content      = <<-EOT
 services:
   web:

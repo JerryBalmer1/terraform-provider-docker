@@ -143,6 +143,13 @@ func composeLoad(ctx context.Context, in composeInputs) (*ctypes.Project, error)
 	if err != nil {
 		return nil, err
 	}
+	if len(p.ComposeFiles) == 0 {
+		// The loader leaves ComposeFiles to the CLI; record the files (the
+		// synthetic docker-compose.yml for content) like it does.
+		for _, f := range details.ConfigFiles {
+			p.ComposeFiles = append(p.ComposeFiles, f.Filename)
+		}
+	}
 	// Like `docker compose up`: networks and volumes no enabled service uses
 	// (e.g. the implicit default network of a profile-disabled service) are
 	// not created.

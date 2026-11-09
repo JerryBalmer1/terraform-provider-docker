@@ -2,8 +2,8 @@
 # would run it: containers shop-web-1, shop-db-1, networks shop_default and a
 # shop_pgdata volume, all labelled com.docker.compose.project=shop.
 resource "docker_compose" "shop" {
-  project_name = "shop"
-  working_dir  = path.module
+  name              = "shop"
+  project_directory = path.module
 
   # Only these variables are visible to ${...} interpolation.
   env = {
@@ -44,8 +44,8 @@ resource "docker_compose" "shop" {
 
 # The same file format deployed as a Swarm stack (needs a Swarm manager).
 resource "docker_compose" "stack" {
-  project_name = "shopstack"
-  mode         = "swarm"
+  name = "shopstack"
+  mode = "swarm"
 
   content = <<-EOT
     services:
@@ -61,4 +61,14 @@ resource "docker_compose" "stack" {
 
 output "web_container_ids" {
   value = docker_compose.shop.services["web"]
+}
+
+# The normalized project (what `docker compose config` prints) and its hash,
+# for a downstream runner.
+output "compose_yaml_sha256" {
+  value = docker_compose.shop.content_sha256
+}
+
+output "web_image" {
+  value = docker_compose.shop.project.services["web"].image
 }

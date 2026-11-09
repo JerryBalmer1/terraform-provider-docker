@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/swarm"
 )
 
 var (
@@ -52,22 +53,38 @@ type composeResource struct {
 }
 
 type composeResourceModel struct {
-	ID          types.String `tfsdk:"id"`
-	Content     types.String `tfsdk:"content"`
-	Files       types.List   `tfsdk:"files"`
-	ProjectName types.String `tfsdk:"project_name"`
-	Profiles    types.List   `tfsdk:"profiles"`
-	Env         types.Map    `tfsdk:"env"`
-	EnvFile     types.List   `tfsdk:"env_file"`
-	WorkingDir  types.String `tfsdk:"working_dir"`
-	Mode        types.String `tfsdk:"mode"`
-	Wait        types.Bool   `tfsdk:"wait"`
-	WaitTimeout types.String `tfsdk:"wait_timeout"`
-	KeepVolumes types.Bool   `tfsdk:"keep_volumes"`
-	SpecHash    types.String `tfsdk:"spec_hash"`
-	Services    types.Map    `tfsdk:"services"`
-	Networks    types.Map    `tfsdk:"networks"`
-	Volumes     types.Map    `tfsdk:"volumes"`
+	// Outputs contract of compose:name (compose_yaml, content_sha256,
+	// project, versions). The other compose:* items of docker_compose share
+	// the `project` name, so only this one is embedded; their identity
+	// outputs are the attributes below.
+	contractComposeName
+
+	ID               types.String `tfsdk:"id"`
+	Content          types.String `tfsdk:"content"`
+	Files            types.List   `tfsdk:"files"`
+	Name             types.String `tfsdk:"name"`
+	Profiles         types.List   `tfsdk:"profiles"`
+	Env              types.Map    `tfsdk:"env"`
+	EnvFile          types.List   `tfsdk:"env_file"`
+	ProjectDirectory types.String `tfsdk:"project_directory"`
+	Mode             types.String `tfsdk:"mode"`
+	Wait             types.Bool   `tfsdk:"wait"`
+	WaitTimeout      types.String `tfsdk:"wait_timeout"`
+	KeepVolumes      types.Bool   `tfsdk:"keep_volumes"`
+	RemoveOrphans    types.Bool   `tfsdk:"remove_orphans"`
+	SpecHash         types.String `tfsdk:"spec_hash"`
+	Services         types.Map    `tfsdk:"services"`
+	Networks         types.Map    `tfsdk:"networks"`
+	Volumes          types.Map    `tfsdk:"volumes"`
+	Labels           types.Map    `tfsdk:"labels"`
+	ConfigFiles      types.List   `tfsdk:"config_files"`
+	Configs          types.Map    `tfsdk:"configs"`
+	Secrets          types.Map    `tfsdk:"secrets"`
+	Models           types.Map    `tfsdk:"models"`
+	Jobs             types.Map    `tfsdk:"jobs"`
+	NetworkNames     types.Map    `tfsdk:"network_names"`
+	ContainerNames   types.Map    `tfsdk:"container_names"`
+	ImageRefs        types.Map    `tfsdk:"image_refs"`
 }
 
 var composeServicesType = types.MapType{ElemType: types.ListType{ElemType: types.StringType}}
@@ -78,27 +95,32 @@ func (r *composeResource) Metadata(_ context.Context, req resource.MetadataReque
 
 func (r *composeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: composeSchemaVersion,
 		MarkdownDescription: "A Docker Compose project applied through the Engine API, with no compose CLI plugin involved. " +
 			"The project is parsed with compose-go (the library `docker compose` uses) from `content` or `files`, with " +
 			"interpolation limited to `env` and `env_file`. In `mode = \"local\"` every service becomes containers named " +
 			"`<project>-<service>-<n>` (or `container_name`), every network `<project>_<name>` and every volume " +
-			"`<project>_<name>`, all labelled `com.docker.compose.project` like `docker compose up` does, so `docker compose ps` " +
+			"`<project>_<name>`, all labelled `com.docker.compose.project` like `docker compose up` does (including the " +
+			"`com.docker.compose.config-hash` values the CLI computes), so `docker compose ps` " +
 			"shows them. In `mode = \"swarm\"` the project becomes a stack (services, overlay networks, secrets and configs " +
 			"labelled `com.docker.stack.namespace`) like `docker stack deploy`. Refresh compares the live objects with the " +
 			"parsed project (a `com.docker.compose.config-hash` label on each object, plus container state or service " +
 			"image/replicas) and marks `spec_hash` as drifted so the next plan shows an update. An update creates what is " +
 			"missing, recreates what changed and removes objects of the project that are no longer in it. Destroy removes " +
-			"everything labelled with the project. `build` is not supported: build images with `docker_image`.",
+			"everything labelled with the project. In local mode a service with a `build:` section is built through BuildKit " +
+			"when its image is missing (always with `pull_policy: build`) and tagged `image` or `<project>-<service>`. " +
+			"A project that defines `jobs` plans with a warning: jobs are not run yet (use the `docker_compose_run` action). " +
+			"The whole normalized project is exposed as `compose_yaml` (what `docker compose config` prints) and the structured `project`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{Computed: true, MarkdownDescription: "The project name.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"content": schema.StringAttribute{Optional: true,
-				MarkdownDescription: "Compose YAML as a string. Exactly one of `content` and `files` must be set; relative paths in it resolve against `working_dir` (default: the Terraform working directory)."},
+				MarkdownDescription: "Compose YAML as a string. Exactly one of `content` and `files` must be set; relative paths in it resolve against `project_directory` (default: the Terraform working directory)."},
 			"files": schema.ListAttribute{ElementType: types.StringType, Optional: true,
 				Validators:          []validator.List{listvalidator.SizeAtLeast(1)},
-				MarkdownDescription: "Compose file paths, merged in order like repeated `docker compose -f`. Relative paths in them resolve against `working_dir` or, when unset, the first file's directory."},
-			"project_name": schema.StringAttribute{Optional: true, Computed: true,
-				MarkdownDescription: "Project name used to name and label every object. Defaults to the file's top-level `name`, then to the working directory's name; changing it forces a new resource.",
+				MarkdownDescription: "Compose file paths, merged in order like repeated `docker compose -f`. Relative paths in them resolve against `project_directory` or, when unset, the first file's directory."},
+			"name": schema.StringAttribute{Optional: true, Computed: true,
+				MarkdownDescription: "The compose project name (compose-spec top-level `name`, CLI `--project-name`), used to name and label every object. Defaults to the file's top-level `name`, then to the project directory's name. Forces replacement.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplaceIfConfigured()}},
 			"profiles": schema.ListAttribute{ElementType: types.StringType, Optional: true,
 				MarkdownDescription: "Profiles to enable. Services with a `profiles` list run only when one of them is enabled; services without one always run."},
@@ -106,10 +128,10 @@ func (r *composeResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				MarkdownDescription: "Variables for `${VAR}` interpolation and `environment:`-sourced secrets and configs. The provider's own environment is never read; values here override `env_file`."},
 			"env_file": schema.ListAttribute{ElementType: types.StringType, Optional: true,
 				MarkdownDescription: "Dotenv files read for interpolation variables, later files winning. Relative paths resolve like compose file paths."},
-			"working_dir": schema.StringAttribute{Optional: true,
-				MarkdownDescription: "Project directory that relative paths resolve against. Defaults to the first file's directory, or the Terraform working directory for `content`."},
+			"project_directory": schema.StringAttribute{Optional: true,
+				MarkdownDescription: "The project directory relative paths resolve against (CLI `--project-directory`). Defaults to the first file's directory, or the Terraform working directory for `content`."},
 			"mode": schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString(composeModeLocal),
-				MarkdownDescription: "Deployment target: `local` (default) or `swarm`. `local` creates containers on the provider's daemon; `swarm` creates a stack and needs a Swarm manager. Changing it forces a new resource.",
+				MarkdownDescription: "Deployment target: `local` (default) or `swarm`. `local` creates containers on the provider's daemon; `swarm` creates a stack and needs a Swarm manager. Forces replacement.",
 				Validators:          []validator.String{stringvalidator.OneOf(composeModeLocal, composeModeSwarm)},
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 			"wait": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true),
@@ -119,6 +141,8 @@ func (r *composeResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Validators:          []validator.String{svcDurationStringValidator{}}},
 			"keep_volumes": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false),
 				MarkdownDescription: "Keep the project's named volumes on destroy and when they leave the project (default `false`, which removes them)."},
+			"remove_orphans": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true),
+				MarkdownDescription: "Remove containers (local) or Swarm services (swarm) of the project whose service is no longer configured, like `docker compose up --remove-orphans` (default `true`). With `false` they are left running and not reported as drift."},
 			"spec_hash": schema.StringAttribute{Computed: true,
 				MarkdownDescription: "Digest of the parsed project. Refresh replaces it with `drifted: <reasons>` when the live objects no longer match, which makes the next plan show an update."},
 			"services": schema.MapAttribute{ElementType: types.ListType{ElemType: types.StringType}, Computed: true,
@@ -127,8 +151,27 @@ func (r *composeResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				MarkdownDescription: "Map of network key to the ID of the network the project created. External networks are not listed."},
 			"volumes": schema.MapAttribute{ElementType: types.StringType, Computed: true,
 				MarkdownDescription: "Map of volume key to the volume name. In swarm mode volumes are created by each node on first use, so the names come from the services' mounts."},
+			"labels": schema.MapAttribute{ElementType: types.StringType, Computed: true,
+				MarkdownDescription: "The project label every created object carries (`com.docker.compose.project`, or `com.docker.stack.namespace` in swarm mode), usable as a label selector downstream."},
+			"config_files": schema.ListAttribute{ElementType: types.StringType, Computed: true,
+				MarkdownDescription: "The compose files that make up the project, in merge order (`com.docker.compose.project.config_files`). For `content` it is `docker-compose.yml` in the project directory."},
+			"configs": schema.MapAttribute{ElementType: types.StringType, Computed: true,
+				MarkdownDescription: "Map of config key to the Swarm config ID (swarm) or the config name (local, where the content is copied into the containers)."},
+			"secrets": schema.MapAttribute{ElementType: types.StringType, Computed: true,
+				MarkdownDescription: "Map of secret key to the Swarm secret ID (swarm) or the secret name (local). IDs and names only, never the data."},
+			"models": schema.MapAttribute{ElementType: types.StringType, Computed: true,
+				MarkdownDescription: "Map of top-level model key to its `model` reference (an OCI artifact). Models are recorded but not run."},
+			"jobs": schema.MapAttribute{ElementType: types.ListType{ElemType: types.StringType}, Computed: true,
+				MarkdownDescription: "Map of job name to the container IDs of its runs. Jobs are not run by docker_compose yet, so every list is empty; run one with the `docker_compose_run` action."},
+			"network_names": schema.MapAttribute{ElementType: types.StringType, Computed: true,
+				MarkdownDescription: "Map of network key to the Engine network name (`<project>_<key>` unless `name:` is set), external networks included."},
+			"container_names": schema.MapAttribute{ElementType: types.ListType{ElemType: types.StringType}, Computed: true,
+				MarkdownDescription: "Map of service name to its container names (`<project>-<service>-<n>` or `container_name`); in swarm mode the Swarm service name."},
+			"image_refs": schema.MapAttribute{ElementType: types.StringType, Computed: true,
+				MarkdownDescription: "Map of service name to the image reference it runs after interpolation (`image`, or `<project>-<service>` for a build-only service)."},
 		},
 	}
+	contractAddResourceAttributes(resp.Schema.Attributes, "compose:name")
 }
 
 func (r *composeResource) ConfigValidators(context.Context) []resource.ConfigValidator {
@@ -166,15 +209,15 @@ func composeInputsFrom(ctx context.Context, m *composeResourceModel, diags *diag
 		Profiles:    stringListFrom(ctx, m.Profiles, diags),
 		Env:         stringMapFrom(ctx, m.Env, diags),
 		EnvFiles:    stringListFrom(ctx, m.EnvFile, diags),
-		WorkingDir:  m.WorkingDir.ValueString(),
-		ProjectName: m.ProjectName.ValueString(),
+		WorkingDir:  m.ProjectDirectory.ValueString(),
+		ProjectName: m.Name.ValueString(),
 	}
 	return in
 }
 
 // composeInputsKnown reports whether every input attribute is known.
 func composeInputsKnown(m *composeResourceModel) bool {
-	for _, v := range []attr.Value{m.Content, m.Files, m.Profiles, m.Env, m.EnvFile, m.WorkingDir, m.Mode} {
+	for _, v := range []attr.Value{m.Content, m.Files, m.Profiles, m.Env, m.EnvFile, m.ProjectDirectory, m.Mode, m.RemoveOrphans} {
 		if v.IsUnknown() {
 			return false
 		}
@@ -187,7 +230,7 @@ func composeInputsKnown(m *composeResourceModel) bool {
 func composeBuildDesired(ctx context.Context, m *composeResourceModel) (*composeDesired, error) {
 	var diags diag.Diagnostics
 	in := composeInputsFrom(ctx, m, &diags)
-	if m.ProjectName.IsUnknown() {
+	if m.Name.IsUnknown() {
 		in.ProjectName = ""
 	}
 	if diags.HasError() {
@@ -208,6 +251,7 @@ func composeBuildDesired(ctx context.Context, m *composeResourceModel) (*compose
 		if d.Swarm, err = composeSwarmExpand(p); err != nil {
 			return nil, err
 		}
+		d.Swarm.KeepOrphans = composeKeepOrphans(m)
 		for _, n := range d.Swarm.Networks {
 			objs = append(objs, obj{"network", n.Name, n.Hash})
 		}
@@ -224,6 +268,7 @@ func composeBuildDesired(ctx context.Context, m *composeResourceModel) (*compose
 		if d.Local, err = composeLocalExpand(p); err != nil {
 			return nil, err
 		}
+		d.Local.KeepOrphans = composeKeepOrphans(m)
 		for _, n := range d.Local.Networks {
 			objs = append(objs, obj{"network", n.Name, n.Hash})
 		}
@@ -240,6 +285,128 @@ func composeBuildDesired(ctx context.Context, m *composeResourceModel) (*compose
 		Objects []obj
 	}{mode, p.Name, objs})
 	return d, nil
+}
+
+// composeKeepOrphans is remove_orphans = false.
+func composeKeepOrphans(m *composeResourceModel) bool {
+	return !m.RemoveOrphans.IsNull() && !m.RemoveOrphans.IsUnknown() && !m.RemoveOrphans.ValueBool()
+}
+
+// composeJobsWarning is the Q18 plan-time warning for projects with jobs.
+func composeJobsWarning(p *ctypes.Project) string {
+	if p == nil || len(p.Jobs) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("Project %s defines jobs (%s). docker_compose does not run jobs yet: they are parsed, shown in `project` and `jobs`, "+
+		"and nothing is created for them. Run a one-off container with the docker_compose_run action.",
+		p.Name, strings.Join(composeSortedKeys(p.Jobs), ", "))
+}
+
+// composeStringListMap converts map[string][]string to a framework map.
+func composeStringListMap(in map[string][]string) types.Map {
+	vals := map[string]attr.Value{}
+	for k, l := range in {
+		vals[k] = stringListValue(l, false)
+	}
+	return types.MapValueMust(composeServicesType.ElemType, vals)
+}
+
+// composeFillKnown sets every output that follows from the configuration
+// alone: name, id, labels, config_files, network_names, container_names,
+// image_refs, models, jobs, local configs/secrets and the outputs contract.
+func (r *composeResource) composeFillKnown(ctx context.Context, m *composeResourceModel, d *composeDesired) diag.Diagnostics {
+	p := d.Project
+	m.Name = types.StringValue(p.Name)
+	m.ID = m.Name
+	if d.Swarm != nil {
+		m.Labels = stringMapValue(map[string]string{labelStackNamespace: p.Name}, false)
+	} else {
+		m.Labels = stringMapValue(map[string]string{composeLabelProject: p.Name}, false)
+	}
+	m.ConfigFiles = stringListValue(p.ComposeFiles, false)
+	netNames := map[string]string{}
+	for k, n := range p.Networks {
+		netNames[k] = n.Name
+	}
+	m.NetworkNames = stringMapValue(netNames, false)
+	names := map[string][]string{}
+	images := map[string]string{}
+	for _, svc := range p.Services {
+		images[svc.Name] = composeImageName(p.Name, svc)
+		if d.Swarm != nil {
+			names[svc.Name] = []string{p.Name + "_" + svc.Name}
+		}
+	}
+	if d.Local != nil {
+		for _, c := range d.Local.Containers {
+			names[c.Service] = append(names[c.Service], c.Name)
+		}
+	}
+	m.ContainerNames = composeStringListMap(names)
+	m.ImageRefs = stringMapValue(images, false)
+	models := map[string]string{}
+	for k, mo := range p.Models {
+		models[k] = mo.Model
+	}
+	m.Models = stringMapValue(models, false)
+	jobs := map[string][]string{}
+	for k := range p.Jobs {
+		jobs[k] = []string{}
+	}
+	m.Jobs = composeStringListMap(jobs)
+	if d.Local != nil {
+		cfgs, secs := map[string]string{}, map[string]string{}
+		for k, c := range p.Configs {
+			cfgs[k] = c.Name
+		}
+		for k, s := range p.Secrets {
+			secs[k] = s.Name
+		}
+		m.Configs = stringMapValue(cfgs, false)
+		m.Secrets = stringMapValue(secs, false)
+	}
+	return composeFillContract(ctx, r.pd, &m.contractComposeName, p)
+}
+
+// composeFillContract fills compose:name's contract outputs from p.
+func composeFillContract(ctx context.Context, pd *providerData, c *contractComposeName, p *ctypes.Project) diag.Diagnostics {
+	yaml, err := seamComposeImpl.Normalize(p)
+	if err != nil {
+		var diags diag.Diagnostics
+		diags.AddWarning("Cannot render compose_yaml", err.Error())
+		c.contractSetNull()
+		return diags
+	}
+	return c.contractFill(ctx, pd, contractFillInput{
+		Raw:        map[string][]byte{"compose_yaml": yaml},
+		Structured: map[string]any{"project": composeProjectValue(p)},
+	})
+}
+
+// composeNullOutputs sets every computed identity output and the contract
+// to null (import, or a project that cannot be parsed).
+func composeNullOutputs(m *composeResourceModel) {
+	for _, p := range []*types.Map{&m.Configs, &m.Secrets, &m.Models, &m.NetworkNames, &m.ImageRefs, &m.Labels} {
+		if p.IsUnknown() || p.ElementType(context.Background()) == nil {
+			*p = types.MapNull(types.StringType)
+		}
+	}
+	for _, p := range []*types.Map{&m.Jobs, &m.ContainerNames, &m.Services} {
+		if p.IsUnknown() || p.ElementType(context.Background()) == nil {
+			*p = types.MapNull(composeServicesType.ElemType)
+		}
+	}
+	for _, p := range []*types.Map{&m.Networks, &m.Volumes} {
+		if p.IsUnknown() || p.ElementType(context.Background()) == nil {
+			*p = types.MapNull(types.StringType)
+		}
+	}
+	if m.ConfigFiles.IsUnknown() || m.ConfigFiles.ElementType(context.Background()) == nil {
+		m.ConfigFiles = types.ListNull(types.StringType)
+	}
+	if m.Project.IsUnknown() || m.Project.AttributeTypes(context.Background()) == nil || len(m.Project.AttributeTypes(context.Background())) == 0 {
+		m.contractSetNull()
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -270,18 +437,28 @@ func (r *composeResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 	for _, w := range d.warnings() {
 		resp.Diagnostics.AddWarning("Compose attribute ignored", w)
 	}
-	plan.ProjectName = types.StringValue(d.Project.Name)
-	plan.ID = plan.ProjectName
-	plan.SpecHash = types.StringValue(d.Hash)
-	if state != nil && !state.ProjectName.IsNull() && state.ProjectName.ValueString() != d.Project.Name {
-		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("project_name"))
+	if w := composeJobsWarning(d.Project); w != "" {
+		resp.Diagnostics.AddWarning("Compose jobs are not run", w)
 	}
-	if state != nil && state.SpecHash.ValueString() == d.Hash && state.ProjectName.ValueString() == d.Project.Name {
+	plan.SpecHash = types.StringValue(d.Hash)
+	if state != nil && !state.Name.IsNull() && state.Name.ValueString() != d.Project.Name {
+		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("name"))
+	}
+	resp.Diagnostics.Append(r.composeFillKnown(ctx, &plan, d)...)
+	if state != nil && state.SpecHash.ValueString() == d.Hash && state.Name.ValueString() == d.Project.Name &&
+		composeKeepOrphans(state) == composeKeepOrphans(&plan) {
 		plan.Services, plan.Networks, plan.Volumes = state.Services, state.Networks, state.Volumes
+		if d.Swarm != nil {
+			plan.Configs, plan.Secrets = state.Configs, state.Secrets
+		}
 	} else {
 		plan.Services = types.MapUnknown(composeServicesType.ElemType)
 		plan.Networks = types.MapUnknown(types.StringType)
 		plan.Volumes = types.MapUnknown(types.StringType)
+		if d.Swarm != nil {
+			plan.Configs = types.MapUnknown(types.StringType)
+			plan.Secrets = types.MapUnknown(types.StringType)
+		}
 	}
 	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
 }
@@ -315,12 +492,22 @@ func (r *composeResource) apply(ctx context.Context, m *composeResourceModel, di
 	}
 }
 
+// composeSwarmBlobIDs maps blob keys (the name without the "<ns>_" prefix)
+// to IDs.
+func composeSwarmBlobIDs[T interface{ swarm.Secret | swarm.Config }](ns string, objs map[string]T, id func(T) string) map[string]string {
+	out := map[string]string{}
+	for name, o := range objs {
+		out[strings.TrimPrefix(name, ns+"_")] = id(o)
+	}
+	return out
+}
+
 // refresh lists the project's objects into m's computed maps. With
 // checkDrift it also re-parses the configuration in m and replaces
 // spec_hash when the daemon no longer matches. It returns false when the
 // project has no objects left.
 func (r *composeResource) refresh(ctx context.Context, m *composeResourceModel, checkDrift bool, diags *diag.Diagnostics) bool {
-	name := m.ProjectName.ValueString()
+	name := m.Name.ValueString()
 	var d *composeDesired
 	if checkDrift && (!m.Content.IsNull() || !m.Files.IsNull()) {
 		var err error
@@ -346,6 +533,8 @@ func (r *composeResource) refresh(ctx context.Context, m *composeResourceModel, 
 			drift = composeSwarmDrift(sp, ex)
 		}
 		svcs, nets, vols = composeSwarmIDs(sp, name, ex)
+		m.Secrets = stringMapValue(composeSwarmBlobIDs(name, ex.secrets, func(s swarm.Secret) string { return s.ID }), false)
+		m.Configs = stringMapValue(composeSwarmBlobIDs(name, ex.configs, func(c swarm.Config) string { return c.ID }), false)
 	} else {
 		ex, err := composeLocalList(ctx, r.pd, name)
 		if err != nil {
@@ -361,13 +550,13 @@ func (r *composeResource) refresh(ctx context.Context, m *composeResourceModel, 
 	if empty && checkDrift {
 		return false
 	}
-	sv := map[string]attr.Value{}
-	for k, ids := range svcs {
-		sv[k] = stringListValue(ids, false)
-	}
-	m.Services = types.MapValueMust(composeServicesType.ElemType, sv)
+	m.Services = composeStringListMap(svcs)
 	m.Networks = stringMapValue(nets, false)
 	m.Volumes = stringMapValue(vols, false)
+	if d != nil {
+		diags.Append(r.composeFillKnown(ctx, m, d)...)
+	}
+	composeNullOutputs(m)
 	if len(drift) > 0 {
 		const maxReasons = 5
 		more := ""
@@ -438,7 +627,7 @@ func (r *composeResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	name := state.ProjectName.ValueString()
+	name := state.Name.ValueString()
 	warn := func(summary, detail string) { resp.Diagnostics.AddWarning(summary, detail) }
 	var err error
 	if state.Mode.ValueString() == composeModeSwarm {
@@ -484,8 +673,8 @@ func (r *composeResource) ImportState(ctx context.Context, req resource.ImportSt
 		return
 	}
 	for attrName, v := range map[string]any{
-		"id": name, "project_name": name, "mode": mode,
-		"wait": true, "wait_timeout": composeDefaultWaitTimeout, "keep_volumes": false,
+		"id": name, "name": name, "mode": mode,
+		"wait": true, "wait_timeout": composeDefaultWaitTimeout, "keep_volumes": false, "remove_orphans": true,
 	} {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(attrName), v)...)
 	}

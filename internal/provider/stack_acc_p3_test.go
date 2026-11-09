@@ -72,7 +72,7 @@ resource "docker_stack" "a" {
   service {
     name     = "web"
     image    = "nginx:1.27-alpine"
-    networks = ["net"]
+    networks = { net = {} }
 
     mounts {
       type   = "volume"
@@ -90,7 +90,7 @@ resource "docker_stack" "a" {
     image             = "busybox:1.36"
     mode              = "replicated_job"
     total_completions = 1
-    networks          = ["net"]
+    networks          = { net = {} }
     command           = ["sh", "-c", "for i in $(seq 1 30); do wget -q -T 3 -O /dev/null http://web/ && exit 0; sleep 2; done; exit 1"]
 
     restart_policy {
@@ -121,7 +121,7 @@ resource "docker_stack" "a" {
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("docker_stack.a", "service.0.mounts.0.source", "data"),
-					resource.TestCheckResourceAttr("docker_stack.a", "service.0.networks.#", "1"),
+					resource.TestCheckResourceAttr("docker_stack.a", "service.0.networks.%", "1"),
 					func(*terraform.State) error {
 						ctx := context.Background()
 						c := testAccDockerClient(t)
@@ -203,7 +203,7 @@ resource "docker_stack" "u" {
     name     = "a"
     image    = "busybox:1.36"
     command  = ["sleep", "3600"]
-    networks = ["net"]
+    networks = { net = {} }
 
     secrets {
       secret_id = "s"
@@ -218,7 +218,7 @@ resource "docker_stack" "u" {
     name     = "b"
     image    = "busybox:1.36"
     command  = ["sleep", "3600"]
-    networks = ["net"]
+    networks = { net = {} }
 
     configs {
       config_id = "c"
@@ -233,7 +233,7 @@ resource "docker_stack" "u" {
     name     = "z"
     image    = "busybox:1.36"
     command  = ["sleep", "3600"]
-    networks = ["net"]
+    networks = { net = {} }
 
     converge_config {
       timeout = "3m"

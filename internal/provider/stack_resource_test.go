@@ -85,7 +85,7 @@ func TestStackReferenceRewriting(t *testing.T) {
 	lk.stackPrefix = "app_"
 	m := svcTestModel()
 	m.Name = stringOrNull("web")
-	m.Networks = stringSetValue([]string{"frontend", "backend"}, false)
+	m.Networks = svcNetworksValue(m.Networks, map[string]svcNetworkAttachModel{"frontend": svcNetworkAttachment(nil, nil), "backend": svcNetworkAttachment(nil, nil)})
 	m.Secrets = m.Secrets[:1] // secret_id = "db_password" -> app_db_password
 	m.Configs = nil
 	spec, diags := svcExpand(ctx, &m, lk, svcExpandOpts{FullName: "app_web", Namespace: "app"})
@@ -182,7 +182,7 @@ resource "docker_stack" "app" {
     name     = "web"
     image    = "nginx:1.27"
     replicas = 2
-    networks = ["front"]
+    networks = { front = {} }
 
     mounts {
       type   = "volume"
@@ -206,7 +206,7 @@ resource "docker_stack" "app" {
   service {
     name  = "db"
     image = "postgres:16"
-    networks = ["front"]
+    networks = { front = {} }
 
     secrets {
       secret_id = "db_pw"
@@ -313,7 +313,7 @@ func TestStackFakeDaemonLifecycle(t *testing.T) {
 					a := states[0].Attributes
 					want := map[string]string{
 						"name": "app", "service.#": "2", "service.0.name": "db", "service.1.name": "web",
-						"service.0.secrets.0.secret_id": "db_pw", "service.1.networks.0": "front",
+						"service.0.secrets.0.secret_id": "db_pw", "service.1.networks.front.%": "2",
 						"service.1.configs.0.config_id": "conf", "network.#": "1", "network.0.name": "front",
 						"secret.#": "1", "secret.0.name": "db_pw", "config.0.data": "bGlzdGVuIDgwOw==",
 					}
@@ -367,7 +367,7 @@ resource "docker_stack" "test" {
   service {
     name     = "web"
     image    = "nginx:alpine"
-    networks = ["net"]
+    networks = { net = {} }
 
     configs {
       config_id = "index"

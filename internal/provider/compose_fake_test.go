@@ -108,6 +108,8 @@ func (f *composeFakeEngine) handle(w http.ResponseWriter, r *http.Request) {
 	case p == "/_ping":
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = w.Write([]byte("OK"))
+	case p == "/version":
+		svcFakeJSON(w, 200, map[string]string{"Version": "28.5.0", "ApiVersion": "1.47"})
 	case strings.HasPrefix(p, "/containers/"):
 		f.handleContainers(w, r, strings.Split(strings.TrimPrefix(p, "/containers/"), "/"))
 	case p == "/networks" || strings.HasPrefix(p, "/networks/"):

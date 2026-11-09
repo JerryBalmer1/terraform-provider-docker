@@ -51,6 +51,16 @@ type stackResource struct {
 }
 
 type stackResourceModel struct {
+	// Outputs contract of cli-only:stack (stack_yaml, content_sha256,
+	// stack, service_status, versions); see stack_contract.go.
+	contractCliOnlyStack
+	Namespace  types.String `tfsdk:"namespace"`
+	Labels     types.Map    `tfsdk:"labels"`
+	ServiceIDs types.Map    `tfsdk:"service_ids"`
+	NetworkIDs types.Map    `tfsdk:"network_ids"`
+	SecretIDs  types.Map    `tfsdk:"secret_ids"`
+	ConfigIDs  types.Map    `tfsdk:"config_ids"`
+
 	ID       types.String        `tfsdk:"id"`
 	Name     types.String        `tfsdk:"name"`
 	Services []svcSpecModel      `tfsdk:"service"`
@@ -116,7 +126,7 @@ func (r *stackResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			"id": schema.StringAttribute{Computed: true, MarkdownDescription: "The stack name.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"name": schema.StringAttribute{Required: true,
-				MarkdownDescription: "Stack namespace. Changing this forces a new resource.",
+				MarkdownDescription: "Stack namespace. Forces replacement.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}},
 		},
 		Blocks: map[string]schema.Block{
@@ -155,6 +165,10 @@ func (r *stackResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			"config": stackBlobBlock("config", false),
 		},
 	}
+	for k, v := range stackIdentityAttributes() {
+		resp.Schema.Attributes[k] = v
+	}
+	contractAddResourceAttributes(resp.Schema.Attributes, "cli-only:stack")
 }
 
 func (r *stackResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -883,6 +897,7 @@ func (r *stackResource) refresh(ctx context.Context, m *stackResourceModel, diag
 		cfgData[k] = base64.StdEncoding.EncodeToString(s.Spec.Data)
 	}
 	m.Configs = stackFlattenBlobs(m.Configs, cfgLabels, cfgData)
+	diags.Append(r.stackFillOutputs(ctx, m, ex)...)
 	return true
 }
 
@@ -936,6 +951,7 @@ func (r *stackResource) Create(ctx context.Context, req resource.CreateRequest, 
 	resp.Diagnostics.Append(r.apply(ctx, &plan, nil)...)
 	if resp.Diagnostics.HasError() {
 		// Record the stack so a retry or destroy can clean up what was made.
+		stackNullOutputs(&plan)
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 		return
 	}

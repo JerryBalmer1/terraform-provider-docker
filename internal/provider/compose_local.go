@@ -33,7 +33,27 @@ const (
 	composeLabelVolume     = "com.docker.compose.volume"
 	composeLabelConfigHash = "com.docker.compose.config-hash"
 	composeLabelWorkingDir = "com.docker.compose.project.working_dir"
+	// composeLabelSpecHash holds the provider's own digest of the create
+	// options, which drives recreation; com.docker.compose.config-hash holds
+	// the value `docker compose` computes (compose_seam.go) so the CLI and the
+	// provider agree on what is up to date. Objects created before Pass 5
+	// carry the provider digest in config-hash and no spec-hash label;
+	// composeHashMatches accepts that form so they are not recreated.
+	composeLabelSpecHash = "io.terraform.provider.compose-spec-hash"
+	// composeLabelConfigFiles lists the compose files (comma-separated);
+	// docker compose ls reads it. Set after the spec hash is computed so
+	// containers created before Pass 5 keep their hash.
+	composeLabelConfigFiles = "com.docker.compose.project.config_files"
 )
+
+// composeHashMatches reports whether an object's labels record want as the
+// provider digest (spec-hash label, or the pre-Pass 5 config-hash form).
+func composeHashMatches(labels map[string]string, want string) bool {
+	if h, ok := labels[composeLabelSpecHash]; ok {
+		return h == want
+	}
+	return labels[composeLabelConfigHash] == want
+}
 
 // composeEndpoint is one network a container joins.
 type composeEndpoint struct {
@@ -80,9 +100,19 @@ type composeLocalContainer struct {
 	Copies   []composeCopy
 	Platform string
 	Pull     string
+	// Build is the service's build section (nil: pull the image). The
+	// image is built through the BuildKit seam when it is missing or
+	// pull_policy is "build".
+	Build *composeLocalBuild `json:"-"`
 	// DependsOn are the enabled services this one depends on.
 	DependsOn map[string]ctypes.ServiceDependency
 	Hash      string
+}
+
+// composeLocalBuild is what a container needs to build its image.
+type composeLocalBuild struct {
+	Project *ctypes.Project
+	Service ctypes.ServiceConfig
 }
 
 // composeLocalPlan is the whole desired project for one daemon.
@@ -92,6 +122,9 @@ type composeLocalPlan struct {
 	Volumes    []composeLocalVolume
 	Containers []composeLocalContainer // dependency order
 	Warnings   []string
+	// KeepOrphans is set when remove_orphans is false: containers of the
+	// project whose service is no longer configured are left alone.
+	KeepOrphans bool
 }
 
 func (p *composeLocalPlan) warnf(format string, args ...any) {
@@ -131,7 +164,8 @@ func composeLocalExpand(p *ctypes.Project) (*composeLocalPlan, error) {
 				opts.IPAM = ipam
 			}
 			ln.Hash = composeNetworkHash(opts)
-			opts.Labels[composeLabelConfigHash] = ln.Hash
+			opts.Labels[composeLabelConfigHash] = composeNetworkConfigHash(n)
+			opts.Labels[composeLabelSpecHash] = ln.Hash
 			ln.Create = opts
 		}
 		plan.Networks = append(plan.Networks, ln)
@@ -148,7 +182,8 @@ func composeLocalExpand(p *ctypes.Project) (*composeLocalPlan, error) {
 				Labels:     mergeLabels(v.Labels, projLabels, map[string]string{composeLabelVolume: key}),
 			}
 			lv.Hash = composeVolumeHash(opts)
-			opts.Labels[composeLabelConfigHash] = lv.Hash
+			opts.Labels[composeLabelConfigHash] = composeVolumeConfigHash(v)
+			opts.Labels[composeLabelSpecHash] = lv.Hash
 			lv.Create = opts
 		}
 		plan.Volumes = append(plan.Volumes, lv)
@@ -201,9 +236,6 @@ func composeLocalUnsupported(plan *composeLocalPlan, svc ctypes.ServiceConfig) {
 	w := func(attr string) {
 		plan.warnf("service %s: %s is not supported by docker_compose and is ignored", svc.Name, attr)
 	}
-	if svc.Build != nil {
-		w("build (the image is pulled instead; build it with docker_image)")
-	}
 	if svc.Develop != nil {
 		w("develop")
 	}
@@ -234,12 +266,13 @@ func composeLocalUnsupported(plan *composeLocalPlan, svc ctypes.ServiceConfig) {
 }
 
 func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.ServiceConfig) ([]composeLocalContainer, error) {
-	if svc.Image == "" {
-		return nil, fmt.Errorf("no image: docker_compose does not build images; set image (build it with docker_image)")
+	if svc.Image == "" && svc.Build == nil {
+		return nil, fmt.Errorf("no image and no build section: set image or build")
 	}
-	if svc.PullPolicy == ctypes.PullPolicyBuild {
-		return nil, fmt.Errorf("pull_policy \"build\" is not supported: docker_compose does not build images")
+	if svc.PullPolicy == ctypes.PullPolicyBuild && svc.Build == nil {
+		return nil, fmt.Errorf("pull_policy \"build\" needs a build section")
 	}
+	image := composeImageName(p.Name, svc)
 	composeLocalUnsupported(plan, svc)
 	scale := svc.GetScale()
 	if svc.Deploy != nil && (svc.Deploy.Mode == "global" || svc.Deploy.Mode == "global-job") {
@@ -250,7 +283,7 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 	}
 
 	cfg := &container.Config{
-		Image:        svc.Image,
+		Image:        image,
 		Hostname:     svc.Hostname,
 		Domainname:   svc.DomainName,
 		User:         svc.User,
@@ -481,6 +514,10 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 		}
 	}
 
+	cliHash, err := composeServiceConfigHash(svc)
+	if err != nil {
+		return nil, fmt.Errorf("config hash: %w", err)
+	}
 	var out []composeLocalContainer
 	for n := 1; n <= scale; n++ {
 		c := *cfg
@@ -498,6 +535,9 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 			Config: &c, Host: &h, Networks: eps, Copies: copies, Platform: svc.Platform,
 			Pull: svc.PullPolicy, DependsOn: deps,
 		}
+		if svc.Build != nil {
+			lc.Build = &composeLocalBuild{Project: p, Service: svc}
+		}
 		lc.Hash = composeHash(struct {
 			Config   composeHashConfig
 			Host     *container.HostConfig
@@ -505,7 +545,11 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 			Copies   []composeCopy
 			Platform string
 		}{composeHashConfig{lc.Config}, lc.Host, lc.Networks, lc.Copies, lc.Platform})
-		c.Labels[composeLabelConfigHash] = lc.Hash
+		c.Labels[composeLabelConfigHash] = cliHash
+		if len(p.ComposeFiles) > 0 {
+			c.Labels[composeLabelConfigFiles] = strings.Join(p.ComposeFiles, ",")
+		}
+		c.Labels[composeLabelSpecHash] = lc.Hash
 		out = append(out, lc)
 	}
 	return out, nil

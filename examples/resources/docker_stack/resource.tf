@@ -27,7 +27,7 @@ resource "docker_stack" "shop" {
   service {
     name     = "db"
     image    = "postgres:16-alpine"
-    networks = ["backend"] # stack-local short name
+    networks = { backend = {} } # stack-local short name
 
     env = {
       POSTGRES_PASSWORD_FILE = "/run/secrets/db_password"
@@ -52,7 +52,7 @@ resource "docker_stack" "shop" {
     name     = "web"
     image    = "nginx:1.27-alpine"
     replicas = 2
-    networks = ["backend"]
+    networks = { backend = {} }
 
     configs {
       config_id = "nginx"

@@ -219,7 +219,7 @@ func TestComposeLocalExpand(t *testing.T) {
 	}
 	web := byName["proj-web-2"]
 	if web.Config.Labels[composeLabelNumber] != "2" || web.Config.Labels[composeLabelService] != "web" || web.Config.Labels["team"] != "web" ||
-		web.Config.Labels[composeLabelConfigHash] != web.Hash {
+		web.Config.Labels[composeLabelSpecHash] != web.Hash || len(web.Config.Labels[composeLabelConfigHash]) != 64 {
 		t.Errorf("web labels %v", web.Config.Labels)
 	}
 	if !reflect.DeepEqual(web.Config.Env, []string{"A=1"}) {
@@ -314,7 +314,6 @@ func TestComposeLocalExpand(t *testing.T) {
 
 func TestComposeLocalExpandErrors(t *testing.T) {
 	for name, yaml := range map[string]string{
-		"build only":       "services:\n  a:\n    build: .\n",
 		"external secret":  "services:\n  a:\n    image: x\n    secrets: [s]\nsecrets:\n  s: {external: true}\n",
 		"name with scale":  "services:\n  a:\n    image: x\n    container_name: c\n    deploy: {replicas: 2}\n",
 		"unset secret env": "services:\n  a:\n    image: x\n    secrets: [s]\nsecrets:\n  s: {environment: NOPE}\n",
@@ -330,11 +329,20 @@ func TestComposeLocalExpandErrors(t *testing.T) {
 			}
 		})
 	}
-	// build + image: warning, not an error
-	d := composeMustLoad(t, composeInputs{ProjectName: "p", Content: "services:\n  a: {image: x, build: .}\n"})
+	// build: built through the BuildKit seam, no warning; build-only
+	// services run <project>-<service>.
+	d := composeMustLoad(t, composeInputs{ProjectName: "p", Content: "services:\n  a: {image: x, build: .}\n  b: {build: .}\n"})
 	plan, err := composeLocalExpand(d.Project)
-	if err != nil || len(plan.Warnings) != 1 || !strings.Contains(plan.Warnings[0], "build") {
-		t.Errorf("err %v warnings %v", err, plan.Warnings)
+	if err != nil || len(plan.Warnings) != 0 {
+		t.Fatalf("err %v warnings %v", err, plan.Warnings)
+	}
+	for _, c := range plan.Containers {
+		if c.Build == nil {
+			t.Errorf("%s: no build", c.Name)
+		}
+		if c.Service == "b" && c.Config.Image != "p-b" {
+			t.Errorf("build-only image %q", c.Config.Image)
+		}
 	}
 }
 

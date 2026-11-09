@@ -189,3 +189,32 @@ tests that need a swarm manager skip when it is not (hence two passes).
 interrupted mid-test, running it is always safe. `test/harness/.bin/`
 (the cached Terraform CLI) and the `tfdocker-e2e-mirror-cache` volume are
 kept; delete them by hand to force fresh downloads.
+
+## Compose CLI parity (`TestAccComposeParity`)
+
+`internal/provider/compose_parity_acc_c_test.go` brings every compose
+fixture (`internal/provider/testdata/compose_hash/*.yml` and the local
+projects of `examples/resources/docker_compose/resource.tf`) up twice on the
+manager daemon: once with the real `docker compose` CLI, once with
+`docker_compose` (local mode). It then diffs the containers, networks and
+volumes each created (image, command, env, mounts, ports, networks and
+aliases, restart policy, driver options, every label including
+`com.docker.compose.config-hash`). Any difference fails the test. Only
+`com.docker.compose.version` and the provider's own `io.terraform.provider*`
+labels are ignored.
+
+- The provider never shells out; only this test runs the CLI (`os/exec` in a
+  `_test.go` file), with `DOCKER_HOST` from `.env`.
+- `harness-up` writes `TF_ACC_COMPOSE_CLI`, the path of the host's `docker`
+  binary. The harness already needs the `docker compose` v2 plugin, so
+  nothing new has to be installed. The test skips when `TF_ACC`,
+  `DOCKER_HOST` or `TF_ACC_COMPOSE_CLI` is unset, or when
+  `docker compose version` fails.
+- Fixtures run one at a time under the fixture's own project name: the CLI
+  project is brought up, recorded and removed (`down --volumes`), then the
+  provider's.
+- A fixture the CLI cannot bring up on the harness (for example a bind mount
+  of a host path that the dind daemon does not have, or a missing build
+  context) is skipped with the CLI's output, because there is nothing to
+  compare against.
+- It runs in the plain pass (no swarm needed).

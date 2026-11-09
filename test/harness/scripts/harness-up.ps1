@@ -53,6 +53,7 @@ $HarnessEnv = [ordered]@{
     TF_ACC_TLS_CERT_PATH     = ConvertTo-SlashPath $TlsDir
     TF_ACC_GPU_NODE_LABEL    = 'gpu=nvidia'
     TF_ACC_HARNESS_COMPOSE   = ConvertTo-SlashPath $ComposeFile
+    TF_ACC_COMPOSE_CLI       = ConvertTo-SlashPath ((Get-Command docker -ErrorAction SilentlyContinue).Source)
     TF_ACC_TERRAFORM_VERSION = $TerraformVersion
 }
 

@@ -56,6 +56,9 @@ type composeSwarmPlan struct {
 	Configs   []composeSwarmBlob
 	Services  []composeSwarmService
 	Warnings  []string
+	// KeepOrphans is set when remove_orphans is false: services of the
+	// project that are no longer configured are left alone.
+	KeepOrphans bool
 }
 
 func (p *composeSwarmPlan) warnf(format string, args ...any) {
@@ -657,7 +660,7 @@ func composeSwarmDrift(plan *composeSwarmPlan, ex composeSwarmByName) []string {
 		}
 	}
 	for _, name := range composeSortedKeys(ex.services) {
-		if !want[name] {
+		if !want[name] && !plan.KeepOrphans {
 			out = append(out, fmt.Sprintf("service %s is not in the configuration", name))
 		}
 	}
@@ -785,6 +788,9 @@ func composeSwarmApply(ctx context.Context, pd *providerData, plan *composeSwarm
 
 	var rmIDs []string
 	for _, n := range svcPlan.Remove {
+		if _, wanted := desiredMode[n]; !wanted && plan.KeepOrphans {
+			continue // remove_orphans = false
+		}
 		rmIDs = append(rmIDs, ex.services[n].ID)
 	}
 	if err := stackRemoveServices(ctx, c, rmIDs); err != nil {

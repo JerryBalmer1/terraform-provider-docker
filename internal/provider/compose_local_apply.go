@@ -18,6 +18,7 @@ import (
 
 	ctypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/api/types/volume"
 	"github.com/moby/moby/client"
@@ -120,7 +121,7 @@ func composeLocalDrift(plan *composeLocalPlan, ex composeLocalExisting) []string
 		switch {
 		case !ok:
 			out = append(out, fmt.Sprintf("network %s is missing", n.Name))
-		case got.Labels[composeLabelConfigHash] != n.Hash:
+		case !composeHashMatches(got.Labels, n.Hash):
 			out = append(out, fmt.Sprintf("network %s differs from the configuration", n.Name))
 		}
 	}
@@ -152,7 +153,7 @@ func composeLocalDrift(plan *composeLocalPlan, ex composeLocalExisting) []string
 			out = append(out, fmt.Sprintf("container %s is missing", c.Name))
 			continue
 		}
-		if got.Labels[composeLabelConfigHash] != c.Hash {
+		if !composeHashMatches(got.Labels, c.Hash) {
 			out = append(out, fmt.Sprintf("container %s differs from the configuration", c.Name))
 			continue
 		}
@@ -161,7 +162,7 @@ func composeLocalDrift(plan *composeLocalPlan, ex composeLocalExisting) []string
 		}
 	}
 	for _, name := range composeSortedKeys(ex.containers) {
-		if !want[name] {
+		if !want[name] && !plan.KeepOrphans {
 			out = append(out, fmt.Sprintf("container %s is not in the configuration", name))
 		}
 	}
@@ -195,7 +196,7 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 			continue
 		}
 		wantNet[n.Name] = true
-		if got, ok := ex.networks[n.Name]; ok && got.Labels[composeLabelConfigHash] != n.Hash {
+		if got, ok := ex.networks[n.Name]; ok && !composeHashMatches(got.Labels, n.Hash) {
 			replacedNet[n.Name] = true
 		}
 	}
@@ -216,7 +217,7 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 	}
 	remove := map[string]bool{}
 	for name := range ex.containers {
-		if desired[name] == nil {
+		if desired[name] == nil && !plan.KeepOrphans {
 			remove[name] = true
 		}
 	}
@@ -227,7 +228,7 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 			recreatedSvc[dc.Service] = true
 			continue
 		}
-		recreate := got.Labels[composeLabelConfigHash] != dc.Hash
+		recreate := !composeHashMatches(got.Labels, dc.Hash)
 		if got.NetworkSettings != nil {
 			for netName := range got.NetworkSettings.Networks {
 				if replacedNet[netName] {
@@ -291,7 +292,7 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 			continue
 		}
 		if got, ok := ex.volumes[v.Name]; ok {
-			if got.Labels[composeLabelConfigHash] != v.Hash {
+			if !composeHashMatches(got.Labels, v.Hash) {
 				warn("Compose volume kept", fmt.Sprintf("volume %s exists with a different driver, options or labels; it is kept as is (remove it to recreate it)", v.Name))
 			}
 			continue
@@ -401,9 +402,23 @@ func composePull(ctx context.Context, pd *providerData, ref, platform string) er
 
 func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalContainer, netIDs map[string]string) (string, error) {
 	c := pd.Client
-	switch dc.Pull {
-	case ctypes.PullPolicyNever:
-	case ctypes.PullPolicyAlways:
+	built := false
+	if dc.Build != nil {
+		exists, err := composeImageExists(ctx, pd, dc.Config.Image)
+		if err != nil {
+			return "", fmt.Errorf("inspecting image %s: %w", dc.Config.Image, err)
+		}
+		if !exists || dc.Pull == ctypes.PullPolicyBuild {
+			if _, err := composeBuild(ctx, pd, dc.Build.Project, dc.Build.Service, nil); err != nil {
+				return "", err
+			}
+		}
+		built = true
+	}
+	switch {
+	case built:
+	case dc.Pull == ctypes.PullPolicyNever:
+	case dc.Pull == ctypes.PullPolicyAlways:
 		if err := composePull(ctx, pd, dc.Config.Image, dc.Platform); err != nil {
 			return "", fmt.Errorf("pulling %s: %w", dc.Config.Image, err)
 		}
@@ -412,6 +427,7 @@ func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalCo
 			return "", fmt.Errorf("pulling %s: %w", dc.Config.Image, err)
 		}
 	}
+	dc = composeLocalWire(ctx, pd, dc)
 	var netCfg *network.NetworkingConfig
 	if len(dc.Networks) > 0 {
 		ep := dc.Networks[0]
@@ -451,6 +467,77 @@ func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalCo
 		return resp.ID, fmt.Errorf("starting container %s: %w", dc.Name, err)
 	}
 	return resp.ID, nil
+}
+
+// composeLabelImage is the image ID label `docker compose` puts on every
+// container it creates (api.ImageDigestLabel).
+const composeLabelImage = "com.docker.compose.image"
+
+// composeLabelDependsOn lists a container's dependencies as
+// "<service>:<condition>:<restart>", comma-separated, like `docker compose`
+// (api.DependenciesLabel; compose writes them in map order, sorted here).
+const composeLabelDependsOn = "com.docker.compose.depends_on"
+
+// composeLocalWire turns a planned container into what `docker compose up`
+// sends to the Engine. The plan (and its pinned spec hash) keeps the
+// provider's own form; only the create request differs:
+//   - the label com.docker.compose.image holds the image ID, read once the
+//     image is present, and com.docker.compose.depends_on the dependencies;
+//   - every network endpoint gets the container name as its first alias
+//     (compose getAliases: container name, service name, configured aliases);
+//   - a named volume without nocopy / subpath / driver options is mounted
+//     through HostConfig.Binds as "<volume>:<target>:rw|ro", like compose
+//     (it prefers the Binds API unless a Mount-API-only option is used).
+//
+// dc's maps and slices are copied, never changed in place.
+func composeLocalWire(ctx context.Context, pd *providerData, dc composeLocalContainer) composeLocalContainer {
+	cfg := *dc.Config
+	cfg.Labels = make(map[string]string, len(dc.Config.Labels)+1)
+	for k, v := range dc.Config.Labels {
+		cfg.Labels[k] = v
+	}
+	if insp, err := pd.Client.ImageInspect(ctx, dc.Config.Image); err == nil && insp.ID != "" {
+		cfg.Labels[composeLabelImage] = insp.ID
+	}
+	deps := make([]string, 0, len(dc.DependsOn))
+	for name, d := range dc.DependsOn {
+		deps = append(deps, fmt.Sprintf("%s:%s:%t", name, d.Condition, d.Restart))
+	}
+	sort.Strings(deps)
+	cfg.Labels[composeLabelDependsOn] = strings.Join(deps, ",")
+	dc.Config = &cfg
+
+	eps := make([]composeEndpoint, len(dc.Networks))
+	for i, ep := range dc.Networks {
+		al := []string{dc.Name}
+		for _, a := range ep.Aliases {
+			if a != dc.Name {
+				al = append(al, a)
+			}
+		}
+		ep.Aliases = al
+		eps[i] = ep
+	}
+	dc.Networks = eps
+
+	if dc.Host != nil && len(dc.Host.Mounts) > 0 {
+		hc := *dc.Host
+		hc.Binds = append([]string(nil), dc.Host.Binds...)
+		hc.Mounts = nil
+		for _, m := range dc.Host.Mounts {
+			if m.Type == mount.TypeVolume && m.Source != "" && m.VolumeOptions == nil && m.Consistency == "" {
+				access := "rw"
+				if m.ReadOnly {
+					access = "ro"
+				}
+				hc.Binds = append(hc.Binds, m.Source+":"+m.Target+":"+access)
+				continue
+			}
+			hc.Mounts = append(hc.Mounts, m)
+		}
+		dc.Host = &hc
+	}
+	return dc
 }
 
 // composeTar builds the archive CopyToContainer extracts at "/".

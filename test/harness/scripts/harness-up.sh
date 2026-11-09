@@ -167,6 +167,7 @@ wait_http registry http://127.0.0.1:12380/v2/
   echo "export TF_ACC_TLS_CERT_PATH=$(native_path "${TLS_DIR}")"
   echo "export TF_ACC_GPU_NODE_LABEL=gpu=nvidia"
   echo "export TF_ACC_HARNESS_COMPOSE=$(native_path "${COMPOSE_FILE}")"
+  echo "export TF_ACC_COMPOSE_CLI=$(native_path "$(command -v docker)")"
   echo "export TF_ACC_TERRAFORM_VERSION=${TF_VERSION}"
   if [ -n "${TF_PATH}" ]; then echo "export TF_ACC_TERRAFORM_PATH=${TF_PATH}"; fi
 } > "${ENV_FILE}"
