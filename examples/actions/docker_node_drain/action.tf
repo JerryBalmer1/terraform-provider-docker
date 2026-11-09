@@ -18,7 +18,7 @@ resource "terraform_data" "maintenance" {
 #   terraform apply -invoke=action.docker_node_drain.maintenance
 action "docker_node_drain" "maintenance" {
   config {
-    node    = var.maintenance_node
+    node_id = var.maintenance_node
     timeout = "10m"
   }
 }

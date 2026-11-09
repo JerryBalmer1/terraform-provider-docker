@@ -2,7 +2,7 @@ package provider
 
 // Pass 2: expand/flatten of the service attributes added in Pass 2 (job
 // modes, hostname, user, dir, hosts, dns, cap_add/cap_drop, sysctls, ulimits,
-// stop_grace_period, force_update, networks_advanced). Shared by
+// stop_grace_period, force_update). Shared by
 // docker_service and docker_stack through svcExpand/svcFlatten.
 
 import (
@@ -11,8 +11,6 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/path"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/swarm"
@@ -178,7 +176,7 @@ func svcExpandP2(ctx context.Context, m *svcSpecModel, spec *swarm.ServiceSpec, 
 		}
 		cs.Hosts = append(cs.Hosts, s)
 	}
-	if d := m.DNS; d != nil {
+	if d := m.DNSConfig; d != nil {
 		ns, err := parseAddrs("dns.nameservers", stringListFrom(ctx, d.Nameservers, diags))
 		if err != nil {
 			diags.AddError("Invalid dns.nameservers", err.Error())
@@ -206,139 +204,18 @@ func svcExpandP2(ctx context.Context, m *svcSpecModel, spec *swarm.ServiceSpec, 
 	}
 }
 
-// svcExpandNetworksAdvanced appends networks_advanced attachments. In a
-// stack the service's short name is always added as an alias (like the
-// plain networks attribute).
-func svcExpandNetworksAdvanced(ctx context.Context, m *svcSpecModel, lk *svcLookup, o svcExpandOpts, spec *swarm.ServiceSpec, diags *diag.Diagnostics) {
-	if len(m.NetworksAdvanced) > 0 && len(m.Networks.Elements()) > 0 {
-		diags.AddError("Conflicting network settings", "Use either networks or networks_advanced, not both.")
-		return
-	}
-	for _, n := range m.NetworksAdvanced {
-		id, err := lk.resolve("network", n.Name.ValueString())
-		if err != nil {
-			diags.AddError("Cannot resolve network", err.Error())
-			continue
-		}
-		nac := swarm.NetworkAttachmentConfig{Target: id}
-		seen := map[string]bool{}
-		if o.Namespace != "" {
-			nac.Aliases = append(nac.Aliases, m.Name.ValueString())
-			seen[m.Name.ValueString()] = true
-		}
-		for _, a := range stringSetFrom(ctx, n.Aliases, diags) {
-			if !seen[a] {
-				nac.Aliases = append(nac.Aliases, a)
-				seen[a] = true
-			}
-		}
-		spec.TaskTemplate.Networks = append(spec.TaskTemplate.Networks, nac)
-	}
-}
-
-// svcFlattenNetworks maps TaskTemplate.Networks onto networks or
-// networks_advanced: attachments go to networks_advanced when the prior used
-// it, or (with no prior network config, e.g. import) when an attachment has
-// user aliases; otherwise to networks.
-func svcFlattenNetworks(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svcFlattenOpts, m *svcSpecModel) {
-	priorPlain := svcPriorSet(prior.Networks) && len(prior.Networks.Elements()) > 0
-	useAdv := len(prior.NetworksAdvanced) > 0
-	if !useAdv && !priorPlain {
-		for _, n := range spec.TaskTemplate.Networks {
-			if len(svcUserAliases(n.Aliases, o, nil)) > 0 {
-				useAdv = true
-				break
-			}
-		}
-	}
-	if !useAdv {
-		svcFlattenPlainNetworks(spec, prior, lk, m)
-		m.NetworksAdvanced = nil
-		return
-	}
-	m.Networks = svcSetValue(prior.Networks, nil)
-	used := make([]bool, len(spec.TaskTemplate.Networks))
-	flat := func(p svcNetworkAttachModel, ref string, n swarm.NetworkAttachmentConfig) svcNetworkAttachModel {
-		var keep map[string]bool
-		if svcPriorSet(p.Aliases) {
-			keep = map[string]bool{}
-			for _, a := range containerSetStrings(p.Aliases) {
-				keep[a] = true
-			}
-		}
-		aliases := svcSetValue(p.Aliases, svcUserAliases(n.Aliases, o, keep))
-		if svcPriorSet(p.Aliases) && aliases.Equal(p.Aliases) {
-			aliases = p.Aliases // same members; keep the prior element order
-		}
-		return svcNetworkAttachModel{Name: types.StringValue(ref), Aliases: aliases}
-	}
-	var out []svcNetworkAttachModel
-	for _, p := range prior.NetworksAdvanced {
-		ref := p.Name.ValueString()
-		for i, n := range spec.TaskTemplate.Networks {
-			if used[i] || !(ref == n.Target || (lk != nil && lk.matches("network", ref, n.Target))) {
-				continue
-			}
-			used[i] = true
-			out = append(out, flat(p, ref, n))
-			break
-		}
-	}
-	for i, n := range spec.TaskTemplate.Networks {
-		if !used[i] {
-			out = append(out, flat(svcNetworkAttachModel{Aliases: types.SetNull(types.StringType)}, lk.displayRef("network", n.Target), n))
-		}
-	}
-	m.NetworksAdvanced = out
-}
-
-// svcUserAliases drops the alias a stack adds (the short service name)
-// unless keep lists it.
-func svcUserAliases(aliases []string, o svcFlattenOpts, keep map[string]bool) []string {
-	var out []string
-	for _, a := range aliases {
-		if o.StripStack && o.ShortName != "" && a == o.ShortName && !keep[a] {
-			continue
-		}
-		out = append(out, a)
-	}
-	return out
-}
-
-// svcFlattenPlainNetworks is the networks set: keep the prior reference that
-// denotes each attached ID.
-func svcFlattenPlainNetworks(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, m *svcSpecModel) {
-	var priorNets []string
-	if svcPriorSet(prior.Networks) {
-		var d diag.Diagnostics
-		priorNets = stringSetFrom(context.Background(), prior.Networks, &d)
-	}
-	var nets []string
-	for _, n := range spec.TaskTemplate.Networks {
-		ref := lk.displayRef("network", n.Target)
-		for _, p := range priorNets {
-			if p == n.Target || (lk != nil && lk.matches("network", p, n.Target)) {
-				ref = p
-				break
-			}
-		}
-		nets = append(nets, ref)
-	}
-	m.Networks = svcSetValue(prior.Networks, nets)
-}
-
 // svcFlattenP2 maps the Pass 2 container/task attributes onto m.
 func svcFlattenP2(spec swarm.ServiceSpec, cs *swarm.ContainerSpec, prior svcSpecModel, m *svcSpecModel) {
 	m.Hostname = svcStrValue(prior.Hostname, cs.Hostname, "")
 	m.User = svcStrValue(prior.User, cs.User, "")
 	m.Dir = svcStrValue(prior.Dir, cs.Dir, "")
 	m.Hosts = svcHostsFromSwarm(prior.Hosts, cs.Hosts)
-	if d := cs.DNSConfig; d != nil && (prior.DNS != nil || len(d.Nameservers)+len(d.Search)+len(d.Options) > 0) {
-		p := prior.DNS
+	if d := cs.DNSConfig; d != nil && (prior.DNSConfig != nil || len(d.Nameservers)+len(d.Search)+len(d.Options) > 0) {
+		p := prior.DNSConfig
 		if p == nil {
 			p = &svcDNSModel{Nameservers: types.ListNull(types.StringType), Search: types.ListNull(types.StringType), Options: types.ListNull(types.StringType)}
 		}
-		m.DNS = &svcDNSModel{
+		m.DNSConfig = &svcDNSModel{
 			Nameservers: svcListValue(p.Nameservers, addrStrings(d.Nameservers)),
 			Search:      svcListValue(p.Search, d.Search),
 			Options:     svcListValue(p.Options, d.Options),
@@ -358,36 +235,5 @@ func svcFlattenP2(spec swarm.ServiceSpec, cs *swarm.ContainerSpec, prior svcSpec
 	m.ForceUpdate = types.Int64Null()
 	if svcPriorSet(prior.ForceUpdate) {
 		m.ForceUpdate = types.Int64Value(int64(spec.TaskTemplate.ForceUpdate))
-	}
-}
-
-// svcNetworksConflictValidator rejects networks_advanced blocks next to a
-// non-empty networks attribute (works for docker_service and inside a stack
-// service block, via the sibling path).
-type svcNetworksConflictValidator struct{}
-
-func (svcNetworksConflictValidator) Description(context.Context) string {
-	return "networks_advanced cannot be combined with networks"
-}
-
-func (v svcNetworksConflictValidator) MarkdownDescription(ctx context.Context) string {
-	return v.Description(ctx)
-}
-
-func (svcNetworksConflictValidator) ValidateList(ctx context.Context, req validator.ListRequest, resp *validator.ListResponse) {
-	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() || len(req.ConfigValue.Elements()) == 0 {
-		return
-	}
-	var nets types.Set
-	sibling := req.Path.ParentPath().AtName("networks")
-	if req.Path.ParentPath().Equal(path.Empty()) {
-		sibling = path.Root("networks")
-	}
-	if d := req.Config.GetAttribute(ctx, sibling, &nets); d.HasError() {
-		return
-	}
-	if !nets.IsNull() && !nets.IsUnknown() && len(nets.Elements()) > 0 {
-		resp.Diagnostics.AddAttributeError(req.Path, "Conflicting network settings",
-			"Use either networks or networks_advanced, not both (move each network into a networks_advanced block).")
 	}
 }

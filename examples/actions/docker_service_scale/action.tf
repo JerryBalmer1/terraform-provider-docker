@@ -18,8 +18,9 @@ resource "terraform_data" "scale" {
 #   terraform apply -invoke=action.docker_service_scale.worker
 action "docker_service_scale" "worker" {
   config {
-    service  = "queue-worker"
-    replicas = var.worker_replicas
-    timeout  = "5m"
+    service_id  = "queue-worker"
+    result_path = "${path.module}/scale-result.json"
+    replicas    = var.worker_replicas
+    timeout     = "5m"
   }
 }

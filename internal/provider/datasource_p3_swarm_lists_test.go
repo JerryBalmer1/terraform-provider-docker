@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ func TestP3SwarmListDataSources(t *testing.T) {
 	three := uint64(3)
 	f.json("GET /services", []swarm.Service{
 		{ID: "s2", Meta: swarm.Meta{CreatedAt: ts}, Spec: swarm.ServiceSpec{Annotations: swarm.Annotations{Name: "web"},
-			TaskTemplate: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: "nginx:1.27"}},
+			TaskTemplate: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: "nginx:1.27", Env: []string{"PW=x"}}},
 			Mode:         swarm.ServiceMode{Replicated: &swarm.ReplicatedService{Replicas: &three}}}},
 		{ID: "s1", Spec: swarm.ServiceSpec{Annotations: swarm.Annotations{Name: "agent"}, Mode: swarm.ServiceMode{Global: &swarm.GlobalService{}}}},
 	})
@@ -26,26 +27,29 @@ func TestP3SwarmListDataSources(t *testing.T) {
 	f.json("GET /configs", []swarm.Config{{ID: "c1", Spec: swarm.ConfigSpec{Annotations: swarm.Annotations{Name: "conf"}, Data: []byte("k=v")}}})
 	ctx := context.Background()
 
-	state, diags := p3eReadDS(t, NewP3ServicesDataSource(), pd, map[string]tftypes.Value{"mode": p3eStr("replicated"), "name": p3eStr("w")})
+	state, diags := swarmBReadDS(t, NewServicesDataSource(), pd, map[string]tftypes.Value{"mode": p3eStr("replicated"), "name": p3eStr("w")})
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
-	var svcs []struct {
-		ID        string      `tfsdk:"id"`
-		Name      string      `tfsdk:"name"`
-		Labels    types.Map   `tfsdk:"labels"`
-		CreatedAt string      `tfsdk:"created_at"`
-		UpdatedAt string      `tfsdk:"updated_at"`
-		Image     string      `tfsdk:"image"`
-		Mode      string      `tfsdk:"mode"`
-		Replicas  types.Int64 `tfsdk:"replicas"`
+	var ids, names []string
+	state.GetAttribute(ctx, path.Root("ids"), &ids)
+	state.GetAttribute(ctx, path.Root("names"), &names)
+	if len(ids) != 2 || ids[0] != "s1" || names[1] != "web" {
+		t.Errorf("ids=%v names=%v", ids, names)
 	}
-	if d := state.GetAttribute(ctx, path.Root("services"), &svcs); d.HasError() {
-		t.Fatal(d)
+	var img, created types.String
+	var replicas types.Number
+	state.GetAttribute(ctx, path.Root("services").AtListIndex(1).AtName("spec").AtName("task_template").AtName("container_spec").AtName("image"), &img)
+	state.GetAttribute(ctx, path.Root("services").AtListIndex(1).AtName("created_at"), &created)
+	state.GetAttribute(ctx, path.Root("services").AtListIndex(1).AtName("spec").AtName("mode").AtName("replicated").AtName("replicas"), &replicas)
+	if img.ValueString() != "nginx:1.27" || created.ValueString() != "2026-01-02T03:04:05Z" || replicas.String() != "3" {
+		t.Errorf("services[1]: image=%s created=%s replicas=%s", img, created, replicas)
 	}
-	if len(svcs) != 2 || svcs[0].Name != "agent" || svcs[0].Mode != "global" || !svcs[0].Replicas.IsNull() ||
-		svcs[1].Replicas.ValueInt64() != 3 || svcs[1].Image != "nginx:1.27" || svcs[1].CreatedAt != "2026-01-02T03:04:05Z" {
-		t.Errorf("services = %+v", svcs)
+	var raw, sum types.String
+	state.GetAttribute(ctx, path.Root("services_json"), &raw)
+	state.GetAttribute(ctx, path.Root("content_sha256"), &sum)
+	if !strings.Contains(raw.ValueString(), `"ID":"s1"`) || len(sum.ValueString()) != 64 {
+		t.Errorf("raw=%s sha=%s", raw, sum)
 	}
 	if args := p3eFilterArgs(t, f, "GET /services"); !filterExactMatch(args, "mode", "replicated") || !filterExactMatch(args, "name", "w") {
 		t.Errorf("filters = %v", args)
@@ -56,30 +60,27 @@ func TestP3SwarmListDataSources(t *testing.T) {
 		t.Errorf("mode input not kept in state: %s", mode)
 	}
 
-	state, diags = p3eReadDS(t, NewP3SecretsDataSource(), pd, map[string]tftypes.Value{"labels": p3eStrMap(map[string]string{"a": "b"})})
+	state, diags = swarmBReadDS(t, NewSecretsDataSource(), pd, map[string]tftypes.Value{"labels": p3eStrMap(map[string]string{"a": "b"})})
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
-	var secs []struct {
-		ID        string            `tfsdk:"id"`
-		Name      string            `tfsdk:"name"`
-		Labels    map[string]string `tfsdk:"labels"`
-		CreatedAt string            `tfsdk:"created_at"`
-		UpdatedAt string            `tfsdk:"updated_at"`
+	var secName types.String
+	var secLabels map[string]string
+	state.GetAttribute(ctx, path.Root("secrets").AtListIndex(0).AtName("spec").AtName("name"), &secName)
+	state.GetAttribute(ctx, path.Root("secrets").AtListIndex(0).AtName("spec").AtName("labels"), &secLabels)
+	if secName.ValueString() != "pw" || secLabels["a"] != "b" {
+		t.Errorf("secrets[0] = %s %v", secName, secLabels)
 	}
-	if d := state.GetAttribute(ctx, path.Root("secrets"), &secs); d.HasError() {
-		t.Fatal(d)
-	}
-	if len(secs) != 1 || secs[0].Name != "pw" || secs[0].Labels["a"] != "b" || secs[0].CreatedAt != "" {
-		t.Errorf("secrets = %+v", secs)
+	if args := p3eFilterArgs(t, f, "GET /secrets"); !filterExactMatch(args, "label", "a=b") {
+		t.Errorf("secret filters = %v", args)
 	}
 
-	state, diags = p3eReadDS(t, NewP3ConfigsDataSource(), pd, nil)
+	state, diags = swarmBReadDS(t, NewConfigsDataSource(), pd, nil)
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
 	var data types.String
-	state.GetAttribute(ctx, path.Root("configs").AtListIndex(0).AtName("data"), &data)
+	state.GetAttribute(ctx, path.Root("configs").AtListIndex(0).AtName("spec").AtName("data"), &data)
 	if data.ValueString() != "az12" {
 		t.Errorf("config data = %s", data)
 	}
@@ -118,9 +119,12 @@ data "docker_services" "all" {}
 `,
 			Check: resource.ComposeAggregateTestCheckFunc(
 				resource.TestCheckResourceAttr("data.docker_secrets.s", "secrets.#", "1"),
-				resource.TestCheckResourceAttr("data.docker_secrets.s", "secrets.0.name", "tfacc-secrets-ds"),
-				resource.TestCheckResourceAttr("data.docker_configs.c", "configs.0.data", "az12"),
+				resource.TestCheckResourceAttr("data.docker_secrets.s", "names.0", "tfacc-secrets-ds"),
+				resource.TestCheckResourceAttr("data.docker_secrets.s", "secrets.0.spec.name", "tfacc-secrets-ds"),
+				resource.TestCheckResourceAttr("data.docker_configs.c", "configs.0.spec.data", "az12"),
+				resource.TestCheckResourceAttrSet("data.docker_configs.c", "configs_json"),
 				resource.TestCheckResourceAttrSet("data.docker_services.all", "services.#"),
+				resource.TestCheckResourceAttrSet("data.docker_services.all", "engine_api_version"),
 			),
 		}},
 	})

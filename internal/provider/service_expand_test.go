@@ -27,26 +27,30 @@ func svcTestModel() svcSpecModel {
 	str := types.StringValue
 	i64 := types.Int64Value
 	return svcSpecModel{
-		Name:            str("web"),
-		Image:           str("nginx:1.27"),
-		Mode:            str("replicated"),
-		Replicas:        i64(3),
-		Env:             stringMapValue(map[string]string{"A": "1", "B": "two=2"}, false),
-		Args:            stringListValue([]string{"-g", "daemon off;"}, false),
-		Command:         stringListValue([]string{"nginx"}, false),
-		Networks:        stringSetValue([]string{"frontend", "net333"}, false),
+		Name:     str("web"),
+		Image:    str("nginx:1.27"),
+		Mode:     str("replicated"),
+		Replicas: i64(3),
+		Env:      stringMapValue(map[string]string{"A": "1", "B": "two=2"}, false),
+		Args:     stringListValue([]string{"-g", "daemon off;"}, false),
+		Command:  stringListValue([]string{"nginx"}, false),
+		Networks: svcNetworksValue(types.MapNull(types.ObjectType{AttrTypes: svcNetworkAttachAttrTypes}), map[string]svcNetworkAttachModel{
+			"frontend": svcNetworkAttachment(nil, nil), "net333": svcNetworkAttachment([]string{"api"}, map[string]string{"com.example.opt": "1"}),
+		}),
 		Labels:          stringMapValue(map[string]string{"team": "web"}, false),
 		ContainerLabels: types.MapNull(types.StringType),
 		Mounts: []svcMountModel{
 			{Type: str("volume"), Source: str("data"), Target: str("/data"), ReadOnly: types.BoolValue(false),
-				TmpfsSize: types.Int64Null(), VolumeDriver: str("local"), VolumeDriverOpts: stringMapValue(map[string]string{"type": "nfs"}, false),
-				VolumeLabels: types.MapNull(types.StringType)},
+				VolumeOptions: &svcVolumeOptionsModel{NoCopy: types.BoolValue(true), Labels: types.MapNull(types.StringType),
+					DriverConfig: &svcDriverConfigModel{Name: str("local"), Options: stringMapValue(map[string]string{"type": "nfs"}, false)}}},
 			{Type: str("tmpfs"), Source: types.StringNull(), Target: str("/tmp"), ReadOnly: types.BoolValue(true),
-				TmpfsSize: i64(1 << 20), VolumeDriver: types.StringNull(), VolumeDriverOpts: types.MapNull(types.StringType), VolumeLabels: types.MapNull(types.StringType)},
+				TmpfsOptions: &svcTmpfsOptionsModel{SizeBytes: i64(1 << 20), Mode: i64(0o700)}},
+			{Type: str("bind"), Source: str("/srv/data"), Target: str("/srv"), ReadOnly: types.BoolValue(false),
+				BindOptions: &svcBindOptionsModel{Propagation: str("rslave")}},
 		},
 		EndpointSpec: &svcEndpointModel{Mode: str("vip"), Ports: []svcPortModel{
-			{TargetPort: i64(80), PublishedPort: i64(8080), Protocol: str("tcp"), PublishMode: str("ingress")},
-			{TargetPort: i64(53), PublishedPort: types.Int64Null(), Protocol: str("udp"), PublishMode: str("host")},
+			{Name: str("http"), TargetPort: i64(80), PublishedPort: i64(8080), Protocol: str("tcp"), PublishMode: str("ingress")},
+			{Name: types.StringNull(), TargetPort: i64(53), PublishedPort: types.Int64Null(), Protocol: str("udp"), PublishMode: str("host")},
 		}},
 		Secrets: []svcSecretRefModel{
 			{SecretID: str("db_password"), SecretName: types.StringNull(), FileName: types.StringNull(), UID: str("0"), GID: str("0"), Mode: i64(0o444)},
@@ -61,10 +65,14 @@ func svcTestModel() svcSpecModel {
 			MaxFailureRatio: types.Float64Null(), Order: str("stop-first")},
 		RestartPolicy: &svcRestartModel{Condition: str("on-failure"), Delay: str("5s"), MaxAttempts: i64(3), Window: str("2m")},
 		Placement: &svcPlacementModel{Constraints: stringListValue([]string{"node.role==worker"}, false),
-			Preferences: stringListValue([]string{"spread=node.labels.zone"}, false), MaxReplicas: i64(2)},
+			Preferences: stringListValue([]string{"spread=node.labels.zone"}, false), MaxReplicas: i64(2),
+			Platforms: []svcPlatformModel{{Architecture: str("amd64"), OS: str("linux")}}},
 		Resources: &svcResourcesModel{
-			Limits:       &svcResourceAmountModel{NanoCPUs: i64(500000000), MemoryBytes: i64(268435456)},
-			Reservations: &svcResourceAmountModel{NanoCPUs: types.Int64Null(), MemoryBytes: i64(134217728)},
+			Limits: &svcResourceAmountModel{NanoCPUs: i64(500000000), MemoryBytes: i64(268435456)},
+			Reservations: &svcReservationModel{NanoCPUs: types.Int64Null(), MemoryBytes: i64(134217728), GenericResources: []svcGenericResourceModel{
+				{NamedResourceSpec: &svcNamedResourceModel{Kind: str("GPU"), Value: str("uuid-1")}},
+				{DiscreteResourceSpec: &svcDiscreteResourceModel{Kind: str("SSD"), Value: i64(2)}},
+			}},
 		},
 		Healthcheck: &svcHealthModel{Test: stringListValue([]string{"CMD", "curl", "-f", "http://localhost/"}, false),
 			Interval: str("30s"), Timeout: str("5s"), StartPeriod: types.StringNull(), Retries: i64(3)},
@@ -77,7 +85,7 @@ func svcTestModel() svcSpecModel {
 		User:             str("101:101"),
 		Dir:              str("/srv"),
 		Hosts:            stringListValue([]string{"db.local:10.0.0.5", "v6.local:fd00::1"}, false),
-		DNS: &svcDNSModel{Nameservers: stringListValue([]string{"10.0.0.2"}, false), Search: types.ListNull(types.StringType),
+		DNSConfig: &svcDNSModel{Nameservers: stringListValue([]string{"10.0.0.2"}, false), Search: types.ListNull(types.StringType),
 			Options: stringListValue([]string{"ndots:2"}, false)},
 		CapAdd:          stringSetValue([]string{"NET_ADMIN"}, false),
 		CapDrop:         types.SetNull(types.StringType),
@@ -85,6 +93,15 @@ func svcTestModel() svcSpecModel {
 		Ulimits:         []svcUlimitModel{{Name: str("nofile"), Soft: i64(1024), Hard: i64(2048)}},
 		StopGracePeriod: str("30s"),
 		ForceUpdate:     i64(2),
+
+		Groups:     stringListValue([]string{"audio"}, false),
+		Init:       types.BoolValue(true),
+		Isolation:  types.StringNull(),
+		ReadOnly:   types.BoolValue(true),
+		StopSignal: str("SIGQUIT"),
+		Runtime:    types.StringNull(),
+		Privileges: &svcPrivilegesModel{SELinuxContext: &svcSELinuxContextModel{Disable: types.BoolNull(), User: types.StringNull(),
+			Role: types.StringNull(), Type: str("svirt_lxc_net_t"), Level: str("s0:c100,c200")}},
 	}
 }
 
@@ -95,7 +112,11 @@ func svcP2Nulls(m *svcSpecModel) {
 	m.Hosts = types.ListNull(types.StringType)
 	m.CapAdd, m.CapDrop = types.SetNull(types.StringType), types.SetNull(types.StringType)
 	m.Sysctls = types.MapNull(types.StringType)
-	m.DNS, m.Ulimits, m.NetworksAdvanced = nil, nil, nil
+	m.DNSConfig, m.Ulimits = nil, nil
+	m.Groups = types.ListNull(types.StringType)
+	m.Init, m.ReadOnly = types.BoolNull(), types.BoolNull()
+	m.Isolation, m.StopSignal, m.Runtime = types.StringNull(), types.StringNull(), types.StringNull()
+	m.Privileges = nil
 }
 
 // svcSimulateDaemon mimics what the daemon and client do to a submitted
@@ -148,8 +169,26 @@ func TestServiceExpandFlattenRoundTrip(t *testing.T) {
 	if cs.Mounts[0].VolumeOptions == nil || cs.Mounts[0].VolumeOptions.DriverConfig.Options["type"] != "nfs" {
 		t.Errorf("volume mount = %+v", cs.Mounts[0])
 	}
-	if cs.Mounts[1].TmpfsOptions == nil || cs.Mounts[1].TmpfsOptions.SizeBytes != 1<<20 {
+	if cs.Mounts[1].TmpfsOptions == nil || cs.Mounts[1].TmpfsOptions.SizeBytes != 1<<20 || cs.Mounts[1].TmpfsOptions.Mode != 0o700 {
 		t.Errorf("tmpfs mount = %+v", cs.Mounts[1])
+	}
+	if !cs.Mounts[0].VolumeOptions.NoCopy || cs.Mounts[2].BindOptions == nil || cs.Mounts[2].BindOptions.Propagation != mount.PropagationRSlave {
+		t.Errorf("mount options = %+v / %+v", cs.Mounts[0].VolumeOptions, cs.Mounts[2].BindOptions)
+	}
+	if n := spec.TaskTemplate.Networks[1]; !reflect.DeepEqual(n.Aliases, []string{"api"}) || n.DriverOpts["com.example.opt"] != "1" {
+		t.Errorf("network attachment = %+v", n)
+	}
+	if cs.Init == nil || !*cs.Init || !cs.ReadOnly || cs.StopSignal != "SIGQUIT" || !reflect.DeepEqual(cs.Groups, []string{"audio"}) {
+		t.Errorf("gap attributes = init %v ro %v sig %q groups %v", cs.Init, cs.ReadOnly, cs.StopSignal, cs.Groups)
+	}
+	if p := cs.Privileges; p == nil || p.SELinuxContext == nil || p.SELinuxContext.Level != "s0:c100,c200" || p.CredentialSpec != nil {
+		t.Errorf("privileges = %+v", p)
+	}
+	if g := spec.TaskTemplate.Resources.Reservations.GenericResources; len(g) != 2 || g[0].NamedResourceSpec.Value != "uuid-1" || g[1].DiscreteResourceSpec.Value != 2 {
+		t.Errorf("generic resources = %+v", g)
+	}
+	if spec.EndpointSpec.Ports[0].Name != "http" {
+		t.Errorf("port name = %q", spec.EndpointSpec.Ports[0].Name)
 	}
 	if spec.UpdateConfig.Monitor != time.Minute || spec.UpdateConfig.MaxFailureRatio != float32(0.1) {
 		t.Errorf("update config = %+v", spec.UpdateConfig)
@@ -186,7 +225,7 @@ func TestServiceFlattenMinimalNoSpuriousBlocks(t *testing.T) {
 	m := svcSpecModel{
 		Name: types.StringValue("api"), Image: types.StringValue("nginx"), Mode: types.StringValue("global"), Replicas: types.Int64Value(1),
 		Env: types.MapNull(types.StringType), Args: types.ListNull(types.StringType), Command: types.ListNull(types.StringType),
-		Networks: types.SetNull(types.StringType), Labels: types.MapValueMust(types.StringType, map[string]attr.Value{}), ContainerLabels: types.MapNull(types.StringType),
+		Networks: types.MapNull(types.ObjectType{AttrTypes: svcNetworkAttachAttrTypes}), Labels: types.MapValueMust(types.StringType, map[string]attr.Value{}), ContainerLabels: types.MapNull(types.StringType),
 	}
 	svcP2Nulls(&m)
 	spec, diags := svcExpand(ctx, &m, svcTestLookup(), svcExpandOpts{})
@@ -219,7 +258,7 @@ func TestServiceImportFlattenShowsDaemonValues(t *testing.T) {
 	if lbl := got.Labels.Elements(); len(lbl) != 1 {
 		t.Errorf("labels = %v", lbl)
 	}
-	if n := got.Networks.Elements(); len(n) != 1 || n[0].(types.String).ValueString() != "net333" {
+	if n := got.Networks.Elements(); len(n) != 1 || n["net333"] == nil {
 		t.Errorf("networks = %v", n)
 	}
 }
@@ -319,7 +358,7 @@ func TestServiceExpandErrors(t *testing.T) {
 	ctx := context.Background()
 	m := svcTestModel()
 	m.Placement.Preferences = stringListValue([]string{"pack=node.id"}, false)
-	m.Networks = stringSetValue([]string{"missing"}, false)
+	m.Networks = svcNetworksValue(types.MapNull(types.ObjectType{AttrTypes: svcNetworkAttachAttrTypes}), map[string]svcNetworkAttachModel{"missing": svcNetworkAttachment(nil, nil)})
 	m.UpdateConfig.Delay = types.StringValue("soon")
 	_, diags := svcExpand(ctx, &m, svcTestLookup(), svcExpandOpts{})
 	if diags.ErrorsCount() != 3 {
@@ -331,8 +370,7 @@ func TestServiceMountVolumeOptionsOnlyWhenSet(t *testing.T) {
 	ctx := context.Background()
 	m := svcTestModel()
 	m.Mounts = []svcMountModel{{Type: types.StringValue("volume"), Source: types.StringValue("v"), Target: types.StringValue("/v"),
-		ReadOnly: types.BoolValue(false), TmpfsSize: types.Int64Null(), VolumeDriver: types.StringNull(),
-		VolumeDriverOpts: types.MapNull(types.StringType), VolumeLabels: types.MapNull(types.StringType)}}
+		ReadOnly: types.BoolValue(false)}}
 	spec, _ := svcExpand(ctx, &m, svcTestLookup(), svcExpandOpts{})
 	if mt := spec.TaskTemplate.ContainerSpec.Mounts[0]; mt.VolumeOptions != nil || mt.Type != mount.TypeVolume {
 		t.Errorf("mount = %+v", mt)
@@ -350,6 +388,7 @@ func TestServiceModelMatchesSchema(t *testing.T) {
 	}
 	st := tfsdk.State{Schema: sr.Schema, Raw: tftypes.NewValue(sr.Schema.Type().TerraformType(ctx), nil)}
 	in := serviceResourceModel{ID: types.StringValue("abc"), svcSpecModel: svcTestModel()}
+	in.svcResourceComputedNull()
 	if d := st.Set(ctx, &in); d.HasError() {
 		t.Fatalf("set: %v", d)
 	}
@@ -357,7 +396,7 @@ func TestServiceModelMatchesSchema(t *testing.T) {
 	if d := st.Get(ctx, &out); d.HasError() {
 		t.Fatalf("get: %v", d)
 	}
-	if !reflect.DeepEqual(in, out) {
+	if !reflect.DeepEqual(in.svcSpecModel, out.svcSpecModel) {
 		svcDiffFields(t, out.svcSpecModel, in.svcSpecModel)
 	}
 }

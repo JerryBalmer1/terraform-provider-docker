@@ -25,6 +25,7 @@ type swarmTokensModel struct {
 	ID      types.String `tfsdk:"id"`
 	Worker  types.String `tfsdk:"worker"`
 	Manager types.String `tfsdk:"manager"`
+	contractSwarmSwarmTokensData
 }
 
 func (d *swarmTokensDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -33,7 +34,7 @@ func (d *swarmTokensDataSource) Metadata(_ context.Context, req datasource.Metad
 
 func (d *swarmTokensDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Reads the join tokens of the swarm the provider's Docker host manages (SwarmInspect). " +
+		MarkdownDescription: "Reads the join tokens of the swarm the provider's Docker host manages (SwarmInspect), as `worker` / `manager` and the structured `join_tokens`. " +
 			"Use it to join nodes to a swarm that was not created by `docker_swarm_init` in this configuration. The host must be a manager.",
 		Attributes: map[string]schema.Attribute{
 			"id":      schema.StringAttribute{Computed: true, MarkdownDescription: "Swarm cluster ID."},
@@ -41,6 +42,7 @@ func (d *swarmTokensDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 			"manager": schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "Token that joins a node as a manager."},
 		},
 	}
+	contractAddDataSourceAttributes(resp.Schema.Attributes, "swarm:swarm-tokens-data")
 }
 
 func (d *swarmTokensDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -62,5 +64,6 @@ func (d *swarmTokensDataSource) Read(ctx context.Context, _ datasource.ReadReque
 		Worker:  types.StringValue(sw.JoinTokens.Worker),
 		Manager: types.StringValue(sw.JoinTokens.Manager),
 	}
+	resp.Diagnostics.Append(m.contractFill(ctx, d.pd, contractFillInput{Structured: map[string]any{"join_tokens": sw.JoinTokens}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

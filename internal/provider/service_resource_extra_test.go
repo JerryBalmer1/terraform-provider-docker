@@ -3,7 +3,6 @@ package provider
 import (
 	"fmt"
 	"reflect"
-	"regexp"
 	"testing"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 )
 
 // TestServiceFakeDaemonP2Attributes creates a service using the Pass 2
-// container attributes and networks_advanced, updates some in place and
+// container attributes and a networks map entry with aliases, updates some in place and
 // imports it, against the fake Engine API.
 func TestServiceFakeDaemonP2Attributes(t *testing.T) {
 	f, host := newSvcFakeDaemon(t)
@@ -33,12 +32,11 @@ resource "docker_service" "p2" {
   stop_grace_period = "1m"
   force_update      = %d
 
-  networks_advanced {
-    name    = "ext_net"
-    aliases = ["p2-alias"]
+  networks = {
+    ext_net = { aliases = ["p2-alias"] }
   }
 
-  dns {
+  dns_config {
     nameservers = ["10.0.0.2"]
     options     = ["ndots:2"]
   }
@@ -63,9 +61,8 @@ resource "docker_service" "p2" {
 				Config: cfg(1, "db.local:10.0.0.5"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("docker_service.p2", "hosts.0", "db.local:10.0.0.5"),
-					resource.TestCheckResourceAttr("docker_service.p2", "networks_advanced.0.name", "ext_net"),
+					resource.TestCheckResourceAttr("docker_service.p2", "networks.ext_net.aliases.0", "p2-alias"),
 					resource.TestCheckResourceAttr("docker_service.p2", "stop_grace_period", "1m"),
-					resource.TestCheckNoResourceAttr("docker_service.p2", "networks"),
 					func(*terraform.State) error {
 						f.mu.Lock()
 						defer f.mu.Unlock()
@@ -105,9 +102,9 @@ resource "docker_service" "p2" {
 				ResourceName:      "docker_service.p2",
 				ImportState:       true,
 				ImportStateVerify: true,
-				// force_update is ignored on refresh unless configured; networks_advanced
-				// names come back as IDs on import.
-				ImportStateVerifyIgnore: []string{"converge_config", "image", "force_update", "networks_advanced.0.name", "labels.%"},
+				// force_update is ignored on refresh unless configured; networks
+				// keys come back as IDs on import.
+				ImportStateVerifyIgnore: []string{"converge_config", "image", "force_update", "networks.", "labels.%"},
 			},
 		},
 	})
@@ -178,28 +175,5 @@ resource "docker_service" "job" {
 				Check: resource.TestCheckResourceAttr("docker_service.job", "mode", "global_job"),
 			},
 		},
-	})
-}
-
-// TestServiceNetworksConflict: networks and networks_advanced together fail
-// at plan time.
-func TestServiceNetworksConflict(t *testing.T) {
-	_, host := newSvcFakeDaemon(t)
-	resource.UnitTest(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{{
-			Config: svcFakeConfig(host, `
-resource "docker_service" "c" {
-  name     = "c"
-  image    = "busybox"
-  networks = ["ext_net"]
-  networks_advanced {
-    name = "ext_net"
-  }
-}
-`),
-			PlanOnly:    true,
-			ExpectError: regexp.MustCompile(`Conflicting network settings`),
-		}},
 	})
 }

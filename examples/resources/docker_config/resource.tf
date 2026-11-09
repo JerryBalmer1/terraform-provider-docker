@@ -7,6 +7,11 @@ resource "docker_config" "nginx" {
     }
   CONF
   )
+
+  # Labels update in place (ConfigUpdate); new content replaces the config.
+  labels = {
+    app = "shop"
+  }
 }
 
 # Terraform 1.11+: write-only content, kept out of plan and state. Bump

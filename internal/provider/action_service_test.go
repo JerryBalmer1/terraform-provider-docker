@@ -126,7 +126,7 @@ func TestServiceScaleAction(t *testing.T) {
 		}
 		return out
 	}
-	res := actInvokePD(t, actServicePD(t, f), NewServiceScaleAction(), map[string]tftypes.Value{"service": actTfStr("web"), "replicas": actTfNum(3)})
+	res := actInvokePD(t, actServicePD(t, f), NewServiceScaleAction(), map[string]tftypes.Value{"service_id": actTfStr("web"), "replicas": actTfNum(3)})
 	if res.Diags.HasError() {
 		t.Fatal(res.errText())
 	}
@@ -151,11 +151,11 @@ func TestServiceScaleActionGlobal(t *testing.T) {
 	f := swarmNewFakeEngine(t)
 	s := actNewFakeService(t, f, 1)
 	s.svc.Spec.Mode = swarm.ServiceMode{Global: &swarm.GlobalService{}}
-	res := actInvoke(t, f, NewServiceScaleAction(), map[string]tftypes.Value{"service": actTfStr("web"), "replicas": actTfNum(2)})
+	res := actInvoke(t, f, NewServiceScaleAction(), map[string]tftypes.Value{"service_id": actTfStr("web"), "replicas": actTfNum(2)})
 	if !strings.Contains(res.errText(), "not in replicated mode") || len(s.updates) != 0 {
 		t.Fatalf("got %q, %d updates", res.errText(), len(s.updates))
 	}
-	d := actValidate(t, NewServiceScaleAction(), map[string]tftypes.Value{"service": actTfStr("web"), "replicas": actTfNum(-1)})
+	d := actValidate(t, NewServiceScaleAction(), map[string]tftypes.Value{"service_id": actTfStr("web"), "replicas": actTfNum(-1)})
 	if d.ErrorsCount() != 1 {
 		t.Errorf("negative replicas: %v", d)
 	}
@@ -166,7 +166,7 @@ func TestServiceScaleActionTimeout(t *testing.T) {
 	f := swarmNewFakeEngine(t)
 	s := actNewFakeService(t, f, 1)
 	s.tasks = func(s *actFakeService) []swarm.Task { return nil }
-	res := actInvoke(t, f, NewServiceScaleAction(), map[string]tftypes.Value{"service": actTfStr("web"), "replicas": actTfNum(2), "timeout": actTfStr("100ms")})
+	res := actInvoke(t, f, NewServiceScaleAction(), map[string]tftypes.Value{"service_id": actTfStr("web"), "replicas": actTfNum(2), "timeout": actTfStr("100ms")})
 	if !strings.Contains(res.errText(), "did not converge: 0/2 tasks running") {
 		t.Fatalf("got %q", res.errText())
 	}
@@ -195,7 +195,7 @@ func TestServiceForceUpdateAction(t *testing.T) {
 		}
 		swarmFakeJSON(w, s.svc)
 	})
-	res := actInvoke(t, f, NewServiceForceUpdateAction(), map[string]tftypes.Value{"service": actTfStr("s1abcdef")})
+	res := actInvoke(t, f, NewServiceForceUpdateAction(), map[string]tftypes.Value{"service_id": actTfStr("s1abcdef")})
 	if res.Diags.HasError() {
 		t.Fatal(res.errText())
 	}
@@ -218,7 +218,7 @@ func TestServiceForceUpdateActionPaused(t *testing.T) {
 		now := time.Now()
 		s.svc.UpdateStatus = &swarm.UpdateStatus{State: swarm.UpdateStatePaused, StartedAt: &now, Message: "update paused due to failure"}
 	}
-	res := actInvoke(t, f, NewServiceForceUpdateAction(), map[string]tftypes.Value{"service": actTfStr("web")})
+	res := actInvoke(t, f, NewServiceForceUpdateAction(), map[string]tftypes.Value{"service_id": actTfStr("web")})
 	if !strings.Contains(res.errText(), "update paused due to failure") {
 		t.Fatalf("got %q", res.errText())
 	}
@@ -246,7 +246,7 @@ func TestServiceRollbackAction(t *testing.T) {
 		}
 		swarmFakeJSON(w, s.svc)
 	})
-	res := actInvokePD(t, actServicePD(t, f), NewServiceRollbackAction(), map[string]tftypes.Value{"service": actTfStr("web")})
+	res := actInvokePD(t, actServicePD(t, f), NewServiceRollbackAction(), map[string]tftypes.Value{"service_id": actTfStr("web")})
 	if res.Diags.HasError() {
 		t.Fatal(res.errText())
 	}
@@ -267,7 +267,7 @@ func TestServiceRollbackAction(t *testing.T) {
 func TestServiceRollbackActionNoPrevious(t *testing.T) {
 	f := swarmNewFakeEngine(t)
 	s := actNewFakeService(t, f, 1)
-	res := actInvoke(t, f, NewServiceRollbackAction(), map[string]tftypes.Value{"service": actTfStr("web")})
+	res := actInvoke(t, f, NewServiceRollbackAction(), map[string]tftypes.Value{"service_id": actTfStr("web")})
 	if !strings.Contains(res.errText(), "no previous spec") || len(s.updates) != 0 {
 		t.Fatalf("got %q", res.errText())
 	}
@@ -283,7 +283,7 @@ func TestServiceRollbackActionPaused(t *testing.T) {
 		now := time.Now()
 		s.svc.UpdateStatus = &swarm.UpdateStatus{State: swarm.UpdateStateRollbackPaused, StartedAt: &now, Message: "rollback paused"}
 	}
-	res := actInvoke(t, f, NewServiceRollbackAction(), map[string]tftypes.Value{"service": actTfStr("web")})
+	res := actInvoke(t, f, NewServiceRollbackAction(), map[string]tftypes.Value{"service_id": actTfStr("web")})
 	if !strings.Contains(res.errText(), "rollback paused") {
 		t.Fatalf("got %q", res.errText())
 	}

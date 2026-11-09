@@ -4,6 +4,7 @@ package provider
 
 import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
@@ -23,7 +24,7 @@ type svcSpecModel struct {
 	Env             types.Map           `tfsdk:"env"`
 	Args            types.List          `tfsdk:"args"`
 	Command         types.List          `tfsdk:"command"`
-	Networks        types.Set           `tfsdk:"networks"`
+	Networks        types.Map           `tfsdk:"networks"`
 	Labels          types.Map           `tfsdk:"labels"`
 	ContainerLabels types.Map           `tfsdk:"container_labels"`
 	Mounts          []svcMountModel     `tfsdk:"mounts"`
@@ -40,20 +41,50 @@ type svcSpecModel struct {
 	ConvergeConfig  *svcConvergeModel   `tfsdk:"converge_config"`
 
 	// Pass 2 additions.
-	MaxConcurrent    types.Int64             `tfsdk:"max_concurrent"`
-	TotalCompletions types.Int64             `tfsdk:"total_completions"`
-	Hostname         types.String            `tfsdk:"hostname"`
-	User             types.String            `tfsdk:"user"`
-	Dir              types.String            `tfsdk:"dir"`
-	Hosts            types.List              `tfsdk:"hosts"`
-	DNS              *svcDNSModel            `tfsdk:"dns"`
-	CapAdd           types.Set               `tfsdk:"cap_add"`
-	CapDrop          types.Set               `tfsdk:"cap_drop"`
-	Sysctls          types.Map               `tfsdk:"sysctls"`
-	Ulimits          []svcUlimitModel        `tfsdk:"ulimits"`
-	StopGracePeriod  types.String            `tfsdk:"stop_grace_period"`
-	ForceUpdate      types.Int64             `tfsdk:"force_update"`
-	NetworksAdvanced []svcNetworkAttachModel `tfsdk:"networks_advanced"`
+	MaxConcurrent    types.Int64      `tfsdk:"max_concurrent"`
+	TotalCompletions types.Int64      `tfsdk:"total_completions"`
+	Hostname         types.String     `tfsdk:"hostname"`
+	User             types.String     `tfsdk:"user"`
+	Dir              types.String     `tfsdk:"dir"`
+	Hosts            types.List       `tfsdk:"hosts"`
+	DNSConfig        *svcDNSModel     `tfsdk:"dns_config"`
+	CapAdd           types.Set        `tfsdk:"cap_add"`
+	CapDrop          types.Set        `tfsdk:"cap_drop"`
+	Sysctls          types.Map        `tfsdk:"sysctls"`
+	Ulimits          []svcUlimitModel `tfsdk:"ulimits"`
+	StopGracePeriod  types.String     `tfsdk:"stop_grace_period"`
+	ForceUpdate      types.Int64      `tfsdk:"force_update"`
+
+	// Pass 5 additions (renames.json gap rows; upstream ContainerSpec /
+	// TaskSpec names).
+	Groups     types.List          `tfsdk:"groups"`
+	Init       types.Bool          `tfsdk:"init"`
+	Isolation  types.String        `tfsdk:"isolation"`
+	ReadOnly   types.Bool          `tfsdk:"read_only"`
+	StopSignal types.String        `tfsdk:"stop_signal"`
+	Runtime    types.String        `tfsdk:"runtime"`
+	Privileges *svcPrivilegesModel `tfsdk:"privileges"`
+}
+
+// svcPrivilegesModel is ContainerSpec.Privileges (credential spec and
+// SELinux context).
+type svcPrivilegesModel struct {
+	CredentialSpec *svcCredentialSpecModel `tfsdk:"credential_spec"`
+	SELinuxContext *svcSELinuxContextModel `tfsdk:"selinux_context"`
+}
+
+type svcCredentialSpecModel struct {
+	Config   types.String `tfsdk:"config"`
+	File     types.String `tfsdk:"file"`
+	Registry types.String `tfsdk:"registry"`
+}
+
+type svcSELinuxContextModel struct {
+	Disable types.Bool   `tfsdk:"disable"`
+	User    types.String `tfsdk:"user"`
+	Role    types.String `tfsdk:"role"`
+	Type    types.String `tfsdk:"type"`
+	Level   types.String `tfsdk:"level"`
 }
 
 type svcDNSModel struct {
@@ -68,20 +99,51 @@ type svcUlimitModel struct {
 	Hard types.Int64  `tfsdk:"hard"`
 }
 
+// svcNetworkAttachModel is one value of the networks map (keyed by network
+// name or ID): TaskTemplate.Networks[] without its Target.
 type svcNetworkAttachModel struct {
-	Name    types.String `tfsdk:"name"`
-	Aliases types.Set    `tfsdk:"aliases"`
+	Aliases    types.Set `tfsdk:"aliases"`
+	DriverOpts types.Map `tfsdk:"driver_opts"`
+}
+
+// svcNetworkAttachAttrTypes is the object type of a networks map value.
+var svcNetworkAttachAttrTypes = map[string]attr.Type{
+	"aliases":     types.SetType{ElemType: types.StringType},
+	"driver_opts": types.MapType{ElemType: types.StringType},
 }
 
 type svcMountModel struct {
-	Type             types.String `tfsdk:"type"`
-	Source           types.String `tfsdk:"source"`
-	Target           types.String `tfsdk:"target"`
-	ReadOnly         types.Bool   `tfsdk:"read_only"`
-	TmpfsSize        types.Int64  `tfsdk:"tmpfs_size"`
-	VolumeDriver     types.String `tfsdk:"volume_driver"`
-	VolumeDriverOpts types.Map    `tfsdk:"volume_driver_opts"`
-	VolumeLabels     types.Map    `tfsdk:"volume_labels"`
+	Type          types.String           `tfsdk:"type"`
+	Source        types.String           `tfsdk:"source"`
+	Target        types.String           `tfsdk:"target"`
+	ReadOnly      types.Bool             `tfsdk:"read_only"`
+	BindOptions   *svcBindOptionsModel   `tfsdk:"bind_options"`
+	TmpfsOptions  *svcTmpfsOptionsModel  `tfsdk:"tmpfs_options"`
+	VolumeOptions *svcVolumeOptionsModel `tfsdk:"volume_options"`
+}
+
+// svcBindOptionsModel is Mount.BindOptions.
+type svcBindOptionsModel struct {
+	Propagation types.String `tfsdk:"propagation"`
+}
+
+// svcTmpfsOptionsModel is Mount.TmpfsOptions.
+type svcTmpfsOptionsModel struct {
+	SizeBytes types.Int64 `tfsdk:"size_bytes"`
+	Mode      types.Int64 `tfsdk:"mode"`
+}
+
+// svcVolumeOptionsModel is Mount.VolumeOptions.
+type svcVolumeOptionsModel struct {
+	NoCopy       types.Bool            `tfsdk:"no_copy"`
+	Labels       types.Map             `tfsdk:"labels"`
+	DriverConfig *svcDriverConfigModel `tfsdk:"driver_config"`
+}
+
+// svcDriverConfigModel is Mount.VolumeOptions.DriverConfig.
+type svcDriverConfigModel struct {
+	Name    types.String `tfsdk:"name"`
+	Options types.Map    `tfsdk:"options"`
 }
 
 type svcEndpointModel struct {
@@ -90,6 +152,7 @@ type svcEndpointModel struct {
 }
 
 type svcPortModel struct {
+	Name          types.String `tfsdk:"name"`
 	TargetPort    types.Int64  `tfsdk:"target_port"`
 	PublishedPort types.Int64  `tfsdk:"published_port"`
 	Protocol      types.String `tfsdk:"protocol"`
@@ -131,14 +194,46 @@ type svcRestartModel struct {
 }
 
 type svcPlacementModel struct {
-	Constraints types.List  `tfsdk:"constraints"`
-	Preferences types.List  `tfsdk:"preferences"`
-	MaxReplicas types.Int64 `tfsdk:"max_replicas"`
+	Constraints types.List         `tfsdk:"constraints"`
+	Preferences types.List         `tfsdk:"preferences"`
+	MaxReplicas types.Int64        `tfsdk:"max_replicas"`
+	Platforms   []svcPlatformModel `tfsdk:"platforms"`
+}
+
+// svcPlatformModel is one Placement.Platforms entry.
+type svcPlatformModel struct {
+	Architecture types.String `tfsdk:"architecture"`
+	OS           types.String `tfsdk:"os"`
 }
 
 type svcResourcesModel struct {
 	Limits       *svcResourceAmountModel `tfsdk:"limits"`
-	Reservations *svcResourceAmountModel `tfsdk:"reservations"`
+	Reservations *svcReservationModel    `tfsdk:"reservations"`
+}
+
+// svcReservationModel is Resources.Reservations: an amount plus generic
+// resources.
+type svcReservationModel struct {
+	NanoCPUs         types.Int64               `tfsdk:"nano_cpus"`
+	MemoryBytes      types.Int64               `tfsdk:"memory_bytes"`
+	GenericResources []svcGenericResourceModel `tfsdk:"generic_resources"`
+}
+
+// svcGenericResourceModel is one GenericResources entry: exactly one of the
+// named (string value) and discrete (integer value) specs.
+type svcGenericResourceModel struct {
+	NamedResourceSpec    *svcNamedResourceModel    `tfsdk:"named_resource_spec"`
+	DiscreteResourceSpec *svcDiscreteResourceModel `tfsdk:"discrete_resource_spec"`
+}
+
+type svcNamedResourceModel struct {
+	Kind  types.String `tfsdk:"kind"`
+	Value types.String `tfsdk:"value"`
+}
+
+type svcDiscreteResourceModel struct {
+	Kind  types.String `tfsdk:"kind"`
+	Value types.Int64  `tfsdk:"value"`
 }
 
 type svcResourceAmountModel struct {
@@ -245,28 +340,63 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 			MarkdownDescription: "Arguments passed to the command (overrides the image `CMD`)."},
 		"command": schema.ListAttribute{ElementType: types.StringType, Optional: true,
 			MarkdownDescription: "Command to run (overrides the image `ENTRYPOINT`)."},
-		"networks": schema.SetAttribute{ElementType: types.StringType, Optional: true,
-			MarkdownDescription: "Networks to attach the tasks to, by ID or name (resolved to IDs; overlay networks). In a stack, " +
-				"the short name of a stack `network` block resolves to `<stack>_<name>`. Use `networks_advanced` instead for per-network " +
-				"aliases; the two cannot be combined. Updated in place."},
+		"networks": schema.MapNestedAttribute{Optional: true,
+			MarkdownDescription: "Networks the tasks attach to (`TaskTemplate.Networks`), keyed by network name or ID (resolved to the ID, the " +
+				"attachment's `Target`); use `{}` as the value for a plain attachment. In a stack, the short name of a stack `network` block " +
+				"resolves to `<stack>_<name>`. Updated in place.",
+			NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+				"aliases": schema.SetAttribute{ElementType: types.StringType, Optional: true,
+					MarkdownDescription: "Extra DNS names the service gets on this network (`Aliases`); the service name always resolves."},
+				"driver_opts": schema.MapAttribute{ElementType: types.StringType, Optional: true,
+					MarkdownDescription: "Driver options of this attachment (`DriverOpts`)."},
+			}}},
+		"groups": schema.ListAttribute{ElementType: types.StringType, Optional: true,
+			MarkdownDescription: "Additional groups the task process runs with (`ContainerSpec.Groups`). Updated in place."},
+		"init": schema.BoolAttribute{Optional: true,
+			MarkdownDescription: "Run an init process inside the task containers that forwards signals and reaps processes (`ContainerSpec.Init`). " +
+				"Unset uses the daemon default. Updated in place."},
+		"isolation": schema.StringAttribute{Optional: true,
+			Validators: []validator.String{stringvalidator.OneOf("default", "process", "hyperv")},
+			MarkdownDescription: "Isolation technology of the task containers (`ContainerSpec.Isolation`): `default`, `process` or `hyperv` " +
+				"(Windows only). Updated in place."},
+		"read_only": schema.BoolAttribute{Optional: true,
+			MarkdownDescription: "Mount the task containers' root filesystem read-only (`ContainerSpec.ReadOnly`). Updated in place."},
+		"stop_signal": schema.StringAttribute{Optional: true,
+			MarkdownDescription: "Signal that stops the task containers, e.g. `SIGTERM` (`ContainerSpec.StopSignal`). Unset uses the image's. Updated in place."},
+		"runtime": schema.StringAttribute{Optional: true,
+			Validators: []validator.String{stringvalidator.OneOf("container", "plugin", "attachment")},
+			MarkdownDescription: "Runtime of the tasks (`TaskTemplate.Runtime`). Only `container` (the default) is useful here: this type always " +
+				"sends a `ContainerSpec`, and the `plugin` and `attachment` runtimes need a plugin or network-attachment spec instead. Updated in place."},
 		"labels": schema.MapAttribute{ElementType: types.StringType, Optional: true,
 			MarkdownDescription: "Labels on the service object."},
 		"container_labels": schema.MapAttribute{ElementType: types.StringType, Optional: true,
 			MarkdownDescription: "Labels on the task containers."},
 	}
 	blocks := map[string]schema.Block{
-		"networks_advanced": schema.ListNestedBlock{
-			MarkdownDescription: "Networks to attach, with per-network DNS aliases (`TaskTemplate.Networks[].Aliases`). An alternative to " +
-				"`networks`: setting both is an error. Updated in place.",
-			Validators: []validator.List{svcNetworksConflictValidator{}},
-			NestedObject: schema.NestedBlockObject{Attributes: map[string]schema.Attribute{
-				"name": schema.StringAttribute{Required: true,
-					MarkdownDescription: "Network ID or name (resolved to its ID). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`."},
-				"aliases": schema.SetAttribute{ElementType: types.StringType, Optional: true,
-					MarkdownDescription: "Extra DNS names the service gets on this network (the service name always resolves)."},
-			}},
+		"privileges": schema.SingleNestedBlock{
+			MarkdownDescription: "Security options of the task containers (`ContainerSpec.Privileges`). Updated in place.",
+			Blocks: map[string]schema.Block{
+				"credential_spec": schema.SingleNestedBlock{
+					MarkdownDescription: "Managed service account credential spec (`CredentialSpec`, Windows only); set one of `config`, `file` and `registry`.",
+					Attributes: map[string]schema.Attribute{
+						"config":   schema.StringAttribute{Optional: true, MarkdownDescription: "ID of a swarm config holding the credential spec (`Config`)."},
+						"file":     schema.StringAttribute{Optional: true, MarkdownDescription: "Credential spec file name under the daemon's `CredentialSpecs` directory (`File`)."},
+						"registry": schema.StringAttribute{Optional: true, MarkdownDescription: "Registry value name holding the credential spec (`Registry`)."},
+					},
+				},
+				"selinux_context": schema.SingleNestedBlock{
+					MarkdownDescription: "SELinux labels of the task containers (`SELinuxContext`).",
+					Attributes: map[string]schema.Attribute{
+						"disable": schema.BoolAttribute{Optional: true, MarkdownDescription: "Disable SELinux labeling (`Disable`)."},
+						"user":    schema.StringAttribute{Optional: true, MarkdownDescription: "SELinux user label (`User`)."},
+						"role":    schema.StringAttribute{Optional: true, MarkdownDescription: "SELinux role label (`Role`)."},
+						"type":    schema.StringAttribute{Optional: true, MarkdownDescription: "SELinux type label (`Type`)."},
+						"level":   schema.StringAttribute{Optional: true, MarkdownDescription: "SELinux level label (`Level`)."},
+					},
+				},
+			},
 		},
-		"dns": schema.SingleNestedBlock{
+		"dns_config": schema.SingleNestedBlock{
 			MarkdownDescription: "Resolver configuration of the task containers (`ContainerSpec.DNSConfig`). Updated in place.",
 			Attributes: map[string]schema.Attribute{
 				"nameservers": schema.ListAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: "DNS server IPs."},
@@ -290,15 +420,41 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 				"source": schema.StringAttribute{Optional: true, MarkdownDescription: "Host path (`bind`) or volume name (`volume`; " +
 					"created on each node by the volume driver if missing). In a stack, the short name of a stack `volume` block " +
 					"resolves to `<stack>_<name>` with that block's driver, options and labels."},
-				"target":     schema.StringAttribute{Required: true, MarkdownDescription: "Path inside the container."},
-				"read_only":  schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), MarkdownDescription: "Mount read-only."},
-				"tmpfs_size": schema.Int64Attribute{Optional: true, MarkdownDescription: "Size of a `tmpfs` mount in bytes."},
-				"volume_driver": schema.StringAttribute{Optional: true,
-					MarkdownDescription: "Volume driver used when the volume does not exist yet on the node."},
-				"volume_driver_opts": schema.MapAttribute{ElementType: types.StringType, Optional: true,
-					MarkdownDescription: "Driver options for a volume created on first use."},
-				"volume_labels": schema.MapAttribute{ElementType: types.StringType, Optional: true,
-					MarkdownDescription: "Labels for a volume created on first use."},
+				"target":    schema.StringAttribute{Required: true, MarkdownDescription: "Path inside the container."},
+				"read_only": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), MarkdownDescription: "Mount read-only."},
+			}, Blocks: map[string]schema.Block{
+				"bind_options": schema.SingleNestedBlock{
+					MarkdownDescription: "Options of a `bind` mount (`Mount.BindOptions`).",
+					Attributes: map[string]schema.Attribute{
+						"propagation": schema.StringAttribute{Optional: true,
+							Validators:          []validator.String{stringvalidator.OneOf("private", "rprivate", "shared", "rshared", "slave", "rslave")},
+							MarkdownDescription: "Bind propagation: `private`, `rprivate`, `shared`, `rshared`, `slave` or `rslave` (`Propagation`)."},
+					},
+				},
+				"tmpfs_options": schema.SingleNestedBlock{
+					MarkdownDescription: "Options of a `tmpfs` mount (`Mount.TmpfsOptions`).",
+					Attributes: map[string]schema.Attribute{
+						"size_bytes": schema.Int64Attribute{Optional: true, MarkdownDescription: "Size of the tmpfs in bytes (`SizeBytes`); unset is unlimited."},
+						"mode":       schema.Int64Attribute{Optional: true, MarkdownDescription: "Permission bits of the tmpfs as a decimal number, e.g. `448` for `0700` (`Mode`)."},
+					},
+				},
+				"volume_options": schema.SingleNestedBlock{
+					MarkdownDescription: "Options of a `volume` mount, used when the volume does not exist yet on the node (`Mount.VolumeOptions`).",
+					Attributes: map[string]schema.Attribute{
+						"no_copy": schema.BoolAttribute{Optional: true, MarkdownDescription: "Do not populate a new volume with the image's data at the target (`NoCopy`)."},
+						"labels": schema.MapAttribute{ElementType: types.StringType, Optional: true,
+							MarkdownDescription: "Labels for a volume created on first use (`Labels`)."},
+					},
+					Blocks: map[string]schema.Block{
+						"driver_config": schema.SingleNestedBlock{
+							MarkdownDescription: "Volume driver for a volume created on first use (`DriverConfig`).",
+							Attributes: map[string]schema.Attribute{
+								"name":    schema.StringAttribute{Optional: true, MarkdownDescription: "Volume driver name, e.g. `local` (`Name`)."},
+								"options": schema.MapAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: "Driver options (`Options`)."},
+							},
+						},
+					},
+				},
 			}},
 		},
 		"endpoint_spec": schema.SingleNestedBlock{
@@ -312,6 +468,7 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 				"ports": schema.ListNestedBlock{
 					MarkdownDescription: "Published ports.",
 					NestedObject: schema.NestedBlockObject{Attributes: map[string]schema.Attribute{
+						"name":           schema.StringAttribute{Optional: true, MarkdownDescription: "Name of the port mapping (`Name`)."},
 						"target_port":    schema.Int64Attribute{Required: true, MarkdownDescription: "Port inside the tasks."},
 						"published_port": schema.Int64Attribute{Optional: true, MarkdownDescription: "Port published on the nodes. Unset lets Swarm choose one (30000+)."},
 						"protocol": schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("tcp"),
@@ -348,12 +505,22 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 					MarkdownDescription: "Spread preferences, each `spread=<descriptor>` such as `spread=node.labels.zone`."},
 				"max_replicas": schema.Int64Attribute{Optional: true, MarkdownDescription: "Maximum tasks per node; 0 or unset means unlimited."},
 			},
+			Blocks: map[string]schema.Block{
+				"platforms": schema.ListNestedBlock{
+					MarkdownDescription: "Platforms the tasks may run on (`Placement.Platforms`). Unset lets the daemon fill them from the image " +
+						"manifest; that daemon value is then not shown.",
+					NestedObject: schema.NestedBlockObject{Attributes: map[string]schema.Attribute{
+						"architecture": schema.StringAttribute{Required: true, MarkdownDescription: "CPU architecture, e.g. `amd64` or `arm64` (`Architecture`)."},
+						"os":           schema.StringAttribute{Required: true, MarkdownDescription: "Operating system, e.g. `linux` (`OS`)."},
+					}},
+				},
+			},
 		},
 		"resources": schema.SingleNestedBlock{
 			MarkdownDescription: "CPU and memory limits and reservations per task.",
 			Blocks: map[string]schema.Block{
 				"limits":       svcResourceAmountBlock("Hard limits."),
-				"reservations": svcResourceAmountBlock("Reservations the scheduler must find on a node."),
+				"reservations": svcReservationBlock(),
 			},
 		},
 		"healthcheck": schema.SingleNestedBlock{
@@ -433,6 +600,35 @@ func svcUpdateBlock(desc string) schema.SingleNestedBlock {
 				Validators:          []validator.String{stringvalidator.OneOf("stop-first", "start-first")}},
 		},
 	}
+}
+
+// svcReservationBlock is resources.reservations: an amount plus generic
+// resources.
+func svcReservationBlock() schema.SingleNestedBlock {
+	b := svcResourceAmountBlock("Reservations the scheduler must find on a node.")
+	b.Blocks = map[string]schema.Block{
+		"generic_resources": schema.ListNestedBlock{
+			MarkdownDescription: "User-defined resources the node must advertise (`GenericResources`); each entry sets one of " +
+				"`named_resource_spec` and `discrete_resource_spec`.",
+			NestedObject: schema.NestedBlockObject{Blocks: map[string]schema.Block{
+				"named_resource_spec": schema.SingleNestedBlock{
+					MarkdownDescription: "A resource with a string value, e.g. a GPU UUID (`NamedResourceSpec`).",
+					Attributes: map[string]schema.Attribute{
+						"kind":  schema.StringAttribute{Optional: true, MarkdownDescription: "Resource kind, e.g. `GPU` (`Kind`)."},
+						"value": schema.StringAttribute{Optional: true, MarkdownDescription: "Resource value (`Value`)."},
+					},
+				},
+				"discrete_resource_spec": schema.SingleNestedBlock{
+					MarkdownDescription: "A countable resource (`DiscreteResourceSpec`).",
+					Attributes: map[string]schema.Attribute{
+						"kind":  schema.StringAttribute{Optional: true, MarkdownDescription: "Resource kind, e.g. `SSD` (`Kind`)."},
+						"value": schema.Int64Attribute{Optional: true, MarkdownDescription: "Amount (`Value`)."},
+					},
+				},
+			}},
+		},
+	}
+	return b
 }
 
 func svcResourceAmountBlock(desc string) schema.SingleNestedBlock {

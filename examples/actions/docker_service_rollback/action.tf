@@ -19,7 +19,7 @@ resource "terraform_data" "rollback" {
 #   terraform apply -invoke=action.docker_service_rollback.web
 action "docker_service_rollback" "web" {
   config {
-    service = "web"
-    timeout = "10m"
+    service_id = "web"
+    timeout    = "10m"
   }
 }

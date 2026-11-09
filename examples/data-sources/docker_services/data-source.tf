@@ -4,5 +4,5 @@ data "docker_services" "replicated" {
 }
 
 output "replicas" {
-  value = { for s in data.docker_services.replicated.services : s.name => s.replicas }
+  value = { for s in data.docker_services.replicated.services : s.spec.name => s.spec.mode.replicated.replicas }
 }

@@ -22,7 +22,7 @@ variable "worker_join_token" {
 #   terraform apply -invoke=action.docker_service_force_update.web
 action "docker_service_force_update" "web" {
   config {
-    service = "web"
-    timeout = "10m"
+    service_id = "web"
+    timeout    = "10m"
   }
 }

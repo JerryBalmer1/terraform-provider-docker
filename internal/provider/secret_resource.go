@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -44,6 +43,8 @@ type secretResourceModel struct {
 	DataWO        types.String `tfsdk:"data_wo"`
 	DataWOVersion types.Int64  `tfsdk:"data_wo_version"`
 	Labels        types.Map    `tfsdk:"labels"`
+	VersionIndex  types.Int64  `tfsdk:"version_index"`
+	contractSwarmSecret
 }
 
 func (r *secretResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -52,9 +53,9 @@ func (r *secretResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "A Swarm secret: an immutable blob the Swarm managers store encrypted and mount into service tasks " +
-			"under `/run/secrets/<file_name>`. Requires the provider to point at a Swarm manager. Swarm secrets cannot be " +
-			"changed after creation, so every change replaces the secret; a secret still referenced by a service cannot be " +
+		MarkdownDescription: "A Swarm secret: a blob the Swarm managers store encrypted and mount into service tasks " +
+			"under `/run/secrets/<file_name>`. Requires the provider to point at a Swarm manager. The content of a swarm secret cannot be " +
+			"changed after creation, so a content or name change replaces the secret, while labels are updated in place (`SecretUpdate`); a secret still referenced by a service cannot be " +
 			"removed, so change the referencing service in the same apply (or use `create_before_destroy` with a new name).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -81,11 +82,13 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"labels": schema.MapAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
-				MarkdownDescription: "User labels on the secret. Changing this forces a new resource.",
-				PlanModifiers:       []planmodifier.Map{mapplanmodifier.RequiresReplace()},
+				MarkdownDescription: "User labels on the secret. Updated in place (`SecretUpdate`); the content cannot change, so only labels can.",
 			},
+			"version_index": schema.Int64Attribute{Computed: true,
+				MarkdownDescription: "The secret object's `Version.Index`; it changes when the labels are updated."},
 		},
 	}
+	contractAddResourceAttributes(resp.Schema.Attributes, "swarm:secret")
 }
 
 func (r *secretResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -106,6 +109,9 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	if r.pd != nil && !r.pd.gateItemAPI(ctx, "swarm:secret", &resp.Diagnostics) {
+		return
+	}
 	data, ok := secretPayload(ctx, req.Config, plan.Data, &resp.Diagnostics)
 	if !ok {
 		return
@@ -124,6 +130,8 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 	plan.ID = types.StringValue(out.ID)
 	plan.DataWO = types.StringNull() // write-only: never persisted
+	plan.VersionIndex = types.Int64Null()
+	plan.contractSetNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, out.ID)...)
 	r.read(ctx, &plan, &resp.Diagnostics, nil)
@@ -146,7 +154,9 @@ func (r *secretResource) read(ctx context.Context, m *secretResourceModel, diags
 	m.ID = types.StringValue(s.ID)
 	m.Name = types.StringValue(s.Spec.Name)
 	m.Labels = svcMapValue(m.Labels, userLabels(s.Spec.Labels, false))
+	m.VersionIndex = swarmVersionIndex(s.Version)
 	// Data is never returned by the daemon: keep the state value.
+	diags.Append(m.contractFill(ctx, r.pd, swarmInspectInput(sRes.Raw, s))...)
 }
 
 func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -168,15 +178,37 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
-// Update is never called with a real change: every attribute forces
-// replacement. It just persists the plan.
+// Update changes the labels in place (SecretUpdate); every other attribute
+// forces replacement.
 func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan secretResourceModel
+	var plan, state secretResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	plan.ID = state.ID
+	labels := mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue})
+	err := swarmRetryConflict(ctx, func(ctx context.Context) error {
+		res, err := r.pd.Client.SecretInspect(ctx, plan.ID.ValueString(), client.SecretInspectOptions{})
+		if err != nil {
+			return err
+		}
+		spec := res.Secret.Spec
+		spec.Labels = labels
+		spec.Data = nil // the Engine only accepts label changes
+		_, err = r.pd.Client.SecretUpdate(ctx, plan.ID.ValueString(), client.SecretUpdateOptions{Version: res.Secret.Version, Spec: spec})
+		return err
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot update secret labels", err.Error())
+		return
+	}
 	plan.DataWO = types.StringNull()
+	r.read(ctx, &plan, &resp.Diagnostics, nil)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }

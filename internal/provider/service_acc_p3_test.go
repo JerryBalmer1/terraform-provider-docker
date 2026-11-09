@@ -316,7 +316,7 @@ resource "docker_service" "f" {
 
 // TestAccServiceP3_laneCAttributes: every Pass 2 Lane C docker_service
 // attribute against a live Swarm: hostname, user, dir, hosts, dns,
-// cap_add/cap_drop, sysctls, ulimits, stop_grace_period, networks_advanced
+// cap_add/cap_drop, sysctls, ulimits, stop_grace_period, networks map
 // aliases; created, checked on the daemon spec, updated in place, imported.
 func TestAccServiceP3_laneCAttributes(t *testing.T) {
 	testAccPreCheck(t)
@@ -342,7 +342,7 @@ resource "docker_service" "c" {
   sysctls           = { "net.core.somaxconn" = "1024" }
   stop_grace_period = %[3]q
 
-  dns {
+  dns_config {
     nameservers = ["10.0.0.53"]
     search      = ["example.internal"]
     options     = ["ndots:2"]
@@ -354,9 +354,8 @@ resource "docker_service" "c" {
     hard = 2048
   }
 
-  networks_advanced {
-    name    = docker_network.o.id
-    aliases = %[6]s
+  networks = {
+    (docker_network.o.id) = { aliases = %[6]s }
   }
 
   converge_config {

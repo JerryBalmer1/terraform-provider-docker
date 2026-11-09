@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/swarm"
 )
 
@@ -59,8 +61,8 @@ func TestServiceP2FlattenDaemonNormalisation(t *testing.T) {
 	// Import: daemon values show, empty DNS config gives no block.
 	d.TaskTemplate.ContainerSpec.DNSConfig = &swarm.DNSConfig{}
 	got = svcFlatten(d, svcSpecModel{}, svcTestLookup(), svcFlattenOpts{})
-	if got.Hostname.ValueString() != "{{.Task.Name}}" || got.DNS != nil || len(got.Ulimits) != 1 || got.StopGracePeriod.ValueString() != "30s" {
-		t.Errorf("import: hostname=%v dns=%+v ulimits=%+v grace=%v", got.Hostname, got.DNS, got.Ulimits, got.StopGracePeriod)
+	if got.Hostname.ValueString() != "{{.Task.Name}}" || got.DNSConfig != nil || len(got.Ulimits) != 1 || got.StopGracePeriod.ValueString() != "30s" {
+		t.Errorf("import: hostname=%v dns=%+v ulimits=%+v grace=%v", got.Hostname, got.DNSConfig, got.Ulimits, got.StopGracePeriod)
 	}
 	if h := got.Hosts.Elements(); len(h) != 2 || h[0].(types.String).ValueString() != "db.local:10.0.0.5" {
 		t.Errorf("import hosts = %v", got.Hosts)
@@ -145,15 +147,14 @@ func TestServiceJobModesRoundTrip(t *testing.T) {
 	}
 }
 
-func TestServiceNetworksAdvancedRoundTrip(t *testing.T) {
+func TestServiceNetworksMapRoundTrip(t *testing.T) {
 	ctx := context.Background()
-	str := types.StringValue
+	nullNets := types.MapNull(types.ObjectType{AttrTypes: svcNetworkAttachAttrTypes})
 	m := svcTestModel()
-	m.Networks = types.SetNull(types.StringType)
-	m.NetworksAdvanced = []svcNetworkAttachModel{
-		{Name: str("frontend"), Aliases: stringSetValue([]string{"www", "web-alias"}, false)},
-		{Name: str("net333"), Aliases: types.SetNull(types.StringType)},
-	}
+	m.Networks = svcNetworksValue(nullNets, map[string]svcNetworkAttachModel{
+		"frontend": svcNetworkAttachment([]string{"www", "web-alias"}, nil),
+		"net333":   svcNetworkAttachment(nil, nil),
+	})
 	lk := svcTestLookup()
 	spec, diags := svcExpand(ctx, &m, lk, svcExpandOpts{FullName: "web"})
 	if diags.HasError() {
@@ -166,35 +167,66 @@ func TestServiceNetworksAdvancedRoundTrip(t *testing.T) {
 		svcDiffFields(t, got, m)
 	}
 
-	// Import: an attachment with aliases selects networks_advanced.
+	// Import: keys are the IDs (no prior spelling), aliases kept.
 	got := svcFlatten(svcSimulateDaemon(spec), svcSpecModel{}, lk, svcFlattenOpts{})
-	if len(got.NetworksAdvanced) != 2 || !got.Networks.IsNull() || got.NetworksAdvanced[0].Name.ValueString() != "net111" {
-		t.Errorf("import = %+v / %v", got.NetworksAdvanced, got.Networks)
+	el := got.Networks.Elements()
+	if len(el) != 2 || el["net111"] == nil || el["net333"] == nil {
+		t.Errorf("import = %v", got.Networks)
 	}
 
 	// Stack: the short-name alias is added on expand and stripped on flatten
 	// unless the user listed it.
 	lk.stackPrefix = "app_"
-	m.Name = str("web")
-	m.NetworksAdvanced[1].Aliases = stringSetValue([]string{"web"}, false)
+	m.Name = types.StringValue("web")
+	m.Networks = svcNetworksValue(nullNets, map[string]svcNetworkAttachModel{
+		"frontend": svcNetworkAttachment([]string{"www", "web-alias"}, nil),
+		"net333":   svcNetworkAttachment([]string{"web"}, nil),
+	})
 	spec, diags = svcExpand(ctx, &m, lk, svcExpandOpts{FullName: "app_web", Namespace: "app"})
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
-	if a := spec.TaskTemplate.Networks[0].Aliases; a[0] != "web" || len(a) != 3 {
-		t.Errorf("stack aliases = %v", a)
+	if a := spec.TaskTemplate.Networks[0].Aliases; a[0] != "web" || len(a) != 3 || spec.TaskTemplate.Networks[0].Target != "net222" {
+		t.Errorf("stack attachment = %+v", spec.TaskTemplate.Networks[0])
 	}
 	if a := spec.TaskTemplate.Networks[1].Aliases; len(a) != 1 {
 		t.Errorf("stack aliases dedupe = %v", a)
 	}
-	if got := svcFlatten(svcSimulateDaemon(spec), m, lk, svcFlattenOpts{ShortName: "web", StripStack: true}); !reflect.DeepEqual(got.NetworksAdvanced, m.NetworksAdvanced) {
-		t.Errorf("stack flatten = %+v", got.NetworksAdvanced)
+	if got := svcFlatten(svcSimulateDaemon(spec), m, lk, svcFlattenOpts{ShortName: "web", StripStack: true}); !got.Networks.Equal(m.Networks) {
+		t.Errorf("stack flatten = %v", got.Networks)
 	}
 
-	// Conflict.
-	m.Networks = stringSetValue([]string{"backend"}, false)
-	if _, diags := svcExpand(ctx, &m, lk, svcExpandOpts{}); !diags.HasError() {
-		t.Error("networks + networks_advanced should fail")
+	// An explicitly empty map survives the round trip.
+	m.Networks = svcNetworksValue(types.MapValueMust(types.ObjectType{AttrTypes: svcNetworkAttachAttrTypes}, map[string]attr.Value{}), nil)
+	spec, _ = svcExpand(ctx, &m, lk, svcExpandOpts{FullName: "web"})
+	if got := svcFlatten(svcSimulateDaemon(spec), m, lk, svcFlattenOpts{}); got.Networks.IsNull() || len(got.Networks.Elements()) != 0 {
+		t.Errorf("empty map = %v", got.Networks)
+	}
+}
+
+func TestServiceMountOptionTypeMismatch(t *testing.T) {
+	m := svcTestModel()
+	m.Mounts[0].TmpfsOptions = &svcTmpfsOptionsModel{SizeBytes: types.Int64Value(1), Mode: types.Int64Null()}
+	m.Resources.Reservations.GenericResources = append(m.Resources.Reservations.GenericResources, svcGenericResourceModel{})
+	m.Privileges.CredentialSpec = &svcCredentialSpecModel{File: types.StringValue("a.json"), Registry: types.StringValue("r"), Config: types.StringNull()}
+	_, diags := svcExpand(context.Background(), &m, svcTestLookup(), svcExpandOpts{})
+	if diags.ErrorsCount() != 3 {
+		t.Errorf("want 3 errors (tmpfs_options on a volume, empty generic resource, two credential sources), got %v", diags)
+	}
+}
+
+func TestServiceFlattenP5ImportDefaults(t *testing.T) {
+	f := false
+	spec := swarm.ServiceSpec{TaskTemplate: swarm.TaskSpec{Runtime: swarm.RuntimeContainer, ContainerSpec: &swarm.ContainerSpec{
+		Image: "nginx", Init: &f, Isolation: "default", Privileges: &swarm.Privileges{},
+		Mounts: []mount.Mount{{Type: mount.TypeVolume, Target: "/v", VolumeOptions: &mount.VolumeOptions{}}},
+	}}}
+	got := svcFlatten(spec, svcSpecModel{}, svcTestLookup(), svcFlattenOpts{})
+	if !got.Init.IsNull() || !got.Isolation.IsNull() || !got.Runtime.IsNull() || got.Privileges != nil || !got.ReadOnly.IsNull() {
+		t.Errorf("defaults should be null: init=%v iso=%v runtime=%v priv=%+v ro=%v", got.Init, got.Isolation, got.Runtime, got.Privileges, got.ReadOnly)
+	}
+	if got.Mounts[0].VolumeOptions != nil {
+		t.Errorf("empty volume options should not show: %+v", got.Mounts[0].VolumeOptions)
 	}
 }
 

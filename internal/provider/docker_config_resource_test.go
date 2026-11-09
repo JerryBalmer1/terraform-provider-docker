@@ -105,7 +105,7 @@ func TestDockerConfigCreateFromDataWO(t *testing.T) {
 	f.on("GET /configs/cfg1", func(w http.ResponseWriter, _ *http.Request) {
 		p3eWriteJSON(w, http.StatusOK, swarm.Config{ID: "cfg1", Spec: got})
 	})
-	state, _, diags := p3eSecretLikeCreate(t, NewDockerConfigResource(), pd, map[string]tftypes.Value{
+	state, _, diags := p3eSecretLikeCreate(t, NewConfigResource(), pd, map[string]tftypes.Value{
 		"name":            p3eStr("app.conf"),
 		"data_wo":         p3eStr("YT0x"),
 		"data_wo_version": tftypes.NewValue(tftypes.Number, 1),

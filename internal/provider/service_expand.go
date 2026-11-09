@@ -21,7 +21,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
@@ -165,46 +164,13 @@ func svcExpand(ctx context.Context, m *svcSpecModel, lk *svcLookup, o svcExpandO
 	svcExpandMode(m, &spec, &diags)
 
 	// Networks
-	for _, ref := range stringSetFrom(ctx, m.Networks, &diags) {
-		id, err := lk.resolve("network", ref)
-		if err != nil {
-			diags.AddError("Cannot resolve network", err.Error())
-			continue
-		}
-		nac := swarm.NetworkAttachmentConfig{Target: id}
-		if o.Namespace != "" {
-			nac.Aliases = []string{m.Name.ValueString()}
-		}
-		spec.TaskTemplate.Networks = append(spec.TaskTemplate.Networks, nac)
-	}
-	svcExpandNetworksAdvanced(ctx, m, lk, o, &spec, &diags)
+	svcExpandNetworks(ctx, m, lk, o, &spec, &diags)
 	svcExpandP2(ctx, m, &spec, &diags)
+	svcExpandP5(ctx, m, &spec, &diags)
 
 	// Mounts
-	for _, mm := range m.Mounts {
-		mt := mount.Mount{
-			Type:     mount.Type(mm.Type.ValueString()),
-			Source:   mm.Source.ValueString(),
-			Target:   mm.Target.ValueString(),
-			ReadOnly: mm.ReadOnly.ValueBool(),
-		}
-		switch mt.Type {
-		case mount.TypeTmpfs:
-			if v, ok := knownInt64(mm.TmpfsSize); ok && v > 0 {
-				mt.TmpfsOptions = &mount.TmpfsOptions{SizeBytes: v}
-			}
-		case mount.TypeVolume:
-			drv := mm.VolumeDriver.ValueString()
-			opts := stringMapFrom(ctx, mm.VolumeDriverOpts, &diags)
-			lbl := stringMapFrom(ctx, mm.VolumeLabels, &diags)
-			if drv != "" || len(opts) > 0 || len(lbl) > 0 {
-				mt.VolumeOptions = &mount.VolumeOptions{Labels: lbl}
-				if drv != "" || len(opts) > 0 {
-					mt.VolumeOptions.DriverConfig = &mount.Driver{Name: drv, Options: opts}
-				}
-			}
-		}
-		cs.Mounts = append(cs.Mounts, mt)
+	for i, mm := range m.Mounts {
+		cs.Mounts = append(cs.Mounts, svcExpandMount(ctx, i, mm, &diags))
 	}
 
 	// Secrets / configs
@@ -254,6 +220,7 @@ func svcExpand(ctx context.Context, m *svcSpecModel, lk *svcLookup, o svcExpandO
 		es := &swarm.EndpointSpec{Mode: swarm.ResolutionMode(svcStrOr(e.Mode, "vip"))}
 		for _, p := range e.Ports {
 			es.Ports = append(es.Ports, swarm.PortConfig{
+				Name:          p.Name.ValueString(),
 				TargetPort:    uint32(p.TargetPort.ValueInt64()),
 				PublishedPort: uint32(p.PublishedPort.ValueInt64()),
 				Protocol:      network.IPProtocol(svcStrOr(p.Protocol, "tcp")),
@@ -293,6 +260,9 @@ func svcExpand(ctx context.Context, m *svcSpecModel, lk *svcLookup, o svcExpandO
 		if v, ok := knownInt64(p.MaxReplicas); ok {
 			pl.MaxReplicas = uint64(v)
 		}
+		for _, pf := range p.Platforms {
+			pl.Platforms = append(pl.Platforms, swarm.Platform{Architecture: pf.Architecture.ValueString(), OS: pf.OS.ValueString()})
+		}
 		spec.TaskTemplate.Placement = pl
 	}
 
@@ -303,7 +273,8 @@ func svcExpand(ctx context.Context, m *svcSpecModel, lk *svcLookup, o svcExpandO
 			rr.Limits = &swarm.Limit{NanoCPUs: l.NanoCPUs.ValueInt64(), MemoryBytes: l.MemoryBytes.ValueInt64()}
 		}
 		if l := r.Reservations; l != nil {
-			rr.Reservations = &swarm.Resources{NanoCPUs: l.NanoCPUs.ValueInt64(), MemoryBytes: l.MemoryBytes.ValueInt64()}
+			rr.Reservations = &swarm.Resources{NanoCPUs: l.NanoCPUs.ValueInt64(), MemoryBytes: l.MemoryBytes.ValueInt64(),
+				GenericResources: svcExpandGenericResources(l.GenericResources, &diags)}
 		}
 		spec.TaskTemplate.Resources = rr
 	}
@@ -440,6 +411,7 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 
 	svcFlattenNetworks(spec, prior, lk, o, &m)
 	svcFlattenP2(spec, cs, prior, &m)
+	svcFlattenP5(spec, cs, prior, &m)
 
 	// Mounts (positional against prior).
 	for i, mt := range cs.Mounts {
@@ -447,29 +419,7 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 		if i < len(prior.Mounts) {
 			p = prior.Mounts[i]
 		}
-		mm := svcMountModel{
-			Type:     types.StringValue(string(mt.Type)),
-			Source:   svcStrValue(p.Source, mt.Source, ""),
-			Target:   types.StringValue(mt.Target),
-			ReadOnly: types.BoolValue(mt.ReadOnly),
-		}
-		var size int64
-		if mt.TmpfsOptions != nil {
-			size = mt.TmpfsOptions.SizeBytes
-		}
-		mm.TmpfsSize = svcIntValue(p.TmpfsSize, size)
-		var drv string
-		var opts, lbl map[string]string
-		if vo := mt.VolumeOptions; vo != nil {
-			lbl = vo.Labels
-			if vo.DriverConfig != nil {
-				drv, opts = vo.DriverConfig.Name, vo.DriverConfig.Options
-			}
-		}
-		mm.VolumeDriver = svcStrValue(p.VolumeDriver, drv, "")
-		mm.VolumeDriverOpts = svcMapValue(p.VolumeDriverOpts, opts)
-		mm.VolumeLabels = svcMapValue(p.VolumeLabels, lbl)
-		m.Mounts = append(m.Mounts, mm)
+		m.Mounts = append(m.Mounts, svcFlattenMount(mt, p))
 	}
 
 	for i, s := range cs.Secrets {
@@ -526,6 +476,7 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 				p = prior.EndpointSpec.Ports[i]
 			}
 			em.Ports = append(em.Ports, svcPortModel{
+				Name:          svcStrValue(p.Name, pc.Name, ""),
 				TargetPort:    types.Int64Value(int64(pc.TargetPort)),
 				PublishedPort: svcIntValue(p.PublishedPort, int64(pc.PublishedPort)),
 				Protocol:      types.StringValue(svcOr(string(pc.Protocol), "tcp")),
@@ -571,6 +522,14 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 			Preferences: svcListValue(p.Preferences, prefs),
 			MaxReplicas: svcIntValue(p.MaxReplicas, int64(pl.MaxReplicas)),
 		}
+		// The daemon fills Platforms from the image manifest; they are only
+		// shown when the configuration sets them.
+		if len(p.Platforms) > 0 {
+			for _, pf := range pl.Platforms {
+				m.Placement.Platforms = append(m.Placement.Platforms, svcPlatformModel{
+					Architecture: types.StringValue(pf.Architecture), OS: types.StringValue(pf.OS)})
+			}
+		}
 	}
 
 	if rr := spec.TaskTemplate.Resources; rr != nil {
@@ -582,8 +541,8 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 		if l := rr.Limits; l != nil && (p.Limits != nil || l.NanoCPUs != 0 || l.MemoryBytes != 0) {
 			res.Limits = svcFlattenAmount(p.Limits, l.NanoCPUs, l.MemoryBytes)
 		}
-		if l := rr.Reservations; l != nil && (p.Reservations != nil || l.NanoCPUs != 0 || l.MemoryBytes != 0) {
-			res.Reservations = svcFlattenAmount(p.Reservations, l.NanoCPUs, l.MemoryBytes)
+		if l := rr.Reservations; l != nil && (p.Reservations != nil || l.NanoCPUs != 0 || l.MemoryBytes != 0 || len(l.GenericResources) > 0) {
+			res.Reservations = svcFlattenReservation(p.Reservations, *l)
 		}
 		if prior.Resources != nil || res.Limits != nil || res.Reservations != nil {
 			m.Resources = res

@@ -115,7 +115,7 @@ func TestNodeDrainAction(t *testing.T) {
 		}
 		return []swarm.Task{actTask("t1", "n1abcdef", swarm.TaskStateShutdown), actTask("t2", "n1abcdef", swarm.TaskStateComplete)}
 	}
-	res := actInvoke(t, f, NewNodeDrainAction(), map[string]tftypes.Value{"node": actTfStr("worker-1")})
+	res := actInvoke(t, f, NewNodeDrainAction(), map[string]tftypes.Value{"node_id": actTfStr("worker-1")})
 	if res.Diags.HasError() {
 		t.Fatal(res.errText())
 	}
@@ -136,7 +136,7 @@ func TestNodeDrainActionTimeout(t *testing.T) {
 	n.tasks = func() []swarm.Task {
 		return []swarm.Task{actTask("stuck1234567890", "n1abcdef", swarm.TaskStateRunning)}
 	}
-	res := actInvoke(t, f, NewNodeDrainAction(), map[string]tftypes.Value{"node": actTfStr("n1abcdef"), "timeout": actTfStr("100ms")})
+	res := actInvoke(t, f, NewNodeDrainAction(), map[string]tftypes.Value{"node_id": actTfStr("n1abcdef"), "timeout": actTfStr("100ms")})
 	if !strings.Contains(res.errText(), "1 task(s) were still running after 100ms: stuck1234567") {
 		t.Fatalf("got %q", res.errText())
 	}
@@ -149,7 +149,7 @@ func TestNodeDrainActionNoWait(t *testing.T) {
 		t.Error("tasks listed with wait = false")
 		return nil
 	}
-	res := actInvoke(t, f, NewNodeDrainAction(), map[string]tftypes.Value{"node": actTfStr("worker-1"), "wait": actTfBool(false)})
+	res := actInvoke(t, f, NewNodeDrainAction(), map[string]tftypes.Value{"node_id": actTfStr("worker-1"), "wait": actTfBool(false)})
 	if res.Diags.HasError() {
 		t.Fatal(res.errText())
 	}
@@ -158,7 +158,7 @@ func TestNodeDrainActionNoWait(t *testing.T) {
 func TestNodeActivateAction(t *testing.T) {
 	f := swarmNewFakeEngine(t)
 	n := actNewFakeNode(t, f, swarm.NodeAvailabilityDrain)
-	res := actInvoke(t, f, NewNodeActivateAction(), map[string]tftypes.Value{"node": actTfStr("worker-1")})
+	res := actInvoke(t, f, NewNodeActivateAction(), map[string]tftypes.Value{"node_id": actTfStr("worker-1")})
 	if res.Diags.HasError() {
 		t.Fatal(res.errText())
 	}
@@ -166,11 +166,11 @@ func TestNodeActivateAction(t *testing.T) {
 		t.Errorf("node updates %+v", n.specs)
 	}
 	// Already active: no update is sent.
-	res = actInvoke(t, f, NewNodeActivateAction(), map[string]tftypes.Value{"node": actTfStr("worker-1")})
+	res = actInvoke(t, f, NewNodeActivateAction(), map[string]tftypes.Value{"node_id": actTfStr("worker-1")})
 	if res.Diags.HasError() || len(n.specs) != 1 {
 		t.Errorf("second activate: %s, %d updates", res.errText(), len(n.specs))
 	}
-	res = actInvoke(t, f, NewNodeActivateAction(), map[string]tftypes.Value{"node": actTfStr("nope")})
+	res = actInvoke(t, f, NewNodeActivateAction(), map[string]tftypes.Value{"node_id": actTfStr("nope")})
 	if !strings.Contains(res.errText(), "no node named") {
 		t.Errorf("unknown node: %q", res.errText())
 	}

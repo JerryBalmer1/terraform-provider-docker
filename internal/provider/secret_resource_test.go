@@ -128,7 +128,7 @@ func p3eValidateSecretLike(t *testing.T, r fwresource.ResourceWithConfigValidato
 }
 
 func TestSecretWriteOnlySchema(t *testing.T) {
-	for _, r := range []fwresource.Resource{NewSecretResource(), NewDockerConfigResource()} {
+	for _, r := range []fwresource.Resource{NewSecretResource(), NewConfigResource()} {
 		var sr fwresource.SchemaResponse
 		r.Schema(context.Background(), fwresource.SchemaRequest{}, &sr)
 		if d := sr.Schema.ValidateImplementation(context.Background()); d.HasError() {

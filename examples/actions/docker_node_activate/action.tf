@@ -18,6 +18,6 @@ resource "terraform_data" "back_in_service" {
 #   terraform apply -invoke=action.docker_node_activate.back
 action "docker_node_activate" "back" {
   config {
-    node = var.node
+    node_id = var.node
   }
 }

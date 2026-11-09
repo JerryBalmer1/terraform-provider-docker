@@ -105,6 +105,8 @@ func (f *svcFakeDaemon) handle(w http.ResponseWriter, r *http.Request) {
 		f.handleServices(w, r, parts)
 	case p == "/tasks":
 		f.handleTasks(w, r)
+	case p == "/version":
+		svcFakeJSON(w, 200, map[string]string{"Version": "29.0.0-fake", "ApiVersion": "1.47"})
 	default:
 		svcFakeErr(w, 404, "fake daemon: no route "+r.Method+" "+p)
 	}
@@ -202,7 +204,7 @@ func (f *svcFakeDaemon) handleSecrets(w http.ResponseWriter, r *http.Request, pa
 			}
 		}
 		id := f.id("sec")
-		f.secrets[id] = &swarm.Secret{ID: id, Spec: spec}
+		f.secrets[id] = &swarm.Secret{ID: id, Spec: spec, Meta: swarm.Meta{Version: swarm.Version{Index: uint64(f.seq)}}}
 		svcFakeJSON(w, 201, swarm.SecretCreateResponse{ID: id})
 	case len(parts) == 2 && r.Method == http.MethodGet:
 		s, ok := f.secrets[parts[1]]
@@ -213,6 +215,27 @@ func (f *svcFakeDaemon) handleSecrets(w http.ResponseWriter, r *http.Request, pa
 		c := *s
 		c.Spec.Data = nil
 		svcFakeJSON(w, 200, c)
+	case len(parts) == 3 && parts[2] == "update" && r.Method == http.MethodPost:
+		// swarmkit only accepts label changes at the current version.
+		o, ok := f.secrets[parts[1]]
+		if !ok {
+			svcFakeErr(w, 404, "no such sec")
+			return
+		}
+		var spec swarm.SecretSpec
+		_ = json.NewDecoder(r.Body).Decode(&spec)
+		if r.URL.Query().Get("version") != fmt.Sprint(o.Version.Index) {
+			svcFakeErr(w, 500, "update out of sequence")
+			return
+		}
+		if spec.Name != o.Spec.Name || spec.Data != nil {
+			svcFakeErr(w, 400, "only updates to Labels are allowed")
+			return
+		}
+		f.seq++
+		o.Spec.Labels = spec.Labels
+		o.Version.Index = uint64(f.seq)
+		w.WriteHeader(200)
 	case len(parts) == 2 && r.Method == http.MethodDelete:
 		if _, ok := f.secrets[parts[1]]; !ok {
 			svcFakeErr(w, 404, "no such secret")
@@ -249,7 +272,7 @@ func (f *svcFakeDaemon) handleConfigs(w http.ResponseWriter, r *http.Request, pa
 			}
 		}
 		id := f.id("cfg")
-		f.configs[id] = &swarm.Config{ID: id, Spec: spec}
+		f.configs[id] = &swarm.Config{ID: id, Spec: spec, Meta: swarm.Meta{Version: swarm.Version{Index: uint64(f.seq)}}}
 		svcFakeJSON(w, 201, swarm.ConfigCreateResponse{ID: id})
 	case len(parts) == 2 && r.Method == http.MethodGet:
 		s, ok := f.configs[parts[1]]
@@ -258,6 +281,27 @@ func (f *svcFakeDaemon) handleConfigs(w http.ResponseWriter, r *http.Request, pa
 			return
 		}
 		svcFakeJSON(w, 200, s)
+	case len(parts) == 3 && parts[2] == "update" && r.Method == http.MethodPost:
+		// swarmkit only accepts label changes at the current version.
+		o, ok := f.configs[parts[1]]
+		if !ok {
+			svcFakeErr(w, 404, "no such cfg")
+			return
+		}
+		var spec swarm.ConfigSpec
+		_ = json.NewDecoder(r.Body).Decode(&spec)
+		if r.URL.Query().Get("version") != fmt.Sprint(o.Version.Index) {
+			svcFakeErr(w, 500, "update out of sequence")
+			return
+		}
+		if spec.Name != o.Spec.Name || spec.Data != nil {
+			svcFakeErr(w, 400, "only updates to Labels are allowed")
+			return
+		}
+		f.seq++
+		o.Spec.Labels = spec.Labels
+		o.Version.Index = uint64(f.seq)
+		w.WriteHeader(200)
 	case len(parts) == 2 && r.Method == http.MethodDelete:
 		if _, ok := f.configs[parts[1]]; !ok {
 			svcFakeErr(w, 404, "no such config")
@@ -469,7 +513,7 @@ resource "docker_service" "web" {
   name     = "web"
   image    = %q
   replicas = %d
-  networks = ["ext_net"]
+  networks = { ext_net = {} }
   env      = { A = "1" }
   labels   = {}
 
@@ -525,7 +569,8 @@ resource "docker_service" "web" {
 					resource.TestCheckResourceAttr("docker_service.web", "mode", "replicated"),
 					resource.TestCheckNoResourceAttr("docker_service.web", "secrets.0.file_name"),
 					resource.TestCheckResourceAttr("docker_service.web", "endpoint_spec.ports.0.protocol", "tcp"),
-					resource.TestCheckResourceAttr("docker_service.web", "networks.0", "ext_net"),
+					resource.TestCheckResourceAttr("docker_service.web", "networks.%", "1"),
+					resource.TestCheckResourceAttrSet("docker_service.web", "networks.ext_net.%"),
 					func(*terraform.State) error {
 						f.mu.Lock()
 						defer f.mu.Unlock()

@@ -7,11 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
@@ -267,76 +265,6 @@ func swarmLeave(ctx context.Context, c *client.Client) error {
 		return err
 	}
 	return nil
-}
-
-// ---------------------------------------------------------------------------
-// Node flattening for the docker_node / docker_nodes data sources.
-
-// swarmNodeInfo is the flattened view of a swarm.Node.
-type swarmNodeInfo struct {
-	ID            string
-	Hostname      string
-	Role          string
-	Availability  string
-	State         string
-	Addr          string
-	Labels        map[string]string
-	EngineVersion string
-	Leader        bool
-}
-
-func swarmFlattenNode(n swarm.Node) swarmNodeInfo {
-	info := swarmNodeInfo{
-		ID:            n.ID,
-		Hostname:      n.Description.Hostname,
-		Role:          string(n.Spec.Role),
-		Availability:  string(n.Spec.Availability),
-		State:         string(n.Status.State),
-		Addr:          n.Status.Addr,
-		Labels:        n.Spec.Labels,
-		EngineVersion: n.Description.Engine.EngineVersion,
-	}
-	if n.ManagerStatus != nil {
-		info.Leader = n.ManagerStatus.Leader
-	}
-	return info
-}
-
-// swarmNodeObjectAttrTypes is the object type of one docker_nodes entry.
-var swarmNodeObjectAttrTypes = map[string]attr.Type{
-	"id":             types.StringType,
-	"hostname":       types.StringType,
-	"role":           types.StringType,
-	"availability":   types.StringType,
-	"state":          types.StringType,
-	"addr":           types.StringType,
-	"labels":         types.MapType{ElemType: types.StringType},
-	"engine_version": types.StringType,
-	"leader":         types.BoolType,
-}
-
-func swarmNodeObjectValue(i swarmNodeInfo) types.Object {
-	return types.ObjectValueMust(swarmNodeObjectAttrTypes, map[string]attr.Value{
-		"id":             types.StringValue(i.ID),
-		"hostname":       types.StringValue(i.Hostname),
-		"role":           types.StringValue(i.Role),
-		"availability":   types.StringValue(i.Availability),
-		"state":          types.StringValue(i.State),
-		"addr":           types.StringValue(i.Addr),
-		"labels":         stringMapValue(i.Labels, false),
-		"engine_version": types.StringValue(i.EngineVersion),
-		"leader":         types.BoolValue(i.Leader),
-	})
-}
-
-// swarmSortNodes orders nodes by hostname then ID so docker_nodes is stable.
-func swarmSortNodes(nodes []swarm.Node) {
-	sort.SliceStable(nodes, func(i, j int) bool {
-		if nodes[i].Description.Hostname != nodes[j].Description.Hostname {
-			return nodes[i].Description.Hostname < nodes[j].Description.Hostname
-		}
-		return nodes[i].ID < nodes[j].ID
-	})
 }
 
 // swarmLabelsValue converts daemon labels to state, keeping an explicitly

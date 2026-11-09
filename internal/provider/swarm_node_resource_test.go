@@ -56,6 +56,10 @@ func (f *swarmFakeEngine) serve(w http.ResponseWriter, r *http.Request) {
 	f.calls = append(f.calls, key)
 	h := f.handlers[key]
 	f.mu.Unlock()
+	if h == nil && key == "GET /version" {
+		swarmFakeJSON(w, map[string]string{"Version": "29.0.0-fake", "ApiVersion": "1.47"})
+		return
+	}
 	if h == nil {
 		swarmFakeError(w, http.StatusNotImplemented, "fake: no handler for "+key)
 		return

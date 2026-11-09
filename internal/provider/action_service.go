@@ -39,25 +39,26 @@ var (
 )
 
 // actServiceUpdate reads service ref, lets mutate change it, and sends the
-// update, retrying on version conflicts. It returns the service ID.
-func actServiceUpdate(ctx context.Context, pd *providerData, ref string, rollback bool, mutate func(*swarm.Service) error, diags *diag.Diagnostics) string {
+// update, retrying on version conflicts. It returns the service ID and the
+// daemon's warnings.
+func actServiceUpdate(ctx context.Context, pd *providerData, ref string, rollback bool, mutate func(*swarm.Service) error, diags *diag.Diagnostics) (string, []string) {
 	c := pd.Client
 	id, err := resolveServiceID(ctx, c, ref)
 	if err != nil {
 		diags.AddError("Cannot find service", err.Error())
-		return ""
+		return "", nil
 	}
 	var lastErr error
 	for attempt := 0; attempt < swarmNodeUpdateAttempts; attempt++ {
 		svcRes, err := c.ServiceInspect(ctx, id, client.ServiceInspectOptions{})
 		if err != nil {
 			diags.AddError("Cannot inspect service", err.Error())
-			return ""
+			return "", nil
 		}
 		svc := svcRes.Service
 		if err := mutate(&svc); err != nil {
 			diags.AddError("Cannot update service", err.Error())
-			return ""
+			return "", nil
 		}
 		img := svc.Spec.TaskTemplate.ContainerSpec
 		opts := client.ServiceUpdateOptions{}
@@ -79,17 +80,71 @@ func actServiceUpdate(ctx context.Context, pd *providerData, ref string, rollbac
 			for _, w := range out.Warnings {
 				diags.AddWarning("Docker daemon warning", w)
 			}
-			return id
+			return id, out.Warnings
 		}
 		if !swarmIsVersionConflict(err) {
 			diags.AddError("Service update failed", err.Error())
-			return ""
+			return "", nil
 		}
 		lastErr = err
 	}
 	diags.AddError("Service update failed", fmt.Sprintf("gave up after %d version conflicts: %v", swarmNodeUpdateAttempts, lastErr))
-	return ""
+	return "", nil
 }
+
+// actServiceFinish reports the service as the result object of a service
+// action: the identity values, plus result = {update_response,
+// update_status} and the extra result fields (a func(swarm.Service) any
+// value is called with the service as read after the update).
+func actServiceFinish(ctx context.Context, resp *action.InvokeResponse, pd *providerData, itemID, id string, warnings []string, extra map[string]any, resultPath types.String) {
+	svcRes, err := pd.Client.ServiceInspect(ctx, id, client.ServiceInspectOptions{})
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot inspect service", "reading the service after the update: "+err.Error())
+		return
+	}
+	svc := svcRes.Service
+	if warnings == nil {
+		warnings = []string{}
+	}
+	result := map[string]any{"update_response": map[string]any{"Warnings": warnings}, "update_status": svc.UpdateStatus}
+	for k, v := range extra {
+		if f, ok := v.(func(swarm.Service) any); ok {
+			v = f(svc)
+		}
+		result[k] = v
+	}
+	values := map[string]any{
+		"service_id":    svc.ID,
+		"name":          svc.Spec.Name,
+		"version_index": svc.Version.Index,
+		"result":        result,
+	}
+	if itemID == "swarm:service-rollback" {
+		if cs := svc.Spec.TaskTemplate.ContainerSpec; cs != nil {
+			if ref := svcImageDigestRef(cs.Image); ref != "" {
+				values["image_digest_ref"] = ref
+			}
+		}
+	}
+	actFinishResult(ctx, resp, pd, itemID, values, resultPath)
+}
+
+// actServiceStatus returns the service's running/desired task counts
+// (ServiceList with status=true), or nil when the daemon does not say.
+func actServiceStatus(ctx context.Context, c *client.Client, id string) *swarm.ServiceStatus {
+	res, err := c.ServiceList(ctx, client.ServiceListOptions{Filters: client.Filters{}.Add("id", id), Status: true})
+	if err != nil {
+		return nil
+	}
+	for _, s := range res.Items {
+		if s.ID == id {
+			return s.ServiceStatus
+		}
+	}
+	return nil
+}
+
+const actServiceIDDoc = "Target service: ID, unique ID prefix or name (resolved to the service ID)."
 
 // actServiceReplicas is the wanted task count for svcConvergeCheck: the
 // replica count for replicated services, -1 for global ones.
@@ -155,10 +210,11 @@ func NewServiceScaleAction() action.Action { return &serviceScaleAction{} }
 type serviceScaleAction struct{ actBase }
 
 type serviceScaleActionModel struct {
-	Service  types.String `tfsdk:"service"`
-	Replicas types.Int64  `tfsdk:"replicas"`
-	Wait     types.Bool   `tfsdk:"wait"`
-	Timeout  types.String `tfsdk:"timeout"`
+	ServiceID  types.String `tfsdk:"service_id"`
+	Replicas   types.Int64  `tfsdk:"replicas"`
+	Wait       types.Bool   `tfsdk:"wait"`
+	Timeout    types.String `tfsdk:"timeout"`
+	ResultPath types.String `tfsdk:"result_path"`
 }
 
 func (a *serviceScaleAction) Metadata(_ context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
@@ -169,12 +225,14 @@ func (a *serviceScaleAction) Schema(_ context.Context, _ action.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Sets the replica count of a replicated swarm service, like `docker service scale`, and waits for the tasks. " +
 			"If a `docker_service` resource manages the service with `replicas` set, its next plan reverts the change; " +
-			"use this action for services whose replica count Terraform does not own, or for one-off scaling.",
+			"use this action for services whose replica count Terraform does not own, or for one-off scaling. " +
+			"The result object has the update warnings, the rollout status, the service mode and its running/desired task counts.",
 		Attributes: map[string]schema.Attribute{
-			"service":  schema.StringAttribute{Required: true, MarkdownDescription: "Service ID or name."},
-			"replicas": schema.Int64Attribute{Required: true, MarkdownDescription: "Wanted number of tasks, `0` or more."},
-			"wait":     schema.BoolAttribute{Optional: true, MarkdownDescription: actServiceWaitDoc},
-			"timeout":  schema.StringAttribute{Optional: true, MarkdownDescription: actServiceTimeoutDoc},
+			"service_id":  schema.StringAttribute{Required: true, MarkdownDescription: actServiceIDDoc},
+			"replicas":    schema.Int64Attribute{Required: true, MarkdownDescription: "Wanted number of tasks, `0` or more."},
+			"wait":        schema.BoolAttribute{Optional: true, MarkdownDescription: actServiceWaitDoc},
+			"timeout":     schema.StringAttribute{Optional: true, MarkdownDescription: actServiceTimeoutDoc},
+			"result_path": actResultPathAttribute(),
 		},
 	}
 }
@@ -199,8 +257,8 @@ func (a *serviceScaleAction) Invoke(ctx context.Context, req action.InvokeReques
 		return
 	}
 	n := uint64(m.Replicas.ValueInt64())
-	ref := m.Service.ValueString()
-	id := actServiceUpdate(ctx, a.pd, ref, false, func(svc *swarm.Service) error {
+	ref := m.ServiceID.ValueString()
+	id, warnings := actServiceUpdate(ctx, a.pd, ref, false, func(svc *swarm.Service) error {
 		if svc.Spec.Mode.Replicated == nil {
 			return fmt.Errorf("service %s is not in replicated mode; only replicated services can be scaled", ref)
 		}
@@ -211,14 +269,17 @@ func (a *serviceScaleAction) Invoke(ctx context.Context, req action.InvokeReques
 		return
 	}
 	actProgress(ctx, resp, "service %s scaled to %d", ref, n)
-	if !actBool(m.Wait, true) {
-		return
+	if actBool(m.Wait, true) {
+		if err := actServiceWait(ctx, c, id, actTimeout(m.Timeout, actServiceDefaultTimeout)); err != nil {
+			resp.Diagnostics.AddError("docker_service_scale: service did not converge", err.Error())
+			return
+		}
+		actProgress(ctx, resp, "service %s converged with %d replicas", ref, n)
 	}
-	if err := actServiceWait(ctx, c, id, actTimeout(m.Timeout, actServiceDefaultTimeout)); err != nil {
-		resp.Diagnostics.AddError("docker_service_scale: service did not converge", err.Error())
-		return
-	}
-	actProgress(ctx, resp, "service %s converged with %d replicas", ref, n)
+	actServiceFinish(ctx, resp, a.pd, "swarm:service-scale", id, warnings, map[string]any{
+		"mode":           func(s swarm.Service) any { return s.Spec.Mode },
+		"service_status": actServiceStatus(ctx, c, id),
+	}, m.ResultPath)
 }
 
 // ---------------------------------------------------------------------------
@@ -230,16 +291,18 @@ func NewServiceForceUpdateAction() action.Action { return &serviceForceUpdateAct
 type serviceForceUpdateAction struct{ actBase }
 
 type serviceWaitActionModel struct {
-	Service types.String `tfsdk:"service"`
-	Wait    types.Bool   `tfsdk:"wait"`
-	Timeout types.String `tfsdk:"timeout"`
+	ServiceID  types.String `tfsdk:"service_id"`
+	Wait       types.Bool   `tfsdk:"wait"`
+	Timeout    types.String `tfsdk:"timeout"`
+	ResultPath types.String `tfsdk:"result_path"`
 }
 
 func serviceWaitActionAttributes() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
-		"service": schema.StringAttribute{Required: true, MarkdownDescription: "Service ID or name."},
-		"wait":    schema.BoolAttribute{Optional: true, MarkdownDescription: actServiceWaitDoc},
-		"timeout": schema.StringAttribute{Optional: true, MarkdownDescription: actServiceTimeoutDoc},
+		"service_id":  schema.StringAttribute{Required: true, MarkdownDescription: actServiceIDDoc},
+		"wait":        schema.BoolAttribute{Optional: true, MarkdownDescription: actServiceWaitDoc},
+		"timeout":     schema.StringAttribute{Optional: true, MarkdownDescription: actServiceTimeoutDoc},
+		"result_path": actResultPathAttribute(),
 	}
 }
 
@@ -259,7 +322,8 @@ func (a *serviceForceUpdateAction) Metadata(_ context.Context, req action.Metada
 func (a *serviceForceUpdateAction) Schema(_ context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Redeploys every task of a swarm service without changing its spec, like `docker service update --force`. " +
-			"The rollout follows the service's update_config. It bumps TaskTemplate.ForceUpdate; a `docker_service` that leaves `force_update` unset ignores the new value.",
+			"The rollout follows the service's update_config. It bumps TaskTemplate.ForceUpdate; a `docker_service` that leaves `force_update` unset ignores the new value. " +
+			"The result object has the update warnings, the rollout status and the new `force_update` counter.",
 		Attributes: serviceWaitActionAttributes(),
 	}
 }
@@ -275,9 +339,9 @@ func (a *serviceForceUpdateAction) Invoke(ctx context.Context, req action.Invoke
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ref := m.Service.ValueString()
+	ref := m.ServiceID.ValueString()
 	var counter uint64
-	id := actServiceUpdate(ctx, a.pd, ref, false, func(svc *swarm.Service) error {
+	id, warnings := actServiceUpdate(ctx, a.pd, ref, false, func(svc *swarm.Service) error {
 		svc.Spec.TaskTemplate.ForceUpdate++
 		counter = svc.Spec.TaskTemplate.ForceUpdate
 		return nil
@@ -286,21 +350,21 @@ func (a *serviceForceUpdateAction) Invoke(ctx context.Context, req action.Invoke
 		return
 	}
 	actProgress(ctx, resp, "service %s force update %d started", ref, counter)
-	if !actBool(m.Wait, true) {
-		return
+	if actBool(m.Wait, true) {
+		timeout := actTimeout(m.Timeout, actServiceDefaultTimeout)
+		wctx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		if err := actWaitRolloutStarted(wctx, c, id); err != nil {
+			resp.Diagnostics.AddError("docker_service_force_update: service did not converge", err.Error())
+			return
+		}
+		if err := actServiceWait(wctx, c, id, timeout); err != nil {
+			resp.Diagnostics.AddError("docker_service_force_update: service did not converge", err.Error())
+			return
+		}
+		actProgress(ctx, resp, "service %s redeployed and converged", ref)
 	}
-	timeout := actTimeout(m.Timeout, actServiceDefaultTimeout)
-	wctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	if err := actWaitRolloutStarted(wctx, c, id); err != nil {
-		resp.Diagnostics.AddError("docker_service_force_update: service did not converge", err.Error())
-		return
-	}
-	if err := actServiceWait(wctx, c, id, timeout); err != nil {
-		resp.Diagnostics.AddError("docker_service_force_update: service did not converge", err.Error())
-		return
-	}
-	actProgress(ctx, resp, "service %s redeployed and converged", ref)
+	actServiceFinish(ctx, resp, a.pd, "swarm:service-force-update", id, warnings, map[string]any{"force_update": counter}, m.ResultPath)
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +382,8 @@ func (a *serviceRollbackAction) Metadata(_ context.Context, req action.MetadataR
 func (a *serviceRollbackAction) Schema(_ context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Rolls a swarm service back to its previous spec, like `docker service rollback`, and waits for the rollback to complete. " +
-			"The service must have been updated at least once. A `docker_service` resource managing the service will plan to re-apply its configured spec afterwards.",
+			"The service must have been updated at least once. A `docker_service` resource managing the service will plan to re-apply its configured spec afterwards. " +
+			"The result object has the update warnings and the rollout status, beside the image the service runs now (`image_digest_ref`).",
 		Attributes: serviceWaitActionAttributes(),
 	}
 }
@@ -350,8 +415,8 @@ func (a *serviceRollbackAction) Invoke(ctx context.Context, req action.InvokeReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ref := m.Service.ValueString()
-	id := actServiceUpdate(ctx, a.pd, ref, true, func(svc *swarm.Service) error {
+	ref := m.ServiceID.ValueString()
+	id, warnings := actServiceUpdate(ctx, a.pd, ref, true, func(svc *swarm.Service) error {
 		if svc.PreviousSpec == nil {
 			return fmt.Errorf("service %s has no previous spec to roll back to", ref)
 		}
@@ -365,6 +430,7 @@ func (a *serviceRollbackAction) Invoke(ctx context.Context, req action.InvokeReq
 	}
 	actProgress(ctx, resp, "service %s rollback started", ref)
 	if !actBool(m.Wait, true) {
+		actServiceFinish(ctx, resp, a.pd, "swarm:service-rollback", id, warnings, nil, m.ResultPath)
 		return
 	}
 	timeout := actTimeout(m.Timeout, actServiceDefaultTimeout)
@@ -395,4 +461,5 @@ func (a *serviceRollbackAction) Invoke(ctx context.Context, req action.InvokeReq
 		return
 	}
 	actProgress(ctx, resp, "service %s rolled back and converged", ref)
+	actServiceFinish(ctx, resp, a.pd, "swarm:service-rollback", id, warnings, nil, m.ResultPath)
 }

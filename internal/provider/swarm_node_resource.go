@@ -52,6 +52,17 @@ type swarmNodeModel struct {
 	Availability   types.String `tfsdk:"availability"`
 	Role           types.String `tfsdk:"role"`
 	Labels         types.Map    `tfsdk:"labels"`
+	Name           types.String `tfsdk:"name"`
+	Addr           types.String `tfsdk:"addr"`
+	VersionIndex   types.Int64  `tfsdk:"version_index"`
+	contractSwarmSwarmNode
+}
+
+// swarmNodeComputedNull nulls the read-only outputs (an intermediate state
+// before the node could be read).
+func (m *swarmNodeModel) swarmNodeComputedNull() {
+	m.Name, m.Addr, m.VersionIndex = types.StringNull(), types.StringNull(), types.Int64Null()
+	m.contractSetNull()
 }
 
 func (r *swarmNodeResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -100,7 +111,7 @@ func (r *swarmNodeResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	keep := []planmodifier.String{stringplanmodifier.UseStateForUnknown()}
 	replace := []planmodifier.String{swarmNodeRequiresReplace()}
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Joins a Docker host to an existing swarm. The join is sent to the joining node's OWN daemon (`host`, " +
+		MarkdownDescription: "Joins a Docker host to an existing swarm (`docker swarm join`); to manage a node that already joined without joining or leaving, use `docker_node`. The join is sent to the joining node's OWN daemon (`host`, " +
 			"optionally with a `tls` block, or over SSH with an `ssh://` host and an `ssh` block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. " +
 			"Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list " +
 			"(managers are demoted first).\n\nImport with the node ID; `host`, `join_token` and `manager_address` must then be set in configuration " +
@@ -154,12 +165,19 @@ func (r *swarmNodeResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				ElementType: types.StringType, Optional: true,
 				MarkdownDescription: "Node labels (`node.labels.*` in placement constraints). Updated in place; labels set outside Terraform are removed.",
 			},
+			"name": schema.StringAttribute{Computed: true, PlanModifiers: keep,
+				MarkdownDescription: "Node name (`Spec.Name`), else the hostname."},
+			"addr": schema.StringAttribute{Computed: true, PlanModifiers: keep,
+				MarkdownDescription: "IP address the manager reaches the node at (`Status.Addr`)."},
+			"version_index": schema.Int64Attribute{Computed: true,
+				MarkdownDescription: "The node object's `Version.Index`; it changes on every update of the node."},
 		},
 		Blocks: map[string]schema.Block{
 			"tls": swarmNodeTLSBlockSchema(),
 			"ssh": sshResourceBlockSchema(swarmNodeSSHBlockDoc),
 		},
 	}
+	contractAddResourceAttributes(resp.Schema.Attributes, "swarm:swarm-node")
 }
 
 func (r *swarmNodeResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -207,6 +225,9 @@ func swarmNodeFlatten(m *swarmNodeModel, n swarm.Node) {
 	m.Availability = types.StringValue(string(n.Spec.Availability))
 	m.Role = types.StringValue(string(n.Spec.Role))
 	m.Labels = swarmLabelsValue(m.Labels, n.Spec.Labels)
+	m.Name = types.StringValue(swarmNodeName(n))
+	m.Addr = types.StringValue(n.Status.Addr)
+	m.VersionIndex = swarmVersionIndex(n.Version)
 	if m.ListenAddr.IsNull() || m.ListenAddr.IsUnknown() {
 		m.ListenAddr = types.StringValue(swarmDefaultListenAddr)
 	}
@@ -300,6 +321,7 @@ func (r *swarmNodeResource) Create(ctx context.Context, req resource.CreateReque
 	if err := swarmUpdateNode(ctx, r.pd.Client, nodeID, change); err != nil {
 		resp.Diagnostics.AddError("Cannot set node availability/role/labels", err.Error())
 		plan.Hostname = types.StringNull()
+		plan.swarmNodeComputedNull()
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 		resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, nodeID)...)
 		return
@@ -311,6 +333,7 @@ func (r *swarmNodeResource) Create(ctx context.Context, req resource.CreateReque
 	}
 	n := nRes.Node
 	swarmNodeFlatten(&plan, n)
+	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, swarmInspectInput(nRes.Raw, n))...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
@@ -332,6 +355,7 @@ func (r *swarmNodeResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 	swarmNodeFlatten(&state, n)
+	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, swarmInspectInput(nRes.Raw, n))...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
@@ -360,6 +384,7 @@ func (r *swarmNodeResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 	n := nRes.Node
 	swarmNodeFlatten(&plan, n)
+	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, swarmInspectInput(nRes.Raw, n))...)
 	// Config is now complete; later changes to host etc. replace the node.
 	resp.Diagnostics.Append(resp.Private.SetKey(ctx, swarmNodeImportedKey, nil)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)

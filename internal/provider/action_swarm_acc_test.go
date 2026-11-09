@@ -113,9 +113,9 @@ func TestAccActionNodeDrainActivate_basic(t *testing.T) {
 		active := swarm.NodeAvailabilityActive
 		_ = swarmUpdateNode(context.Background(), c, node.ID, swarmNodeSpecChange{Availability: &active})
 	})
-	drain := actAccTrigger("docker_node_drain", "d", fmt.Sprintf(`    node    = %q
+	drain := actAccTrigger("docker_node_drain", "d", fmt.Sprintf(`    node_id = %q
     timeout = "2m"`, node.Description.Hostname))
-	activate := actAccTrigger("docker_node_activate", "a", fmt.Sprintf(`    node = %q`, node.ID))
+	activate := actAccTrigger("docker_node_activate", "a", fmt.Sprintf(`    node_id = %q`, node.ID))
 	resource.Test(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -169,12 +169,12 @@ func TestAccActionServiceScaleForceUpdateRollback_basic(t *testing.T) {
 		s := sRes.Service
 		return s, err
 	}
-	scale := actAccTrigger("docker_service_scale", "s", fmt.Sprintf(`    service  = %q
+	scale := actAccTrigger("docker_service_scale", "s", fmt.Sprintf(`    service_id = %q
     replicas = 2
     timeout  = "3m"`, name))
-	force := actAccTrigger("docker_service_force_update", "f", fmt.Sprintf(`    service = %q
+	force := actAccTrigger("docker_service_force_update", "f", fmt.Sprintf(`    service_id = %q
     timeout = "3m"`, name))
-	rollback := actAccTrigger("docker_service_rollback", "r", fmt.Sprintf(`    service = %q
+	rollback := actAccTrigger("docker_service_rollback", "r", fmt.Sprintf(`    service_id = %q
     timeout = "3m"`, created.ID))
 	resource.Test(t, resource.TestCase{
 		TerraformVersionChecks:   actAccVersionChecks,

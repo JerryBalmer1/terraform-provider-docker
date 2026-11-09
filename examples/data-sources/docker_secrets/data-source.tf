@@ -3,5 +3,5 @@ data "docker_secrets" "shop" {
 }
 
 output "shop_secret_names" {
-  value = data.docker_secrets.shop.secrets[*].name
+  value = data.docker_secrets.shop.names
 }

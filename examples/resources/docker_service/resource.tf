@@ -13,12 +13,10 @@ resource "docker_service" "web" {
   image    = "nginx:1.27-alpine"
   replicas = 3
 
-  # Overlay networks by name or ID, with extra DNS aliases per network.
-  # (Use the plain `networks = ["frontend"]` set when no aliases are needed;
-  # the two cannot be combined.)
-  networks_advanced {
-    name    = "frontend"
-    aliases = ["www"]
+  # Overlay networks keyed by name or ID; `{}` attaches without extras.
+  networks = {
+    frontend = { aliases = ["www"] }
+    backend  = {}
   }
 
   env = {
@@ -32,8 +30,10 @@ resource "docker_service" "web" {
   cap_drop          = ["NET_RAW"]
   sysctls           = { "net.core.somaxconn" = "1024" }
   stop_grace_period = "30s"
+  stop_signal       = "SIGQUIT"
+  init              = true
 
-  dns {
+  dns_config {
     nameservers = ["10.0.0.2"]
     options     = ["ndots:2"]
   }
@@ -55,10 +55,28 @@ resource "docker_service" "web" {
     type   = "volume"
     source = "web-cache"
     target = "/var/cache/nginx"
+
+    volume_options {
+      no_copy = true
+      driver_config {
+        name = "local"
+      }
+    }
+  }
+
+  mounts {
+    type   = "tmpfs"
+    target = "/tmp"
+
+    tmpfs_options {
+      size_bytes = 67108864
+      mode       = 448 # 0700
+    }
   }
 
   endpoint_spec {
     ports {
+      name           = "http"
       target_port    = 80
       published_port = 8080
     }

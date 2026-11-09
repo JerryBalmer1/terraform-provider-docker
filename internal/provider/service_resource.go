@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -28,8 +29,32 @@ type serviceResource struct {
 }
 
 type serviceResourceModel struct {
-	ID types.String `tfsdk:"id"`
+	ID             types.String `tfsdk:"id"`
+	VersionIndex   types.Int64  `tfsdk:"version_index"`
+	ImageDigestRef types.String `tfsdk:"image_digest_ref"`
 	svcSpecModel
+	contractSwarmService
+
+	// Outputs of inventory item compose:service-deploy (the compose
+	// `deploy` view of the spec), see svcDeployOutputs.
+	Deploy             types.Object `tfsdk:"deploy"`
+	ComposeSpecVersion types.String `tfsdk:"compose_spec_version"`
+	ComposeGoVersion   types.String `tfsdk:"compose_go_version"`
+}
+
+// svcDeployAssign sets the compose:service-deploy outputs from vals.
+func (m *serviceResourceModel) svcDeployAssign(vals map[string]attr.Value) {
+	m.Deploy = vals["deploy"].(types.Object)
+	m.ComposeSpecVersion = vals["compose_spec_version"].(types.String)
+	m.ComposeGoVersion = vals["compose_go_version"].(types.String)
+}
+
+// svcResourceComputedNull sets the computed outputs to null (an
+// intermediate state before the first read).
+func (m *serviceResourceModel) svcResourceComputedNull() {
+	m.VersionIndex, m.ImageDigestRef = types.Int64Null(), types.StringNull()
+	m.contractSetNull()
+	m.svcDeployAssign(contractNullValues("compose:service-deploy"))
 }
 
 // svcRemoveTimeout bounds the wait for a removed service's tasks to go.
@@ -41,6 +66,15 @@ func (r *serviceResource) Metadata(_ context.Context, req resource.MetadataReque
 
 func (r *serviceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	attrs, blocks := svcSchema(true)
+	attrs["version_index"] = schema.Int64Attribute{Computed: true,
+		MarkdownDescription: "The service object's `Version.Index`; it changes on every update of the service."}
+	attrs["image_digest_ref"] = schema.StringAttribute{Computed: true,
+		MarkdownDescription: "Image the tasks run, pinned by digest (`repo@sha256:...`), from the daemon's digest pin; null when the daemon did not pin one."}
+	contractAddResourceAttributes(attrs, "swarm:service")
+	deployAttrs := contractResourceAttributes("compose:service-deploy")
+	for _, n := range svcDeployOutputs {
+		attrs[n] = deployAttrs[n]
+	}
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A Swarm service: a desired number of tasks (containers) of one image scheduled across the Swarm. " +
 			"Requires the provider to point at a Swarm manager. Almost every change is a rolling update in place " +
@@ -90,6 +124,7 @@ func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest
 		resp.Diagnostics.AddWarning("Service create warning", w)
 	}
 	plan.ID = types.StringValue(out.ID)
+	plan.svcResourceComputedNull()
 	// Save the ID first so a failed convergence still leaves a tracked
 	// (tainted) resource rather than an orphan.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -123,6 +158,20 @@ func (r *serviceResource) refresh(ctx context.Context, m *serviceResourceModel, 
 	}
 	m.ID = types.StringValue(svc.ID)
 	m.svcSpecModel = svcFlatten(svc.Spec, m.svcSpecModel, lk, svcFlattenOpts{})
+	m.VersionIndex = swarmVersionIndex(svc.Version)
+	m.ImageDigestRef = types.StringNull()
+	if cs := svc.Spec.TaskTemplate.ContainerSpec; cs != nil {
+		if ref := svcImageDigestRef(cs.Image); ref != "" {
+			m.ImageDigestRef = types.StringValue(ref)
+		}
+	}
+	diags.Append(m.contractFill(ctx, r.pd, svcContractInput(svcRes.Raw, svc))...)
+	dvals, d := contractValues(ctx, r.pd, "compose:service-deploy", contractFillInput{Structured: map[string]any{"deploy": svcComposeDeploy(svc.Spec)}})
+	diags.Append(d...)
+	if d.HasError() {
+		dvals = contractNullValues("compose:service-deploy")
+	}
+	m.svcDeployAssign(dvals)
 	return true
 }
 

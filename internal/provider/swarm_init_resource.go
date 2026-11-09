@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -53,6 +54,14 @@ type swarmInitModel struct {
 	ManagerJoinToken types.String `tfsdk:"manager_join_token"`
 	WorkerJoinToken  types.String `tfsdk:"worker_join_token"`
 	UnlockKey        types.String `tfsdk:"unlock_key"`
+	Labels           types.Map    `tfsdk:"labels"`
+	VersionIndex     types.Int64  `tfsdk:"version_index"`
+
+	Orchestration *swarmOrchestrationModel `tfsdk:"orchestration"`
+	Raft          *swarmRaftModel          `tfsdk:"raft"`
+	Dispatcher    *swarmDispatcherModel    `tfsdk:"dispatcher"`
+	CAConfig      *swarmCAConfigModel      `tfsdk:"ca_config"`
+	contractSwarmSwarmInit
 }
 
 func (r *swarmInitResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -65,6 +74,8 @@ func (r *swarmInitResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Initializes a Docker Swarm on the provider's Docker host (`docker swarm init` through the Engine API), " +
 			"making that daemon the first manager. Exposes the cluster ID and the worker/manager join tokens for `docker_swarm_node`. " +
+			"The spec settings `docker swarm update` changes (`labels`, `autolock`, `orchestration`, `raft`, `dispatcher`, `ca_config`) are set at init and " +
+			"updated in place. `id` is the cluster ID (`ClusterInfo.ID`, also `cluster_id`); `inspect` holds the whole Engine swarm object. " +
 			"Destroying the resource makes the host leave the swarm with force, which dissolves a single-manager swarm.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -128,8 +139,22 @@ func (r *swarmInitResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed: true, Sensitive: true,
 				MarkdownDescription: "Swarm unlock key when `autolock` is true, otherwise null.",
 			},
+			"labels": schema.MapAttribute{
+				ElementType: types.StringType, Optional: true, Computed: true,
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				MarkdownDescription: "Labels on the swarm (`Spec.Labels`). When set, the swarm gets exactly these labels; unset leaves them as " +
+					"they are. Updated in place (SwarmUpdate).",
+			},
+			"version_index": schema.Int64Attribute{
+				Computed:            true,
+				MarkdownDescription: "The swarm object's `Version.Index`; it changes on every update of the swarm.",
+			},
 		},
 	}
+	for k, v := range swarmInitSpecAttributes() {
+		resp.Schema.Attributes[k] = v
+	}
+	contractAddResourceAttributes(resp.Schema.Attributes, "swarm:swarm-init")
 }
 
 func (r *swarmInitResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -165,6 +190,7 @@ func swarmInitBuildRequest(ctx context.Context, m swarmInitModel, diags *diag.Di
 		// top-level flag, so set both or autolock reads back false.
 		req.Spec.EncryptionConfig.AutoLockManagers = v
 	}
+	swarmApplySpec(ctx, m, &req.Spec, diags)
 	return req
 }
 
@@ -190,6 +216,8 @@ func swarmInitFlatten(m *swarmInitModel, nodeID string, sw swarm.Swarm, unlockKe
 	if m.ForceNewCluster.IsNull() || m.ForceNewCluster.IsUnknown() {
 		m.ForceNewCluster = types.BoolValue(false)
 	}
+	m.VersionIndex = swarmVersionIndex(sw.Version)
+	swarmFlattenSpec(m, sw.Spec)
 }
 
 // swarmInitRefresh reads the daemon into m. It returns false when the host is
@@ -197,35 +225,42 @@ func swarmInitFlatten(m *swarmInitModel, nodeID string, sw swarm.Swarm, unlockKe
 // (autolock after restart) is reported present with m left unchanged and
 // swarmInitErrLocked.
 func swarmInitRefresh(ctx context.Context, c *client.Client, m *swarmInitModel) (bool, error) {
+	ok, _, err := swarmInitRefreshSwarm(ctx, c, m)
+	return ok, err
+}
+
+// swarmInitRefreshSwarm is swarmInitRefresh that also returns the swarm it
+// read (nil when it read none).
+func swarmInitRefreshSwarm(ctx context.Context, c *client.Client, m *swarmInitModel) (bool, *swarm.Swarm, error) {
 	infoRes, err := c.Info(ctx, client.InfoOptions{})
 	if err != nil {
-		return false, fmt.Errorf("reading daemon info: %w", err)
+		return false, nil, fmt.Errorf("reading daemon info: %w", err)
 	}
 	info := infoRes.Info
 	if info.Swarm.LocalNodeState == swarm.LocalNodeStateLocked {
-		return true, swarmInitErrLocked
+		return true, nil, swarmInitErrLocked
 	}
 	if info.Swarm.LocalNodeState != swarm.LocalNodeStateActive {
-		return false, nil
+		return false, nil, nil
 	}
 	swRes, err := c.SwarmInspect(ctx, client.SwarmInspectOptions{})
 	if err != nil {
-		return false, fmt.Errorf("inspecting swarm: %w", err)
+		return false, nil, fmt.Errorf("inspecting swarm: %w", err)
 	}
 	sw := swRes.Swarm
 	if id, ok := knownString(m.ID); ok && id != "" && id != sw.ID {
-		return false, nil
+		return false, nil, nil
 	}
 	unlock := ""
 	if sw.Spec.EncryptionConfig.AutoLockManagers {
 		k, err := c.SwarmGetUnlockKey(ctx)
 		if err != nil {
-			return false, fmt.Errorf("reading unlock key: %w", err)
+			return false, nil, fmt.Errorf("reading unlock key: %w", err)
 		}
 		unlock = k.Key
 	}
 	swarmInitFlatten(m, info.Swarm.NodeID, sw, unlock)
-	return true, nil
+	return true, &sw, nil
 }
 
 func (r *swarmInitResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -243,7 +278,7 @@ func (r *swarmInitResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 	plan.ID = types.StringUnknown()
-	ok, err := swarmInitRefresh(ctx, r.pd.Client, &plan)
+	ok, sw, err := swarmInitRefreshSwarm(ctx, r.pd.Client, &plan)
 	if err != nil || !ok {
 		if err == nil {
 			err = fmt.Errorf("daemon is not an active swarm member after init")
@@ -251,6 +286,7 @@ func (r *swarmInitResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.AddError("Cannot read swarm after init", err.Error())
 		return
 	}
+	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, swarmContractInput(*sw))...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -260,7 +296,7 @@ func (r *swarmInitResource) Read(ctx context.Context, req resource.ReadRequest, 
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	ok, err := swarmInitRefresh(ctx, r.pd.Client, &state)
+	ok, sw, err := swarmInitRefreshSwarm(ctx, r.pd.Client, &state)
 	if errors.Is(err, swarmInitErrLocked) {
 		resp.Diagnostics.AddWarning("Swarm is locked",
 			"The provider's Docker host is a locked swarm manager (autolock). Unlock it with the unlock_key; state was left unchanged.")
@@ -275,6 +311,7 @@ func (r *swarmInitResource) Read(ctx context.Context, req resource.ReadRequest, 
 		resp.State.RemoveResource(ctx)
 		return
 	}
+	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, swarmContractInput(*sw))...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -292,16 +329,23 @@ func (r *swarmInitResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 	sw := swRes.Swarm
-	if sw.Spec.EncryptionConfig.AutoLockManagers != want {
-		spec := sw.Spec
+	spec := sw.Spec
+	changed := swarmApplySpec(ctx, plan, &spec, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if spec.EncryptionConfig.AutoLockManagers != want {
 		spec.EncryptionConfig.AutoLockManagers = want
+		changed = true
+	}
+	if changed {
 		if _, err := r.pd.Client.SwarmUpdate(ctx, client.SwarmUpdateOptions{Version: sw.Version, Spec: spec}); err != nil {
-			resp.Diagnostics.AddError("Cannot update swarm autolock", err.Error())
+			resp.Diagnostics.AddError("Cannot update swarm", err.Error())
 			return
 		}
 	}
 	plan.ID = state.ID
-	ok, err := swarmInitRefresh(ctx, r.pd.Client, &plan)
+	ok, swNow, err := swarmInitRefreshSwarm(ctx, r.pd.Client, &plan)
 	if err != nil || !ok {
 		if err == nil {
 			err = fmt.Errorf("swarm %s is gone", state.ID.ValueString())
@@ -309,6 +353,7 @@ func (r *swarmInitResource) Update(ctx context.Context, req resource.UpdateReque
 		resp.Diagnostics.AddError("Cannot read swarm after update", err.Error())
 		return
 	}
+	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, swarmContractInput(*swNow))...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 

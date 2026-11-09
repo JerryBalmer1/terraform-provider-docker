@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -26,8 +25,8 @@ var (
 	_ resource.ResourceWithConfigValidators = (*dockerConfigResource)(nil)
 )
 
-// NewDockerConfigResource returns the docker_config resource.
-func NewDockerConfigResource() resource.Resource { return &dockerConfigResource{} }
+// NewConfigResource returns the docker_config resource.
+func NewConfigResource() resource.Resource { return &dockerConfigResource{} }
 
 type dockerConfigResource struct {
 	pd *providerData
@@ -40,6 +39,8 @@ type dockerConfigResourceModel struct {
 	DataWO        types.String `tfsdk:"data_wo"`
 	DataWOVersion types.Int64  `tfsdk:"data_wo_version"`
 	Labels        types.Map    `tfsdk:"labels"`
+	VersionIndex  types.Int64  `tfsdk:"version_index"`
+	contractSwarmConfig
 }
 
 func (r *dockerConfigResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -48,9 +49,9 @@ func (r *dockerConfigResource) Metadata(_ context.Context, req resource.Metadata
 
 func (r *dockerConfigResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "A Swarm config: an immutable, non-secret blob mounted into service tasks as a file. Requires the " +
-			"provider to point at a Swarm manager. Swarm configs cannot be changed after creation, so every change replaces " +
-			"the config; a config still referenced by a service cannot be removed, so change the referencing service in the " +
+		MarkdownDescription: "A Swarm config: a non-secret blob mounted into service tasks as a file. Requires the " +
+			"provider to point at a Swarm manager. The content of a swarm config cannot be changed after creation, so a content or name " +
+			"change replaces the config, while labels are updated in place (`ConfigUpdate`); a config still referenced by a service cannot be removed, so change the referencing service in the " +
 			"same apply (or use `create_before_destroy` with a new name).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
@@ -76,11 +77,13 @@ func (r *dockerConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 			"labels": schema.MapAttribute{
 				ElementType:         types.StringType,
 				Optional:            true,
-				MarkdownDescription: "User labels on the config. Changing this forces a new resource.",
-				PlanModifiers:       []planmodifier.Map{mapplanmodifier.RequiresReplace()},
+				MarkdownDescription: "User labels on the config. Updated in place (`ConfigUpdate`); the content cannot change, so only labels can.",
 			},
+			"version_index": schema.Int64Attribute{Computed: true,
+				MarkdownDescription: "The config object's `Version.Index`; it changes when the labels are updated."},
 		},
 	}
+	contractAddResourceAttributes(resp.Schema.Attributes, "swarm:config")
 }
 
 func (r *dockerConfigResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -119,6 +122,8 @@ func (r *dockerConfigResource) Create(ctx context.Context, req resource.CreateRe
 	}
 	plan.ID = types.StringValue(out.ID)
 	plan.DataWO = types.StringNull() // write-only: never persisted
+	plan.VersionIndex = types.Int64Null()
+	plan.contractSetNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, out.ID)...)
 	r.read(ctx, &plan, &resp.Diagnostics, nil)
@@ -146,6 +151,8 @@ func (r *dockerConfigResource) read(ctx context.Context, m *dockerConfigResource
 	if (m.Data.IsNull() || m.Data.IsUnknown()) && m.DataWOVersion.IsNull() {
 		m.Data = types.StringValue(base64.StdEncoding.EncodeToString(s.Spec.Data))
 	}
+	m.VersionIndex = swarmVersionIndex(s.Version)
+	diags.Append(m.contractFill(ctx, r.pd, swarmInspectInput(sRes.Raw, s))...)
 }
 
 func (r *dockerConfigResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -167,14 +174,37 @@ func (r *dockerConfigResource) Read(ctx context.Context, req resource.ReadReques
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
 
-// Update only persists the plan: every attribute forces replacement.
+// Update changes the labels in place (ConfigUpdate); every other attribute
+// forces replacement.
 func (r *dockerConfigResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan dockerConfigResourceModel
+	var plan, state dockerConfigResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	plan.ID = state.ID
+	labels := mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue})
+	err := swarmRetryConflict(ctx, func(ctx context.Context) error {
+		res, err := r.pd.Client.ConfigInspect(ctx, plan.ID.ValueString(), client.ConfigInspectOptions{})
+		if err != nil {
+			return err
+		}
+		spec := res.Config.Spec
+		spec.Labels = labels
+		spec.Data = nil // the Engine only accepts label changes
+		_, err = r.pd.Client.ConfigUpdate(ctx, plan.ID.ValueString(), client.ConfigUpdateOptions{Version: res.Config.Version, Spec: spec})
+		return err
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot update config labels", err.Error())
+		return
+	}
 	plan.DataWO = types.StringNull()
+	r.read(ctx, &plan, &resp.Diagnostics, nil)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }

@@ -21,6 +21,13 @@ type swarmTokensEphemeral struct {
 	pd *providerData
 }
 
+type swarmTokensEphemeralModel struct {
+	ID      types.String `tfsdk:"id"`
+	Worker  types.String `tfsdk:"worker"`
+	Manager types.String `tfsdk:"manager"`
+	contractSwarmSwarmTokensEphemeral
+}
+
 func (e *swarmTokensEphemeral) Metadata(_ context.Context, req ephemeral.MetadataRequest, resp *ephemeral.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_swarm_tokens"
 }
@@ -35,6 +42,7 @@ func (e *swarmTokensEphemeral) Schema(_ context.Context, _ ephemeral.SchemaReque
 			"manager": schema.StringAttribute{Computed: true, Sensitive: true, MarkdownDescription: "Token that joins a node as a manager."},
 		},
 	}
+	contractAddEphemeralAttributes(resp.Schema.Attributes, "swarm:swarm-tokens-ephemeral")
 }
 
 func (e *swarmTokensEphemeral) Configure(_ context.Context, req ephemeral.ConfigureRequest, resp *ephemeral.ConfigureResponse) {
@@ -52,9 +60,11 @@ func (e *swarmTokensEphemeral) Open(ctx context.Context, _ ephemeral.OpenRequest
 		return
 	}
 	sw := swRes.Swarm
-	resp.Diagnostics.Append(resp.Result.Set(ctx, &swarmTokensModel{
+	m := swarmTokensEphemeralModel{
 		ID:      types.StringValue(sw.ID),
 		Worker:  types.StringValue(sw.JoinTokens.Worker),
 		Manager: types.StringValue(sw.JoinTokens.Manager),
-	})...)
+	}
+	resp.Diagnostics.Append(m.contractFill(ctx, e.pd, contractFillInput{Structured: map[string]any{"join_tokens": sw.JoinTokens}})...)
+	resp.Diagnostics.Append(resp.Result.Set(ctx, &m)...)
 }
