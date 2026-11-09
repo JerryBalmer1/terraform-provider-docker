@@ -15,14 +15,22 @@ REF = os.path.normpath(os.path.join(HERE, ".."))  # reference/
 Z = os.path.join(HERE, "fragments")
 FRAGS = ["z1-engine.json", "z2-compose.json", "z3-cli.json", "z4-dockerfile.json"]
 # Fragments added after the harvest; each is read only when the file exists, in this order.
-EXTRA_FRAGS = ["dockerfile-sources.json"]
+EXTRA_FRAGS = ["dockerfile-sources.json", "pass5.json"]
 OUTPUTS_DIR = os.path.join(Z, "outputs")  # outputs/<lane>.json, joined onto items by id (SCHEMA.md)
 OUT_CATEGORIES = ["raw", "structured", "result", "identity", "version", "hash"]
 OUT_SOURCE_TYPES = ["swagger", "schema", "doc", "cli", "sources_md", "derived"]
 ITEM_OUT_KEYS = {"no_raw_reason", "no_structured_reason", "outputs_status", "outputs_note", "uses_cli", "inputs"}
 TF_TYPE = re.compile(r"^(string|number|bool|dynamic|(list|set|map)\(.+\)|object\(\{.*\}\))$", re.S)
 LAYERS = ["engine", "swarm", "compose", "dockerfile", "buildx", "cli-only"]
-KINDS = ["resource", "data_source", "action", "dockerfile_block", "skip"]
+KINDS = ["resource", "data_source", "action", "ephemeral_resource", "list_resource", "function", "dockerfile_block", "skip"]
+# Terraform kind label per inventory kind (collisions, the `registered` field).
+TFKIND = {"resource": "resource", "data_source": "data", "action": "action", "ephemeral_resource": "ephemeral",
+          "list_resource": "list", "function": "function", "dockerfile_block": "block"}
+# Status is computed, never hand-set (Pass 5): from the registration in internal/provider/registry_gen.go
+# (generated from this inventory by tools/registrygen) and the stub markers in internal/provider/*.go.
+PROVIDER = os.path.normpath(os.path.join(REF, "..", "internal", "provider"))
+REGISTRY_GEN = os.path.join(PROVIDER, "registry_gen.go")
+MARKER = re.compile(r"//\s*STUB\(pass5\)\s+([a-z-]+:[A-Za-z0-9._-]+)(?:[ \t]+partial:[ \t]*(.*))?")
 STATUSES = ["exists", "partial", "missing"]
 
 
@@ -68,10 +76,9 @@ for it in items:
     else:
         if not it.get("name"):
             errors.append("%s no name" % it["id"])
-        if it.get("status") not in STATUSES:
-            errors.append("%s bad status %r" % (it["id"], it.get("status")))
-        if it.get("status") == "partial" and not it.get("status_note"):
-            errors.append("%s partial without status_note" % it["id"])
+        for k in ("status", "status_note", "existing"):
+            if k in it:
+                errors.append("%s: %s is computed by merge.py (Pass 5); remove it from the fragment" % (it["id"], k))
     if it["kind"] == "resource" and it.get("update") not in ("in_place", "replace"):
         errors.append("%s resource without update" % it["id"])
     for s in it.get("sources", []):
@@ -187,11 +194,49 @@ for fn in out_files:
             errors.append("%s: bad outputs_status %r" % (iid, entry.get("outputs_status")))
         it["outputs_lane"] = d.get("lane", fn[:-5])
 
+# ---- status: computed from registry_gen.go + stub markers
+registered = {}  # (kind, name) -> constructor
+if os.path.exists(REGISTRY_GEN):
+    with open(REGISTRY_GEN, encoding="utf-8") as f:
+        for line in f:
+            m = re.match(r"^\s*(New\w+),\s*//\s*(\w+)\s+(\S+)\s*$", line)
+            if m:
+                registered[(m.group(2), m.group(3))] = m.group(1)
+markers = collections.defaultdict(list)  # item id -> [(file, partial note or None)]
+for fn in sorted(os.listdir(PROVIDER)) if os.path.isdir(PROVIDER) else []:
+    if not fn.endswith(".go") or fn.endswith("_test.go"):
+        continue
+    with open(os.path.join(PROVIDER, fn), encoding="utf-8") as f:
+        for m in MARKER.finditer(f.read()):
+            markers[m.group(1)].append((fn, (m.group(2) or "").strip() or None))
+for mid in sorted(markers):
+    if mid not in by_id:
+        errors.append("stub marker for unknown item %s in %s" % (mid, ", ".join(sorted({x[0] for x in markers[mid]}))))
+    elif by_id[mid]["kind"] == "skip":
+        errors.append("stub marker for skipped item %s" % mid)
+for it in items:
+    if it["kind"] == "skip":
+        continue
+    key = ("data_source", "docker_dockerfile") if it["kind"] == "dockerfile_block" else (it["kind"], it["name"])
+    mk = markers.get(it["id"], [])
+    if key not in registered:
+        it["status"], it["status_note"] = "missing", "not registered"
+    elif any(n is None for _, n in mk):
+        it["status"], it["status_note"] = "missing", "stub: not implemented (Pass 5)"
+    elif mk:
+        it["status"], it["status_note"] = "partial", "; ".join(n for _, n in mk)
+    else:
+        it["status"] = "exists"
+    if key in registered:
+        it["registered"] = ("%s.%s" % (TFKIND[key[0]], key[1])) if key[0] != "resource" else key[1]
+    if mk:
+        it["stub_files"] = sorted({x[0] for x in mk})
+
 # ---- collisions: same name used by >1 item of the same Terraform kind
 by_name = collections.defaultdict(list)
 for it in items:
     if it.get("name") and it["kind"] != "skip":
-        tfkind = {"resource": "resource", "data_source": "data", "action": "action", "dockerfile_block": "block"}[it["kind"]]
+        tfkind = TFKIND[it["kind"]]
         by_name[(tfkind, it["name"])].append(it["id"])
 auto_collisions = [(k, v) for k, v in sorted(by_name.items()) if len(v) > 1]
 flagged = [(i["id"], i["name"], i["collision"]) for i in items if i.get("collision")]
@@ -211,7 +256,7 @@ for it in sorted(items, key=lambda i: (LAYERS.index(i["layer"]), KINDS.index(i["
     out_items.append(o)
 inv = {
     "generated": "2026-11-08",
-    "about": "Name inventory proposed from reference/upstream (see SOURCES.md). Names only; no code. Paths in sources are relative to reference/.",
+    "about": "Every Docker object, operation and spec element in reference/upstream (see SOURCES.md) with its decided Terraform name (DECISIONS.md). status is computed from internal/provider/registry_gen.go and the Pass 5 stub markers. Paths in sources are relative to reference/.",
     "pins": {
         "engine_api": "1.56 (moby api/v1.56.1 @ 14ebc602124e280ef4ae3e1a8e688dac1255baa6)",
         "compose_spec": "main @ 3a4a6995e4a971f6173dff9130cb3e38e6738651",
@@ -257,10 +302,11 @@ def srcs(it):
         out = out[:6] + ["+%d more" % (len(out) - 6)]
     return "<br>".join(esc(x) for x in out)
 
-KN = {"resource": "resource", "data_source": "data source", "action": "action", "dockerfile_block": "block", "skip": "skip"}
+KN = {"resource": "resource", "data_source": "data source", "action": "action", "ephemeral_resource": "ephemeral",
+      "list_resource": "list resource", "function": "function", "dockerfile_block": "block", "skip": "skip"}
 md = ["# Inventory", "",
-      "Proposed Terraform names for every item in [upstream/](upstream/) ([SOURCES.md](SOURCES.md)). Names only, no code. Machine-readable: [inventory.json](inventory.json).", "",
-      "Status is against the provider's registered types on 2026-11-08. `cli` = CLI-only (no Engine API endpoint, client-side). Update: `in place` / `replace` for resources.", ""]
+      "The Terraform name of every item in [upstream/](upstream/) ([SOURCES.md](SOURCES.md)). Machine-readable: [inventory.json](inventory.json).", "",
+      "Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/merge.py`: `missing` = not registered in `internal/provider/registry_gen.go`, or still a Pass 5 stub; `partial` = registered with an open Pass 5 marker (the note says what is left); `exists` = registered with no marker. `cli` = CLI-only (no Engine API endpoint, client-side). Update: `in place` / `replace` for resources.", ""]
 TITLES = {"engine": "Engine", "swarm": "Swarm", "compose": "Compose", "dockerfile": "Dockerfile", "buildx": "Buildx", "cli-only": "CLI-only"}
 for L in LAYERS:
     rows = [i for i in out_items if i["layer"] == L]
@@ -272,6 +318,8 @@ for L in LAYERS:
         for it in rows:
             fl = ", ".join("`%s`" % esc(x["name"]) for x in it.get("flags", []))
             st = it.get("status", "") if it["kind"] != "skip" else "skip: " + it.get("skip_reason", "")
+            if it.get("decisions"):
+                st += " (" + ", ".join(it["decisions"]) + ")"
             md.append("| %s | `%s` | %s | %s | %s |" % (KN[it["kind"]], it.get("name") or "-", fl, srcs(it), esc(st)))
     else:
         md += ["| kind | name | update | sources | min API | status | note |", "|---|---|---|---|---|---|---|"]
@@ -282,8 +330,10 @@ for L in LAYERS:
             else:
                 st = it.get("status", "")
                 note = it.get("status_note", "") if st == "partial" else ""
-                if it.get("existing"):
-                    note = (note + " " if note else "") + "(has: " + ", ".join(it["existing"]) + ")"
+                if it.get("decisions"):
+                    note = (note + " " if note else "") + "(" + ", ".join(it["decisions"]) + ")"
+                if it.get("previous_name"):
+                    note = (note + " " if note else "") + "(was `%s`)" % it["previous_name"]
             if it.get("cli_only"):
                 st += " · cli"
             if it.get("collision"):
@@ -330,7 +380,8 @@ if any(i.get("outputs") for i in out_items):
         md.append("")
 
 md += ["## Totals", "", "Counts as exists / partial / missing.", "",
-       "| layer | resources | data sources | actions | blocks | skipped |", "|---|---|---|---|---|---|"]
+       "| layer | resources | data sources | actions | ephemeral | list resources | functions | blocks | skipped |",
+       "|---|---|---|---|---|---|---|---|---|"]
 def cell(c):
     n = sum(c[s] for s in STATUSES)
     return "%d (%d / %d / %d)" % (n, c["exists"], c["partial"], c["missing"]) if n else "0"
@@ -339,10 +390,8 @@ for L in LAYERS:
     t = tot[L]
     for k in KINDS:
         grand[k].update(t[k])
-    md.append("| %s | %s | %s | %s | %s | %d |" % (L, cell(t["resource"]), cell(t["data_source"]), cell(t["action"]),
-                                                 cell(t["dockerfile_block"]), sum(t["skip"].values())))
-md.append("| **all** | %s | %s | %s | %s | %d |" % (cell(grand["resource"]), cell(grand["data_source"]), cell(grand["action"]),
-                                                    cell(grand["dockerfile_block"]), sum(grand["skip"].values())))
+    md.append("| %s | %s | %d |" % (L, " | ".join(cell(t[k]) for k in KINDS[:-1]), sum(t["skip"].values())))
+md.append("| **all** | %s | %d |" % (" | ".join(cell(grand[k]) for k in KINDS[:-1]), sum(grand["skip"].values())))
 md += ["", "Engine API coverage: %d of %d swagger operations placed%s." % (
     len(all_ops & set(seen)), len(all_ops), (" (uncovered: " + ", ".join(uncovered) + ")") if uncovered else ""), ""]
 

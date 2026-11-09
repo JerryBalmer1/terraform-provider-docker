@@ -80,7 +80,7 @@ resource "docker_service" "e2e" {
   name     = "e2e-svc-%[1]s"
   image    = docker_image.e2e.name
   replicas = 3
-  networks = [docker_network.e2e.id]
+  networks = { (docker_network.e2e.name) = {} }
 
   secrets {
     secret_id   = docker_secret.e2e.id
@@ -189,7 +189,7 @@ func TestAccE2EImageToService(t *testing.T) {
 			{
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("docker_image.e2e", "image_id"),
+					resource.TestCheckResourceAttrSet("docker_image.e2e", "id"),
 					resource.TestCheckResourceAttrSet("docker_swarm_init.e2e", "cluster_id"),
 					resource.TestCheckResourceAttrSet("docker_swarm_init.e2e", "node_id"),
 					resource.TestCheckResourceAttrSet("docker_network.e2e", "id"),

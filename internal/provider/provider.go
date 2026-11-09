@@ -101,6 +101,10 @@ type providerData struct {
 	// apiMu guards apiVersion, the negotiated version APIVersion caches.
 	apiMu      sync.Mutex
 	apiVersion string
+
+	// serverVersion caches GET /version Version for the
+	// docker_server_version contract output (contract_version.go).
+	serverVersion contractServerVersionCache
 }
 
 func (p *dockerProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -360,6 +364,7 @@ func (p *dockerProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 	ep.UserAgent = "terraform-provider-docker/" + p.version
+	ep.MinAPIVersion = minAPI
 	// The client is lazy: no daemon round trip happens here, so validate and
 	// plan work without a reachable daemon.
 	c, err := newDockerClient(ep)
@@ -451,50 +456,36 @@ func checkDockerDaemon(ctx context.Context, c *client.Client, ep endpointConfig,
 	return v
 }
 
-// ===== BEGIN LANE REGISTRATIONS =====
-// Each lane owns one register_<lane>.go file and returns its constructors
-// from the two functions it defines there. Do not register resources here
-// directly; add a new lane function call instead.
+// ===== BEGIN REGISTRATIONS =====
+// Pass 5: every type is registered by registry_gen.go, which tools/registrygen
+// generates from reference/inventory.json (Invoke-Build RegistryGen). A type
+// gets registered by adding it to the inventory, never by editing this file;
+// RegistryCheck fails when the two differ.
 func (p *dockerProvider) Resources(_ context.Context) []func() resource.Resource {
-	var r []func() resource.Resource
-	r = append(r, imageLaneResources()...)    // lane 1: register_image.go
-	r = append(r, composeLaneResources()...)  // lane 2: register_compose.go
-	r = append(r, swarmLaneResources()...)    // lane 3: register_swarm.go
-	r = append(r, workloadLaneResources()...) // lane 4: register_workload.go
-	r = append(r, composeFileResources()...)  // pass 3 lane B: register_composefile.go
-	r = append(r, p3ContainerResources()...)  // pass 3 lane C: register_p3_container.go
-	return r
+	return genResources()
 }
 
 func (p *dockerProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	var d []func() datasource.DataSource
-	d = append(d, imageLaneDataSources()...)    // lane 1
-	d = append(d, composeLaneDataSources()...)  // lane 2
-	d = append(d, swarmLaneDataSources()...)    // lane 3
-	d = append(d, workloadLaneDataSources()...) // lane 4
-	d = append(d, p3ContainerDataSources()...)  // pass 3 lane C: register_p3_container.go
-	d = append(d, p3ParityDataSources()...)     // pass 3 lane E: register_p3_datasources.go
-	return d
+	return genDataSources()
 }
 
-// Pass 3: Terraform 1.14 surface. Same rule: one register file per lane.
 func (p *dockerProvider) Actions(_ context.Context) []func() action.Action {
-	return laneActions() // pass 3 lane D: register_actions.go
+	return genActions()
 }
 
 func (p *dockerProvider) EphemeralResources(_ context.Context) []func() ephemeral.EphemeralResource {
-	return laneEphemeralResources() // pass 3 lane E: register_ephemeral.go
+	return genEphemeralResources()
 }
 
 func (p *dockerProvider) Functions(_ context.Context) []func() function.Function {
-	return laneFunctions() // pass 3 lane E: register_functions.go
+	return genFunctions()
 }
 
 func (p *dockerProvider) ListResources(_ context.Context) []func() list.ListResource {
-	return laneListResources() // pass 3 lane E: register_lists.go
+	return genListResources()
 }
 
-// ===== END LANE REGISTRATIONS =====
+// ===== END REGISTRATIONS =====
 
 // providerDataFrom extracts the data handed over by Configure. data is nil
 // before Configure runs (validation); callers then return without error.

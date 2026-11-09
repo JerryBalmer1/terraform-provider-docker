@@ -4,9 +4,8 @@ Every file in `reference/_gen/fragments/` (except `z3-cli-map.json`, the CLI cov
 `merge.py` validates it; see README.md in this folder.
 
 Harvested sources: `reference/upstream/` (see `reference/SOURCES.md`).
-Existing provider types: the types the provider registers (`internal/provider/register_*.go`; README_resources.md lists them).
-  `existing` entries are written `<type> (<kind>)`, kind being resource | data source | action | ephemeral resource | list resource | function.
-  Read internal/provider/*.go to judge "partial" (e.g. grep which Engine API client calls / attributes a type uses).
+Existing provider types: generated from this inventory (internal/provider/registry_gen.go, tools/registrygen) since Pass 5. The harvest-era
+  `existing` / hand-set `status` fields are gone; merge.py computes status (below).
 
 A fragment is ONE JSON file (UTF-8, LF), shaped:
 
@@ -21,7 +20,7 @@ ITEM:
 {
   "id": "<layer>:<stable-slug>",            // unique, e.g. "engine:container", "swarm:service-rollback", "dockerfile:RUN"
   "layer": "engine|swarm|compose|dockerfile|buildx|cli-only",
-  "kind": "resource|data_source|action|dockerfile_block|skip",
+  "kind": "resource|data_source|action|ephemeral_resource|list_resource|function|dockerfile_block|skip",
   "name": "docker_...",                     // proposed Terraform type name; null only for skip
   "update": "in_place|replace",             // resources only: in_place if an update endpoint/mechanism exists, else replace. Omit otherwise.
   "summary": "one line",
@@ -32,9 +31,11 @@ ITEM:
     {"type": "doc", "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md", "anchor": "#run---mount"}
   ],
   "min_api": "1.41",                        // only where a source states it (swagger text, api/docs/CHANGELOG.md); else null
-  "status": "exists|partial|missing|n/a",   // n/a for skip
-  "existing": ["docker_container (resource)"],  // provider types that cover it (fully or partly); [] if none
-  "status_note": "why partial / what is missing",  // required when partial
+  // status / status_note / registered / stub_files are COMPUTED by merge.py (Pass 5) and must not appear in a
+  // fragment: missing = not registered in internal/provider/registry_gen.go or a STUB(pass5) stub; partial =
+  // registered with a `STUB(pass5) <id> partial: <note>` marker in internal/provider/*.go; exists = registered, no marker.
+  "decisions": ["Q1"],                      // optional: the DECISIONS.md questions that shaped the item
+  "previous_name": "docker_logs",           // optional: the name before Pass 5 (skip_previous_name on items that became skips)
   "cli_only": false,                        // true when it appears in a CLI but has NO Engine API endpoint (client-side: compose, stack deploy, context, trust, manifest, buildx bake...)
   "skip_reason": "one line",                // required for skip
   "collision": "text if the proposed name collides or is confusable with another name (existing or proposed)",  // optional
@@ -49,8 +50,12 @@ Rules:
 - action = imperative op outside CRUD (restart, kill, pause/unpause, exec, prune, push, pull, tag, commit, swarm init/join/leave/unlock, node promote/demote, service rollback/scale, compose up/down/restart, build). Terraform plugin framework "actions".
 - skip = deprecated, session/streaming-only, attach/websocket, interactive, pure-client UI etc. One-line reason.
 - Naming prefixes: docker_*, docker_swarm_*, docker_compose_*, docker_dockerfile_*, docker_buildx_*. Prefer existing names where the type already exists. Don't invent a new name for something that exists.
-- status: exists = a registered type of the same kind covers it; partial = covered only in part or by a different kind (ephemeral/list resource/attribute of another type/different name); missing = nothing.
-- Propose names only. Do not write code.
+- status is computed (see above). The registration itself is generated from the inventory (tools/registrygen ->
+  internal/provider/registry_gen.go), so adding an item with a new (kind, name) registers a type: run
+  `Invoke-Build Inventory, RegistryGen`, then implement the constructor (`New<CamelName><Kind>`, see
+  tools/registrygen) or let `go run ./tools/registrygen -stubs` write a stub.
+- dockerfile_block items name a nested block or attribute of data.docker_dockerfile (`docker_dockerfile.run`); they are
+  not registered types. Their status follows data.docker_dockerfile plus their own markers.
 
 # Outputs schema (`fragments/outputs/<lane>.json`)
 
@@ -142,6 +147,7 @@ Naming rules:
 | `dockerfile_syntax` | the `# syntax=` value, else the default frontend (SOURCES.md pin `dockerfile`) | - |
 | `buildx_version` | SOURCES.md pin `buildx` (the release the bake / imagetools model follows) | - |
 | `buildkit_version` | builder inspect: `docker buildx inspect` node `BuildkitVersion` (BuildKit's ListWorkers / Info) | - |
+| `distribution_api_version` | the registry's `Docker-Distribution-API-Version` response header (e.g. `registry/2.0`), for items that talk to a registry directly | - |
 | `docker_cli_version` | `docker version` client `Version` of the docker CLI binary the item runs | `uses_cli` |
 <!-- /version-registry -->
 

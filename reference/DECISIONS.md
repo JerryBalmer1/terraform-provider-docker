@@ -4,6 +4,8 @@ Every open naming question from [INVENTORY.md](INVENTORY.md#naming-questions) (1
 Lane Z carry-overs (Pass 4.5, BUILD_REPORT.md) are already in that list: the names for non-JSON raw streams (Q33)
 and the action result shape (Q35, together with Q43). Question numbers match INVENTORY.md.
 
+**Status (Pass 5):** every question below is decided. Each `Decision:` line is the user's ruling, and the inventory follows it. The recommendations stay as the record of what was proposed. From Pass 5 on, kreuzwerker naming is not a naming source (see "General rule" at the end).
+
 Recommendations follow this order of preference: match kreuzwerker/docker v4.6.0 where it has the type or attribute
 (migration path), then the upstream name, then consistency with [CONTRACT.md](CONTRACT.md).
 
@@ -91,7 +93,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `NetworkConnect` / `NetworkDisconnect` (POST /networks/{id}/connect, /disconnect); CLI `docker network connect` / `docker network disconnect`.
 - **kreuzwerker v4.6.0:** No attachment type. docker_container `networks_advanced` (block set) is `ForceNew: true` in resource_docker_container.go. This provider uses the same attribute name.
 - **Recommendation:** B. It keeps the kreuzwerker attribute, stops needless container replacement, and avoids two resources fighting over one pair.
-- **Decision:**
+- **Decision:** In-place network connect/disconnect on docker_container (NetworkConnect / NetworkDisconnect, no replacement). `networks_advanced` is renamed `networks`: a map keyed by network name of endpoint settings mirroring `NetworkingConfig.EndpointsConfig` (`aliases`, `ipv4_address`, `ipv6_address`, `mac_address`, `driver_opts`, `gw_priority`, ...). No standalone attachment type: engine:network-attachment becomes a skip. (Pass 5, decided by the user.)
 
 ### Q2. Build cache prune action name
 
@@ -102,7 +104,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `BuildPrune` (POST /build/prune); CLI `docker builder prune`.
 - **kreuzwerker v4.6.0:** None. The `docker_system_prune` action covers build cache in bulk.
 - **Recommendation:** A. It matches the CLI command and the `docker_<object>_prune` family. Decide together with Q23.
-- **Decision:**
+- **Decision:** One action, `docker_builder_prune` (decided with Q23), with an optional `builder`: unset prunes the Engine build cache (BuildPrune); set prunes that buildx builder. (Pass 5, decided by the user.)
 
 ### Q3. Standalone image build action?
 
@@ -114,7 +116,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `ImageBuild` (POST /build); CLI `docker image build` / `docker build`.
 - **kreuzwerker v4.6.0:** No build action. Builds live in the docker_image (and docker_registry_image) `build` block.
 - **Recommendation:** B. It matches kreuzwerker. Builds with no local image output belong in `docker_buildx_bake` (Q20).
-- **Decision:**
+- **Decision:** No standalone build action. Builds live in docker_image's `build` block; engine:image-build becomes a skip pointing there. (Pass 5, decided by the user.)
 
 ### Q7. SystemAuth identity token
 
@@ -126,7 +128,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `SystemAuth` (POST /auth, response `IdentityToken`); CLI `docker login`.
 - **kreuzwerker v4.6.0:** None. It has the provider `registry_auth` block and per-resource `auth_config` blocks.
 - **Recommendation:** A. The token is a credential and an ephemeral resource keeps it out of state. "login" matches the CLI and stays clear of `registry_auth` and `docker_registry_token`.
-- **Decision:**
+- **Decision:** Ephemeral resource `docker_registry_login` (SystemAuth `IdentityToken`; never stored in state). (Pass 5, decided by the user.)
 
 ### Q8. PluginCreate: action or resource?
 
@@ -138,7 +140,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `PluginCreate` (POST /plugins/create) and `PluginDelete`; CLI `docker plugin create`.
 - **kreuzwerker v4.6.0:** docker_plugin installs from a registry (`name`, `plugin_reference`). It has no create.
 - **Recommendation:** A. It mirrors the CLI one-to-one and leaves kreuzwerker's docker_plugin meaning unchanged.
-- **Decision:**
+- **Decision:** Action `docker_plugin_create`. (Pass 5, decided by the user.)
 
 ### Q9. Container file read and copy-in names
 
@@ -150,7 +152,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `ContainerArchive` + `ContainerArchiveInfo` (GET/HEAD /containers/{id}/archive), `PutContainerArchive` (PUT); CLI `docker container cp`.
 - **kreuzwerker v4.6.0:** docker_container `upload` block (`content`, `content_base64`, `source`). It has no read.
 - **Recommendation:** A. "upload" is kreuzwerker's word for copy-in, and a read belongs in a data source.
-- **Decision:**
+- **Decision:** data `docker_container_file` (ContainerArchive + ContainerArchiveInfo) + action `docker_container_cp` (PutContainerArchive; host path or inline content -> container path). The copy-in block on docker_container becomes `files { path, content | content_base64 | source, mode }`. (Pass 5, decided by the user.)
 
 ### Q34. Hash names when an item has two raw outputs
 
@@ -161,7 +163,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** None. Archive stat is the `X-Docker-Container-Path-Stat` header of `ContainerArchiveInfo`, and content is the tar body of `ContainerArchive`.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** A. It is the contract's existing rule, so one rule covers every two-raw item.
-- **Decision:**
+- **Decision:** Two raw outputs: `<raw>_sha256` each. One raw output: `content_sha256` (the current rule). (Pass 5, decided by the user.)
 
 ### Q37. Files written by actions: `archive_sha256` as identity, or a hash exception?
 
@@ -172,7 +174,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** None. `ContainerExport` and `ImageGet` stream a tar with no digest header.
 - **kreuzwerker v4.6.0:** None. Its container_export / image_save actions take `output` and return nothing.
 - **Recommendation:** A. The hash category means "sha256 of a raw output", and the file is not one. An exception would weaken V2/merge.py checks for one case.
-- **Decision:**
+- **Decision:** `archive_sha256` stays identity. No hash exception. (Pass 5, decided by the user.)
 
 ### Q44. `repo_digest` vs contract `image_digest_ref`
 
@@ -184,7 +186,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `ImageInspect` → `RepoDigests` (list of `repo@sha256:…`).
 - **kreuzwerker v4.6.0:** `repo_digest` on resource and data docker_image, documented as `repo[:tag]@sha256:<hash>`.
 - **Recommendation:** B. kreuzwerker configs keep working, and the contract's handoff name stays uniform across the five image types.
-- **Decision:**
+- **Decision:** Rename `repo_digest` -> `image_digest_ref` on every image type. Expose the upstream `repo_digests` list in the structured output. No alias. (Pass 5, decided by the user.)
 
 ### Q45. `sha256_digest` vs contract `digest` / `image_digest_ref`
 
@@ -196,7 +198,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `DistributionInspect` → `Descriptor.digest`.
 - **kreuzwerker v4.6.0:** `sha256_digest` on data and resource docker_registry_image, and in `docker_registry_image_manifests.manifests[*]`. Its documented example is `pull_triggers = [data.docker_registry_image.x.sha256_digest]`.
 - **Recommendation:** B. That kreuzwerker example pattern is in many configs, and the contract names come in alongside it.
-- **Decision:**
+- **Decision:** Rename `sha256_digest` -> `digest` (+ `image_digest_ref`) on the registry image types and in `manifests[*]`. No alias. (Pass 5, decided by the user.)
 
 ### Q46. `image_id` duplicates `id`
 
@@ -207,7 +209,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `ImageInspect` → `Id`.
 - **kreuzwerker v4.6.0:** On resource docker_image, `id` is documented as *not* the image ID ("use the `image_id` attribute"). `image_id` is the reference everyone uses (e.g. `docker_container.image`).
 - **Recommendation:** A. Deprecating `image_id` would warn on most kreuzwerker configs.
-- **Decision:**
+- **Decision:** docker_image and data docker_image: `id` = the image ID (`ImageInspect.Id`); `image_id` is removed from those two. Containers keep `image_id` (the container's image). (Pass 5, decided by the user.)
 
 ## Swarm
 
@@ -220,7 +222,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `NodeUpdate` (POST /nodes/{id}/update); CLI `docker node update`.
 - **kreuzwerker v4.6.0:** None (no swarm node types).
 - **Recommendation:** B. It is the CLI noun, pairs with the existing data.docker_node, and docker_swarm_node keeps one meaning (join).
-- **Decision:**
+- **Decision:** New resource `docker_node`: labels, availability and role on an already-joined node (NodeUpdate). `docker_swarm_node` keeps the meaning "join". (Pass 5, decided by the user.)
 
 ### Q5. Node role actions
 
@@ -231,7 +233,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `NodeUpdate` (`Spec.Role`); CLI `docker node promote` / `docker node demote`.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** A. These are the CLI verbs and sit beside the existing `docker_node_drain` / `docker_node_activate`.
-- **Decision:**
+- **Decision:** `docker_node_promote` / `docker_node_demote` actions. (Pass 5, decided by the user.)
 
 ### Q6. Service and task logs
 
@@ -243,7 +245,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `ServiceLogs`, `TaskLogs`, `ContainerLogs` (three operations); CLI `docker service logs` (service or task), `docker container logs`.
 - **kreuzwerker v4.6.0:** data.docker_logs is container-only, with a required `name` and output `logs_list_string`.
 - **Recommendation:** A. docker_logs keeps kreuzwerker's required `name`, each type maps to one operationId, and CONTRACT.md already uses these two names.
-- **Decision:**
+- **Decision:** data `docker_service_logs` + data `docker_task_logs`. data `docker_logs` is renamed `docker_container_logs`, with input `container` (ID or name). All three follow the logs contract (`logs`, `log_entries`, `tail` / `since`). (Pass 5, decided by the user.)
 
 ### Q10. Swarm rotation actions
 
@@ -255,7 +257,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `SwarmUpdate` (query `rotateWorkerToken`, `rotateManagerToken`, `rotateManagerUnlockKey`; CA via `Spec.CAConfig.ForceRotate`); CLI `docker swarm join-token --rotate`, `docker swarm unlock-key --rotate`, `docker swarm ca --rotate`.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** B. Each action maps to one CLI command, the existing `docker_swarm_rotate_tokens` is unchanged, and the names sort together.
-- **Decision:**
+- **Decision:** Separate actions `docker_swarm_rotate_unlock_key` and `docker_swarm_rotate_ca`; `docker_swarm_rotate_tokens` unchanged. (Pass 5, decided by the user.)
 
 ### Q38. docker_swarm_init `cluster_id` vs contract `id`
 
@@ -266,7 +268,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `SwarmInspect` → `ClusterInfo.ID`.
 - **kreuzwerker v4.6.0:** None (no swarm init type).
 - **Recommendation:** A. Existing users keep `cluster_id`, and the contract needs only `id`.
-- **Decision:**
+- **Decision:** docker_swarm_init: `id` = `ClusterInfo.ID` (contract identity); keep `cluster_id`. (Pass 5, decided by the user.)
 
 ### Q40. Action target identity
 
@@ -277,7 +279,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger Task fields `NodeID` / `ServiceID`; `NodeUpdate` / `ServiceUpdate` path param `{id}`.
 - **kreuzwerker v4.6.0:** Its actions take the target as an input named for the object (`container`) and return nothing.
 - **Recommendation:** A. An action is not an object with its own id, and data.docker_task already uses `node_id` / `service_id`.
-- **Decision:**
+- **Decision:** Action targets: `node_id` / `service_id` / `container_id` (object-named inputs). (Pass 5, decided by the user.)
 
 ## Compose
 
@@ -291,7 +293,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker compose up`, `docker compose down`.
 - **kreuzwerker v4.6.0:** docker_compose resource (create = up, destroy = down, `remove_orphans`, `wait`). It has no compose actions.
 - **Recommendation:** C. It matches kreuzwerker, and an up action beside the resource would fight the resource's state.
-- **Decision:**
+- **Decision:** No up/down actions. docker_compose apply / destroy are up / down; compose:cli-up and compose:cli-down become skips. (Pass 5, decided by the user.)
 
 ### Q12. `compose config` render
 
@@ -303,7 +305,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker compose config`; compose-spec top-level `configs` (#/properties/configs) is the confusable name.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** A. It is the CLI command, and CONTRACT.md's Handoff table already names `data.docker_compose_config`.
-- **Decision:**
+- **Decision:** data `docker_compose_config`. (Pass 5, decided by the user.)
 
 ### Q13. `compose ps` / `compose ls`
 
@@ -314,7 +316,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker compose ps`, `docker compose ls`.
 - **kreuzwerker v4.6.0:** Plural nouns for lists: data.docker_containers (not docker_ps).
 - **Recommendation:** B. It follows kreuzwerker's noun convention.
-- **Decision:**
+- **Decision:** data `docker_compose_containers` + data `docker_compose_projects` (plural-noun rule for list data sources, the same as docker_containers / docker_services). (Pass 5, decided by the user.)
 
 ### Q14. `compose volumes`
 
@@ -325,7 +327,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker compose volumes`.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** A. It is the upstream command, and the name follows Q13's plural nouns.
-- **Decision:**
+- **Decision:** data `docker_compose_volumes`. (Pass 5, decided by the user.)
 
 ### Q15. Compose per-container verbs
 
@@ -337,7 +339,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker compose start|stop|restart|kill|pause|unpause`; swagger `ContainerStart`, `ContainerStop`, `ContainerRestart`, `ContainerKill`, `ContainerPause`, `ContainerUnpause`.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** A. Each type maps to one CLI command (the docker-cli-map stays 1:1), and a selector would give container actions two targeting modes.
-- **Decision:**
+- **Decision:** Separate actions `docker_compose_start` / `_stop` / `_restart` / `_kill` / `_pause` / `_unpause`, plus `docker_container_start` / `_stop` / `_restart` / `_kill` / `_pause` / `_unpause`, sharing one implementation. (Pass 5, decided by the user.)
 
 ### Q16. `compose scale`
 
@@ -348,7 +350,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker compose scale` (creates/removes containers); `docker service scale` → swagger `ServiceUpdate` (replicas).
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** A. The CLI has two commands with different mechanisms, and docker_service_scale stays swarm-only.
-- **Decision:**
+- **Decision:** Action `docker_compose_scale`. `docker_service_scale` stays swarm-only. (Pass 5, decided by the user.)
 
 ### Q17. Compose top-level elements
 
@@ -359,7 +361,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** compose-spec top-level keys `services`, `networks`, `volumes`, `configs`, `secrets`, `models`, `include`, `name` of one project document.
 - **kreuzwerker v4.6.0:** One docker_compose resource over `config_paths`.
 - **Recommendation:** A. It matches kreuzwerker, and split names would collide with docker_service / docker_network / docker_volume.
-- **Decision:**
+- **Decision:** Compose top-level elements stay inside docker_compose. (Pass 5, decided by the user.)
 
 ### Q18. Compose `jobs`
 
@@ -371,7 +373,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** compose-spec `#/properties/jobs`, `#/$defs/job`, `#/$defs/schedule` (jobs.md); CLI `docker compose run`.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** B. Run-on-apply semantics are a design decision, not a naming one; a warning is honest until that is made.
-- **Decision:**
+- **Decision:** Jobs: a plan-time warning when a project defines `jobs`. `docker_compose_run` ships for one-off runs. Run-on-apply is a later design pass. (Pass 5, decided by the user.)
 
 ### Q41. docker_compose project name
 
@@ -383,7 +385,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** compose-spec top-level `name`; CLI `--project-name` / `-p`.
 - **kreuzwerker v4.6.0:** docker_compose `project_name` (optional) and `id` = project name.
 - **Recommendation:** C. It matches kreuzwerker exactly and the CLI flag. An alias would add a third name for one value.
-- **Decision:**
+- **Decision:** docker_compose: rename `project_name` -> `name` (compose-spec top-level `name`). `id` = `name`. (Pass 5, decided by the user.)
 
 ### Q42. docker_compose facets
 
@@ -394,7 +396,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** compose-spec models one project document; `docker compose config` prints it whole.
 - **kreuzwerker v4.6.0:** None (only `id`).
 - **Recommendation:** A. It mirrors the spec's one document and CONTRACT.md's Handoff (`project`), and it does not clash with today's computed `services` / `networks` / `volumes` ID maps.
-- **Decision:**
+- **Decision:** One `project` structured output for docker_compose. (Pass 5, decided by the user.)
 
 ### Q43. Compose exec/run result shape
 
@@ -405,7 +407,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `ExecInspect` → `ExitCode`; `ContainerWait` → `StatusCode`. stdout and stderr are the two multiplexed streams.
 - **kreuzwerker v4.6.0:** Its docker_exec action returns nothing.
 - **Recommendation:** A, decided with Q35. Every action reports one `result`. The flat names stay on the ephemeral docker_exec_output, which can return values.
-- **Decision:**
+- **Decision:** Compose exec / run: the result object `{exit_code, stdout, stderr}` (same as Q35). (Pass 5, decided by the user.)
 
 ## Dockerfile
 
@@ -419,7 +421,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** Dockerfile reference (instructions in order, grouped in stages by FROM).
 - **kreuzwerker v4.6.0:** None (only `build.dockerfile`, a file name).
 - **Recommendation:** B. Order and stages fit nested blocks, and 21 trivial types would bloat the registry.
-- **Decision:**
+- **Decision:** One data `docker_dockerfile` with ordered nested blocks that renders Dockerfile text. (Pass 5, decided by the user.)
 
 ### Q28. Dockerfile directives
 
@@ -430,7 +432,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** Dockerfile reference parser directives `# syntax=`, `# escape=`, `# check=skip=...;error=...`.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** B. The directive names are used as-is, and it follows Q27 B.
-- **Decision:**
+- **Decision:** Top-level attributes `syntax`, `escape`, `check { skip = [...], error = bool }`. (Pass 5, decided by the user.)
 
 ### Q29. MAINTAINER (deprecated)
 
@@ -442,7 +444,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** Dockerfile reference "MAINTAINER (deprecated)", which recommends LABEL instead.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** C. Old Dockerfiles still read correctly, and new configs cannot write a deprecated instruction.
-- **Decision:**
+- **Decision:** MAINTAINER is parsed when reading text or image history; there is no input block. Docs point to `LABEL org.opencontainers.image.authors`. (Pass 5, decided by the user.)
 
 ### Q30. ONBUILD
 
@@ -453,7 +455,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** Dockerfile reference `ONBUILD <INSTRUCTION>`.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** B. Each instruction keeps one block type, and there is no nesting depth to validate.
-- **Decision:**
+- **Decision:** `onbuild = true` attribute on each instruction block. (Pass 5, decided by the user.)
 
 ### Q31. Stages
 
@@ -464,7 +466,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** Dockerfile reference `FROM [--platform=<platform>] <image> [AS <name>]`, with "build stage" as the term.
 - **kreuzwerker v4.6.0:** None (only `build.target`).
 - **Recommendation:** A. A stage owns its instructions, which a flag cannot express.
-- **Decision:**
+- **Decision:** `stage { name, from, platform, ... instruction blocks }` (`FROM ... AS name`). (Pass 5, decided by the user.)
 
 ### Q32. `check` rule names
 
@@ -476,7 +478,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** `upstream/dockerfile/frontend/dockerfile/docs/rules/` (frontend 1.28).
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** C. A newer frontend chosen with `# syntax=` can add rules, which a hard error would block.
-- **Decision:**
+- **Decision:** `check` rule names: warn on names outside the pinned list, don't error. (Pass 5, decided by the user.)
 
 ### Q47. Source text as a second raw output
 
@@ -487,7 +489,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** None (the provider renders the text).
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** A. In git/URL mode the user does not hold the original text. Once there are two raw outputs, Q34's `<raw>_sha256` rule applies.
-- **Decision:**
+- **Decision:** data docker_dockerfile also exposes `source_dockerfile` + `source_dockerfile_sha256`. (Pass 5, decided by the user.)
 
 ### Q48. Structured output name per instruction
 
@@ -498,7 +500,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** Dockerfile reference instruction keywords.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** A. It is the upstream keyword, and under Q27 B these become the nested block names anyway.
-- **Decision:**
+- **Decision:** Per-instruction structured output names: the lowercase keyword (`run`, `copy`, `env`, ...). (Pass 5, decided by the user.)
 
 ### Q49. Image-mode provenance outputs
 
@@ -509,7 +511,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `ImageHistory` → `CreatedBy` (the source of reconstruction).
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** B. `fidelity` already implies `reconstructed`; one value cannot contradict itself.
-- **Decision:**
+- **Decision:** Image-mode provenance: `fidelity` only (`"exact"` | `"approximate"`). `reconstructed` is dropped. (Pass 5, decided by the user.)
 
 ## Buildx
 
@@ -522,7 +524,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker buildx build`, `docker buildx bake`; swagger `ImageBuild` + `Session`.
 - **kreuzwerker v4.6.0:** docker_image `build` block already has buildx fields (`builder`, `cache_from`, `cache_to`, `provenance`, `additional_contexts`, `build_log_file`).
 - **Recommendation:** A. It matches kreuzwerker, where buildx builds go through docker_image.
-- **Decision:**
+- **Decision:** Extend docker_image's `build` block for BuildKit, plus action `docker_buildx_bake`. (Pass 5, decided by the user.)
 
 ### Q23. One build-cache prune action for Engine and buildx builders
 
@@ -534,7 +536,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger `BuildPrune`; CLI `docker builder prune` and `docker buildx prune --builder`.
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** C. One type, the Engine CLI name from Q2, and `builder` mirrors the buildx flag.
-- **Decision:**
+- **Decision:** Same as Q2: one `docker_builder_prune` with an optional `builder`; buildx:prune folds into it (becomes a skip pointing at engine:build-prune). (Pass 5, decided by the user.)
 
 ### Q24. Buildx builder and history data sources
 
@@ -545,7 +547,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker buildx inspect`, `docker buildx ls`, `docker buildx history ls`, `docker buildx history inspect`.
 - **kreuzwerker v4.6.0:** Resource `docker_buildx_builder` (no data sources). A resource/data-source pair with one name is its usual pattern (docker_image, docker_network, docker_plugin).
 - **Recommendation:** A. There is one type per CLI command, and an optional argument would not change the output shape.
-- **Decision:**
+- **Decision:** data `docker_buildx_builder` + data `docker_buildx_builders`; data `docker_buildx_history` + data `docker_buildx_history_records`. Applied with the plural-noun rule (Q13): `docker buildx history ls` -> `docker_buildx_history_records` (list), `docker buildx history inspect` -> `docker_buildx_history` (one record). (Pass 5, decided by the user.)
 
 ### Q25. `docker buildx stop`
 
@@ -556,7 +558,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker buildx stop`.
 - **kreuzwerker v4.6.0:** None. docker_buildx_builder has `bootstrap` only.
 - **Recommendation:** B. It is low value, and a later docker_container_stop on the builder container covers it.
-- **Decision:**
+- **Decision:** Skip `docker buildx stop`. (Pass 5, decided by the user.)
 
 ### Q26. Buildx disk usage
 
@@ -567,7 +569,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker buildx du`, `docker system df`; swagger `SystemDataUsage` (`BuildCache` section).
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** A. system df reports images, containers and volumes, which a builder lacks; unlike prune (Q23), the shapes differ.
-- **Decision:**
+- **Decision:** data `docker_buildx_disk_usage` (separate from system df). (Pass 5, decided by the user.)
 
 ## CLI-only
 
@@ -581,7 +583,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker manifest create` / `annotate` / `push`, `docker buildx imagetools create`; registry v2 API (OCI index).
 - **kreuzwerker v4.6.0:** The registry family is `docker_registry_image` and `docker_registry_image_manifests`.
 - **Recommendation:** A. It sits in kreuzwerker's `docker_registry_*` family, and destroy can copy `keep_remotely` from docker_registry_image.
-- **Decision:**
+- **Decision:** Resource `docker_registry_manifest_list` (registry API; OCI image index). (Pass 5, decided by the user.)
 
 ### Q21. Stack names
 
@@ -593,7 +595,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker stack deploy`, `docker stack ls`, `docker stack services`.
 - **kreuzwerker v4.6.0:** None. Same-name resource/data pairs are its pattern.
 - **Recommendation:** A. docker_stack exists, and the pair follows kreuzwerker's naming pattern.
-- **Decision:**
+- **Decision:** Keep `docker_stack`. Add data `docker_stacks` + data `docker_stack`. (Pass 5, decided by the user.)
 
 ### Q22. Docker context
 
@@ -604,7 +606,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker context create|use|inspect|...`.
 - **kreuzwerker v4.6.0:** No type. The provider `context` argument ("Overrides the `host` if set", env `DOCKER_CONTEXT`) has the same name here.
 - **Recommendation:** A. The provider argument (kreuzwerker-compatible) already selects a context, and a data source of the same name would confuse.
-- **Decision:**
+- **Decision:** Skip `docker_context`. (Pass 5, decided by the user.)
 
 ### Q50. Stack data source: `tasks`?
 
@@ -615,7 +617,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI `docker stack services` (services) and `docker stack ps` (tasks; cli-only:stack-ps is skipped and points to docker_tasks).
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** B. It follows the CLI's split, and task lists churn on every reschedule.
-- **Decision:**
+- **Decision:** data docker_stack: drop `tasks` (use the tasks data source). (Pass 5, decided by the user.)
 
 ### Q51. docker_stacks service count
 
@@ -626,7 +628,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** `docker stack ls --format` field `.Services` ("Number of services").
 - **kreuzwerker v4.6.0:** None.
 - **Recommendation:** A. It is the upstream name, per CONTRACT naming; it lives on a different type from docker_stack's `services` map. B is the safer read if the type mismatch worries you.
-- **Decision:**
+- **Decision:** data docker_stacks: `services_count` (avoids one field name being a map on docker_stack and a number here). (Pass 5, decided by the user.)
 
 ## Cross-layer (outputs contract)
 
@@ -640,7 +642,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** `ExecStart` multiplexes stdout and stderr; `ImageBuild` streams JSON progress messages; `ContainerArchive` returns a tar body.
 - **kreuzwerker v4.6.0:** docker_container upload uses `content` / `content_base64` (the suffix names the encoding); its docker_exec action returns nothing. This provider's ephemeral docker_exec_output already uses `stdout` / `stderr` / `exit_code`.
 - **Recommendation:** B. It matches upstream's two streams and the existing docker_exec_output, and `content_base64` follows kreuzwerker's encoding suffix. Exec then has two raw outputs, so Q34 names the hashes `stdout_sha256` / `stderr_sha256`.
-- **Decision:**
+- **Decision:** Non-JSON raw streams: `stdout` + `stderr` (exec / run), `build_log` (builds), `content_base64` (file content). (Pass 5, decided by the user.)
 
 ### Q35. Action result shape (Lane Z carry-over)
 
@@ -652,7 +654,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** swagger response bodies, e.g. `ContainerPrune` → `{ContainersDeleted, SpaceReclaimed}`, `ContainerWait` → `{StatusCode, Error}`, `ExecInspect` → `ExitCode`.
 - **kreuzwerker v4.6.0:** Its six actions return nothing. Terraform 1.14 actions have no computed attributes, so results only reach the user as progress messages.
 - **Recommendation:** A. It gives one predictable name per action and maps 1:1 to the swagger body. Since results are progress payloads, not referenceable attributes, the flat form gains nothing.
-- **Decision:**
+- **Decision:** One result object per action. Every action also accepts an optional `result_path`: after a successful run it writes that same result object as JSON (UTF-8, sorted keys, trailing newline). Progress messages carry the same object. Terraform can read it in a later run with `local_file` + `jsondecode`. (Pass 5, decided by the user.)
 
 ### Q36. List data sources: `ids` / `names` lists
 
@@ -663,7 +665,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** List endpoints return arrays of objects (`ContainerList`, `ServiceList`, ...); CLI `-q` prints IDs only.
 - **kreuzwerker v4.6.0:** data.docker_containers has only `containers[*].id` / `names`.
 - **Recommendation:** A. It is additive to kreuzwerker's shape (nothing breaks), it is what V1 needs as identity, and it gives the `-q` equivalent without a `for` expression.
-- **Decision:**
+- **Decision:** Keep `ids` / `names` lists beside the structured list. (Pass 5, decided by the user.)
 
 ### Q39. Plural data sources: structured list name
 
@@ -674,7 +676,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
 - **Upstream:** CLI and API name lists by object (`docker service ls`, `ServiceList`).
 - **kreuzwerker v4.6.0:** data.docker_containers → `containers`.
 - **Recommendation:** A. It matches kreuzwerker's docker_containers.
-- **Decision:**
+- **Decision:** Plural data sources: the list attribute is named after the type (`containers`, `services`, `nodes`, ...). (Pass 5, decided by the user.)
 
 ## Not found
 
@@ -683,3 +685,7 @@ Item ids are `layer:slug` from [inventory.json](inventory.json).
   - None for 26 of 51: Q4, Q5, Q10, Q12, Q14, Q15, Q16, Q18, Q23, Q25, Q26, Q27-Q32, Q34, Q37, Q38, Q42, Q47-Q51 (swarm, compose CLI, Dockerfile, buildx extras, stack).
   - Direct (same type or attribute): Q1, Q3, Q6, Q7, Q8, Q9, Q11, Q13, Q17, Q20, Q22, Q24, Q41, Q44, Q45, Q46.
   - Indirect (a naming pattern or neighbouring type only): Q2, Q19, Q21, Q33, Q35, Q36, Q39, Q40, Q43.
+
+## General rule (Pass 5)
+
+- **Decision:** Audit every existing attribute name across all types. Any name that came from Pass 3 kreuzwerker parity and doesn't match the upstream field (snake_cased per CONTRACT.md) is renamed to the upstream name, e.g. port bindings use `container_port` / `host_port` / `host_ip` / `protocol` from `PortBindings`, not `internal` / `external`. Where upstream has no name, the CONTRACT.md rules apply. Every rename, including Q1 / Q6 / Q9 / Q41 / Q44 / Q45 / Q46, is recorded in [_gen/renames.json](_gen/renames.json) as `{type, kreuzwerker_attr, previous_attr, our_attr, transform, reason}`; attributes dropped with no equivalent have `our_attr: null` and a reason. kreuzwerker names appear only as the "from" side of the migration mappings (`moved {}` from registry.terraform.io/kreuzwerker/docker). (Pass 5, decided by the user.)

@@ -1473,15 +1473,18 @@
              "name": "aliases",
              "upstream": "Aliases",
              "tf_type": "list(string)",
-             "pointer": "#/definitions/NetworkAttachmentConfig/properties/Aliases"
+             "pointer": "#/definitions/NetworkAttachmentConfig/properties/Aliases",
+             "input_attr": "networks.aliases"
             },
             {
              "name": "driver_opts",
              "upstream": "DriverOpts",
              "tf_type": "map(string)",
-             "pointer": "#/definitions/NetworkAttachmentConfig/properties/DriverOpts"
+             "pointer": "#/definitions/NetworkAttachmentConfig/properties/DriverOpts",
+             "input_attr": "networks.driver_opts"
             }
-           ]
+           ],
+           "input_attr": "networks (map key = network name -> target)"
           },
           {
            "name": "log_driver",
@@ -1493,15 +1496,18 @@
              "name": "name",
              "upstream": "Name",
              "tf_type": "string",
-             "pointer": "#/definitions/TaskSpec/properties/LogDriver/properties/Name"
+             "pointer": "#/definitions/TaskSpec/properties/LogDriver/properties/Name",
+             "input_attr": "logging.driver"
             },
             {
              "name": "options",
              "upstream": "Options",
              "tf_type": "map(string)",
-             "pointer": "#/definitions/TaskSpec/properties/LogDriver/properties/Options"
+             "pointer": "#/definitions/TaskSpec/properties/LogDriver/properties/Options",
+             "input_attr": "logging.options"
             }
-           ]
+           ],
+           "input_attr": "logging"
           }
          ]
         },
@@ -2479,6 +2485,20 @@
      "known_after_apply": true,
      "sensitive": false,
      "description": "Swarm cluster ID.",
+     "provided": true
+    },
+    {
+     "name": "cluster_id",
+     "tf_type": "string",
+     "category": "identity",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/definitions/ClusterInfo/properties/ID"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "The swarm's cluster ID (ClusterInfo.ID), equal to `id` (Q38).",
      "provided": true
     },
     {
@@ -4518,15 +4538,18 @@
              "name": "aliases",
              "upstream": "Aliases",
              "tf_type": "list(string)",
-             "pointer": "#/definitions/NetworkAttachmentConfig/properties/Aliases"
+             "pointer": "#/definitions/NetworkAttachmentConfig/properties/Aliases",
+             "input_attr": "networks.aliases"
             },
             {
              "name": "driver_opts",
              "upstream": "DriverOpts",
              "tf_type": "map(string)",
-             "pointer": "#/definitions/NetworkAttachmentConfig/properties/DriverOpts"
+             "pointer": "#/definitions/NetworkAttachmentConfig/properties/DriverOpts",
+             "input_attr": "networks.driver_opts"
             }
-           ]
+           ],
+           "input_attr": "networks (map key = network name -> target)"
           },
           {
            "name": "log_driver",
@@ -4538,15 +4561,18 @@
              "name": "name",
              "upstream": "Name",
              "tf_type": "string",
-             "pointer": "#/definitions/TaskSpec/properties/LogDriver/properties/Name"
+             "pointer": "#/definitions/TaskSpec/properties/LogDriver/properties/Name",
+             "input_attr": "logging.driver"
             },
             {
              "name": "options",
              "upstream": "Options",
              "tf_type": "map(string)",
-             "pointer": "#/definitions/TaskSpec/properties/LogDriver/properties/Options"
+             "pointer": "#/definitions/TaskSpec/properties/LogDriver/properties/Options",
+             "input_attr": "logging.options"
             }
-           ]
+           ],
+           "input_attr": "logging"
           }
          ]
         },
@@ -11803,7 +11829,7 @@
      "description": "Node Version.Index after the update. Not a version-category output."
     },
     {
-     "name": "spec",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -11813,31 +11839,38 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Node Spec after the action; spec.availability is now active.",
+     "description": "The action's outcome as one object (Q35): spec.",
      "fields": [
       {
-       "name": "name",
-       "upstream": "Name",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Name"
-      },
-      {
-       "name": "labels",
-       "upstream": "Labels",
-       "tf_type": "map(string)",
-       "pointer": "#/definitions/NodeSpec/properties/Labels"
-      },
-      {
-       "name": "role",
-       "upstream": "Role",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Role"
-      },
-      {
-       "name": "availability",
-       "upstream": "Availability",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Availability"
+       "name": "spec",
+       "upstream": "spec",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "name",
+         "upstream": "Name",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Name"
+        },
+        {
+         "name": "labels",
+         "upstream": "Labels",
+         "tf_type": "map(string)",
+         "pointer": "#/definitions/NodeSpec/properties/Labels"
+        },
+        {
+         "name": "role",
+         "upstream": "Role",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Role"
+        },
+        {
+         "name": "availability",
+         "upstream": "Availability",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Availability"
+        }
+       ]
       }
      ],
      "fields_complete": true
@@ -11873,7 +11906,33 @@
    ],
    "outputs_status": "partial",
    "outputs_note": "Action exists; actions return no attributes today. Changed value: Spec.Availability = active.",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "node_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1nodes~1{id}/post"
+     },
+     "description": "The swarm node (ID or hostname) the action targets (Q40)."
+    }
+   ]
   },
   "swarm:node-drain": {
    "outputs": [
@@ -11917,7 +11976,7 @@
      "description": "Node Version.Index after the update. Not a version-category output."
     },
     {
-     "name": "spec",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -11927,31 +11986,38 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Node Spec after the action; spec.availability is now drain.",
+     "description": "The action's outcome as one object (Q35): spec.",
      "fields": [
       {
-       "name": "name",
-       "upstream": "Name",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Name"
-      },
-      {
-       "name": "labels",
-       "upstream": "Labels",
-       "tf_type": "map(string)",
-       "pointer": "#/definitions/NodeSpec/properties/Labels"
-      },
-      {
-       "name": "role",
-       "upstream": "Role",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Role"
-      },
-      {
-       "name": "availability",
-       "upstream": "Availability",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Availability"
+       "name": "spec",
+       "upstream": "spec",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "name",
+         "upstream": "Name",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Name"
+        },
+        {
+         "name": "labels",
+         "upstream": "Labels",
+         "tf_type": "map(string)",
+         "pointer": "#/definitions/NodeSpec/properties/Labels"
+        },
+        {
+         "name": "role",
+         "upstream": "Role",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Role"
+        },
+        {
+         "name": "availability",
+         "upstream": "Availability",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Availability"
+        }
+       ]
       }
      ],
      "fields_complete": true
@@ -11987,7 +12053,33 @@
    ],
    "outputs_status": "partial",
    "outputs_note": "Action exists; actions return no attributes today. Changed value: Spec.Availability = drain.",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "node_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1nodes~1{id}/post"
+     },
+     "description": "The swarm node (ID or hostname) the action targets (Q40)."
+    }
+   ]
   },
   "swarm:node-promote": {
    "outputs": [
@@ -12031,7 +12123,7 @@
      "description": "Node Version.Index after the update. Not a version-category output."
     },
     {
-     "name": "spec",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -12041,31 +12133,38 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Node Spec after the action; spec.role is now manager.",
+     "description": "The action's outcome as one object (Q35): spec.",
      "fields": [
       {
-       "name": "name",
-       "upstream": "Name",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Name"
-      },
-      {
-       "name": "labels",
-       "upstream": "Labels",
-       "tf_type": "map(string)",
-       "pointer": "#/definitions/NodeSpec/properties/Labels"
-      },
-      {
-       "name": "role",
-       "upstream": "Role",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Role"
-      },
-      {
-       "name": "availability",
-       "upstream": "Availability",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Availability"
+       "name": "spec",
+       "upstream": "spec",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "name",
+         "upstream": "Name",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Name"
+        },
+        {
+         "name": "labels",
+         "upstream": "Labels",
+         "tf_type": "map(string)",
+         "pointer": "#/definitions/NodeSpec/properties/Labels"
+        },
+        {
+         "name": "role",
+         "upstream": "Role",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Role"
+        },
+        {
+         "name": "availability",
+         "upstream": "Availability",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Availability"
+        }
+       ]
       }
      ],
      "fields_complete": true
@@ -12101,7 +12200,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "No action yet (role is an argument of docker_swarm_node). Changed value: Spec.Role = manager.",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "node_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1nodes~1{id}/post"
+     },
+     "description": "The swarm node (ID or hostname) the action targets (Q40)."
+    }
+   ]
   },
   "swarm:node-demote": {
    "outputs": [
@@ -12145,7 +12270,7 @@
      "description": "Node Version.Index after the update. Not a version-category output."
     },
     {
-     "name": "spec",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -12155,31 +12280,38 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Node Spec after the action; spec.role is now worker.",
+     "description": "The action's outcome as one object (Q35): spec.",
      "fields": [
       {
-       "name": "name",
-       "upstream": "Name",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Name"
-      },
-      {
-       "name": "labels",
-       "upstream": "Labels",
-       "tf_type": "map(string)",
-       "pointer": "#/definitions/NodeSpec/properties/Labels"
-      },
-      {
-       "name": "role",
-       "upstream": "Role",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Role"
-      },
-      {
-       "name": "availability",
-       "upstream": "Availability",
-       "tf_type": "string",
-       "pointer": "#/definitions/NodeSpec/properties/Availability"
+       "name": "spec",
+       "upstream": "spec",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "name",
+         "upstream": "Name",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Name"
+        },
+        {
+         "name": "labels",
+         "upstream": "Labels",
+         "tf_type": "map(string)",
+         "pointer": "#/definitions/NodeSpec/properties/Labels"
+        },
+        {
+         "name": "role",
+         "upstream": "Role",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Role"
+        },
+        {
+         "name": "availability",
+         "upstream": "Availability",
+         "tf_type": "string",
+         "pointer": "#/definitions/NodeSpec/properties/Availability"
+        }
+       ]
       }
      ],
      "fields_complete": true
@@ -12215,7 +12347,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "No action yet (role is an argument of docker_swarm_node). Changed value: Spec.Role = worker.",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "node_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1nodes~1{id}/post"
+     },
+     "description": "The swarm node (ID or hostname) the action targets (Q40)."
+    }
+   ]
   },
   "swarm:service-force-update": {
    "outputs": [
@@ -12259,7 +12417,7 @@
      "description": "Service Version.Index after the update. Not a version-category output."
     },
     {
-     "name": "update_response",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -12269,69 +12427,59 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "ServiceUpdate response (Warnings).",
+     "description": "The action's outcome as one object (Q35): update_response, update_status, force_update.",
      "fields": [
       {
-       "name": "warnings",
-       "upstream": "Warnings",
-       "tf_type": "list(string)",
-       "pointer": "#/definitions/ServiceUpdateResponse/properties/Warnings"
+       "name": "update_response",
+       "upstream": "update_response",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "warnings",
+         "upstream": "Warnings",
+         "tf_type": "list(string)",
+         "pointer": "#/definitions/ServiceUpdateResponse/properties/Warnings"
+        }
+       ]
+      },
+      {
+       "name": "update_status",
+       "upstream": "update_status",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "state",
+         "upstream": "State",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/State"
+        },
+        {
+         "name": "started_at",
+         "upstream": "StartedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/StartedAt"
+        },
+        {
+         "name": "completed_at",
+         "upstream": "CompletedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/CompletedAt"
+        },
+        {
+         "name": "message",
+         "upstream": "Message",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/Message"
+        }
+       ]
+      },
+      {
+       "name": "force_update",
+       "upstream": "force_update",
+       "tf_type": "number"
       }
      ],
      "fields_complete": true
-    },
-    {
-     "name": "update_status",
-     "tf_type": "object({...})",
-     "category": "result",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/Service/properties/UpdateStatus"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Service UpdateStatus read back after the call (State, StartedAt, CompletedAt, Message).",
-     "fields": [
-      {
-       "name": "state",
-       "upstream": "State",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/State"
-      },
-      {
-       "name": "started_at",
-       "upstream": "StartedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/StartedAt"
-      },
-      {
-       "name": "completed_at",
-       "upstream": "CompletedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/CompletedAt"
-      },
-      {
-       "name": "message",
-       "upstream": "Message",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/Message"
-      }
-     ],
-     "fields_complete": true
-    },
-    {
-     "name": "force_update",
-     "tf_type": "number",
-     "category": "result",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/TaskSpec/properties/ForceUpdate"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Spec.TaskTemplate.ForceUpdate counter after the action (incremented by one)."
     },
     {
      "name": "engine_api_version",
@@ -12364,7 +12512,33 @@
    ],
    "outputs_status": "partial",
    "outputs_note": "Action exists; returns no attributes today. Changed value: TaskTemplate.ForceUpdate.",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "service_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1services~1{id}~1update/post"
+     },
+     "description": "The swarm service (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "swarm:service-rollback": {
    "outputs": [
@@ -12408,7 +12582,7 @@
      "description": "Service Version.Index after the update. Not a version-category output."
     },
     {
-     "name": "update_response",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -12418,53 +12592,51 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "ServiceUpdate response (Warnings).",
+     "description": "The action's outcome as one object (Q35): update_response, update_status.",
      "fields": [
       {
-       "name": "warnings",
-       "upstream": "Warnings",
-       "tf_type": "list(string)",
-       "pointer": "#/definitions/ServiceUpdateResponse/properties/Warnings"
-      }
-     ],
-     "fields_complete": true
-    },
-    {
-     "name": "update_status",
-     "tf_type": "object({...})",
-     "category": "result",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/Service/properties/UpdateStatus"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Service UpdateStatus read back after the call (State, StartedAt, CompletedAt, Message).",
-     "fields": [
-      {
-       "name": "state",
-       "upstream": "State",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/State"
+       "name": "update_response",
+       "upstream": "update_response",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "warnings",
+         "upstream": "Warnings",
+         "tf_type": "list(string)",
+         "pointer": "#/definitions/ServiceUpdateResponse/properties/Warnings"
+        }
+       ]
       },
       {
-       "name": "started_at",
-       "upstream": "StartedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/StartedAt"
-      },
-      {
-       "name": "completed_at",
-       "upstream": "CompletedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/CompletedAt"
-      },
-      {
-       "name": "message",
-       "upstream": "Message",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/Message"
+       "name": "update_status",
+       "upstream": "update_status",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "state",
+         "upstream": "State",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/State"
+        },
+        {
+         "name": "started_at",
+         "upstream": "StartedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/StartedAt"
+        },
+        {
+         "name": "completed_at",
+         "upstream": "CompletedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/CompletedAt"
+        },
+        {
+         "name": "message",
+         "upstream": "Message",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/Message"
+        }
+       ]
       }
      ],
      "fields_complete": true
@@ -12513,7 +12685,33 @@
    ],
    "outputs_status": "partial",
    "outputs_note": "Action exists; returns no attributes today. Rollback is ServiceUpdate with rollback=previous; the whole spec reverts.",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "service_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1services~1{id}~1update/post"
+     },
+     "description": "The swarm service (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "swarm:service-scale": {
    "outputs": [
@@ -12557,7 +12755,7 @@
      "description": "Service Version.Index after the update. Not a version-category output."
     },
     {
-     "name": "update_response",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -12567,149 +12765,129 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "ServiceUpdate response (Warnings).",
+     "description": "The action's outcome as one object (Q35): update_response, update_status, mode, service_status.",
      "fields": [
       {
-       "name": "warnings",
-       "upstream": "Warnings",
-       "tf_type": "list(string)",
-       "pointer": "#/definitions/ServiceUpdateResponse/properties/Warnings"
-      }
-     ],
-     "fields_complete": true
-    },
-    {
-     "name": "update_status",
-     "tf_type": "object({...})",
-     "category": "result",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/Service/properties/UpdateStatus"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Service UpdateStatus read back after the call (State, StartedAt, CompletedAt, Message).",
-     "fields": [
-      {
-       "name": "state",
-       "upstream": "State",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/State"
-      },
-      {
-       "name": "started_at",
-       "upstream": "StartedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/StartedAt"
-      },
-      {
-       "name": "completed_at",
-       "upstream": "CompletedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/CompletedAt"
-      },
-      {
-       "name": "message",
-       "upstream": "Message",
-       "tf_type": "string",
-       "pointer": "#/definitions/Service/properties/UpdateStatus/properties/Message"
-      }
-     ],
-     "fields_complete": true
-    },
-    {
-     "name": "mode",
-     "tf_type": "object({...})",
-     "category": "result",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/ServiceSpec/properties/Mode"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Spec.Mode after scaling (Replicated.Replicas or ReplicatedJob.MaxConcurrent changed).",
-     "fields": [
-      {
-       "name": "replicated",
-       "upstream": "Replicated",
+       "name": "update_response",
+       "upstream": "update_response",
        "tf_type": "object({...})",
-       "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/Replicated",
        "fields": [
         {
-         "name": "replicas",
-         "upstream": "Replicas",
-         "tf_type": "number",
-         "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/Replicated/properties/Replicas"
+         "name": "warnings",
+         "upstream": "Warnings",
+         "tf_type": "list(string)",
+         "pointer": "#/definitions/ServiceUpdateResponse/properties/Warnings"
         }
        ]
       },
       {
-       "name": "global",
-       "upstream": "Global",
-       "tf_type": "dynamic",
-       "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/Global"
-      },
-      {
-       "name": "replicated_job",
-       "upstream": "ReplicatedJob",
+       "name": "update_status",
+       "upstream": "update_status",
        "tf_type": "object({...})",
-       "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/ReplicatedJob",
        "fields": [
         {
-         "name": "max_concurrent",
-         "upstream": "MaxConcurrent",
-         "tf_type": "number",
-         "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/ReplicatedJob/properties/MaxConcurrent"
+         "name": "state",
+         "upstream": "State",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/State"
         },
         {
-         "name": "total_completions",
-         "upstream": "TotalCompletions",
-         "tf_type": "number",
-         "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/ReplicatedJob/properties/TotalCompletions"
+         "name": "started_at",
+         "upstream": "StartedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/StartedAt"
+        },
+        {
+         "name": "completed_at",
+         "upstream": "CompletedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/CompletedAt"
+        },
+        {
+         "name": "message",
+         "upstream": "Message",
+         "tf_type": "string",
+         "pointer": "#/definitions/Service/properties/UpdateStatus/properties/Message"
         }
        ]
       },
       {
-       "name": "global_job",
-       "upstream": "GlobalJob",
-       "tf_type": "dynamic",
-       "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/GlobalJob"
-      }
-     ],
-     "fields_complete": true
-    },
-    {
-     "name": "service_status",
-     "tf_type": "object({...})",
-     "category": "result",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/Service/properties/ServiceStatus"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "ServiceStatus (RunningTasks, DesiredTasks, CompletedTasks) read with status=true after the call.",
-     "fields": [
-      {
-       "name": "running_tasks",
-       "upstream": "RunningTasks",
-       "tf_type": "number",
-       "pointer": "#/definitions/Service/properties/ServiceStatus/properties/RunningTasks"
+       "name": "mode",
+       "upstream": "mode",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "replicated",
+         "upstream": "Replicated",
+         "tf_type": "object({...})",
+         "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/Replicated",
+         "fields": [
+          {
+           "name": "replicas",
+           "upstream": "Replicas",
+           "tf_type": "number",
+           "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/Replicated/properties/Replicas"
+          }
+         ]
+        },
+        {
+         "name": "global",
+         "upstream": "Global",
+         "tf_type": "dynamic",
+         "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/Global"
+        },
+        {
+         "name": "replicated_job",
+         "upstream": "ReplicatedJob",
+         "tf_type": "object({...})",
+         "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/ReplicatedJob",
+         "fields": [
+          {
+           "name": "max_concurrent",
+           "upstream": "MaxConcurrent",
+           "tf_type": "number",
+           "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/ReplicatedJob/properties/MaxConcurrent"
+          },
+          {
+           "name": "total_completions",
+           "upstream": "TotalCompletions",
+           "tf_type": "number",
+           "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/ReplicatedJob/properties/TotalCompletions"
+          }
+         ]
+        },
+        {
+         "name": "global_job",
+         "upstream": "GlobalJob",
+         "tf_type": "dynamic",
+         "pointer": "#/definitions/ServiceSpec/properties/Mode/properties/GlobalJob"
+        }
+       ]
       },
       {
-       "name": "desired_tasks",
-       "upstream": "DesiredTasks",
-       "tf_type": "number",
-       "pointer": "#/definitions/Service/properties/ServiceStatus/properties/DesiredTasks"
-      },
-      {
-       "name": "completed_tasks",
-       "upstream": "CompletedTasks",
-       "tf_type": "number",
-       "pointer": "#/definitions/Service/properties/ServiceStatus/properties/CompletedTasks"
+       "name": "service_status",
+       "upstream": "service_status",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "running_tasks",
+         "upstream": "RunningTasks",
+         "tf_type": "number",
+         "pointer": "#/definitions/Service/properties/ServiceStatus/properties/RunningTasks"
+        },
+        {
+         "name": "desired_tasks",
+         "upstream": "DesiredTasks",
+         "tf_type": "number",
+         "pointer": "#/definitions/Service/properties/ServiceStatus/properties/DesiredTasks"
+        },
+        {
+         "name": "completed_tasks",
+         "upstream": "CompletedTasks",
+         "tf_type": "number",
+         "pointer": "#/definitions/Service/properties/ServiceStatus/properties/CompletedTasks"
+        }
+       ]
       }
      ],
      "fields_complete": true
@@ -12745,7 +12923,33 @@
    ],
    "outputs_status": "partial",
    "outputs_note": "Action exists; returns no attributes today. Changed value: Spec.Mode.Replicated.Replicas.",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "service_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1services~1{id}~1update/post"
+     },
+     "description": "The swarm service (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "swarm:swarm-ca-rotate": {
    "outputs": [
@@ -12776,7 +12980,7 @@
      "description": "Swarm Version.Index after the update. Not a version-category output."
     },
     {
-     "name": "tls_info",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -12786,41 +12990,40 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "ClusterInfo.TLSInfo after rotation (new TrustRoot, CertIssuerSubject, CertIssuerPublicKey).",
+     "description": "The action's outcome as one object (Q35): tls_info, root_rotation_in_progress.",
      "fields": [
       {
-       "name": "trust_root",
-       "upstream": "TrustRoot",
-       "tf_type": "string",
-       "pointer": "#/definitions/TLSInfo/properties/TrustRoot"
+       "name": "tls_info",
+       "upstream": "tls_info",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "trust_root",
+         "upstream": "TrustRoot",
+         "tf_type": "string",
+         "pointer": "#/definitions/TLSInfo/properties/TrustRoot"
+        },
+        {
+         "name": "cert_issuer_subject",
+         "upstream": "CertIssuerSubject",
+         "tf_type": "string",
+         "pointer": "#/definitions/TLSInfo/properties/CertIssuerSubject"
+        },
+        {
+         "name": "cert_issuer_public_key",
+         "upstream": "CertIssuerPublicKey",
+         "tf_type": "string",
+         "pointer": "#/definitions/TLSInfo/properties/CertIssuerPublicKey"
+        }
+       ]
       },
       {
-       "name": "cert_issuer_subject",
-       "upstream": "CertIssuerSubject",
-       "tf_type": "string",
-       "pointer": "#/definitions/TLSInfo/properties/CertIssuerSubject"
-      },
-      {
-       "name": "cert_issuer_public_key",
-       "upstream": "CertIssuerPublicKey",
-       "tf_type": "string",
-       "pointer": "#/definitions/TLSInfo/properties/CertIssuerPublicKey"
+       "name": "root_rotation_in_progress",
+       "upstream": "root_rotation_in_progress",
+       "tf_type": "bool"
       }
      ],
      "fields_complete": true
-    },
-    {
-     "name": "root_rotation_in_progress",
-     "tf_type": "bool",
-     "category": "result",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/ClusterInfo/properties/RootRotationInProgress"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "ClusterInfo.RootRotationInProgress: true until every node holds a cert from the new root."
     },
     {
      "name": "engine_api_version",
@@ -12853,7 +13056,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "No action yet. SwarmUpdate with Spec.CAConfig.ForceRotate incremented; a supplied signing key is a sensitive input and never returned.",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "swarm:swarm-rotate-tokens": {
    "outputs": [
@@ -12884,7 +13101,7 @@
      "description": "Swarm Version.Index after the update. Not a version-category output."
     },
     {
-     "name": "join_tokens",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -12893,25 +13110,31 @@
       "pointer": "#/definitions/JoinTokens"
      },
      "known_after_apply": true,
-     "sensitive": true,
-     "description": "Swarm.JoinTokens after rotation. Sensitive.",
+     "sensitive": false,
+     "description": "The action's outcome as one object (Q35): join_tokens.",
      "fields": [
       {
-       "name": "worker",
-       "upstream": "Worker",
-       "tf_type": "string",
-       "pointer": "#/definitions/JoinTokens/properties/Worker"
-      },
-      {
-       "name": "manager",
-       "upstream": "Manager",
-       "tf_type": "string",
-       "pointer": "#/definitions/JoinTokens/properties/Manager"
+       "name": "join_tokens",
+       "upstream": "join_tokens",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "worker",
+         "upstream": "Worker",
+         "tf_type": "string",
+         "pointer": "#/definitions/JoinTokens/properties/Worker"
+        },
+        {
+         "name": "manager",
+         "upstream": "Manager",
+         "tf_type": "string",
+         "pointer": "#/definitions/JoinTokens/properties/Manager"
+        }
+       ],
+       "sensitive": true
       }
      ],
-     "fields_complete": true,
-     "provided": false,
-     "sensitive_reason": "Every field is a secret: worker and manager join tokens each let their holder join the swarm."
+     "fields_complete": true
     },
     {
      "name": "worker_join_token",
@@ -12970,7 +13193,21 @@
    ],
    "outputs_status": "partial",
    "outputs_note": "Action exists; returns no attributes today (new tokens are read with ephemeral.docker_swarm_tokens). Token outputs must stay sensitive.",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "swarm:swarm-rotate-unlock-key": {
    "outputs": [
@@ -13014,8 +13251,8 @@
      "description": "New unlock key (GET /swarm/unlockkey after rotation). Sensitive."
     },
     {
-     "name": "autolock_managers",
-     "tf_type": "bool",
+     "name": "result",
+     "tf_type": "object({...})",
      "category": "result",
      "source": {
       "type": "swagger",
@@ -13024,8 +13261,15 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Whether autolock is on after the rotation (the new key only matters when it is).",
-     "provided": false
+     "description": "The action's outcome as one object (Q35): autolock_managers.",
+     "fields": [
+      {
+       "name": "autolock_managers",
+       "upstream": "autolock_managers",
+       "tf_type": "bool"
+      }
+     ],
+     "fields_complete": true
     },
     {
      "name": "engine_api_version",
@@ -13058,7 +13302,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "No action yet. SwarmUpdate with rotateManagerUnlockKey=true, then SwarmUnlockkey.",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "swarm:swarm-unlock": {
    "outputs": [
@@ -13076,7 +13334,7 @@
      "description": "ID of the node that was unlocked (GET /info Swarm.NodeID)."
     },
     {
-     "name": "swarm_info",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -13086,37 +13344,44 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Subset of SwarmInfo read after the unlock (LocalNodeState goes from locked to active).",
+     "description": "The action's outcome as one object (Q35): swarm_info.",
      "fields": [
       {
-       "name": "node_id",
-       "upstream": "NodeID",
-       "tf_type": "string",
-       "pointer": "#/definitions/SwarmInfo/properties/NodeID"
-      },
-      {
-       "name": "node_addr",
-       "upstream": "NodeAddr",
-       "tf_type": "string",
-       "pointer": "#/definitions/SwarmInfo/properties/NodeAddr"
-      },
-      {
-       "name": "local_node_state",
-       "upstream": "LocalNodeState",
-       "tf_type": "string",
-       "pointer": "#/definitions/LocalNodeState"
-      },
-      {
-       "name": "control_available",
-       "upstream": "ControlAvailable",
-       "tf_type": "bool",
-       "pointer": "#/definitions/SwarmInfo/properties/ControlAvailable"
-      },
-      {
-       "name": "error",
-       "upstream": "Error",
-       "tf_type": "string",
-       "pointer": "#/definitions/SwarmInfo/properties/Error"
+       "name": "swarm_info",
+       "upstream": "swarm_info",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "node_id",
+         "upstream": "NodeID",
+         "tf_type": "string",
+         "pointer": "#/definitions/SwarmInfo/properties/NodeID"
+        },
+        {
+         "name": "node_addr",
+         "upstream": "NodeAddr",
+         "tf_type": "string",
+         "pointer": "#/definitions/SwarmInfo/properties/NodeAddr"
+        },
+        {
+         "name": "local_node_state",
+         "upstream": "LocalNodeState",
+         "tf_type": "string",
+         "pointer": "#/definitions/LocalNodeState"
+        },
+        {
+         "name": "control_available",
+         "upstream": "ControlAvailable",
+         "tf_type": "bool",
+         "pointer": "#/definitions/SwarmInfo/properties/ControlAvailable"
+        },
+        {
+         "name": "error",
+         "upstream": "Error",
+         "tf_type": "string",
+         "pointer": "#/definitions/SwarmInfo/properties/Error"
+        }
+       ]
       }
      ],
      "fields_complete": false
@@ -13152,7 +13417,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "No action yet. SwarmUnlock returns no body; outputs come from GET /info afterwards. The unlock key is a sensitive input, never an output.",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   }
  }
 }

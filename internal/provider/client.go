@@ -41,6 +41,10 @@ type endpointConfig struct {
 	SSH           *sshConfig
 	// Context is the Docker CLI context the endpoint came from ("" if none).
 	Context string
+	// MinAPIVersion is the min_api_version floor ("" = none). When set,
+	// finishDockerClient installs apiFloorHook, so every versioned request
+	// below the floor fails even on paths that never call pd.APIVersion.
+	MinAPIVersion string
 }
 
 // newDockerClient builds a client for one endpoint. It makes no network call
@@ -93,6 +97,13 @@ func finishDockerClient(ep endpointConfig, opts []client.Opt) (*client.Client, e
 	}
 	if ep.UserAgent != "" {
 		opts = append(opts, client.WithUserAgent(ep.UserAgent))
+	}
+	if ep.MinAPIVersion != "" {
+		host := ep.Host
+		if host == "" {
+			host = defaultDockerHost
+		}
+		opts = append(opts, client.WithHTTPRequestHook(apiFloorHook(host, ep.MinAPIVersion)))
 	}
 	return client.NewClientWithOpts(opts...)
 }

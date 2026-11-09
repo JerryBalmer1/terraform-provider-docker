@@ -24,8 +24,8 @@
       "id": "dockerfile:FROM",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_from",
-      "summary": "Start a build stage from a base image (or scratch / a previous stage).",
+      "name": "docker_dockerfile.stage",
+      "summary": "FROM: the `stage { name, from, platform, ... }` block (FROM ... AS name) (Q31).",
       "sources": [
         {
           "type": "doc",
@@ -34,9 +34,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -73,13 +70,18 @@
           ],
           "anchor": "#understand-how-arg-and-from-interact"
         }
+      ],
+      "previous_name": "docker_dockerfile_from",
+      "decisions": [
+        "Q27",
+        "Q31"
       ]
     },
     {
       "id": "dockerfile:RUN",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_run",
+      "name": "docker_dockerfile.run",
       "summary": "Execute a command at build time and commit the result as a new layer.",
       "sources": [
         {
@@ -89,9 +91,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -242,13 +241,17 @@
           "min_syntax": "dockerfile:1.20",
           "note": "insecure needs the security.insecure entitlement."
         }
+      ],
+      "previous_name": "docker_dockerfile_run",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:CMD",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_cmd",
+      "name": "docker_dockerfile.cmd",
       "summary": "Set the default command (or default ENTRYPOINT arguments) for containers from the image.",
       "sources": [
         {
@@ -258,9 +261,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -284,13 +284,17 @@
           ],
           "anchor": "#shell-form"
         }
+      ],
+      "previous_name": "docker_dockerfile_cmd",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:LABEL",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_label",
+      "name": "docker_dockerfile.label",
       "summary": "Add key=value metadata labels to the image.",
       "sources": [
         {
@@ -300,9 +304,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -313,14 +314,18 @@
           ],
           "anchor": "#label"
         }
+      ],
+      "previous_name": "docker_dockerfile_label",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:MAINTAINER",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_maintainer",
-      "summary": "Deprecated: set the image author field; use LABEL org.opencontainers.image.authors instead.",
+      "name": "docker_dockerfile.maintainer",
+      "summary": "MAINTAINER (deprecated): parsed when reading text or image history; no input block. Use LABEL org.opencontainers.image.authors (Q29).",
       "sources": [
         {
           "type": "doc",
@@ -329,9 +334,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "Deprecated instruction (build check MaintainerDeprecated). Kept as a block for parse/round-trip completeness; a generator should emit LABEL org.opencontainers.image.authors instead. No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -341,13 +343,18 @@
           ],
           "anchor": "#maintainer-deprecated"
         }
+      ],
+      "previous_name": "docker_dockerfile_maintainer",
+      "decisions": [
+        "Q27",
+        "Q29"
       ]
     },
     {
       "id": "dockerfile:EXPOSE",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_expose",
+      "name": "docker_dockerfile.expose",
       "summary": "Document the ports the container listens on.",
       "sources": [
         {
@@ -357,9 +364,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -372,13 +376,17 @@
           ],
           "anchor": "#expose"
         }
+      ],
+      "previous_name": "docker_dockerfile_expose",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:ENV",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_env",
+      "name": "docker_dockerfile.env",
       "summary": "Set environment variables for later instructions and the running container.",
       "sources": [
         {
@@ -388,9 +396,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -402,13 +407,17 @@
           ],
           "anchor": "#env"
         }
+      ],
+      "previous_name": "docker_dockerfile_env",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:ADD",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_add",
+      "name": "docker_dockerfile.add",
       "summary": "Add files from the build context, a URL, or a Git repository (with optional unpacking) to the image.",
       "sources": [
         {
@@ -418,9 +427,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -500,13 +506,17 @@
           "anchor": "#add---exclude",
           "min_syntax": "dockerfile:1.19"
         }
+      ],
+      "previous_name": "docker_dockerfile_add",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:COPY",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_copy",
+      "name": "docker_dockerfile.copy",
       "summary": "Copy files from the build context, a build stage, a named context, or an image into the image.",
       "sources": [
         {
@@ -516,9 +526,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -596,13 +603,17 @@
           "anchor": "#copy---exclude",
           "min_syntax": "dockerfile:1.19"
         }
+      ],
+      "previous_name": "docker_dockerfile_copy",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:ENTRYPOINT",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_entrypoint",
+      "name": "docker_dockerfile.entrypoint",
       "summary": "Configure the executable the container runs.",
       "sources": [
         {
@@ -612,9 +623,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -631,13 +639,17 @@
           ],
           "anchor": "#shell-form"
         }
+      ],
+      "previous_name": "docker_dockerfile_entrypoint",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:VOLUME",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_volume",
+      "name": "docker_dockerfile.volume",
       "summary": "Declare mount points for externally mounted volumes.",
       "sources": [
         {
@@ -647,9 +659,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -660,13 +669,17 @@
           ],
           "anchor": "#volume"
         }
+      ],
+      "previous_name": "docker_dockerfile_volume",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:USER",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_user",
+      "name": "docker_dockerfile.user",
       "summary": "Set the user (and optionally group) for later instructions and the running container.",
       "sources": [
         {
@@ -676,9 +689,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -689,13 +699,17 @@
           ],
           "anchor": "#user"
         }
+      ],
+      "previous_name": "docker_dockerfile_user",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:WORKDIR",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_workdir",
+      "name": "docker_dockerfile.workdir",
       "summary": "Set the working directory for later instructions and the running container.",
       "sources": [
         {
@@ -705,9 +719,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -719,13 +730,17 @@
           ],
           "anchor": "#workdir"
         }
+      ],
+      "previous_name": "docker_dockerfile_workdir",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:ARG",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_arg",
+      "name": "docker_dockerfile.arg",
       "summary": "Declare build-time variables (with optional defaults).",
       "sources": [
         {
@@ -735,9 +750,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -792,14 +804,18 @@
           ],
           "anchor": "#buildkit-built-in-build-args"
         }
+      ],
+      "previous_name": "docker_dockerfile_arg",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:ONBUILD",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_onbuild",
-      "summary": "Register a trigger instruction that runs when the image is used as a base for another build.",
+      "name": "docker_dockerfile.onbuild",
+      "summary": "ONBUILD: the `onbuild = true` attribute on any instruction block (Q30).",
       "sources": [
         {
           "type": "doc",
@@ -808,9 +824,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -830,13 +843,18 @@
           "min_syntax": "dockerfile:1.11"
         }
       ],
-      "collision": "Nests another instruction block; could instead be an `onbuild` attribute on each docker_dockerfile_* block."
+      "collision": "Nests another instruction block; could instead be an `onbuild` attribute on each docker_dockerfile_* block.",
+      "previous_name": "docker_dockerfile_onbuild",
+      "decisions": [
+        "Q27",
+        "Q30"
+      ]
     },
     {
       "id": "dockerfile:STOPSIGNAL",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_stopsignal",
+      "name": "docker_dockerfile.stopsignal",
       "summary": "Set the signal sent to stop the container.",
       "sources": [
         {
@@ -846,9 +864,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -859,13 +874,17 @@
           ],
           "anchor": "#stopsignal"
         }
+      ],
+      "previous_name": "docker_dockerfile_stopsignal",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:HEALTHCHECK",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_healthcheck",
+      "name": "docker_dockerfile.healthcheck",
       "summary": "Define (or disable with NONE) the container health check.",
       "sources": [
         {
@@ -875,9 +894,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -929,13 +945,17 @@
           ],
           "anchor": "#healthcheck"
         }
+      ],
+      "previous_name": "docker_dockerfile_healthcheck",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:SHELL",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_shell",
+      "name": "docker_dockerfile.shell",
       "summary": "Override the default shell used by shell-form instructions.",
       "sources": [
         {
@@ -945,9 +965,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) build {context, dockerfile} only builds from an existing Dockerfile file.",
       "cli_only": false,
       "flags": [
         {
@@ -957,13 +974,17 @@
           ],
           "anchor": "#shell"
         }
+      ],
+      "previous_name": "docker_dockerfile_shell",
+      "decisions": [
+        "Q27"
       ]
     },
     {
       "id": "dockerfile:directive-syntax",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_directive_syntax",
+      "name": "docker_dockerfile.syntax",
       "summary": "Parser directive selecting the Dockerfile frontend image/version.",
       "sources": [
         {
@@ -973,9 +994,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) builds from an existing Dockerfile file only.",
       "cli_only": false,
       "flags": [
         {
@@ -987,13 +1005,18 @@
           ],
           "anchor": "#syntax"
         }
+      ],
+      "previous_name": "docker_dockerfile_directive_syntax",
+      "decisions": [
+        "Q27",
+        "Q28"
       ]
     },
     {
       "id": "dockerfile:directive-escape",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_directive_escape",
+      "name": "docker_dockerfile.escape",
       "summary": "Parser directive setting the escape character.",
       "sources": [
         {
@@ -1003,9 +1026,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) builds from an existing Dockerfile file only.",
       "cli_only": false,
       "flags": [
         {
@@ -1016,13 +1036,18 @@
           ],
           "anchor": "#escape"
         }
+      ],
+      "previous_name": "docker_dockerfile_directive_escape",
+      "decisions": [
+        "Q27",
+        "Q28"
       ]
     },
     {
       "id": "dockerfile:directive-check",
       "layer": "dockerfile",
       "kind": "dockerfile_block",
-      "name": "docker_dockerfile_directive_check",
+      "name": "docker_dockerfile.check",
       "summary": "Parser directive configuring build checks (skip list, error on warnings).",
       "sources": [
         {
@@ -1120,9 +1145,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "No Dockerfile composer in the provider; docker_image (resource) builds from an existing Dockerfile file only.",
       "cli_only": false,
       "flags": [
         {
@@ -1250,6 +1272,11 @@
           "options": [],
           "anchor": "rules/workdir-relative-path.md"
         }
+      ],
+      "previous_name": "docker_dockerfile_directive_check",
+      "decisions": [
+        "Q27",
+        "Q28"
       ]
     }
   ]

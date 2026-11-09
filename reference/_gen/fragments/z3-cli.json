@@ -129,11 +129,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [
-    "provider argument context",
-    "provider arguments host / tls / ssh"
-   ],
    "cli_only": true,
    "skip_reason": "Client-side config store, no Engine API; the provider's `context`, `host`, `tls` and `ssh` arguments already select the daemon, and writing files under ~/.docker from Terraform would be a local-file side effect.",
    "collision": "A `docker_context` resource would be confusable with the provider-level `context` argument."
@@ -163,11 +158,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [
-    "provider block registry_auth",
-    "docker_registry_token (ephemeral resource)"
-   ],
    "cli_only": false,
    "skip_reason": "Only the validation half is Engine API (POST /auth, which Z1 owns); persisting credentials is client config. Terraform supplies credentials per run via provider registry_auth (password_wo) and ephemeral docker_registry_token."
   },
@@ -190,10 +180,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [
-    "provider block registry_auth"
-   ],
    "cli_only": true,
    "skip_reason": "Pure client config edit, no endpoint; Terraform never persists credentials, so there is nothing to log out of."
   },
@@ -267,14 +253,12 @@
     }
    ],
    "min_api": null,
-   "status": "missing",
-   "existing": [
-    "docker_registry_image (resource)"
-   ],
-   "status_note": "docker_registry_image pushes single images; nothing assembles an index from existing digests.",
    "cli_only": true,
    "collision": "Same job as `docker buildx imagetools create` (buildx:imagetools-create points here). Do not also add docker_buildx_imagetools / docker_manifest. `docker manifest rm` only deletes the local draft, so destroy semantics (registry DELETE of the tag vs leave it) need a flag like docker_registry_image.keep_remotely.",
-   "implementation_note": "Registry HTTP API v2 (distribution), not Engine API; the provider already has registry auth + manifest fetch code for docker_registry_image_manifests."
+   "implementation_note": "Registry HTTP API v2 (distribution), not Engine API; the provider already has registry auth + manifest fetch code for docker_registry_image_manifests.",
+   "decisions": [
+    "Q19"
+   ]
   },
   {
    "id": "cli-only:manifest-inspect",
@@ -311,11 +295,6 @@
     }
    ],
    "min_api": null,
-   "status": "exists",
-   "existing": [
-    "docker_registry_image_manifests (data source)",
-    "docker_registry_image (data source)"
-   ],
    "cli_only": true,
    "collision": "buildx:imagetools-inspect maps to the same data source."
   },
@@ -368,14 +347,12 @@
     }
    ],
    "min_api": null,
-   "status": "exists",
-   "existing": [
-    "docker_stack (resource)",
-    "docker_compose (resource, swarm mode)"
-   ],
    "cli_only": true,
    "collision": "Keep `docker_stack` (exists); do not rename to docker_swarm_stack even though it is a swarm-layer type.",
-   "stack_deploy_flags_note": "--prune, --resolve-image and --with-registry-auth should be checked against docker_stack attributes by the implementing lane."
+   "stack_deploy_flags_note": "--prune, --resolve-image and --with-registry-auth should be checked against docker_stack attributes by the implementing lane.",
+   "decisions": [
+    "Q21"
+   ]
   },
   {
    "id": "cli-only:stacks",
@@ -397,12 +374,11 @@
     }
    ],
    "min_api": null,
-   "status": "partial",
-   "existing": [
-    "docker_services (data source)"
-   ],
-   "status_note": "docker_services with a label filter returns the services but not the grouped stack list.",
-   "cli_only": true
+   "cli_only": true,
+   "decisions": [
+    "Q21",
+    "Q51"
+   ]
   },
   {
    "id": "cli-only:stack-services",
@@ -430,13 +406,12 @@
     }
    ],
    "min_api": null,
-   "status": "partial",
-   "existing": [
-    "docker_services (data source)"
-   ],
-   "status_note": "docker_services + label filter covers the list; running/desired replica counts (from tasks) are missing.",
    "cli_only": true,
-   "collision": "Data source `docker_stack` would share its name with the existing docker_stack resource (allowed by Terraform, same pattern as docker_image); alternative name docker_stack_services."
+   "collision": "Data source `docker_stack` would share its name with the existing docker_stack resource (allowed by Terraform, same pattern as docker_image); alternative name docker_stack_services.",
+   "decisions": [
+    "Q21",
+    "Q50"
+   ]
   },
   {
    "id": "cli-only:stack-ps",
@@ -458,8 +433,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Same as the tasks list data source Z1 derives from GET /tasks with a label filter (com.docker.stack.namespace); no separate type."
   },
@@ -477,11 +450,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [
-    "tools/compose2stack",
-    "provider::docker::compose_env (function)"
-   ],
    "cli_only": true,
    "skip_reason": "Pure client-side compose rendering with no daemon call; covered by tools/compose2stack and the compose lane."
   },
@@ -514,8 +482,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Experimental (needs experimental daemon + CRIU, Linux only); daemon endpoints /containers/{id}/checkpoints exist but are undocumented and absent from swagger.yaml 1.56. Revisit only if moby documents them (then: action docker_container_checkpoint)."
   },
@@ -533,8 +499,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Transport plumbing for the CLI's ssh:// helper; the provider's ssh block is pure Go and does not need it."
   },
@@ -597,8 +561,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Notary v1 client against a Notary server, no Engine API; split out of docker/cli into the docker-trust plugin and DCT is being retired by Docker Hub. Signing belongs to cosign/notation-style providers."
   },
@@ -659,15 +621,12 @@
     }
    ],
    "min_api": null,
-   "status": "partial",
-   "existing": [
-    "docker_image (resource, build block)",
-    "docker_buildx_builder (resource)"
-   ],
-   "status_note": "docker_image.build has context, dockerfile, target, args, labels, platform(s), pull, no_cache, cache_from, secrets, builder. Missing: --output/exporters (local, tar, oci, registry with push), --cache-to, --ssh, --attest/--sbom/--provenance, --annotation, --network, --add-host, --build-context (named contexts), --shm-size, --ulimit, --call/--check, --iidfile/metadata, --policy (0.38).",
    "cli_only": true,
    "collision": "Do not add docker_buildx_build: it would duplicate docker_image. If exporters that produce no local image are wanted, that is an action (docker_buildx_bake or docker_image_build action), not a second build resource.",
-   "channel": "BuildKit gRPC/session, not Engine API"
+   "channel": "BuildKit gRPC/session, not Engine API",
+   "decisions": [
+    "Q20"
+   ]
   },
   {
    "id": "buildx:bake",
@@ -703,12 +662,13 @@
     }
    ],
    "min_api": null,
-   "status": "missing",
-   "existing": [],
    "cli_only": true,
    "collision": "Overlaps docker_image (build block) for single targets.",
    "channel": "BuildKit gRPC/session, not Engine API",
-   "design_note": "Action, not resource: bake outputs are often not local images (registry push, local/tar exporters) and the target set is chosen per run. The action takes either a bake file path + target names, or inline `target` blocks mirroring bake's target attributes; Terraform variables/for_each replace bake variables/groups/matrix. Images that Terraform should own stay docker_image."
+   "design_note": "Action, not resource: bake outputs are often not local images (registry push, local/tar exporters) and the target set is chosen per run. The action takes either a bake file path + target names, or inline `target` blocks mirroring bake's target attributes; Terraform variables/for_each replace bake variables/groups/matrix. Images that Terraform should own stay docker_image.",
+   "decisions": [
+    "Q20"
+   ]
   },
   {
    "id": "buildx:builder",
@@ -740,11 +700,6 @@
     }
    ],
    "min_api": null,
-   "status": "partial",
-   "existing": [
-    "docker_buildx_builder (resource)"
-   ],
-   "status_note": "Only the docker-container driver, single node: no kubernetes/remote/cloud drivers, no --append/--node/--leave multi-node builders, no --platform pinning per node, no --driver-opt beyond image/network/env/restart/memory etc. Builder is a container + state volume created via Engine API; buildx's local store (~/.docker/buildx/instances) is not written, so `docker buildx ls` will not list it.",
    "cli_only": true,
    "channel": "Engine API for the docker-container driver's container/volume; BuildKit gRPC for bootstrap/workers"
   },
@@ -767,13 +722,12 @@
     }
    ],
    "min_api": null,
-   "status": "missing",
-   "existing": [
-    "docker_buildx_builder (resource, computed attrs)"
-   ],
    "cli_only": true,
    "collision": "Same name as the resource (resource/data source pair, allowed). For builders not created by Terraform, discovery is limited to buildx_buildkit_* containers on the daemon (buildx's builder store is client-side).",
-   "channel": "BuildKit gRPC/session, not Engine API"
+   "channel": "BuildKit gRPC/session, not Engine API",
+   "decisions": [
+    "Q24"
+   ]
   },
   {
    "id": "buildx:builders",
@@ -794,11 +748,11 @@
     }
    ],
    "min_api": null,
-   "status": "missing",
-   "existing": [],
-   "status_note": "Only daemon-visible builders (buildx_buildkit_* containers, plus the built-in `default`/docker driver) can be listed without reading ~/.docker/buildx.",
    "cli_only": true,
-   "channel": "BuildKit gRPC/session, not Engine API"
+   "channel": "BuildKit gRPC/session, not Engine API",
+   "decisions": [
+    "Q24"
+   ]
   },
   {
    "id": "buildx:use",
@@ -819,18 +773,14 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [
-    "docker_image.build.builder (attribute)"
-   ],
    "cli_only": true,
    "skip_reason": "Client-side default selection; Terraform references the builder explicitly via docker_image.build.builder."
   },
   {
    "id": "buildx:stop",
    "layer": "buildx",
-   "kind": "action",
-   "name": "docker_buildx_builder_stop",
+   "kind": "skip",
+   "name": null,
    "summary": "docker buildx stop: stop a builder's BuildKit node (the buildx_buildkit_* container) without removing it.",
    "sources": [
     {
@@ -851,17 +801,20 @@
     }
    ],
    "min_api": null,
-   "status": "missing",
-   "existing": [],
    "cli_only": true,
    "collision": "Low value: docker_buildx_builder with bootstrap=false or a must_run-style flag could cover it; consider skip.",
-   "channel": "For the docker-container driver this is Engine ContainerStop; for remote drivers there is nothing to stop."
+   "channel": "For the docker-container driver this is Engine ContainerStop; for remote drivers there is nothing to stop.",
+   "skip_previous_name": "docker_buildx_builder_stop",
+   "skip_reason": "Q25: skipped; a builder is stopped by removing or replacing docker_buildx_builder.",
+   "decisions": [
+    "Q25"
+   ]
   },
   {
    "id": "buildx:prune",
    "layer": "buildx",
-   "kind": "action",
-   "name": "docker_buildx_prune",
+   "kind": "skip",
+   "name": null,
    "summary": "docker buildx prune: remove build cache on a builder (filters, keep-storage/min-free-space, --all).",
    "sources": [
     {
@@ -882,14 +835,14 @@
     }
    ],
    "min_api": null,
-   "status": "partial",
-   "existing": [
-    "docker_system_prune (action)"
-   ],
-   "status_note": "docker_system_prune can include the daemon's build cache (POST /build/prune) for the built-in builder only; nothing prunes a docker-container builder's cache.",
    "cli_only": true,
    "collision": "Z1 will likely propose an Engine action for POST /build/prune (e.g. docker_build_cache_prune / docker_builder_prune). One type should take an optional `builder` and choose BuildKit gRPC vs POST /build/prune.",
-   "channel": "BuildKit gRPC/session, not Engine API (docker driver falls back to POST /build/prune)"
+   "channel": "BuildKit gRPC/session, not Engine API (docker driver falls back to POST /build/prune)",
+   "skip_previous_name": "docker_buildx_prune",
+   "skip_reason": "Q2/Q23: folded into action docker_builder_prune (engine:build-prune), which prunes a buildx builder when `builder` is set.",
+   "decisions": [
+    "Q23"
+   ]
   },
   {
    "id": "buildx:du",
@@ -916,11 +869,12 @@
     }
    ],
    "min_api": null,
-   "status": "missing",
-   "existing": [],
    "cli_only": true,
    "collision": "Overlaps Z1's system df data source (BuildCache section); merge or keep builder-scoped.",
-   "channel": "BuildKit gRPC/session, not Engine API (docker driver: GET /system/df BuildCache)"
+   "channel": "BuildKit gRPC/session, not Engine API (docker driver: GET /system/df BuildCache)",
+   "decisions": [
+    "Q26"
+   ]
   },
   {
    "id": "buildx:dial-stdio",
@@ -941,8 +895,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Transport plumbing for other tools; the provider dials BuildKit directly."
   },
@@ -975,8 +927,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Interactive IDE debugging session; not declarative."
   },
@@ -999,8 +949,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Experimental, interactive; also newer than the installed buildx v0.34.1 (not in help capture)."
   },
@@ -1008,7 +956,7 @@
    "id": "buildx:history-ls",
    "layer": "buildx",
    "kind": "data_source",
-   "name": "docker_buildx_history",
+   "name": "docker_buildx_history_records",
    "summary": "docker buildx history ls: build records on a builder (ref, name, status, duration, cache ratio).",
    "sources": [
     {
@@ -1033,17 +981,18 @@
     }
    ],
    "min_api": null,
-   "status": "missing",
-   "existing": [],
-   "status_note": "Low priority; useful only for auditing builds Terraform ran.",
    "cli_only": true,
-   "channel": "BuildKit gRPC/session, not Engine API (ListenBuildHistory)"
+   "channel": "BuildKit gRPC/session, not Engine API (ListenBuildHistory)",
+   "previous_name": "docker_buildx_history",
+   "decisions": [
+    "Q24"
+   ]
   },
   {
    "id": "buildx:history-inspect",
    "layer": "buildx",
    "kind": "data_source",
-   "name": "docker_buildx_history_record",
+   "name": "docker_buildx_history",
    "summary": "docker buildx history inspect: details of one build record (args, platforms, outputs, materials, errors).",
    "sources": [
     {
@@ -1058,11 +1007,13 @@
     }
    ],
    "min_api": null,
-   "status": "missing",
-   "existing": [],
    "cli_only": true,
    "collision": "Could be folded into docker_buildx_history as a `ref` filter; naming question.",
-   "channel": "BuildKit gRPC/session, not Engine API"
+   "channel": "BuildKit gRPC/session, not Engine API",
+   "previous_name": "docker_buildx_history_record",
+   "decisions": [
+    "Q24"
+   ]
   },
   {
    "id": "buildx:history-inspect-attachment",
@@ -1083,8 +1034,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Returns raw attachment blobs (SBOM/provenance) of a record; low value as state, and docker_image attestations are Z1's ImageAttestations territory."
   },
@@ -1107,8 +1056,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Build log stream; logs are not Terraform state."
   },
@@ -1131,8 +1078,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Exports a Docker Desktop .dockerbuild bundle (Desktop UI artifact)."
   },
@@ -1155,8 +1100,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Imports a Docker Desktop .dockerbuild bundle (Desktop UI artifact)."
   },
@@ -1179,8 +1122,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Opens the Docker Desktop UI."
   },
@@ -1203,8 +1144,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Deleting build records is housekeeping; covered well enough by buildx prune / builder recreation. Revisit as an action if asked."
   },
@@ -1227,8 +1166,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Starts a local Jaeger UI for the trace; interactive."
   },
@@ -1251,8 +1188,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Client version print."
   },
@@ -1285,8 +1220,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Build-policy (Rego) development tooling, client-local; build policy itself is a --policy input on build/bake."
   },
@@ -1309,8 +1242,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Build-policy (Rego) development tooling, client-local."
   },
@@ -1328,8 +1259,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Prints a JSON schema; newer than installed buildx v0.34.1."
   },
@@ -1352,8 +1281,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "New and experimental reproducibility tooling, newer than installed buildx v0.34.1; revisit as an action docker_buildx_replay once stable."
   },
@@ -1386,8 +1313,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Same object as cli-only:manifest-list (proposed docker_registry_manifest_list); one resource covers both `docker manifest create/push` and imagetools create.",
    "collision": "docker_buildx_imagetools_create would duplicate docker_registry_manifest_list."
@@ -1411,11 +1336,6 @@
     }
    ],
    "min_api": null,
-   "status": "partial",
-   "existing": [
-    "docker_registry_image_manifests (data source)"
-   ],
-   "status_note": "Manifests and platforms are covered; provenance/SBOM attestation content (--format '{{json .Provenance}}') is not.",
    "cli_only": true,
    "collision": "Same type as cli-only:manifest-inspect."
   },
@@ -1433,8 +1353,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Not a Terraform type: becomes a nested `target` block of the docker_buildx_bake action (and its attributes mirror docker_image.build). `inherits` and `matrix` map to Terraform locals/for_each."
   },
@@ -1452,8 +1370,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "A list of target names; in Terraform this is the docker_buildx_bake action's `targets` argument or a for_each over targets."
   },
@@ -1471,8 +1387,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Terraform variables/locals replace them; when the action consumes an existing bake file, overrides go through a `set`/`variables` map argument."
   },
@@ -1494,8 +1408,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Bake HCL is itself HCL built on the same go-cty stdlib; Terraform functions (plus provider functions) replace user functions."
   },
@@ -1518,8 +1430,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Docker Desktop AI product plugin; talks to model providers and its own runtime, not the Engine API."
   },
@@ -1542,8 +1452,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Interactive Docker Desktop product feature; no Engine API."
   },
@@ -1566,8 +1474,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Docker Desktop (Pro) plugin; composite of Engine calls (create helper container, exec) plus proprietary toolbox; interactive. docker_exec covers the declarative part."
   },
@@ -1590,8 +1496,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Controls the Docker Desktop app via its backend socket, not the Engine API."
   },
@@ -1614,8 +1518,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Docker Hub product API (DHI), not Engine API; mirroring could later be a registry-side resource in a Hub provider."
   },
@@ -1638,8 +1540,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Docker Desktop extension manager; not Engine API."
   },
@@ -1662,8 +1562,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Interactive local file scaffolding; no daemon involved."
   },
@@ -1686,8 +1584,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Docker Desktop MCP product; own gateway/catalog APIs, not Engine API (gateway runs MCP servers as containers through Docker but via its own logic)."
   },
@@ -1710,8 +1606,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Model Runner has its own HTTP API (OpenAI-compatible, /models, /engines via the Desktop socket or localhost:12434, or a docker/model-runner container on plain Engine), not the Engine API. Plausible future provider surface (docker_model resource for pull/rm, install-runner as a container), but it is a separate API; out of scope for Engine-API parity."
   },
@@ -1734,8 +1628,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Docker cloud product session; not Engine API (it switches the daemon endpoint)."
   },
@@ -1758,8 +1650,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Local/Desktop secrets store; Terraform has its own secret handling (write-only args, ephemeral)."
   },
@@ -1782,8 +1672,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Docker Desktop sandbox product with its own VM backend API, not Engine API."
   },
@@ -1806,8 +1694,6 @@
     }
    ],
    "min_api": null,
-   "status": "n/a",
-   "existing": [],
    "cli_only": true,
    "skip_reason": "Docker Scout SaaS/analysis tool; not Engine API. Vulnerability data could later be a data source in a Scout/Hub provider."
   }

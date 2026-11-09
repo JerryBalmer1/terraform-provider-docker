@@ -65,16 +65,12 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_compose (resource)",
-        "docker_stack (resource)",
-        "docker_service (resource)",
-        "docker_container (resource)"
-      ],
-      "status_note": "docker_compose loads services with compose-go and creates containers (local) or Swarm services (swarm). Ignored with a warning: build (no image is an error, pull_policy build errors), develop, pre_start/post_start/pre_stop hooks, models, provider, credential_spec, blkio_config, use_api_socket, external_links, attach (local); swarm mode also ignores container_name, depends_on, network_mode, privileged, devices, ipc/pid/userns/uts/cgroup_parent, security_opt, shm_size, volumes_from, gpus, links, tmpfs, pull_policy other than missing/always.",
       "collision": "A per-service type named docker_compose_service would be confusable with docker_service (swarm). Keep services inside docker_compose.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q17",
+        "Q42"
+      ]
     },
     {
       "id": "compose:networks",
@@ -111,13 +107,12 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_compose (resource)",
-        "docker_network (resource)"
-      ],
       "collision": "docker_compose_network would be confusable with docker_network.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q17",
+        "Q42"
+      ]
     },
     {
       "id": "compose:volumes",
@@ -154,13 +149,12 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_compose (resource)",
-        "docker_volume (resource)"
-      ],
       "collision": "docker_compose_volume(s) would be confusable with docker_volume and with the proposed docker_compose_volumes data source (CLI `compose volumes`).",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q17",
+        "Q42"
+      ]
     },
     {
       "id": "compose:configs",
@@ -197,14 +191,12 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_compose (resource)",
-        "docker_config (resource)"
-      ],
-      "status_note": "Local mode copies the content into the container (no bind mount); swarm mode creates Swarm configs but ignores driver and template_driver with a warning.",
       "collision": "Top-level `configs` vs docker_config (Swarm config resource) vs the proposed docker_compose_config data source (CLI `compose config`, rendered model).",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q17",
+        "Q42"
+      ]
     },
     {
       "id": "compose:secrets",
@@ -241,14 +233,12 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_compose (resource)",
-        "docker_secret (resource)"
-      ],
-      "status_note": "Local mode copies content into the container (no bind mount as compose does); swarm mode ignores driver and template_driver with a warning.",
       "collision": "docker_compose_secret would be confusable with docker_secret.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q17",
+        "Q42"
+      ]
     },
     {
       "id": "compose:models",
@@ -285,12 +275,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [
-        "docker_compose (resource)"
-      ],
-      "status_note": "Parsed by compose-go but ignored: service `models` gets a warning in local mode; the top-level element is never acted on. Model Runner is not part of the Docker Engine API, so support needs a separate client.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q17",
+        "Q42"
+      ]
     },
     {
       "id": "compose:jobs",
@@ -298,7 +287,7 @@
       "kind": "resource",
       "name": "docker_compose",
       "update": "in_place",
-      "summary": "jobs: run-to-completion containers with manual or scheduled triggers (Compose NEXT).",
+      "summary": "jobs: run-to-completion containers with manual or scheduled triggers (Compose NEXT). Pass 5 (Q18): a plan-time warning when a project defines jobs; run-on-apply is a later design pass.",
       "sources": [
         {
           "type": "schema",
@@ -342,12 +331,10 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [
-        "docker_compose (resource)"
-      ],
-      "status_note": "compose-go v2.16.2 parses jobs (Project.Jobs) but docker_compose never reads them: silently ignored, not even warned. Scheduled triggers need a scheduler outside Terraform; manual runs map to the proposed docker_compose_run action. The embedded compose-go schema lacks jobs.*.extends.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q18"
+      ]
     },
     {
       "id": "compose:include",
@@ -384,12 +371,11 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_compose (resource)"
-      ],
-      "status_note": "Local-path includes are resolved by the compose-go loader; remote (git/oci) includes are disabled by design (compose_parse.go).",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q17",
+        "Q42"
+      ]
     },
     {
       "id": "compose:name",
@@ -416,12 +402,11 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_compose (resource)"
-      ],
-      "status_note": "docker_compose.project_name defaults to the file's top-level name.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q41",
+        "Q42"
+      ]
     },
     {
       "id": "compose:version",
@@ -447,8 +432,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "skip_reason": "obsolete; Compose ignores it (warns) and so does the loader",
       "cli_only": false
     },
@@ -477,12 +460,6 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_image (resource)",
-        "docker_buildx_builder (resource)"
-      ],
-      "status_note": "docker_compose does not build (warns; errors when image is unset); docker_image covers the build as a separate resource. A build action would be docker_compose_build.",
       "cli_only": false
     },
     {
@@ -520,13 +497,6 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_compose (resource)",
-        "docker_service (resource)",
-        "docker_stack (resource)"
-      ],
-      "status_note": "docker_compose swarm mode maps deploy to the Swarm service spec; local mode uses replicas (scale), global mode and resources. Not its own Terraform type: it is the docker_service spec.",
       "cli_only": false
     },
     {
@@ -563,8 +533,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "skip_reason": "developer inner-loop file watching; not declarative (docker_compose warns and ignores it)",
       "cli_only": false
     },
@@ -582,8 +550,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "skip_reason": "file-format mechanic, handled by the compose loader",
       "cli_only": false
     },
@@ -601,8 +567,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "skip_reason": "file-format mechanic, handled by the compose loader",
       "cli_only": false
     },
@@ -620,8 +584,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "skip_reason": "file-format mechanic, handled by the compose loader",
       "cli_only": false
     },
@@ -639,8 +601,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "skip_reason": "file-format mechanic, handled by the compose loader",
       "cli_only": false
     },
@@ -658,8 +618,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "skip_reason": "file-format mechanic, handled by the compose loader",
       "cli_only": false
     },
@@ -682,16 +640,14 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "command group only; global flags (-f, -p, --profile, --env-file) are docker_compose attributes"
     },
     {
       "id": "compose:cli-up",
       "layer": "compose",
-      "kind": "action",
-      "name": "docker_compose_up",
+      "kind": "skip",
+      "name": null,
       "summary": "Create/recreate and start the project. Engine: network/volume create, image pull, container create/start (+ wait).",
       "sources": [
         {
@@ -706,19 +662,19 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_compose (resource)"
-      ],
-      "status_note": "The docker_compose resource does up on create/update; climap maps `compose up` to it. A standalone action would serve projects not managed by Terraform.",
       "cli_only": true,
-      "collision": "docker_compose (resource) already means up; an action docker_compose_up beside it invites confusion."
+      "collision": "docker_compose (resource) already means up; an action docker_compose_up beside it invites confusion.",
+      "skip_previous_name": "docker_compose_up",
+      "skip_reason": "Q11: no up action; creating or updating docker_compose is `up`.",
+      "decisions": [
+        "Q11"
+      ]
     },
     {
       "id": "compose:cli-down",
       "layer": "compose",
-      "kind": "action",
-      "name": "docker_compose_down",
+      "kind": "skip",
+      "name": null,
       "summary": "Stop and remove the project's containers and networks (optionally volumes, images). Engine: container stop/delete, network delete, volume delete.",
       "sources": [
         {
@@ -733,12 +689,12 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_compose (resource)"
-      ],
-      "status_note": "Destroying docker_compose (keep_volumes) is down; no action for projects outside Terraform.",
-      "cli_only": true
+      "cli_only": true,
+      "skip_previous_name": "docker_compose_down",
+      "skip_reason": "Q11: no down action; destroying docker_compose is `down`.",
+      "decisions": [
+        "Q11"
+      ]
     },
     {
       "id": "compose:cli-start",
@@ -759,10 +715,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": true,
-      "collision": "Would mirror single-container docker_container_start actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+      "collision": "Would mirror single-container docker_container_start actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.",
+      "decisions": [
+        "Q15"
+      ]
     },
     {
       "id": "compose:cli-stop",
@@ -783,10 +740,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": true,
-      "collision": "Would mirror single-container docker_container_stop actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+      "collision": "Would mirror single-container docker_container_stop actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.",
+      "decisions": [
+        "Q15"
+      ]
     },
     {
       "id": "compose:cli-restart",
@@ -807,10 +765,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": true,
-      "collision": "Would mirror single-container docker_container_restart actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+      "collision": "Would mirror single-container docker_container_restart actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.",
+      "decisions": [
+        "Q15"
+      ]
     },
     {
       "id": "compose:cli-kill",
@@ -831,10 +790,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": true,
-      "collision": "Would mirror single-container docker_container_kill actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+      "collision": "Would mirror single-container docker_container_kill actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.",
+      "decisions": [
+        "Q15"
+      ]
     },
     {
       "id": "compose:cli-pause",
@@ -855,10 +815,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": true,
-      "collision": "Would mirror single-container docker_container_pause actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+      "collision": "Would mirror single-container docker_container_pause actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.",
+      "decisions": [
+        "Q15"
+      ]
     },
     {
       "id": "compose:cli-unpause",
@@ -879,10 +840,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": true,
-      "collision": "Would mirror single-container docker_container_unpause actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those."
+      "collision": "Would mirror single-container docker_container_unpause actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those.",
+      "decisions": [
+        "Q15"
+      ]
     },
     {
       "id": "compose:cli-create",
@@ -903,8 +865,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "half of `up`; the docker_compose resource owns container creation"
     },
@@ -927,8 +887,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "docker_compose reconciles and removes its own containers; one-off cleanup is docker_system_prune"
     },
@@ -951,11 +909,6 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_image (resource)"
-      ],
-      "status_note": "docker_compose ignores build: and climap says no equivalent; docker_image builds one image per resource.",
       "cli_only": true
     },
     {
@@ -977,12 +930,6 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_image (resource)",
-        "docker_compose (resource)"
-      ],
-      "status_note": "docker_compose pulls missing images during apply; climap maps it to docker_image.",
       "cli_only": true
     },
     {
@@ -1004,11 +951,6 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_registry_image (resource)"
-      ],
-      "status_note": "docker_registry_image pushes one image per resource; no project-wide push.",
       "cli_only": true
     },
     {
@@ -1030,10 +972,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "climap: no equivalent. Also the natural manual trigger for compose `jobs`.",
-      "cli_only": true
+      "cli_only": true,
+      "decisions": [
+        "Q18",
+        "Q43"
+      ]
     },
     {
       "id": "compose:cli-exec",
@@ -1054,13 +997,10 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_exec (action)",
-        "docker_exec_output (ephemeral resource)"
-      ],
-      "status_note": "climap maps it to docker_exec with the <project>-<service>-<n> container name; no service selector.",
-      "cli_only": true
+      "cli_only": true,
+      "decisions": [
+        "Q43"
+      ]
     },
     {
       "id": "compose:cli-cp",
@@ -1081,11 +1021,6 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_container (resource)"
-      ],
-      "status_note": "docker_container has upload blocks for containers it manages; nothing for compose containers or for copying out.",
       "cli_only": true
     },
     {
@@ -1107,8 +1042,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": true
     },
     {
@@ -1130,11 +1063,6 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_container_export (action)"
-      ],
-      "status_note": "docker_container_export takes a container, not a project/service.",
       "cli_only": true
     },
     {
@@ -1156,14 +1084,11 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_compose (resource)",
-        "docker_service_scale (action)"
-      ],
-      "status_note": "Declaratively via deploy.replicas in docker_compose content; docker_service_scale covers swarm services.",
       "cli_only": true,
-      "collision": "docker_service_scale (swarm action) already exists; docker_compose_scale is near-identical in purpose."
+      "collision": "docker_service_scale (swarm action) already exists; docker_compose_scale is near-identical in purpose.",
+      "decisions": [
+        "Q16"
+      ]
     },
     {
       "id": "compose:cli-wait",
@@ -1184,11 +1109,6 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_compose (resource)"
-      ],
-      "status_note": "docker_compose has wait/wait_timeout for readiness after apply, not for exit.",
       "cli_only": true
     },
     {
@@ -1210,9 +1130,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "Registry (OCI distribution) API, not Engine API.",
       "cli_only": true
     },
     {
@@ -1234,8 +1151,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "interactive, long-running file watcher"
     },
@@ -1258,8 +1173,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "interactive attach stream"
     },
@@ -1282,8 +1195,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "streaming"
     },
@@ -1306,8 +1217,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "streaming (a --no-stream snapshot could be a data source later)"
     },
@@ -1330,8 +1239,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "client version only; provider embeds compose-go v2.16.2"
     },
@@ -1354,15 +1261,11 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_compose (resource)",
-        "data.docker_containers (data source)",
-        "list.docker_container (list resource)"
-      ],
-      "status_note": "docker_compose.services gives container IDs for managed projects; docker_containers can filter by label for others.",
       "cli_only": true,
-      "collision": "Name options: docker_compose_ps (CLI-shaped) vs docker_compose_containers (plural-noun convention beside docker_containers)."
+      "collision": "Name options: docker_compose_ps (CLI-shaped) vs docker_compose_containers (plural-noun convention beside docker_containers).",
+      "decisions": [
+        "Q13"
+      ]
     },
     {
       "id": "compose:cli-ls",
@@ -1383,10 +1286,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": true,
-      "collision": "docker_compose_ls (CLI-shaped) vs docker_compose_projects (noun)."
+      "collision": "docker_compose_ls (CLI-shaped) vs docker_compose_projects (noun).",
+      "decisions": [
+        "Q13"
+      ]
     },
     {
       "id": "compose:cli-config",
@@ -1407,11 +1311,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "tools/compose2stack converts once at authoring time (a tool, not a type); compose_env only builds env. No type renders the model.",
       "cli_only": true,
-      "collision": "Confusable with top-level compose `configs` and docker_config (swarm config resource). Alternatives: docker_compose_project, docker_compose_model, or function compose_render."
+      "collision": "Confusable with top-level compose `configs` and docker_config (swarm config resource). Alternatives: docker_compose_project, docker_compose_model, or function compose_render.",
+      "decisions": [
+        "Q12"
+      ]
     },
     {
       "id": "compose:cli-convert",
@@ -1427,8 +1331,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "alias of config"
     },
@@ -1451,8 +1353,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": true,
       "collision": "Beside data.docker_image (singular) and list.docker_image."
     },
@@ -1475,15 +1375,11 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_compose (resource)",
-        "data.docker_volume (data source)",
-        "list.docker_volume (list resource)"
-      ],
-      "status_note": "docker_compose.volumes lists managed project volumes; no lookup for others.",
       "cli_only": true,
-      "collision": "docker_compose_volumes vs docker_volume / top-level compose `volumes`."
+      "collision": "docker_compose_volumes vs docker_volume / top-level compose `volumes`.",
+      "decisions": [
+        "Q14"
+      ]
     },
     {
       "id": "compose:cli-logs",
@@ -1504,11 +1400,6 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "data.docker_logs (data source)"
-      ],
-      "status_note": "climap maps it to docker_logs per container; no project/service selector.",
       "cli_only": true
     },
     {
@@ -1530,8 +1421,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": true
     },
     {
@@ -1553,8 +1442,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": true,
       "collision": "Confusable with the port_spec function."
     },
@@ -1577,8 +1464,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "command group only"
     },
@@ -1601,8 +1486,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "Terraform plan already is the dry run"
     },
@@ -1625,8 +1508,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "experimental authoring helper; output is a file, not infra (terraform query + list resources cover discovery)"
     },
@@ -1649,8 +1530,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "duplicate of docker_compose_publish"
     },
@@ -1673,8 +1552,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "duplicate of docker_compose_scale"
     },
@@ -1697,8 +1574,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "visualisation only; terraform graph covers it"
     },
@@ -1721,8 +1596,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "interactive file watcher"
     },
@@ -1745,8 +1618,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "command group; targets non-Docker platforms"
     },
@@ -1769,8 +1640,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "out of scope (Kubernetes output)"
     },
@@ -1793,8 +1662,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "command group"
     },
@@ -1817,8 +1684,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "out of scope (compose-bridge tooling)"
     },
@@ -1841,8 +1706,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": true,
       "skip_reason": "out of scope (compose-bridge tooling)"
     }

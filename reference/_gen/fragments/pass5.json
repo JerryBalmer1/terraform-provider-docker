@@ -1,0 +1,307 @@
+{
+  "lane": "P5",
+  "notes": [
+    "Pass 5 Lane 0: types registered before Pass 5 that the harvest did not list (ephemeral resources, list resources, functions, data.docker_registry_image_tags, data.docker_swarm_tokens, action.docker_system_prune) and the new docker_node resource (Q4). list_resource and function items have no outputs: the contract (V1/V2) covers the types that read or change Docker objects."
+  ],
+  "naming_questions": [],
+  "items": [
+    {
+      "id": "swarm:node",
+      "layer": "swarm",
+      "kind": "resource",
+      "name": "docker_node",
+      "summary": "Labels, availability and role of an already-joined swarm node (NodeUpdate), without joining or leaving (Q4).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "NodeInspect",
+          "method": "GET",
+          "path": "/nodes/{id}"
+        },
+        {
+          "type": "swagger",
+          "operationId": "NodeUpdate",
+          "method": "POST",
+          "path": "/nodes/{id}/update"
+        },
+        {
+          "type": "cli",
+          "command": "docker node update",
+          "file": "upstream/docker-cli/docs/reference/commandline/node_update.md"
+        }
+      ],
+      "min_api": null,
+      "cli_only": false,
+      "update": "in_place",
+      "decisions": [
+        "Q4"
+      ]
+    },
+    {
+      "id": "engine:system-prune",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_system_prune",
+      "summary": "Prune stopped containers, unused networks, dangling (or all unused) images, build cache and optionally volumes, like `docker system prune`.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerPrune",
+          "method": "POST",
+          "path": "/containers/prune"
+        },
+        {
+          "type": "swagger",
+          "operationId": "NetworkPrune",
+          "method": "POST",
+          "path": "/networks/prune"
+        },
+        {
+          "type": "swagger",
+          "operationId": "ImagePrune",
+          "method": "POST",
+          "path": "/images/prune"
+        },
+        {
+          "type": "swagger",
+          "operationId": "BuildPrune",
+          "method": "POST",
+          "path": "/build/prune"
+        },
+        {
+          "type": "swagger",
+          "operationId": "VolumePrune",
+          "method": "POST",
+          "path": "/volumes/prune"
+        },
+        {
+          "type": "cli",
+          "command": "docker system prune",
+          "file": "upstream/docker-cli/docs/reference/commandline/system_prune.md"
+        }
+      ],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "engine:registry-image-tags",
+      "layer": "engine",
+      "kind": "data_source",
+      "name": "docker_registry_image_tags",
+      "summary": "Every tag of a repository, read straight from its registry (GET /v2/<name>/tags/list, paginated).",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker buildx imagetools inspect",
+          "file": "upstream/buildx/docs/reference/buildx_imagetools_inspect.md"
+        }
+      ],
+      "min_api": null,
+      "cli_only": true
+    },
+    {
+      "id": "swarm:swarm-tokens-data",
+      "layer": "swarm",
+      "kind": "data_source",
+      "name": "docker_swarm_tokens",
+      "summary": "The swarm's worker and manager join tokens (SwarmInspect JoinTokens), stored in state as sensitive values.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SwarmInspect",
+          "method": "GET",
+          "path": "/swarm"
+        },
+        {
+          "type": "cli",
+          "command": "docker swarm join-token",
+          "file": "upstream/docker-cli/docs/reference/commandline/swarm_join-token.md"
+        }
+      ],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "swarm:swarm-tokens-ephemeral",
+      "layer": "swarm",
+      "kind": "ephemeral_resource",
+      "name": "docker_swarm_tokens",
+      "summary": "The swarm's join tokens as ephemeral values, never written to plan or state.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "SwarmInspect",
+          "method": "GET",
+          "path": "/swarm"
+        }
+      ],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "engine:registry-token",
+      "layer": "engine",
+      "kind": "ephemeral_resource",
+      "name": "docker_registry_token",
+      "summary": "A short-lived registry bearer token from the registry's token service, never written to plan or state.",
+      "sources": [
+        {
+          "type": "cli",
+          "command": "docker login",
+          "file": "upstream/docker-cli/docs/reference/commandline/login.md"
+        }
+      ],
+      "min_api": null,
+      "cli_only": true
+    },
+    {
+      "id": "engine:exec-output",
+      "layer": "engine",
+      "kind": "ephemeral_resource",
+      "name": "docker_exec_output",
+      "summary": "Runs a command in a running container and returns its exit code, stdout and stderr as ephemeral values.",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerExec",
+          "method": "POST",
+          "path": "/containers/{id}/exec"
+        },
+        {
+          "type": "swagger",
+          "operationId": "ExecStart",
+          "method": "POST",
+          "path": "/exec/{id}/start"
+        },
+        {
+          "type": "swagger",
+          "operationId": "ExecInspect",
+          "method": "GET",
+          "path": "/exec/{id}/json"
+        }
+      ],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "engine:list-container",
+      "layer": "engine",
+      "kind": "list_resource",
+      "name": "docker_container",
+      "summary": "Lists existing objects as `docker_container` resources for `terraform query` and bulk import.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "engine:list-image",
+      "layer": "engine",
+      "kind": "list_resource",
+      "name": "docker_image",
+      "summary": "Lists existing objects as `docker_image` resources for `terraform query` and bulk import.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "engine:list-network",
+      "layer": "engine",
+      "kind": "list_resource",
+      "name": "docker_network",
+      "summary": "Lists existing objects as `docker_network` resources for `terraform query` and bulk import.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "engine:list-volume",
+      "layer": "engine",
+      "kind": "list_resource",
+      "name": "docker_volume",
+      "summary": "Lists existing objects as `docker_volume` resources for `terraform query` and bulk import.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "swarm:list-swarm-node",
+      "layer": "swarm",
+      "kind": "list_resource",
+      "name": "docker_swarm_node",
+      "summary": "Lists existing objects as `docker_swarm_node` resources for `terraform query` and bulk import.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "swarm:list-service",
+      "layer": "swarm",
+      "kind": "list_resource",
+      "name": "docker_service",
+      "summary": "Lists existing objects as `docker_service` resources for `terraform query` and bulk import.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "swarm:list-secret",
+      "layer": "swarm",
+      "kind": "list_resource",
+      "name": "docker_secret",
+      "summary": "Lists existing objects as `docker_secret` resources for `terraform query` and bulk import.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "swarm:list-config",
+      "layer": "swarm",
+      "kind": "list_resource",
+      "name": "docker_config",
+      "summary": "Lists existing objects as `docker_config` resources for `terraform query` and bulk import.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "engine:function-parse-image-ref",
+      "layer": "engine",
+      "kind": "function",
+      "name": "parse_image_ref",
+      "summary": "Splits an image reference into registry, repository, tag and digest.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "engine:function-image-ref",
+      "layer": "engine",
+      "kind": "function",
+      "name": "image_ref",
+      "summary": "Builds a fully qualified image reference from its parts.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "engine:function-port-spec",
+      "layer": "engine",
+      "kind": "function",
+      "name": "port_spec",
+      "summary": "Parses a `docker run -p` port spec into host_ip, host_port, container_port and protocol.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    },
+    {
+      "id": "compose:function-compose-env",
+      "layer": "compose",
+      "kind": "function",
+      "name": "compose_env",
+      "summary": "Turns a map of environment variables into sorted KEY=VALUE strings.",
+      "sources": [],
+      "min_api": null,
+      "cli_only": false
+    }
+  ]
+}

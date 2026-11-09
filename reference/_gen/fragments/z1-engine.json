@@ -116,16 +116,20 @@
           "type": "cli",
           "command": "docker container cp (into a container)",
           "file": "upstream/docker-cli/docs/reference/commandline/container_cp.md"
+        },
+        {
+          "type": "swagger",
+          "operationId": "NetworkDisconnect",
+          "method": "POST",
+          "path": "/networks/{id}/disconnect"
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_container (resource)",
-        "list.docker_container (list resource)"
-      ],
-      "status_note": "Covers ContainerCreate/Update/Rename/Delete; PutContainerArchive only through `upload` blocks before first start; networks connected only at create (NetworkConnect), never connected/disconnected in place.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q1",
+        "Q9"
+      ]
     },
     {
       "id": "engine:container-data",
@@ -153,8 +157,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -183,18 +185,13 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "data.docker_containers (data source)",
-        "list.docker_container (list resource)"
-      ],
       "cli_only": false
     },
     {
       "id": "engine:container-logs",
       "layer": "engine",
       "kind": "data_source",
-      "name": "docker_logs",
+      "name": "docker_container_logs",
       "summary": "Read a container's logs (non-follow snapshot).",
       "sources": [
         {
@@ -211,11 +208,11 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "data.docker_logs (data source)"
-      ],
-      "cli_only": false
+      "cli_only": false,
+      "previous_name": "docker_logs",
+      "decisions": [
+        "Q6"
+      ]
     },
     {
       "id": "engine:container-top",
@@ -238,8 +235,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -263,8 +258,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -288,8 +281,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -321,16 +312,19 @@
         }
       ],
       "min_api": "1.20",
-      "status": "missing",
-      "existing": [],
       "cli_only": false,
-      "collision": "Confusable with docker_container `upload` blocks (the write direction); also consider an action instead if large archives are expected."
+      "collision": "Confusable with docker_container `upload` blocks (the write direction); also consider an action instead if large archives are expected.",
+      "decisions": [
+        "Q9",
+        "Q33",
+        "Q34"
+      ]
     },
     {
       "id": "engine:container-upload",
       "layer": "engine",
       "kind": "action",
-      "name": "docker_container_upload",
+      "name": "docker_container_cp",
       "summary": "Copy files into an existing (running) container at any time, not only before first start.",
       "sources": [
         {
@@ -347,12 +341,11 @@
         }
       ],
       "min_api": "1.20",
-      "status": "partial",
-      "existing": [
-        "docker_container (resource)"
-      ],
-      "status_note": "Only docker_container `upload` blocks (before first start) use PutContainerArchive.",
-      "cli_only": false
+      "cli_only": false,
+      "previous_name": "docker_container_upload",
+      "decisions": [
+        "Q9"
+      ]
     },
     {
       "id": "engine:container-export",
@@ -375,10 +368,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "action.docker_container_export (action)"
-      ],
       "cli_only": false
     },
     {
@@ -402,9 +391,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q15",
+        "Q40"
+      ]
     },
     {
       "id": "engine:container-stop",
@@ -427,9 +418,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q15",
+        "Q40"
+      ]
     },
     {
       "id": "engine:container-restart",
@@ -452,9 +445,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q15",
+        "Q40"
+      ]
     },
     {
       "id": "engine:container-kill",
@@ -477,9 +472,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q15",
+        "Q40"
+      ]
     },
     {
       "id": "engine:container-pause",
@@ -502,9 +499,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q15",
+        "Q40"
+      ]
     },
     {
       "id": "engine:container-unpause",
@@ -527,9 +526,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q15",
+        "Q40"
+      ]
     },
     {
       "id": "engine:container-wait",
@@ -552,8 +553,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -578,11 +577,6 @@
         }
       ],
       "min_api": "1.25",
-      "status": "partial",
-      "existing": [
-        "action.docker_system_prune (action)"
-      ],
-      "status_note": "Only through docker_system_prune with containers=true (and other kinds switched off); no dedicated action.",
       "cli_only": false
     },
     {
@@ -620,13 +614,12 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "action.docker_exec (action)",
-        "ephemeral.docker_exec_output (ephemeral resource)"
-      ],
-      "status_note": "ephemeral docker_exec_output uses the same three ops to return stdout as an ephemeral value.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q33",
+        "Q34",
+        "Q35"
+      ]
     },
     {
       "id": "engine:image",
@@ -680,19 +673,19 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_image (resource)",
-        "list.docker_image (list resource)"
-      ],
-      "status_note": "ImageCreate fromSrc (import) lives in action docker_image_import.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q3",
+        "Q20",
+        "Q44",
+        "Q46"
+      ]
     },
     {
       "id": "engine:image-build",
       "layer": "engine",
-      "kind": "action",
-      "name": "docker_image_build",
+      "kind": "skip",
+      "name": null,
       "summary": "One-shot image build without a managed image object (e.g. build-and-push pipelines).",
       "sources": [
         {
@@ -713,13 +706,13 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_image (resource)"
-      ],
-      "status_note": "Builds exist only as the docker_image `build` block (legacy builder and BuildKit via /session).",
       "cli_only": false,
-      "collision": "Confusable with docker_image (resource whose `build` block already calls ImageBuild) and with docker_buildx_builder."
+      "collision": "Confusable with docker_image (resource whose `build` block already calls ImageBuild) and with docker_buildx_builder.",
+      "skip_previous_name": "docker_image_build",
+      "skip_reason": "Q3: no standalone build action; builds live in docker_image's `build` block (BuildKit, Q20).",
+      "decisions": [
+        "Q3"
+      ]
     },
     {
       "id": "engine:image-data",
@@ -742,11 +735,11 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "data.docker_image (data source)"
-      ],
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q44",
+        "Q46"
+      ]
     },
     {
       "id": "engine:images",
@@ -774,11 +767,6 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "list.docker_image (list resource)"
-      ],
-      "status_note": "Only as a list resource for `terraform query`; no plural data source.",
       "cli_only": false
     },
     {
@@ -802,8 +790,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -823,8 +809,6 @@
         }
       ],
       "min_api": "1.55",
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -848,8 +832,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -874,11 +856,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_tag (resource)"
-      ],
-      "status_note": "Untag on destroy reuses ImageDelete (primary home engine:image).",
       "cli_only": false
     },
     {
@@ -910,11 +887,10 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_registry_image (resource)"
-      ],
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q45"
+      ]
     },
     {
       "id": "engine:registry-image-data",
@@ -933,12 +909,10 @@
         }
       ],
       "min_api": "1.30",
-      "status": "exists",
-      "existing": [
-        "data.docker_registry_image (data source)"
-      ],
-      "status_note": "No docker CLI command calls this endpoint directly (docker manifest/buildx imagetools talk to the registry client-side).",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q45"
+      ]
     },
     {
       "id": "engine:image-commit",
@@ -961,8 +935,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -993,10 +965,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "action.docker_image_save (action)"
-      ],
       "cli_only": false
     },
     {
@@ -1020,10 +988,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "action.docker_image_load (action)"
-      ],
       "cli_only": false
     },
     {
@@ -1046,10 +1010,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "action.docker_image_import (action)"
-      ],
       "cli_only": false
     },
     {
@@ -1074,11 +1034,6 @@
         }
       ],
       "min_api": "1.25",
-      "status": "exists",
-      "existing": [
-        "action.docker_image_prune (action)",
-        "action.docker_system_prune (action)"
-      ],
       "cli_only": false
     },
     {
@@ -1102,19 +1057,18 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "action.docker_system_prune (action)"
-      ],
-      "status_note": "Only through docker_system_prune build_cache=true; no dedicated action with keep/reserved-space options.",
       "cli_only": false,
-      "collision": "docker_builder_prune (Engine build cache) is easy to confuse with docker_buildx_builder (a BuildKit builder container); docker_build_cache_prune avoids it."
+      "collision": "docker_builder_prune (Engine build cache) is easy to confuse with docker_buildx_builder (a BuildKit builder container); docker_build_cache_prune avoids it.",
+      "decisions": [
+        "Q2",
+        "Q23"
+      ]
     },
     {
       "id": "engine:registry-auth",
       "layer": "engine",
-      "kind": "data_source",
-      "name": "docker_registry_auth",
+      "kind": "ephemeral_resource",
+      "name": "docker_registry_login",
       "summary": "Validate registry credentials through the daemon and return an identity token when the registry issues one.",
       "sources": [
         {
@@ -1131,13 +1085,12 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "ephemeral.docker_registry_token (ephemeral resource)"
-      ],
-      "status_note": "docker_registry_token gets a bearer token straight from the registry; nothing calls /auth. Should be ephemeral (returns a secret), which this schema has no kind for.",
       "cli_only": false,
-      "collision": "Confusable with ephemeral docker_registry_token and with provider registry_auth blocks."
+      "collision": "Confusable with ephemeral docker_registry_token and with provider registry_auth blocks.",
+      "previous_name": "docker_registry_auth",
+      "decisions": [
+        "Q7"
+      ]
     },
     {
       "id": "engine:info",
@@ -1165,9 +1118,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "Provider calls Info internally (swarm state, OS) but exposes no data source.",
       "cli_only": false
     },
     {
@@ -1191,8 +1141,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -1216,8 +1164,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -1241,8 +1187,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": false,
       "skip_reason": "Unbounded streaming endpoint; no Terraform lifecycle fits (a bounded since/until snapshot data source is possible later)."
     },
@@ -1271,8 +1215,6 @@
         }
       ],
       "min_api": "1.11",
-      "status": "n/a",
-      "existing": [],
       "cli_only": false,
       "skip_reason": "Used internally by provider configure for API version negotiation; no user-facing object."
     },
@@ -1304,8 +1246,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": false,
       "skip_reason": "Interactive hijacked/websocket stream."
     },
@@ -1332,8 +1272,6 @@
         }
       ],
       "min_api": null,
-      "status": "n/a",
-      "existing": [],
       "cli_only": false,
       "skip_reason": "Only meaningful for an interactive TTY session."
     },
@@ -1354,8 +1292,6 @@
         }
       ],
       "min_api": "1.31",
-      "status": "n/a",
-      "existing": [],
       "cli_only": false,
       "skip_reason": "Deprecated (API 1.53) transport; used internally by the docker_image BuildKit build path, not a user-facing object."
     },
@@ -1415,12 +1351,6 @@
         }
       ],
       "min_api": "1.21",
-      "status": "partial",
-      "existing": [
-        "docker_volume (resource)",
-        "list.docker_volume (list resource)"
-      ],
-      "status_note": "Local volumes complete; no ClusterVolumeSpec (swarm CSI volumes) and VolumeUpdate (1.42, cluster volumes only) is unused.",
       "cli_only": false
     },
     {
@@ -1445,10 +1375,6 @@
         }
       ],
       "min_api": "1.21",
-      "status": "exists",
-      "existing": [
-        "data.docker_volume (data source)"
-      ],
       "cli_only": false
     },
     {
@@ -1473,11 +1399,6 @@
         }
       ],
       "min_api": "1.21",
-      "status": "partial",
-      "existing": [
-        "list.docker_volume (list resource)"
-      ],
-      "status_note": "Only as a list resource; no plural data source.",
       "cli_only": false
     },
     {
@@ -1502,11 +1423,6 @@
         }
       ],
       "min_api": "1.25",
-      "status": "partial",
-      "existing": [
-        "action.docker_system_prune (action)"
-      ],
-      "status_note": "Only through docker_system_prune volumes=true.",
       "cli_only": false
     },
     {
@@ -1549,11 +1465,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_network (resource)",
-        "list.docker_network (list resource)"
-      ],
       "cli_only": false
     },
     {
@@ -1577,10 +1488,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "data.docker_network (data source)"
-      ],
       "cli_only": false
     },
     {
@@ -1604,19 +1511,13 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "list.docker_network (list resource)"
-      ],
-      "status_note": "Only as a list resource; no plural data source.",
       "cli_only": false
     },
     {
       "id": "engine:network-attachment",
       "layer": "engine",
-      "kind": "resource",
-      "name": "docker_network_attachment",
-      "update": "replace",
+      "kind": "skip",
+      "name": null,
       "summary": "Connect an existing container to a network (create) and disconnect it (destroy), independent of the container's lifecycle.",
       "sources": [
         {
@@ -1645,13 +1546,13 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_container (resource)"
-      ],
-      "status_note": "docker_container connects its `networks` at create only; NetworkDisconnect is never called and there is no standalone attachment.",
       "cli_only": false,
-      "collision": "Overlaps docker_container `networks`; managing the same pair in both would fight."
+      "collision": "Overlaps docker_container `networks`; managing the same pair in both would fight.",
+      "skip_previous_name": "docker_network_attachment",
+      "skip_reason": "Q1: no standalone attachment type; docker_container `networks` connects and disconnects in place (NetworkConnect / NetworkDisconnect).",
+      "decisions": [
+        "Q1"
+      ]
     },
     {
       "id": "engine:network-prune",
@@ -1675,11 +1576,6 @@
         }
       ],
       "min_api": "1.25",
-      "status": "partial",
-      "existing": [
-        "action.docker_system_prune (action)"
-      ],
-      "status_note": "Only through docker_system_prune networks=true.",
       "cli_only": false
     },
     {
@@ -1784,11 +1680,6 @@
         }
       ],
       "min_api": "1.25",
-      "status": "partial",
-      "existing": [
-        "docker_plugin (resource)"
-      ],
-      "status_note": "PluginUpgrade (1.26) is never used: a changed remote reference forces replacement instead of an in-place upgrade.",
       "cli_only": false
     },
     {
@@ -1813,10 +1704,6 @@
         }
       ],
       "min_api": "1.25",
-      "status": "exists",
-      "existing": [
-        "data.docker_plugin (data source)"
-      ],
       "cli_only": false
     },
     {
@@ -1841,8 +1728,6 @@
         }
       ],
       "min_api": "1.25",
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -1867,10 +1752,11 @@
         }
       ],
       "min_api": "1.25",
-      "status": "missing",
-      "existing": [],
       "cli_only": false,
-      "collision": "Confusable with docker_plugin (install from a registry). PluginCreate has a delete counterpart, so it could also be a resource."
+      "collision": "Confusable with docker_plugin (install from a registry). PluginCreate has a delete counterpart, so it could also be a resource.",
+      "decisions": [
+        "Q8"
+      ]
     },
     {
       "id": "engine:plugin-push",
@@ -1894,8 +1780,6 @@
         }
       ],
       "min_api": "1.25",
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -1956,12 +1840,10 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_swarm_init (resource)"
-      ],
-      "status_note": "SwarmUpdate is used for autolock in place; other spec fields' in-place coverage not audited here.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q38"
+      ]
     },
     {
       "id": "swarm:swarm-data",
@@ -1984,12 +1866,6 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "data.docker_swarm_tokens (data source)",
-        "ephemeral.docker_swarm_tokens (ephemeral resource)"
-      ],
-      "status_note": "Only join tokens and ID are exposed; spec/CA/TLS info has no data source.",
       "cli_only": false
     },
     {
@@ -2056,13 +1932,11 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_swarm_node (resource)",
-        "list.docker_swarm_node (list resource)"
-      ],
       "cli_only": false,
-      "collision": "docker_swarm_node is a *join* resource; a user expecting it to manage an already-joined node (labels/availability only, NodeUpdate) would need a separate type, e.g. docker_node."
+      "collision": "docker_swarm_node is a *join* resource; a user expecting it to manage an already-joined node (labels/availability only, NodeUpdate) would need a separate type, e.g. docker_node.",
+      "decisions": [
+        "Q4"
+      ]
     },
     {
       "id": "swarm:swarm-unlock",
@@ -2085,9 +1959,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "docker_swarm_init only detects the locked state and asks the user to unlock.",
       "cli_only": false
     },
     {
@@ -2110,11 +1981,10 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "action.docker_swarm_rotate_tokens (action)"
-      ],
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q10"
+      ]
     },
     {
       "id": "swarm:swarm-rotate-unlock-key",
@@ -2136,15 +2006,16 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q10"
+      ]
     },
     {
       "id": "swarm:swarm-ca-rotate",
       "layer": "swarm",
       "kind": "action",
-      "name": "docker_swarm_ca_rotate",
+      "name": "docker_swarm_rotate_ca",
       "summary": "Rotate the swarm root CA (or install an external one).",
       "sources": [
         {
@@ -2160,9 +2031,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "cli_only": false
+      "cli_only": false,
+      "previous_name": "docker_swarm_ca_rotate",
+      "decisions": [
+        "Q10"
+      ]
     },
     {
       "id": "swarm:node-data",
@@ -2185,10 +2058,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "data.docker_node (data source)"
-      ],
       "cli_only": false
     },
     {
@@ -2212,11 +2081,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "data.docker_nodes (data source)",
-        "list.docker_swarm_node (list resource)"
-      ],
       "cli_only": false
     },
     {
@@ -2239,10 +2103,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "action.docker_node_drain (action)"
-      ],
       "cli_only": false
     },
     {
@@ -2265,10 +2125,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "action.docker_node_activate (action)"
-      ],
       "cli_only": false
     },
     {
@@ -2291,12 +2147,11 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_swarm_node (resource)"
-      ],
-      "status_note": "Only as docker_swarm_node `role` for nodes Terraform joined; no imperative action.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q5",
+        "Q40"
+      ]
     },
     {
       "id": "swarm:node-demote",
@@ -2318,12 +2173,11 @@
         }
       ],
       "min_api": null,
-      "status": "partial",
-      "existing": [
-        "docker_swarm_node (resource)"
-      ],
-      "status_note": "Only as docker_swarm_node `role` for nodes Terraform joined; no imperative action.",
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q5",
+        "Q40"
+      ]
     },
     {
       "id": "swarm:service",
@@ -2377,11 +2231,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_service (resource)",
-        "list.docker_service (list resource)"
-      ],
       "cli_only": false
     },
     {
@@ -2405,9 +2254,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "Only the plural data.docker_services exists.",
       "cli_only": false
     },
     {
@@ -2431,11 +2277,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "data.docker_services (data source)",
-        "list.docker_service (list resource)"
-      ],
       "cli_only": false
     },
     {
@@ -2459,10 +2300,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false,
-      "collision": "Could instead extend data.docker_logs with a service_id/task_id argument."
+      "collision": "Could instead extend data.docker_logs with a service_id/task_id argument.",
+      "decisions": [
+        "Q6"
+      ]
     },
     {
       "id": "swarm:service-scale",
@@ -2484,10 +2326,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "action.docker_service_scale (action)"
-      ],
       "cli_only": false
     },
     {
@@ -2510,10 +2348,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "action.docker_service_rollback (action)"
-      ],
       "cli_only": false
     },
     {
@@ -2536,10 +2370,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "action.docker_service_force_update (action)"
-      ],
       "cli_only": false
     },
     {
@@ -2573,9 +2403,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "status_note": "TaskList is used internally (service convergence, stack, actions) but not exposed.",
       "cli_only": false
     },
     {
@@ -2599,8 +2426,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -2624,10 +2449,11 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false,
-      "collision": "Could merge with docker_service_logs or data.docker_logs."
+      "collision": "Could merge with docker_service_logs or data.docker_logs.",
+      "decisions": [
+        "Q6"
+      ]
     },
     {
       "id": "swarm:secret",
@@ -2680,12 +2506,6 @@
         }
       ],
       "min_api": "1.25",
-      "status": "exists",
-      "existing": [
-        "docker_secret (resource)",
-        "list.docker_secret (list resource)"
-      ],
-      "status_note": "SecretUpdate (labels only) is unused: label changes force replacement today.",
       "cli_only": false
     },
     {
@@ -2710,8 +2530,6 @@
         }
       ],
       "min_api": "1.25",
-      "status": "missing",
-      "existing": [],
       "cli_only": false
     },
     {
@@ -2736,11 +2554,6 @@
         }
       ],
       "min_api": "1.25",
-      "status": "exists",
-      "existing": [
-        "data.docker_secrets (data source)",
-        "list.docker_secret (list resource)"
-      ],
       "cli_only": false
     },
     {
@@ -2790,12 +2603,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "docker_config (resource)",
-        "list.docker_config (list resource)"
-      ],
-      "status_note": "ConfigUpdate (labels only) is unused: label changes force replacement today.",
       "cli_only": false,
       "collision": "docker_config (swarm config object) vs compose top-level `configs` and the provider's own configuration block."
     },
@@ -2820,8 +2627,6 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
       "cli_only": false,
       "collision": "Same confusion as docker_config resource (swarm config vs compose configs)."
     },
@@ -2846,11 +2651,6 @@
         }
       ],
       "min_api": null,
-      "status": "exists",
-      "existing": [
-        "data.docker_configs (data source)",
-        "list.docker_config (list resource)"
-      ],
       "cli_only": false
     }
   ]

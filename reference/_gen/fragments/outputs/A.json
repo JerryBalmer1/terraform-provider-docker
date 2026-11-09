@@ -547,7 +547,8 @@
          "name": "log_config",
          "upstream": "LogConfig",
          "tf_type": "object({...})",
-         "pointer": "#/definitions/HostConfig/allOf/1/properties/LogConfig"
+         "pointer": "#/definitions/HostConfig/allOf/1/properties/LogConfig",
+         "input_attr": "logging"
         },
         {
          "name": "network_mode",
@@ -1056,7 +1057,8 @@
          "name": "networks",
          "upstream": "Networks",
          "tf_type": "map(object({...}))",
-         "pointer": "#/definitions/NetworkSettings/properties/Networks"
+         "pointer": "#/definitions/NetworkSettings/properties/Networks",
+         "input_attr": "networks (map key = network name)"
         }
        ]
       }
@@ -1633,7 +1635,8 @@
          "name": "log_config",
          "upstream": "LogConfig",
          "tf_type": "object({...})",
-         "pointer": "#/definitions/HostConfig/allOf/1/properties/LogConfig"
+         "pointer": "#/definitions/HostConfig/allOf/1/properties/LogConfig",
+         "input_attr": "logging"
         },
         {
          "name": "network_mode",
@@ -2142,7 +2145,8 @@
          "name": "networks",
          "upstream": "Networks",
          "tf_type": "map(object({...}))",
-         "pointer": "#/definitions/NetworkSettings/properties/Networks"
+         "pointer": "#/definitions/NetworkSettings/properties/Networks",
+         "input_attr": "networks (map key = network name)"
         }
        ]
       }
@@ -2832,245 +2836,6 @@
    ],
    "outputs_status": "partial",
    "outputs_note": "Exposed today: id, name, labels. Missing: inspect_json, inspect, engine_api_version, docker_server_version, content_sha256.",
-   "uses_cli": false
-  },
-  "engine:network-attachment": {
-   "outputs": [
-    {
-     "name": "id",
-     "tf_type": "string",
-     "category": "identity",
-     "source": {
-      "type": "derived",
-      "from": "network_id, container_id",
-      "how": "\"<network_id>:<container_id>\""
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Attachment ID: network ID and container ID joined with a colon."
-    },
-    {
-     "name": "network_id",
-     "tf_type": "string",
-     "category": "identity",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/EndpointSettings/properties/NetworkID"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "ID of the attached network."
-    },
-    {
-     "name": "container_id",
-     "tf_type": "string",
-     "category": "identity",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/NetworkInspect/properties/Containers"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "ID of the attached container (the key in NetworkInspect.Containers)."
-    },
-    {
-     "name": "endpoint_id",
-     "tf_type": "string",
-     "category": "identity",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/EndpointSettings/properties/EndpointID"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Endpoint ID of the attachment."
-    },
-    {
-     "name": "endpoint_json",
-     "tf_type": "string",
-     "category": "raw",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/EndpointSettings"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "The container's EndpointSettings for this network (ContainerInspectResponse.NetworkSettings.Networks[<network>]) as JSON.",
-     "serializes": "endpoint"
-    },
-    {
-     "name": "endpoint",
-     "tf_type": "object({...})",
-     "category": "structured",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/EndpointSettings"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "The attachment's EndpointSettings as a nested object.",
-     "fields": [
-      {
-       "name": "ipam_config",
-       "upstream": "IPAMConfig",
-       "tf_type": "object({...})",
-       "pointer": "#/definitions/EndpointIPAMConfig",
-       "fields": [
-        {
-         "name": "ipv4_address",
-         "upstream": "IPv4Address",
-         "tf_type": "string",
-         "pointer": "#/definitions/EndpointIPAMConfig/properties/IPv4Address"
-        },
-        {
-         "name": "ipv6_address",
-         "upstream": "IPv6Address",
-         "tf_type": "string",
-         "pointer": "#/definitions/EndpointIPAMConfig/properties/IPv6Address"
-        },
-        {
-         "name": "link_local_ips",
-         "upstream": "LinkLocalIPs",
-         "tf_type": "list(string)",
-         "pointer": "#/definitions/EndpointIPAMConfig/properties/LinkLocalIPs"
-        }
-       ]
-      },
-      {
-       "name": "links",
-       "upstream": "Links",
-       "tf_type": "list(string)",
-       "pointer": "#/definitions/EndpointSettings/properties/Links"
-      },
-      {
-       "name": "mac_address",
-       "upstream": "MacAddress",
-       "tf_type": "string",
-       "pointer": "#/definitions/EndpointSettings/properties/MacAddress"
-      },
-      {
-       "name": "aliases",
-       "upstream": "Aliases",
-       "tf_type": "list(string)",
-       "pointer": "#/definitions/EndpointSettings/properties/Aliases"
-      },
-      {
-       "name": "driver_opts",
-       "upstream": "DriverOpts",
-       "tf_type": "map(string)",
-       "pointer": "#/definitions/EndpointSettings/properties/DriverOpts"
-      },
-      {
-       "name": "gw_priority",
-       "upstream": "GwPriority",
-       "tf_type": "number",
-       "pointer": "#/definitions/EndpointSettings/properties/GwPriority"
-      },
-      {
-       "name": "network_id",
-       "upstream": "NetworkID",
-       "tf_type": "string",
-       "pointer": "#/definitions/EndpointSettings/properties/NetworkID"
-      },
-      {
-       "name": "endpoint_id",
-       "upstream": "EndpointID",
-       "tf_type": "string",
-       "pointer": "#/definitions/EndpointSettings/properties/EndpointID"
-      },
-      {
-       "name": "gateway",
-       "upstream": "Gateway",
-       "tf_type": "string",
-       "pointer": "#/definitions/EndpointSettings/properties/Gateway"
-      },
-      {
-       "name": "ip_address",
-       "upstream": "IPAddress",
-       "tf_type": "string",
-       "pointer": "#/definitions/EndpointSettings/properties/IPAddress"
-      },
-      {
-       "name": "ip_prefix_len",
-       "upstream": "IPPrefixLen",
-       "tf_type": "number",
-       "pointer": "#/definitions/EndpointSettings/properties/IPPrefixLen"
-      },
-      {
-       "name": "ipv6_gateway",
-       "upstream": "IPv6Gateway",
-       "tf_type": "string",
-       "pointer": "#/definitions/EndpointSettings/properties/IPv6Gateway"
-      },
-      {
-       "name": "global_ipv6_address",
-       "upstream": "GlobalIPv6Address",
-       "tf_type": "string",
-       "pointer": "#/definitions/EndpointSettings/properties/GlobalIPv6Address"
-      },
-      {
-       "name": "global_ipv6_prefix_len",
-       "upstream": "GlobalIPv6PrefixLen",
-       "tf_type": "number",
-       "pointer": "#/definitions/EndpointSettings/properties/GlobalIPv6PrefixLen"
-      },
-      {
-       "name": "dns_names",
-       "upstream": "DNSNames",
-       "tf_type": "list(string)",
-       "pointer": "#/definitions/EndpointSettings/properties/DNSNames"
-      }
-     ],
-     "fields_complete": true
-    },
-    {
-     "name": "engine_api_version",
-     "tf_type": "string",
-     "category": "version",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/SystemVersion/properties/ApiVersion"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion)."
-    },
-    {
-     "name": "docker_server_version",
-     "tf_type": "string",
-     "category": "version",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/SystemVersion/properties/Version"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Docker Engine version from GET /version."
-    },
-    {
-     "name": "content_sha256",
-     "tf_type": "string",
-     "category": "hash",
-     "source": {
-      "type": "derived",
-      "from": "endpoint_json",
-      "how": "hex sha256 of the UTF-8 bytes of endpoint_json"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "hash_of": "endpoint_json",
-     "description": "sha256 of endpoint_json."
-    }
-   ],
-   "outputs_status": "missing",
-   "outputs_note": "No docker_network_attachment resource today (inventory status partial).",
    "uses_cli": false
   },
   "engine:plugin": {
@@ -7498,6 +7263,18 @@
       "pointer": "#/paths/~1containers~1{id}~1logs/get/parameters"
      },
      "description": "Only lines at or after this time: RFC 3339, or a duration before now such as \"42m\" (sent as the Engine's UNIX-timestamp `since`). Combined with tail when both are set."
+    },
+    {
+     "name": "container",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1logs/get"
+     },
+     "description": "The container whose logs are read, by ID or name (Q6)."
     }
    ],
    "uses_cli": false
@@ -8774,7 +8551,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "builder",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "--builder",
+     "source": {
+      "type": "cli",
+      "command": "docker buildx prune",
+      "file": "upstream/buildx/docs/reference/buildx_prune.md"
+     },
+     "description": "Unset: prune the Engine build cache (BuildPrune). Set: prune that buildx builder (Q2/Q23)."
+    }
+   ]
   },
   "engine:container-prune": {
    "outputs": [
@@ -8848,7 +8651,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "engine:image-prune": {
    "outputs": [
@@ -8936,7 +8753,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "engine:network-prune": {
    "outputs": [
@@ -9004,7 +8835,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "engine:volume-prune": {
    "outputs": [
@@ -9078,7 +8923,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "engine:container-kill": {
    "outputs": [
@@ -9096,7 +8955,7 @@
      "description": "ID of the target container."
     },
     {
-     "name": "state",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -9106,97 +8965,104 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Container State after the kill (ContainerInspectResponse.State), field by field.",
+     "description": "The action's outcome as one object (Q35): state.",
      "fields": [
       {
-       "name": "status",
-       "upstream": "Status",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Status"
-      },
-      {
-       "name": "running",
-       "upstream": "Running",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Running"
-      },
-      {
-       "name": "paused",
-       "upstream": "Paused",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Paused"
-      },
-      {
-       "name": "restarting",
-       "upstream": "Restarting",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Restarting"
-      },
-      {
-       "name": "oom_killed",
-       "upstream": "OOMKilled",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/OOMKilled"
-      },
-      {
-       "name": "dead",
-       "upstream": "Dead",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Dead"
-      },
-      {
-       "name": "pid",
-       "upstream": "Pid",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/Pid"
-      },
-      {
-       "name": "exit_code",
-       "upstream": "ExitCode",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/ExitCode"
-      },
-      {
-       "name": "error",
-       "upstream": "Error",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Error"
-      },
-      {
-       "name": "started_at",
-       "upstream": "StartedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/StartedAt"
-      },
-      {
-       "name": "finished_at",
-       "upstream": "FinishedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/FinishedAt"
-      },
-      {
-       "name": "health",
-       "upstream": "Health",
+       "name": "state",
+       "upstream": "state",
        "tf_type": "object({...})",
-       "pointer": "#/definitions/Health",
        "fields": [
         {
          "name": "status",
          "upstream": "Status",
          "tf_type": "string",
-         "pointer": "#/definitions/Health/properties/Status"
+         "pointer": "#/definitions/ContainerState/properties/Status"
         },
         {
-         "name": "failing_streak",
-         "upstream": "FailingStreak",
+         "name": "running",
+         "upstream": "Running",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Running"
+        },
+        {
+         "name": "paused",
+         "upstream": "Paused",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Paused"
+        },
+        {
+         "name": "restarting",
+         "upstream": "Restarting",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Restarting"
+        },
+        {
+         "name": "oom_killed",
+         "upstream": "OOMKilled",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/OOMKilled"
+        },
+        {
+         "name": "dead",
+         "upstream": "Dead",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Dead"
+        },
+        {
+         "name": "pid",
+         "upstream": "Pid",
          "tf_type": "number",
-         "pointer": "#/definitions/Health/properties/FailingStreak"
+         "pointer": "#/definitions/ContainerState/properties/Pid"
         },
         {
-         "name": "log",
-         "upstream": "Log",
-         "tf_type": "list(object({...}))",
-         "pointer": "#/definitions/Health/properties/Log"
+         "name": "exit_code",
+         "upstream": "ExitCode",
+         "tf_type": "number",
+         "pointer": "#/definitions/ContainerState/properties/ExitCode"
+        },
+        {
+         "name": "error",
+         "upstream": "Error",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/Error"
+        },
+        {
+         "name": "started_at",
+         "upstream": "StartedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/StartedAt"
+        },
+        {
+         "name": "finished_at",
+         "upstream": "FinishedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/FinishedAt"
+        },
+        {
+         "name": "health",
+         "upstream": "Health",
+         "tf_type": "object({...})",
+         "pointer": "#/definitions/Health",
+         "fields": [
+          {
+           "name": "status",
+           "upstream": "Status",
+           "tf_type": "string",
+           "pointer": "#/definitions/Health/properties/Status"
+          },
+          {
+           "name": "failing_streak",
+           "upstream": "FailingStreak",
+           "tf_type": "number",
+           "pointer": "#/definitions/Health/properties/FailingStreak"
+          },
+          {
+           "name": "log",
+           "upstream": "Log",
+           "tf_type": "list(object({...}))",
+           "pointer": "#/definitions/Health/properties/Log"
+          }
+         ]
         }
        ]
       }
@@ -9232,7 +9098,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "container_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1json/get"
+     },
+     "description": "The container (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "engine:container-pause": {
    "outputs": [
@@ -9250,7 +9142,7 @@
      "description": "ID of the target container."
     },
     {
-     "name": "state",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -9260,97 +9152,104 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Container State after the pause (ContainerInspectResponse.State), field by field.",
+     "description": "The action's outcome as one object (Q35): state.",
      "fields": [
       {
-       "name": "status",
-       "upstream": "Status",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Status"
-      },
-      {
-       "name": "running",
-       "upstream": "Running",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Running"
-      },
-      {
-       "name": "paused",
-       "upstream": "Paused",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Paused"
-      },
-      {
-       "name": "restarting",
-       "upstream": "Restarting",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Restarting"
-      },
-      {
-       "name": "oom_killed",
-       "upstream": "OOMKilled",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/OOMKilled"
-      },
-      {
-       "name": "dead",
-       "upstream": "Dead",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Dead"
-      },
-      {
-       "name": "pid",
-       "upstream": "Pid",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/Pid"
-      },
-      {
-       "name": "exit_code",
-       "upstream": "ExitCode",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/ExitCode"
-      },
-      {
-       "name": "error",
-       "upstream": "Error",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Error"
-      },
-      {
-       "name": "started_at",
-       "upstream": "StartedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/StartedAt"
-      },
-      {
-       "name": "finished_at",
-       "upstream": "FinishedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/FinishedAt"
-      },
-      {
-       "name": "health",
-       "upstream": "Health",
+       "name": "state",
+       "upstream": "state",
        "tf_type": "object({...})",
-       "pointer": "#/definitions/Health",
        "fields": [
         {
          "name": "status",
          "upstream": "Status",
          "tf_type": "string",
-         "pointer": "#/definitions/Health/properties/Status"
+         "pointer": "#/definitions/ContainerState/properties/Status"
         },
         {
-         "name": "failing_streak",
-         "upstream": "FailingStreak",
+         "name": "running",
+         "upstream": "Running",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Running"
+        },
+        {
+         "name": "paused",
+         "upstream": "Paused",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Paused"
+        },
+        {
+         "name": "restarting",
+         "upstream": "Restarting",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Restarting"
+        },
+        {
+         "name": "oom_killed",
+         "upstream": "OOMKilled",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/OOMKilled"
+        },
+        {
+         "name": "dead",
+         "upstream": "Dead",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Dead"
+        },
+        {
+         "name": "pid",
+         "upstream": "Pid",
          "tf_type": "number",
-         "pointer": "#/definitions/Health/properties/FailingStreak"
+         "pointer": "#/definitions/ContainerState/properties/Pid"
         },
         {
-         "name": "log",
-         "upstream": "Log",
-         "tf_type": "list(object({...}))",
-         "pointer": "#/definitions/Health/properties/Log"
+         "name": "exit_code",
+         "upstream": "ExitCode",
+         "tf_type": "number",
+         "pointer": "#/definitions/ContainerState/properties/ExitCode"
+        },
+        {
+         "name": "error",
+         "upstream": "Error",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/Error"
+        },
+        {
+         "name": "started_at",
+         "upstream": "StartedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/StartedAt"
+        },
+        {
+         "name": "finished_at",
+         "upstream": "FinishedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/FinishedAt"
+        },
+        {
+         "name": "health",
+         "upstream": "Health",
+         "tf_type": "object({...})",
+         "pointer": "#/definitions/Health",
+         "fields": [
+          {
+           "name": "status",
+           "upstream": "Status",
+           "tf_type": "string",
+           "pointer": "#/definitions/Health/properties/Status"
+          },
+          {
+           "name": "failing_streak",
+           "upstream": "FailingStreak",
+           "tf_type": "number",
+           "pointer": "#/definitions/Health/properties/FailingStreak"
+          },
+          {
+           "name": "log",
+           "upstream": "Log",
+           "tf_type": "list(object({...}))",
+           "pointer": "#/definitions/Health/properties/Log"
+          }
+         ]
         }
        ]
       }
@@ -9386,7 +9285,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "container_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1json/get"
+     },
+     "description": "The container (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "engine:container-restart": {
    "outputs": [
@@ -9404,7 +9329,7 @@
      "description": "ID of the target container."
     },
     {
-     "name": "state",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -9414,97 +9339,104 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Container State after the restart (ContainerInspectResponse.State), field by field.",
+     "description": "The action's outcome as one object (Q35): state.",
      "fields": [
       {
-       "name": "status",
-       "upstream": "Status",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Status"
-      },
-      {
-       "name": "running",
-       "upstream": "Running",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Running"
-      },
-      {
-       "name": "paused",
-       "upstream": "Paused",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Paused"
-      },
-      {
-       "name": "restarting",
-       "upstream": "Restarting",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Restarting"
-      },
-      {
-       "name": "oom_killed",
-       "upstream": "OOMKilled",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/OOMKilled"
-      },
-      {
-       "name": "dead",
-       "upstream": "Dead",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Dead"
-      },
-      {
-       "name": "pid",
-       "upstream": "Pid",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/Pid"
-      },
-      {
-       "name": "exit_code",
-       "upstream": "ExitCode",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/ExitCode"
-      },
-      {
-       "name": "error",
-       "upstream": "Error",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Error"
-      },
-      {
-       "name": "started_at",
-       "upstream": "StartedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/StartedAt"
-      },
-      {
-       "name": "finished_at",
-       "upstream": "FinishedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/FinishedAt"
-      },
-      {
-       "name": "health",
-       "upstream": "Health",
+       "name": "state",
+       "upstream": "state",
        "tf_type": "object({...})",
-       "pointer": "#/definitions/Health",
        "fields": [
         {
          "name": "status",
          "upstream": "Status",
          "tf_type": "string",
-         "pointer": "#/definitions/Health/properties/Status"
+         "pointer": "#/definitions/ContainerState/properties/Status"
         },
         {
-         "name": "failing_streak",
-         "upstream": "FailingStreak",
+         "name": "running",
+         "upstream": "Running",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Running"
+        },
+        {
+         "name": "paused",
+         "upstream": "Paused",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Paused"
+        },
+        {
+         "name": "restarting",
+         "upstream": "Restarting",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Restarting"
+        },
+        {
+         "name": "oom_killed",
+         "upstream": "OOMKilled",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/OOMKilled"
+        },
+        {
+         "name": "dead",
+         "upstream": "Dead",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Dead"
+        },
+        {
+         "name": "pid",
+         "upstream": "Pid",
          "tf_type": "number",
-         "pointer": "#/definitions/Health/properties/FailingStreak"
+         "pointer": "#/definitions/ContainerState/properties/Pid"
         },
         {
-         "name": "log",
-         "upstream": "Log",
-         "tf_type": "list(object({...}))",
-         "pointer": "#/definitions/Health/properties/Log"
+         "name": "exit_code",
+         "upstream": "ExitCode",
+         "tf_type": "number",
+         "pointer": "#/definitions/ContainerState/properties/ExitCode"
+        },
+        {
+         "name": "error",
+         "upstream": "Error",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/Error"
+        },
+        {
+         "name": "started_at",
+         "upstream": "StartedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/StartedAt"
+        },
+        {
+         "name": "finished_at",
+         "upstream": "FinishedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/FinishedAt"
+        },
+        {
+         "name": "health",
+         "upstream": "Health",
+         "tf_type": "object({...})",
+         "pointer": "#/definitions/Health",
+         "fields": [
+          {
+           "name": "status",
+           "upstream": "Status",
+           "tf_type": "string",
+           "pointer": "#/definitions/Health/properties/Status"
+          },
+          {
+           "name": "failing_streak",
+           "upstream": "FailingStreak",
+           "tf_type": "number",
+           "pointer": "#/definitions/Health/properties/FailingStreak"
+          },
+          {
+           "name": "log",
+           "upstream": "Log",
+           "tf_type": "list(object({...}))",
+           "pointer": "#/definitions/Health/properties/Log"
+          }
+         ]
         }
        ]
       }
@@ -9540,7 +9472,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "container_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1json/get"
+     },
+     "description": "The container (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "engine:container-start": {
    "outputs": [
@@ -9558,7 +9516,7 @@
      "description": "ID of the target container."
     },
     {
-     "name": "state",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -9568,97 +9526,104 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Container State after the start (ContainerInspectResponse.State), field by field.",
+     "description": "The action's outcome as one object (Q35): state.",
      "fields": [
       {
-       "name": "status",
-       "upstream": "Status",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Status"
-      },
-      {
-       "name": "running",
-       "upstream": "Running",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Running"
-      },
-      {
-       "name": "paused",
-       "upstream": "Paused",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Paused"
-      },
-      {
-       "name": "restarting",
-       "upstream": "Restarting",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Restarting"
-      },
-      {
-       "name": "oom_killed",
-       "upstream": "OOMKilled",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/OOMKilled"
-      },
-      {
-       "name": "dead",
-       "upstream": "Dead",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Dead"
-      },
-      {
-       "name": "pid",
-       "upstream": "Pid",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/Pid"
-      },
-      {
-       "name": "exit_code",
-       "upstream": "ExitCode",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/ExitCode"
-      },
-      {
-       "name": "error",
-       "upstream": "Error",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Error"
-      },
-      {
-       "name": "started_at",
-       "upstream": "StartedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/StartedAt"
-      },
-      {
-       "name": "finished_at",
-       "upstream": "FinishedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/FinishedAt"
-      },
-      {
-       "name": "health",
-       "upstream": "Health",
+       "name": "state",
+       "upstream": "state",
        "tf_type": "object({...})",
-       "pointer": "#/definitions/Health",
        "fields": [
         {
          "name": "status",
          "upstream": "Status",
          "tf_type": "string",
-         "pointer": "#/definitions/Health/properties/Status"
+         "pointer": "#/definitions/ContainerState/properties/Status"
         },
         {
-         "name": "failing_streak",
-         "upstream": "FailingStreak",
+         "name": "running",
+         "upstream": "Running",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Running"
+        },
+        {
+         "name": "paused",
+         "upstream": "Paused",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Paused"
+        },
+        {
+         "name": "restarting",
+         "upstream": "Restarting",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Restarting"
+        },
+        {
+         "name": "oom_killed",
+         "upstream": "OOMKilled",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/OOMKilled"
+        },
+        {
+         "name": "dead",
+         "upstream": "Dead",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Dead"
+        },
+        {
+         "name": "pid",
+         "upstream": "Pid",
          "tf_type": "number",
-         "pointer": "#/definitions/Health/properties/FailingStreak"
+         "pointer": "#/definitions/ContainerState/properties/Pid"
         },
         {
-         "name": "log",
-         "upstream": "Log",
-         "tf_type": "list(object({...}))",
-         "pointer": "#/definitions/Health/properties/Log"
+         "name": "exit_code",
+         "upstream": "ExitCode",
+         "tf_type": "number",
+         "pointer": "#/definitions/ContainerState/properties/ExitCode"
+        },
+        {
+         "name": "error",
+         "upstream": "Error",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/Error"
+        },
+        {
+         "name": "started_at",
+         "upstream": "StartedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/StartedAt"
+        },
+        {
+         "name": "finished_at",
+         "upstream": "FinishedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/FinishedAt"
+        },
+        {
+         "name": "health",
+         "upstream": "Health",
+         "tf_type": "object({...})",
+         "pointer": "#/definitions/Health",
+         "fields": [
+          {
+           "name": "status",
+           "upstream": "Status",
+           "tf_type": "string",
+           "pointer": "#/definitions/Health/properties/Status"
+          },
+          {
+           "name": "failing_streak",
+           "upstream": "FailingStreak",
+           "tf_type": "number",
+           "pointer": "#/definitions/Health/properties/FailingStreak"
+          },
+          {
+           "name": "log",
+           "upstream": "Log",
+           "tf_type": "list(object({...}))",
+           "pointer": "#/definitions/Health/properties/Log"
+          }
+         ]
         }
        ]
       }
@@ -9694,7 +9659,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "container_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1json/get"
+     },
+     "description": "The container (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "engine:container-stop": {
    "outputs": [
@@ -9712,7 +9703,7 @@
      "description": "ID of the target container."
     },
     {
-     "name": "state",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -9722,97 +9713,104 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Container State after the stop (ContainerInspectResponse.State), field by field.",
+     "description": "The action's outcome as one object (Q35): state.",
      "fields": [
       {
-       "name": "status",
-       "upstream": "Status",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Status"
-      },
-      {
-       "name": "running",
-       "upstream": "Running",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Running"
-      },
-      {
-       "name": "paused",
-       "upstream": "Paused",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Paused"
-      },
-      {
-       "name": "restarting",
-       "upstream": "Restarting",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Restarting"
-      },
-      {
-       "name": "oom_killed",
-       "upstream": "OOMKilled",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/OOMKilled"
-      },
-      {
-       "name": "dead",
-       "upstream": "Dead",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Dead"
-      },
-      {
-       "name": "pid",
-       "upstream": "Pid",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/Pid"
-      },
-      {
-       "name": "exit_code",
-       "upstream": "ExitCode",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/ExitCode"
-      },
-      {
-       "name": "error",
-       "upstream": "Error",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Error"
-      },
-      {
-       "name": "started_at",
-       "upstream": "StartedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/StartedAt"
-      },
-      {
-       "name": "finished_at",
-       "upstream": "FinishedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/FinishedAt"
-      },
-      {
-       "name": "health",
-       "upstream": "Health",
+       "name": "state",
+       "upstream": "state",
        "tf_type": "object({...})",
-       "pointer": "#/definitions/Health",
        "fields": [
         {
          "name": "status",
          "upstream": "Status",
          "tf_type": "string",
-         "pointer": "#/definitions/Health/properties/Status"
+         "pointer": "#/definitions/ContainerState/properties/Status"
         },
         {
-         "name": "failing_streak",
-         "upstream": "FailingStreak",
+         "name": "running",
+         "upstream": "Running",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Running"
+        },
+        {
+         "name": "paused",
+         "upstream": "Paused",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Paused"
+        },
+        {
+         "name": "restarting",
+         "upstream": "Restarting",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Restarting"
+        },
+        {
+         "name": "oom_killed",
+         "upstream": "OOMKilled",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/OOMKilled"
+        },
+        {
+         "name": "dead",
+         "upstream": "Dead",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Dead"
+        },
+        {
+         "name": "pid",
+         "upstream": "Pid",
          "tf_type": "number",
-         "pointer": "#/definitions/Health/properties/FailingStreak"
+         "pointer": "#/definitions/ContainerState/properties/Pid"
         },
         {
-         "name": "log",
-         "upstream": "Log",
-         "tf_type": "list(object({...}))",
-         "pointer": "#/definitions/Health/properties/Log"
+         "name": "exit_code",
+         "upstream": "ExitCode",
+         "tf_type": "number",
+         "pointer": "#/definitions/ContainerState/properties/ExitCode"
+        },
+        {
+         "name": "error",
+         "upstream": "Error",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/Error"
+        },
+        {
+         "name": "started_at",
+         "upstream": "StartedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/StartedAt"
+        },
+        {
+         "name": "finished_at",
+         "upstream": "FinishedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/FinishedAt"
+        },
+        {
+         "name": "health",
+         "upstream": "Health",
+         "tf_type": "object({...})",
+         "pointer": "#/definitions/Health",
+         "fields": [
+          {
+           "name": "status",
+           "upstream": "Status",
+           "tf_type": "string",
+           "pointer": "#/definitions/Health/properties/Status"
+          },
+          {
+           "name": "failing_streak",
+           "upstream": "FailingStreak",
+           "tf_type": "number",
+           "pointer": "#/definitions/Health/properties/FailingStreak"
+          },
+          {
+           "name": "log",
+           "upstream": "Log",
+           "tf_type": "list(object({...}))",
+           "pointer": "#/definitions/Health/properties/Log"
+          }
+         ]
         }
        ]
       }
@@ -9848,7 +9846,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "container_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1json/get"
+     },
+     "description": "The container (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "engine:container-unpause": {
    "outputs": [
@@ -9866,7 +9890,7 @@
      "description": "ID of the target container."
     },
     {
-     "name": "state",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -9876,97 +9900,104 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Container State after the unpause (ContainerInspectResponse.State), field by field.",
+     "description": "The action's outcome as one object (Q35): state.",
      "fields": [
       {
-       "name": "status",
-       "upstream": "Status",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Status"
-      },
-      {
-       "name": "running",
-       "upstream": "Running",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Running"
-      },
-      {
-       "name": "paused",
-       "upstream": "Paused",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Paused"
-      },
-      {
-       "name": "restarting",
-       "upstream": "Restarting",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Restarting"
-      },
-      {
-       "name": "oom_killed",
-       "upstream": "OOMKilled",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/OOMKilled"
-      },
-      {
-       "name": "dead",
-       "upstream": "Dead",
-       "tf_type": "bool",
-       "pointer": "#/definitions/ContainerState/properties/Dead"
-      },
-      {
-       "name": "pid",
-       "upstream": "Pid",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/Pid"
-      },
-      {
-       "name": "exit_code",
-       "upstream": "ExitCode",
-       "tf_type": "number",
-       "pointer": "#/definitions/ContainerState/properties/ExitCode"
-      },
-      {
-       "name": "error",
-       "upstream": "Error",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/Error"
-      },
-      {
-       "name": "started_at",
-       "upstream": "StartedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/StartedAt"
-      },
-      {
-       "name": "finished_at",
-       "upstream": "FinishedAt",
-       "tf_type": "string",
-       "pointer": "#/definitions/ContainerState/properties/FinishedAt"
-      },
-      {
-       "name": "health",
-       "upstream": "Health",
+       "name": "state",
+       "upstream": "state",
        "tf_type": "object({...})",
-       "pointer": "#/definitions/Health",
        "fields": [
         {
          "name": "status",
          "upstream": "Status",
          "tf_type": "string",
-         "pointer": "#/definitions/Health/properties/Status"
+         "pointer": "#/definitions/ContainerState/properties/Status"
         },
         {
-         "name": "failing_streak",
-         "upstream": "FailingStreak",
+         "name": "running",
+         "upstream": "Running",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Running"
+        },
+        {
+         "name": "paused",
+         "upstream": "Paused",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Paused"
+        },
+        {
+         "name": "restarting",
+         "upstream": "Restarting",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Restarting"
+        },
+        {
+         "name": "oom_killed",
+         "upstream": "OOMKilled",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/OOMKilled"
+        },
+        {
+         "name": "dead",
+         "upstream": "Dead",
+         "tf_type": "bool",
+         "pointer": "#/definitions/ContainerState/properties/Dead"
+        },
+        {
+         "name": "pid",
+         "upstream": "Pid",
          "tf_type": "number",
-         "pointer": "#/definitions/Health/properties/FailingStreak"
+         "pointer": "#/definitions/ContainerState/properties/Pid"
         },
         {
-         "name": "log",
-         "upstream": "Log",
-         "tf_type": "list(object({...}))",
-         "pointer": "#/definitions/Health/properties/Log"
+         "name": "exit_code",
+         "upstream": "ExitCode",
+         "tf_type": "number",
+         "pointer": "#/definitions/ContainerState/properties/ExitCode"
+        },
+        {
+         "name": "error",
+         "upstream": "Error",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/Error"
+        },
+        {
+         "name": "started_at",
+         "upstream": "StartedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/StartedAt"
+        },
+        {
+         "name": "finished_at",
+         "upstream": "FinishedAt",
+         "tf_type": "string",
+         "pointer": "#/definitions/ContainerState/properties/FinishedAt"
+        },
+        {
+         "name": "health",
+         "upstream": "Health",
+         "tf_type": "object({...})",
+         "pointer": "#/definitions/Health",
+         "fields": [
+          {
+           "name": "status",
+           "upstream": "Status",
+           "tf_type": "string",
+           "pointer": "#/definitions/Health/properties/Status"
+          },
+          {
+           "name": "failing_streak",
+           "upstream": "FailingStreak",
+           "tf_type": "number",
+           "pointer": "#/definitions/Health/properties/FailingStreak"
+          },
+          {
+           "name": "log",
+           "upstream": "Log",
+           "tf_type": "list(object({...}))",
+           "pointer": "#/definitions/Health/properties/Log"
+          }
+         ]
         }
        ]
       }
@@ -10002,7 +10033,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "container_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1json/get"
+     },
+     "description": "The container (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "engine:container-wait": {
    "outputs": [
@@ -10084,7 +10141,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "container_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1json/get"
+     },
+     "description": "The container (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "engine:container-export": {
    "outputs": [
@@ -10128,8 +10211,8 @@
      "description": "sha256 of the written archive (a file, not a raw string output)."
     },
     {
-     "name": "archive_size",
-     "tf_type": "number",
+     "name": "result",
+     "tf_type": "object({...})",
      "category": "result",
      "source": {
       "type": "derived",
@@ -10138,8 +10221,15 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Bytes in the tar archive the action streamed.",
-     "provided": false
+     "description": "The action's outcome as one object (Q35): archive_size.",
+     "fields": [
+      {
+       "name": "archive_size",
+       "upstream": "archive_size",
+       "tf_type": "number"
+      }
+     ],
+     "fields_complete": true
     },
     {
      "name": "engine_api_version",
@@ -10170,7 +10260,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "container_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1json/get"
+     },
+     "description": "The container (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "engine:container-upload": {
    "outputs": [
@@ -10214,7 +10330,7 @@
      "description": "sha256 of the uploaded tar archive."
     },
     {
-     "name": "path_stat",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -10224,41 +10340,47 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Stat of the target path after the upload (HEAD /containers/{id}/archive, X-Docker-Container-Path-Stat).",
+     "description": "The action's outcome as one object (Q35): path_stat.",
      "fields": [
       {
-       "name": "name",
-       "upstream": "name",
-       "tf_type": "string",
-       "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
-      },
-      {
-       "name": "size",
-       "upstream": "size",
-       "tf_type": "number",
-       "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
-      },
-      {
-       "name": "mode",
-       "upstream": "mode",
-       "tf_type": "number",
-       "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
-      },
-      {
-       "name": "mtime",
-       "upstream": "mtime",
-       "tf_type": "string",
-       "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
-      },
-      {
-       "name": "link_target",
-       "upstream": "linkTarget",
-       "tf_type": "string",
-       "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+       "name": "path_stat",
+       "upstream": "path_stat",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "name",
+         "upstream": "name",
+         "tf_type": "string",
+         "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+        },
+        {
+         "name": "size",
+         "upstream": "size",
+         "tf_type": "number",
+         "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+        },
+        {
+         "name": "mode",
+         "upstream": "mode",
+         "tf_type": "number",
+         "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+        },
+        {
+         "name": "mtime",
+         "upstream": "mtime",
+         "tf_type": "string",
+         "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+        },
+        {
+         "name": "link_target",
+         "upstream": "linkTarget",
+         "tf_type": "string",
+         "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+        }
+       ]
       }
      ],
-     "fields_complete": true,
-     "provided": false
+     "fields_complete": true
     },
     {
      "name": "engine_api_version",
@@ -10289,7 +10411,33 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "container_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1json/get"
+     },
+     "description": "The container (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "engine:exec": {
    "outputs": [
@@ -10320,7 +10468,7 @@
      "description": "ID of the container the command ran in."
     },
     {
-     "name": "output",
+     "name": "stdout",
      "tf_type": "string",
      "category": "raw",
      "source": {
@@ -10330,7 +10478,20 @@
      },
      "known_after_apply": true,
      "sensitive": true,
-     "description": "Demultiplexed stdout and stderr of the command as one string."
+     "description": "The command's standard output (Q33)."
+    },
+    {
+     "name": "stderr",
+     "tf_type": "string",
+     "category": "raw",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1exec~1{id}~1start/post/responses/200"
+     },
+     "known_after_apply": true,
+     "sensitive": true,
+     "description": "The command's standard error (Q33)."
     },
     {
      "name": "result",
@@ -10473,7 +10634,7 @@
      "description": "Docker Engine version from GET /version."
     },
     {
-     "name": "content_sha256",
+     "name": "stdout_sha256",
      "tf_type": "string",
      "category": "hash",
      "source": {
@@ -10483,146 +10644,53 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "hash_of": "output",
+     "hash_of": "stdout",
      "description": "sha256 of output."
-    }
-   ],
-   "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
-   "uses_cli": false
-  },
-  "engine:image-build": {
-   "outputs": [
-    {
-     "name": "image_id",
-     "tf_type": "string",
-     "category": "identity",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/ImageID/properties/ID"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "ID of the built image (aux message of the build stream)."
     },
     {
-     "name": "image_ref",
-     "tf_type": "string",
-     "category": "identity",
-     "source": {
-      "type": "derived",
-      "from": "t",
-      "how": "repo:tag the build was tagged with"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Tag given to the built image."
-    },
-    {
-     "name": "image",
-     "tf_type": "object({...})",
-     "category": "result",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/ImageInspect"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Summary of the image the build produced (GET /images/{id}/json).",
-     "fields": [
-      {
-       "name": "size",
-       "upstream": "Size",
-       "tf_type": "number",
-       "pointer": "#/definitions/ImageInspect/properties/Size"
-      },
-      {
-       "name": "created",
-       "upstream": "Created",
-       "tf_type": "string",
-       "pointer": "#/definitions/ImageInspect/properties/Created"
-      },
-      {
-       "name": "architecture",
-       "upstream": "Architecture",
-       "tf_type": "string",
-       "pointer": "#/definitions/ImageInspect/properties/Architecture"
-      },
-      {
-       "name": "os",
-       "upstream": "Os",
-       "tf_type": "string",
-       "pointer": "#/definitions/ImageInspect/properties/Os"
-      },
-      {
-       "name": "variant",
-       "upstream": "Variant",
-       "tf_type": "string",
-       "pointer": "#/definitions/ImageInspect/properties/Variant"
-      }
-     ],
-     "fields_complete": true,
-     "provided": false
-    },
-    {
-     "name": "build_log",
-     "tf_type": "string",
-     "category": "raw",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/BuildInfo"
-     },
-     "known_after_apply": true,
-     "sensitive": true,
-     "description": "The build progress stream (BuildInfo.stream / status messages) as one string; RUN output can echo build args and secrets."
-    },
-    {
-     "name": "engine_api_version",
-     "tf_type": "string",
-     "category": "version",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/SystemVersion/properties/ApiVersion"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion)."
-    },
-    {
-     "name": "docker_server_version",
-     "tf_type": "string",
-     "category": "version",
-     "source": {
-      "type": "swagger",
-      "file": "upstream/engine-api/api/swagger.yaml",
-      "pointer": "#/definitions/SystemVersion/properties/Version"
-     },
-     "known_after_apply": true,
-     "sensitive": false,
-     "description": "Docker Engine version from GET /version."
-    },
-    {
-     "name": "content_sha256",
+     "name": "stderr_sha256",
      "tf_type": "string",
      "category": "hash",
      "source": {
       "type": "derived",
-      "from": "build_log",
-      "how": "hex sha256 of the UTF-8 bytes of build_log"
+      "from": "stderr",
+      "how": "sha256 of the UTF-8 bytes"
      },
      "known_after_apply": true,
      "sensitive": false,
-     "hash_of": "build_log",
-     "description": "sha256 of build_log."
+     "hash_of": "stderr",
+     "description": "sha256 of `stderr` (Q34)."
     }
    ],
    "outputs_status": "missing",
-   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: partial).",
-   "uses_cli": false
+   "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "container_id",
+     "tf_type": "string",
+     "default": null,
+     "upstream": "id",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1json/get"
+     },
+     "description": "The container (ID or name) the action targets (Q40)."
+    }
+   ]
   },
   "engine:image-commit": {
    "outputs": [
@@ -10666,8 +10734,8 @@
      "description": "ID of the committed container."
     },
     {
-     "name": "changes",
-     "tf_type": "list(object({...}))",
+     "name": "result",
+     "tf_type": "object({...})",
      "category": "result",
      "source": {
       "type": "swagger",
@@ -10676,23 +10744,29 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "The container filesystem changes the commit captured (GET /containers/{id}/changes just before the commit).",
+     "description": "The action's outcome as one object (Q35): changes.",
      "fields": [
       {
-       "name": "path",
-       "upstream": "Path",
-       "tf_type": "string",
-       "pointer": "#/definitions/FilesystemChange/properties/Path"
-      },
-      {
-       "name": "kind",
-       "upstream": "Kind",
-       "tf_type": "number",
-       "pointer": "#/definitions/ChangeType"
+       "name": "changes",
+       "upstream": "changes",
+       "tf_type": "list(object({...}))",
+       "fields": [
+        {
+         "name": "path",
+         "upstream": "Path",
+         "tf_type": "string",
+         "pointer": "#/definitions/FilesystemChange/properties/Path"
+        },
+        {
+         "name": "kind",
+         "upstream": "Kind",
+         "tf_type": "number",
+         "pointer": "#/definitions/ChangeType"
+        }
+       ]
       }
      ],
-     "fields_complete": true,
-     "provided": false
+     "fields_complete": true
     },
     {
      "name": "engine_api_version",
@@ -10723,7 +10797,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "engine:image-import": {
    "outputs": [
@@ -10754,7 +10842,7 @@
      "description": "Reference the imported image was tagged with."
     },
     {
-     "name": "image",
+     "name": "result",
      "tf_type": "object({...})",
      "category": "result",
      "source": {
@@ -10764,41 +10852,47 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Summary of the imported image (GET /images/{id}/json).",
+     "description": "The action's outcome as one object (Q35): image.",
      "fields": [
       {
-       "name": "size",
-       "upstream": "Size",
-       "tf_type": "number",
-       "pointer": "#/definitions/ImageInspect/properties/Size"
-      },
-      {
-       "name": "created",
-       "upstream": "Created",
-       "tf_type": "string",
-       "pointer": "#/definitions/ImageInspect/properties/Created"
-      },
-      {
-       "name": "architecture",
-       "upstream": "Architecture",
-       "tf_type": "string",
-       "pointer": "#/definitions/ImageInspect/properties/Architecture"
-      },
-      {
-       "name": "os",
-       "upstream": "Os",
-       "tf_type": "string",
-       "pointer": "#/definitions/ImageInspect/properties/Os"
-      },
-      {
-       "name": "variant",
-       "upstream": "Variant",
-       "tf_type": "string",
-       "pointer": "#/definitions/ImageInspect/properties/Variant"
+       "name": "image",
+       "upstream": "image",
+       "tf_type": "object({...})",
+       "fields": [
+        {
+         "name": "size",
+         "upstream": "Size",
+         "tf_type": "number",
+         "pointer": "#/definitions/ImageInspect/properties/Size"
+        },
+        {
+         "name": "created",
+         "upstream": "Created",
+         "tf_type": "string",
+         "pointer": "#/definitions/ImageInspect/properties/Created"
+        },
+        {
+         "name": "architecture",
+         "upstream": "Architecture",
+         "tf_type": "string",
+         "pointer": "#/definitions/ImageInspect/properties/Architecture"
+        },
+        {
+         "name": "os",
+         "upstream": "Os",
+         "tf_type": "string",
+         "pointer": "#/definitions/ImageInspect/properties/Os"
+        },
+        {
+         "name": "variant",
+         "upstream": "Variant",
+         "tf_type": "string",
+         "pointer": "#/definitions/ImageInspect/properties/Variant"
+        }
+       ]
       }
      ],
-     "fields_complete": true,
-     "provided": false
+     "fields_complete": true
     },
     {
      "name": "engine_api_version",
@@ -10829,7 +10923,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "engine:image-load": {
    "outputs": [
@@ -10847,8 +10955,8 @@
      "description": "References or IDs reported as \"Loaded image: ...\" / \"Loaded image ID: ...\" in the POST /images/load stream."
     },
     {
-     "name": "archive_size",
-     "tf_type": "number",
+     "name": "result",
+     "tf_type": "object({...})",
      "category": "result",
      "source": {
       "type": "derived",
@@ -10857,8 +10965,15 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Bytes in the tar archive the action read.",
-     "provided": false
+     "description": "The action's outcome as one object (Q35): archive_size.",
+     "fields": [
+      {
+       "name": "archive_size",
+       "upstream": "archive_size",
+       "tf_type": "number"
+      }
+     ],
+     "fields_complete": true
     },
     {
      "name": "engine_api_version",
@@ -10889,7 +11004,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "engine:image-save": {
    "outputs": [
@@ -10933,8 +11062,8 @@
      "description": "sha256 of the written archive."
     },
     {
-     "name": "archive_size",
-     "tf_type": "number",
+     "name": "result",
+     "tf_type": "object({...})",
      "category": "result",
      "source": {
       "type": "derived",
@@ -10943,8 +11072,15 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Bytes in the tar archive the action streamed.",
-     "provided": false
+     "description": "The action's outcome as one object (Q35): archive_size.",
+     "fields": [
+      {
+       "name": "archive_size",
+       "upstream": "archive_size",
+       "tf_type": "number"
+      }
+     ],
+     "fields_complete": true
     },
     {
      "name": "engine_api_version",
@@ -10975,7 +11111,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: exists).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "engine:plugin-create": {
    "outputs": [
@@ -11006,8 +11156,8 @@
      "description": "ID of the created plugin (GET /plugins/{name}/json after create)."
     },
     {
-     "name": "enabled",
-     "tf_type": "bool",
+     "name": "result",
+     "tf_type": "object({...})",
      "category": "result",
      "source": {
       "type": "swagger",
@@ -11016,8 +11166,15 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Whether the plugin is enabled after create (a created plugin starts disabled).",
-     "provided": false
+     "description": "The action's outcome as one object (Q35): enabled.",
+     "fields": [
+      {
+       "name": "enabled",
+       "upstream": "enabled",
+       "tf_type": "bool"
+      }
+     ],
+     "fields_complete": true
     },
     {
      "name": "engine_api_version",
@@ -11048,7 +11205,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   },
   "engine:plugin-push": {
    "outputs": [
@@ -11079,8 +11250,8 @@
      "description": "Digest reported by the push stream (\"<tag>: digest: sha256:... size: N\")."
     },
     {
-     "name": "push_status",
-     "tf_type": "string",
+     "name": "result",
+     "tf_type": "object({...})",
      "category": "result",
      "source": {
       "type": "swagger",
@@ -11089,8 +11260,15 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "Last status message of the push stream (\"<tag>: digest: sha256:… size: N\").",
-     "provided": false
+     "description": "The action's outcome as one object (Q35): push_status.",
+     "fields": [
+      {
+       "name": "push_status",
+       "upstream": "push_status",
+       "tf_type": "string"
+      }
+     ],
+     "fields_complete": true
     },
     {
      "name": "engine_api_version",
@@ -11121,7 +11299,21 @@
    ],
    "outputs_status": "missing",
    "outputs_note": "Terraform actions have no result attributes; none of these values is exposed today (status of the action itself: missing).",
-   "uses_cli": false
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    }
+   ]
   }
  }
 }

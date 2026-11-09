@@ -2,7 +2,7 @@
 
 Every resource and data source of the provider exposes its full result as computed attributes, the same as any
 normal Terraform resource, so a downstream provider (Ansible, a config-management module, anything) can consume
-either the whole thing or a single field. Actions list the values they return or change.
+either the whole thing or a single field. Actions report one result object (see [Action results](#action-results)).
 
 This file is the rule set. The per-item outputs are proposals that live in
 [_gen/fragments/outputs/](_gen/fragments/outputs/) (one file per lane). [INVENTORY.md](INVENTORY.md#outputs) has
@@ -19,10 +19,10 @@ Each output has `name`, `tf_type`, `category`, `source`, `known_after_apply` and
 |---|---|---|
 | **raw** | The whole result as one string, serialized from the structured output where possible. | `dockerfile` (rendered), `compose_yaml` (normalized, as `docker compose config` prints it), `stack_yaml`, `inspect_json` (the exact Engine API inspect response), `bake_hcl` / `bake_json`, `manifest_json` |
 | **structured** | A nested object mirroring the upstream schema, so every field is addressable. | `stages[0].base_image`, `project.services["web"].ports`, `inspect.spec.task_template.container_spec.image` |
-| **result** | The outcome of running an action, or a descriptive value about how the data was produced, not the identity or state of a lasting object. Every structured output of an action is a result, and every action has at least one (V6). | prune `result` (`space_reclaimed`), container `state` after start/stop, compose `container_states` after up/stop, exec/run `result` (`exit_code`, `stdout`), service `update_status`, `archive_size`, commit `changes`, `created`, `fidelity`, `reconstructed` |
+| **result** | The outcome of running an action, or a descriptive value about how the data was produced, not the identity or state of a lasting object. Every structured output of an action is a result, and every action has at least one (V6). | an action's single `result` object (prune `space_reclaimed`, exec/run `exit_code`, container `state`, service `update_status`, `archive_size`, commit `changes`); on data sources `created`, `fidelity` |
 | **identity** | Stable handoff values. | `id`, `name`, `image_ref` (repo:tag), `image_digest_ref` (repo@sha256:…), `digest`, `platforms`, `labels` |
 | **version** | Which versions produced or describe the result. | see [Version metadata](#version-metadata) |
-| **hash** | `sha256` of a raw output, so a consumer can detect change without diffing the text. | `content_sha256`, or `<raw>_sha256` when an item has more than one raw output |
+| **hash** | `sha256` of a raw output, so a consumer can detect change without diffing the text. | `content_sha256` when the item has one raw output; `<raw>_sha256` for each raw output when it has two or more (Q34) |
 
 Rules:
 - Raw and structured describe the same data. The raw output names the structured one it serializes (`serializes`).
@@ -47,7 +47,7 @@ Rules:
 - Attribute names are snake_case, derived from the upstream name: `HostConfig` → `host_config`,
   `IPAddress` → `ip_address`, `Id`/`ID` → `id`, `EnableIPv6` → `enable_ipv6`. Acronym runs stay whole
   (`LinkLocalIPs` → `link_local_ips`, `NanoCPUs` → `nano_cpus`).
-- Logs: every logs item (`docker_logs`, `docker_service_logs`, `docker_task_logs`, `docker_compose_logs`) has the
+- Logs: every logs item (`docker_container_logs`, `docker_service_logs`, `docker_task_logs`, `docker_compose_logs`) has the
   structured `log_entries`, `list(object({timestamp=string, stream=string, source=string, message=string}))`, and the
   raw `logs` that serializes it, one line per entry `<timestamp> <stream> <source> <message>`, hashed as
   `content_sha256`.
@@ -80,6 +80,7 @@ Rules:
 | `dockerfile_syntax` | The `# syntax=` value, or the default frontend when there is none | Dockerfile reference `#syntax`; pin `dockerfile` (1.28.0) |
 | `buildx_version` | The buildx release the bake/imagetools model follows | SOURCES.md pin `buildx` (v0.38.2) |
 | `buildkit_version` | The BuildKit version a builder node runs | `docker buildx inspect` node `BuildkitVersion` |
+| `distribution_api_version` | The registry's API version, for items that talk to a registry directly | `Docker-Distribution-API-Version` response header |
 | `docker_cli_version` | The docker CLI binary an item runs; allowed only on items with `uses_cli: true` | `docker version` client `Version` |
 
 The authoritative list is the version registry in [_gen/SCHEMA.md](_gen/SCHEMA.md); this table mirrors it. Any
@@ -88,6 +89,31 @@ fails (rule V3). Every item says whether it runs the docker CLI (`uses_cli`). No
 never shells out, so no item carries `docker_cli_version`. The cli-only types (stack, manifest) reproduce CLI
 behaviour through the Engine and registry APIs instead. A swarm object's `Version.Index` is an identity value
 (`version_index`), not version metadata.
+
+## Action results
+
+Terraform 1.14 actions have no computed attributes, so an action cannot hand values back into configuration or state.
+From Pass 5 on (DECISIONS.md Q35, Q43):
+
+- Every action has exactly one `result` output: the structured API response body (for composite actions, the merged
+  responses), field by field like any structured output.
+- The **result object** of an action is all of its outputs keyed by output name: `result`, the identity and version
+  outputs, raw outputs such as exec `stdout` / `stderr` (Q33), and their hashes. Compose exec / run report
+  `{exit_code, stdout, stderr}` this way: `result.exit_code` beside the raw `stdout` and `stderr`.
+- Every progress message the action sends at the end carries the result object as JSON, with sensitive fields shown as
+  `(sensitive)`.
+- Every action takes an optional `result_path` input. After a successful run the action writes the result object to
+  that local file as JSON: UTF-8, keys sorted at every level, a trailing newline, sensitive fields written in full
+  (the file is the user's own). Nothing is written when the run fails.
+- A later Terraform run reads it with `jsondecode(data.local_file.x.content)` (hashicorp/local), e.g.
+  `jsondecode(data.local_file.prune.content).result.space_reclaimed`.
+- The shared code is `internal/provider/action_result.go`. Lanes do not format results themselves.
+
+## Kinds outside the contract
+
+List resources and provider functions have no outputs in the inventory and are not checked by V1-V6. A list resource
+returns the state of the managed resource it lists, which carries that resource's contract outputs. A function
+returns a computed value and touches no Docker object.
 
 ## Validation rules
 
@@ -98,7 +124,7 @@ behaviour through the Engine and registry APIs instead. A swarm object's `Versio
 | V3 | Version outputs use only names in the SCHEMA.md registry; `docker_cli_version` only on items with `uses_cli: true`. |
 | V4 | Every structured output, and every object-typed result output, has a non-empty `fields` mapping. |
 | V5 | A structured or result output is `sensitive` as a whole only with a `sensitive_reason`; otherwise its secret-carrying fields are marked. |
-| V6 | Every action has at least one `result` output. Resources and data sources need not have one. |
+| V6 | Every action has at least one `result` output (Pass 5: exactly one, named `result`). Resources and data sources need not have one. |
 | L1 | Every logs item has a `tail` and/or `since` input, and a `tail` input has a positive default limit. |
 
 A violation fails `Invoke-Build InventoryValidate` unless [_gen/allowed-violations.txt](_gen/allowed-violations.txt)
@@ -127,7 +153,7 @@ with no Terraform- or Docker-provider-specific types:
 
 | value | from | use downstream |
 |---|---|---|
-| `dockerfile` (text) + `content_sha256` | `data.docker_dockerfile`, `docker_image` | Audit or re-build elsewhere; the hash detects drift. |
+| `dockerfile` (text) + `dockerfile_sha256` | `data.docker_dockerfile`, `docker_image` | Audit or re-build elsewhere; the hash detects drift. |
 | `image_digest_ref` (repo@sha256:…) | `docker_image`, `docker_registry_image`, `data.docker_image`, `data.docker_registry_image`, `docker_service` | Pin deployments by digest, never by tag. |
 | `image_ref` (repo:tag), `platforms`, `labels` | the same image types | Human-readable reference, platform selection, metadata. |
 | `compose_yaml` + `content_sha256` | `docker_compose`, `data.docker_compose_config` | Hand the normalized project to another runner. |
@@ -160,7 +186,7 @@ resource "docker_image" "app" {
   }
   # Rebuild when the parsed Dockerfile changes.
   triggers = {
-    dockerfile_sha256 = data.docker_dockerfile.app.content_sha256
+    dockerfile_sha256 = data.docker_dockerfile.app.dockerfile_sha256
   }
 }
 
@@ -170,7 +196,7 @@ module "deploy" {
 
   image_digest_ref = docker_image.app.image_digest_ref   # repo@sha256:..., pin by digest
   dockerfile       = data.docker_dockerfile.app.dockerfile # sensitive: may carry ARG/ENV values
-  dockerfile_sha256 = data.docker_dockerfile.app.content_sha256
+  dockerfile_sha256 = data.docker_dockerfile.app.dockerfile_sha256
   base_images      = [for s in data.docker_dockerfile.app.stages : s.base_image]
   versions = {
     dockerfile_syntax     = data.docker_dockerfile.app.dockerfile_syntax

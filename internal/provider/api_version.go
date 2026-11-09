@@ -355,3 +355,66 @@ func isBlockLike(v tftypes.Value) bool {
 	}
 	return false
 }
+
+// ---------------------------------------------------------------------------
+// Item-level gate
+//
+// Which gate to use:
+//   - pd.gateItemAPI(ctx, itemID, diags): the whole type needs a newer
+//     Engine API than the provider floor (the endpoint itself appeared in
+//     that version). The minimum comes from the generated contract table
+//     (inventory min_api), so new values flow in by regenerating
+//     contract_gen.go; nothing is written in the lane file. Call it at the
+//     start of Read (data sources), Create/Read (resources), Invoke
+//     (actions), Open (ephemeral) or List (list resources).
+//   - apiSince("1.NN") in a description + pd.gateAPISince: one attribute or
+//     block needs a newer API than the rest of the type (a field added to an
+//     existing endpoint). The annotation lives in the schema description.
+
+// gateItemAPI reports whether the daemon is new enough for itemID (an
+// inventory id such as "engine:image-attestations"). It returns false after
+// adding an error naming the type, the needed and the negotiated version
+// when the daemon is older than the item's min_api. It is a no-op (true)
+// on a nil providerData (validation, before Configure), for an item with
+// no min_api, and when min_api is at or below min_api_version (the floor
+// already guarantees it), so it only contacts the daemon when it must. A
+// daemon that cannot be reached becomes a warning and true: the operation
+// itself will report it. An unknown itemID is a provider bug: an error and
+// false.
+func (pd *providerData) gateItemAPI(ctx context.Context, itemID string, diags *diag.Diagnostics) bool {
+	it, ok := contractLookup(itemID)
+	if !ok {
+		diags.AddError("Provider bug", fmt.Sprintf("gateItemAPI: unknown inventory item %q (regenerate contract_gen.go?)", itemID))
+		return false
+	}
+	if pd == nil || it.MinAPI == "" {
+		return true
+	}
+	if pd.MinAPIVersion != "" && !versions.LessThan(pd.MinAPIVersion, it.MinAPI) {
+		return true
+	}
+	what := gateItemLabel(it)
+	v, err := pd.APIVersion(ctx)
+	if err != nil {
+		var floor *apiFloorError
+		if errors.As(err, &floor) {
+			diags.AddError("Docker daemon too old", err.Error())
+			return false
+		}
+		diags.AddWarning("Cannot check Engine API requirements",
+			fmt.Sprintf("%s needs Engine API >= %s, but the daemon version is unknown: %v", what, it.MinAPI, err))
+		return true
+	}
+	if versions.LessThan(v, it.MinAPI) {
+		diags.AddError("Engine API version too old",
+			fmt.Sprintf("%s needs Engine API >= %s; the daemon at %s negotiated %s. Upgrade the Docker Engine.", what, it.MinAPI, pd.Endpoint.Host, v))
+		return false
+	}
+	return true
+}
+
+// gateItemLabel names an item for messages: "data source docker_x".
+func gateItemLabel(it *contractItem) string {
+	kind := strings.ReplaceAll(it.Kind, "_", " ")
+	return kind + " " + it.Name
+}

@@ -2507,11 +2507,11 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "The project name (resource ID).",
+          "description": "Equal to `name` (Q41).",
           "provided": true
         },
         {
-          "name": "project_name",
+          "name": "name",
           "tf_type": "string",
           "category": "identity",
           "source": {
@@ -2521,7 +2521,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "Project name used to name and label every object (top-level `name`, else the working directory name).",
+          "description": "The compose project name (compose-spec top-level `name`, Q41).",
           "provided": true
         },
         {
@@ -2854,7 +2854,8 @@
                   "name": "logging",
                   "upstream": "logging",
                   "tf_type": "object({...})",
-                  "pointer": "#/$defs/container_spec/properties/logging"
+                  "pointer": "#/$defs/container_spec/properties/logging",
+                  "input_attr": "services.logging (compose shape)"
                 },
                 {
                   "name": "mac_address",
@@ -5910,30 +5911,6 @@
           "description": "Platforms built."
         },
         {
-          "name": "compose_spec_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "compose_spec"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "Pinned compose-spec commit the structured fields follow (main @ 3a4a699...)."
-        },
-        {
-          "name": "compose_go_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "compose_go"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "compose-go version that loads, interpolates, merges and validates the project (v2.16.2, from go.mod)."
-        },
-        {
           "name": "engine_api_version",
           "tf_type": "string",
           "category": "version",
@@ -5948,7 +5925,8 @@
         }
       ],
       "no_raw_reason": "The build section is serialized inside compose_yaml (compose:name); docker_image's own inspect_json belongs to the engine image item.",
-      "uses_cli": false
+      "uses_cli": false,
+      "outputs_note": "Pass 5 Lane Z: the compose version outputs were dropped here; they describe compose parsing, which docker_image does not do (docker_compose carries them)."
     },
     "compose:service-deploy": {
       "outputs": [
@@ -9921,8 +9899,8 @@
           "description": "Service name -> built image ID."
         },
         {
-          "name": "built_images",
-          "tf_type": "map(object({...}))",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -9931,37 +9909,44 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "Service name -> summary of the image built for it (GET /images/{id}/json).",
+          "description": "The action's outcome as one object (Q35): built_images.",
           "fields": [
             {
-              "name": "size",
-              "upstream": "Size",
-              "tf_type": "number",
-              "pointer": "#/definitions/ImageInspect/properties/Size"
-            },
-            {
-              "name": "created",
-              "upstream": "Created",
-              "tf_type": "string",
-              "pointer": "#/definitions/ImageInspect/properties/Created"
-            },
-            {
-              "name": "architecture",
-              "upstream": "Architecture",
-              "tf_type": "string",
-              "pointer": "#/definitions/ImageInspect/properties/Architecture"
-            },
-            {
-              "name": "os",
-              "upstream": "Os",
-              "tf_type": "string",
-              "pointer": "#/definitions/ImageInspect/properties/Os"
-            },
-            {
-              "name": "variant",
-              "upstream": "Variant",
-              "tf_type": "string",
-              "pointer": "#/definitions/ImageInspect/properties/Variant"
+              "name": "built_images",
+              "upstream": "built_images",
+              "tf_type": "map(object({...}))",
+              "fields": [
+                {
+                  "name": "size",
+                  "upstream": "Size",
+                  "tf_type": "number",
+                  "pointer": "#/definitions/ImageInspect/properties/Size"
+                },
+                {
+                  "name": "created",
+                  "upstream": "Created",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ImageInspect/properties/Created"
+                },
+                {
+                  "name": "architecture",
+                  "upstream": "Architecture",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ImageInspect/properties/Architecture"
+                },
+                {
+                  "name": "os",
+                  "upstream": "Os",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ImageInspect/properties/Os"
+                },
+                {
+                  "name": "variant",
+                  "upstream": "Variant",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ImageInspect/properties/Variant"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -10005,7 +9990,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-commit": {
       "outputs": [
@@ -10062,8 +10061,8 @@
           "description": "repo:tag given to the new image (empty when untagged)."
         },
         {
-          "name": "changes",
-          "tf_type": "list(object({...}))",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -10072,19 +10071,26 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "The container filesystem changes the commit captured (GET /containers/{id}/changes just before the commit).",
+          "description": "The action's outcome as one object (Q35): changes.",
           "fields": [
             {
-              "name": "path",
-              "upstream": "Path",
-              "tf_type": "string",
-              "pointer": "#/definitions/FilesystemChange/properties/Path"
-            },
-            {
-              "name": "kind",
-              "upstream": "Kind",
-              "tf_type": "number",
-              "pointer": "#/definitions/ChangeType"
+              "name": "changes",
+              "upstream": "changes",
+              "tf_type": "list(object({...}))",
+              "fields": [
+                {
+                  "name": "path",
+                  "upstream": "Path",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/FilesystemChange/properties/Path"
+                },
+                {
+                  "name": "kind",
+                  "upstream": "Kind",
+                  "tf_type": "number",
+                  "pointer": "#/definitions/ChangeType"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -10104,7 +10110,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-cp": {
       "outputs": [
@@ -10148,7 +10168,7 @@
           "description": "Path inside the container that was written or read."
         },
         {
-          "name": "path_stat",
+          "name": "result",
           "tf_type": "object({...})",
           "category": "result",
           "source": {
@@ -10158,37 +10178,44 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "Stat of the container-side path after the copy (HEAD /containers/{id}/archive).",
+          "description": "The action's outcome as one object (Q35): path_stat.",
           "fields": [
             {
-              "name": "name",
-              "upstream": "name",
-              "tf_type": "string",
-              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
-            },
-            {
-              "name": "size",
-              "upstream": "size",
-              "tf_type": "number",
-              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
-            },
-            {
-              "name": "mode",
-              "upstream": "mode",
-              "tf_type": "number",
-              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
-            },
-            {
-              "name": "mtime",
-              "upstream": "mtime",
-              "tf_type": "string",
-              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
-            },
-            {
-              "name": "link_target",
-              "upstream": "linkTarget",
-              "tf_type": "string",
-              "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+              "name": "path_stat",
+              "upstream": "path_stat",
+              "tf_type": "object({...})",
+              "fields": [
+                {
+                  "name": "name",
+                  "upstream": "name",
+                  "tf_type": "string",
+                  "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+                },
+                {
+                  "name": "size",
+                  "upstream": "size",
+                  "tf_type": "number",
+                  "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+                },
+                {
+                  "name": "mode",
+                  "upstream": "mode",
+                  "tf_type": "number",
+                  "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+                },
+                {
+                  "name": "mtime",
+                  "upstream": "mtime",
+                  "tf_type": "string",
+                  "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+                },
+                {
+                  "name": "link_target",
+                  "upstream": "linkTarget",
+                  "tf_type": "string",
+                  "pointer": "#/paths/~1containers~1{id}~1archive/head/responses/200/headers/X-Docker-Container-Path-Stat"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -10208,144 +10235,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
-    },
-    "compose:cli-down": {
-      "outputs": [
+      "uses_cli": false,
+      "inputs": [
         {
-          "name": "name",
+          "name": "result_path",
           "tf_type": "string",
-          "category": "identity",
-          "source": {
-            "type": "schema",
-            "file": "upstream/compose-spec/schema/compose-spec.json",
-            "pointer": "#/properties/name"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Project the action ran against."
-        },
-        {
-          "name": "removed_container_ids",
-          "tf_type": "list(string)",
-          "category": "identity",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/ContainerSummary/properties/Id"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Containers stopped and removed."
-        },
-        {
-          "name": "removed_network_ids",
-          "tf_type": "list(string)",
-          "category": "identity",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/Network/properties/Id"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Networks removed."
-        },
-        {
-          "name": "removed_volume_names",
-          "tf_type": "list(string)",
-          "category": "identity",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/Volume/properties/Name"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Volumes removed (with volumes = true)."
-        },
-        {
-          "name": "removed_image_ids",
-          "tf_type": "list(string)",
-          "category": "identity",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/ImageDeleteResponseItem"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Images removed (with rmi)."
-        },
-        {
-          "name": "removed_counts",
-          "tf_type": "object({...})",
-          "category": "result",
+          "default": null,
+          "upstream": null,
           "source": {
             "type": "derived",
-            "from": "removed_*",
-            "how": "length of each removed_* list"
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
           },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "How many containers, networks, volumes and images `down` removed.",
-          "fields": [
-            {
-              "name": "containers",
-              "upstream": "len(removed_container_ids)",
-              "tf_type": "number",
-              "pointer": "#/paths/~1containers~1{id}/delete"
-            },
-            {
-              "name": "networks",
-              "upstream": "len(removed_network_ids)",
-              "tf_type": "number",
-              "pointer": "#/paths/~1networks~1{id}/delete"
-            },
-            {
-              "name": "volumes",
-              "upstream": "len(removed_volume_names)",
-              "tf_type": "number",
-              "pointer": "#/paths/~1volumes~1{id}/delete"
-            },
-            {
-              "name": "images",
-              "upstream": "len(removed_image_ids)",
-              "tf_type": "number",
-              "pointer": "#/paths/~1images~1{id}/delete"
-            }
-          ],
-          "fields_complete": true
-        },
-        {
-          "name": "engine_api_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/SystemVersion/properties/ApiVersion"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Engine API version negotiated with the daemon."
-        },
-        {
-          "name": "docker_server_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/SystemVersion/properties/Version"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Docker Engine version of the daemon."
+          "description": "Optional local file the action writes its result object to (Q35)."
         }
-      ],
-      "outputs_status": "missing",
-      "uses_cli": false
+      ]
     },
     "compose:cli-exec": {
       "outputs": [
@@ -10439,7 +10343,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-export": {
       "outputs": [
@@ -10483,8 +10401,8 @@
           "description": "Local tar file written."
         },
         {
-          "name": "archive_size",
-          "tf_type": "number",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "derived",
@@ -10493,7 +10411,15 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "Bytes in the tar archive the action streamed."
+          "description": "The action's outcome as one object (Q35): archive_size.",
+          "fields": [
+            {
+              "name": "archive_size",
+              "upstream": "archive_size",
+              "tf_type": "number"
+            }
+          ],
+          "fields_complete": true
         },
         {
           "name": "engine_api_version",
@@ -10510,7 +10436,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-kill": {
       "outputs": [
@@ -10554,8 +10494,8 @@
           "description": "Service name -> IDs of the containers signalled."
         },
         {
-          "name": "container_states",
-          "tf_type": "list(object({...}))",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -10564,37 +10504,44 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "description": "The action's outcome as one object (Q35): container_states.",
           "fields": [
             {
-              "name": "id",
-              "upstream": "Id",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Id"
-            },
-            {
-              "name": "name",
-              "upstream": "Names[0] (leading \"/\" removed)",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Names"
-            },
-            {
-              "name": "service",
-              "upstream": "Labels[com.docker.compose.service]",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Labels"
-            },
-            {
-              "name": "state",
-              "upstream": "State",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/State"
-            },
-            {
-              "name": "status",
-              "upstream": "Status",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Status"
+              "name": "container_states",
+              "upstream": "container_states",
+              "tf_type": "list(object({...}))",
+              "fields": [
+                {
+                  "name": "id",
+                  "upstream": "Id",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Id"
+                },
+                {
+                  "name": "name",
+                  "upstream": "Names[0] (leading \"/\" removed)",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Names"
+                },
+                {
+                  "name": "service",
+                  "upstream": "Labels[com.docker.compose.service]",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Labels"
+                },
+                {
+                  "name": "state",
+                  "upstream": "State",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/State"
+                },
+                {
+                  "name": "status",
+                  "upstream": "Status",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Status"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -10614,7 +10561,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-pause": {
       "outputs": [
@@ -10658,8 +10619,8 @@
           "description": "Service name -> IDs of the containers paused."
         },
         {
-          "name": "container_states",
-          "tf_type": "list(object({...}))",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -10668,37 +10629,44 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "description": "The action's outcome as one object (Q35): container_states.",
           "fields": [
             {
-              "name": "id",
-              "upstream": "Id",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Id"
-            },
-            {
-              "name": "name",
-              "upstream": "Names[0] (leading \"/\" removed)",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Names"
-            },
-            {
-              "name": "service",
-              "upstream": "Labels[com.docker.compose.service]",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Labels"
-            },
-            {
-              "name": "state",
-              "upstream": "State",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/State"
-            },
-            {
-              "name": "status",
-              "upstream": "Status",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Status"
+              "name": "container_states",
+              "upstream": "container_states",
+              "tf_type": "list(object({...}))",
+              "fields": [
+                {
+                  "name": "id",
+                  "upstream": "Id",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Id"
+                },
+                {
+                  "name": "name",
+                  "upstream": "Names[0] (leading \"/\" removed)",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Names"
+                },
+                {
+                  "name": "service",
+                  "upstream": "Labels[com.docker.compose.service]",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Labels"
+                },
+                {
+                  "name": "state",
+                  "upstream": "State",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/State"
+                },
+                {
+                  "name": "status",
+                  "upstream": "Status",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Status"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -10718,7 +10686,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-unpause": {
       "outputs": [
@@ -10762,8 +10744,8 @@
           "description": "Service name -> IDs of the containers unpaused."
         },
         {
-          "name": "container_states",
-          "tf_type": "list(object({...}))",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -10772,37 +10754,44 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "description": "The action's outcome as one object (Q35): container_states.",
           "fields": [
             {
-              "name": "id",
-              "upstream": "Id",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Id"
-            },
-            {
-              "name": "name",
-              "upstream": "Names[0] (leading \"/\" removed)",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Names"
-            },
-            {
-              "name": "service",
-              "upstream": "Labels[com.docker.compose.service]",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Labels"
-            },
-            {
-              "name": "state",
-              "upstream": "State",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/State"
-            },
-            {
-              "name": "status",
-              "upstream": "Status",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Status"
+              "name": "container_states",
+              "upstream": "container_states",
+              "tf_type": "list(object({...}))",
+              "fields": [
+                {
+                  "name": "id",
+                  "upstream": "Id",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Id"
+                },
+                {
+                  "name": "name",
+                  "upstream": "Names[0] (leading \"/\" removed)",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Names"
+                },
+                {
+                  "name": "service",
+                  "upstream": "Labels[com.docker.compose.service]",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Labels"
+                },
+                {
+                  "name": "state",
+                  "upstream": "State",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/State"
+                },
+                {
+                  "name": "status",
+                  "upstream": "Status",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Status"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -10822,7 +10811,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-start": {
       "outputs": [
@@ -10866,8 +10869,8 @@
           "description": "Service name -> IDs of the containers started."
         },
         {
-          "name": "container_states",
-          "tf_type": "list(object({...}))",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -10876,37 +10879,44 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "description": "The action's outcome as one object (Q35): container_states.",
           "fields": [
             {
-              "name": "id",
-              "upstream": "Id",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Id"
-            },
-            {
-              "name": "name",
-              "upstream": "Names[0] (leading \"/\" removed)",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Names"
-            },
-            {
-              "name": "service",
-              "upstream": "Labels[com.docker.compose.service]",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Labels"
-            },
-            {
-              "name": "state",
-              "upstream": "State",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/State"
-            },
-            {
-              "name": "status",
-              "upstream": "Status",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Status"
+              "name": "container_states",
+              "upstream": "container_states",
+              "tf_type": "list(object({...}))",
+              "fields": [
+                {
+                  "name": "id",
+                  "upstream": "Id",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Id"
+                },
+                {
+                  "name": "name",
+                  "upstream": "Names[0] (leading \"/\" removed)",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Names"
+                },
+                {
+                  "name": "service",
+                  "upstream": "Labels[com.docker.compose.service]",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Labels"
+                },
+                {
+                  "name": "state",
+                  "upstream": "State",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/State"
+                },
+                {
+                  "name": "status",
+                  "upstream": "Status",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Status"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -10926,7 +10936,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-stop": {
       "outputs": [
@@ -10970,8 +10994,8 @@
           "description": "Service name -> IDs of the containers stopped."
         },
         {
-          "name": "container_states",
-          "tf_type": "list(object({...}))",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -10980,37 +11004,44 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "description": "The action's outcome as one object (Q35): container_states.",
           "fields": [
             {
-              "name": "id",
-              "upstream": "Id",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Id"
-            },
-            {
-              "name": "name",
-              "upstream": "Names[0] (leading \"/\" removed)",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Names"
-            },
-            {
-              "name": "service",
-              "upstream": "Labels[com.docker.compose.service]",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Labels"
-            },
-            {
-              "name": "state",
-              "upstream": "State",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/State"
-            },
-            {
-              "name": "status",
-              "upstream": "Status",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Status"
+              "name": "container_states",
+              "upstream": "container_states",
+              "tf_type": "list(object({...}))",
+              "fields": [
+                {
+                  "name": "id",
+                  "upstream": "Id",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Id"
+                },
+                {
+                  "name": "name",
+                  "upstream": "Names[0] (leading \"/\" removed)",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Names"
+                },
+                {
+                  "name": "service",
+                  "upstream": "Labels[com.docker.compose.service]",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Labels"
+                },
+                {
+                  "name": "state",
+                  "upstream": "State",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/State"
+                },
+                {
+                  "name": "status",
+                  "upstream": "Status",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Status"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -11030,7 +11061,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-restart": {
       "outputs": [
@@ -11074,8 +11119,8 @@
           "description": "Service name -> IDs of the containers restarted."
         },
         {
-          "name": "container_states",
-          "tf_type": "list(object({...}))",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -11084,37 +11129,44 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "description": "The action's outcome as one object (Q35): container_states.",
           "fields": [
             {
-              "name": "id",
-              "upstream": "Id",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Id"
-            },
-            {
-              "name": "name",
-              "upstream": "Names[0] (leading \"/\" removed)",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Names"
-            },
-            {
-              "name": "service",
-              "upstream": "Labels[com.docker.compose.service]",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Labels"
-            },
-            {
-              "name": "state",
-              "upstream": "State",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/State"
-            },
-            {
-              "name": "status",
-              "upstream": "Status",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Status"
+              "name": "container_states",
+              "upstream": "container_states",
+              "tf_type": "list(object({...}))",
+              "fields": [
+                {
+                  "name": "id",
+                  "upstream": "Id",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Id"
+                },
+                {
+                  "name": "name",
+                  "upstream": "Names[0] (leading \"/\" removed)",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Names"
+                },
+                {
+                  "name": "service",
+                  "upstream": "Labels[com.docker.compose.service]",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Labels"
+                },
+                {
+                  "name": "state",
+                  "upstream": "State",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/State"
+                },
+                {
+                  "name": "status",
+                  "upstream": "Status",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Status"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -11134,7 +11186,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-publish": {
       "outputs": [
@@ -11191,8 +11257,8 @@
           "description": "Manifest digest of the published artifact."
         },
         {
-          "name": "layers",
-          "tf_type": "list(object({...}))",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "cli",
@@ -11201,25 +11267,32 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "OCI descriptors of the layers pushed in the published artifact (compose files, env files).",
+          "description": "The action's outcome as one object (Q35): layers.",
           "fields": [
             {
-              "name": "media_type",
-              "upstream": "mediaType",
-              "tf_type": "string",
-              "pointer": "OCI image-spec descriptor mediaType"
-            },
-            {
-              "name": "digest",
-              "upstream": "digest",
-              "tf_type": "string",
-              "pointer": "OCI image-spec descriptor digest"
-            },
-            {
-              "name": "size",
-              "upstream": "size",
-              "tf_type": "number",
-              "pointer": "OCI image-spec descriptor size"
+              "name": "layers",
+              "upstream": "layers",
+              "tf_type": "list(object({...}))",
+              "fields": [
+                {
+                  "name": "media_type",
+                  "upstream": "mediaType",
+                  "tf_type": "string",
+                  "pointer": "OCI image-spec descriptor mediaType"
+                },
+                {
+                  "name": "digest",
+                  "upstream": "digest",
+                  "tf_type": "string",
+                  "pointer": "OCI image-spec descriptor digest"
+                },
+                {
+                  "name": "size",
+                  "upstream": "size",
+                  "tf_type": "number",
+                  "pointer": "OCI image-spec descriptor size"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -11250,7 +11323,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-pull": {
       "outputs": [
@@ -11307,8 +11394,8 @@
           "description": "Service name -> local image ID."
         },
         {
-          "name": "pull_status",
-          "tf_type": "map(string)",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -11317,7 +11404,15 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "Service name -> last status of the pull stream (\"Image is up to date for …\" or \"Downloaded newer image for …\")."
+          "description": "The action's outcome as one object (Q35): pull_status.",
+          "fields": [
+            {
+              "name": "pull_status",
+              "upstream": "pull_status",
+              "tf_type": "map(string)"
+            }
+          ],
+          "fields_complete": true
         },
         {
           "name": "compose_go_version",
@@ -11346,7 +11441,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-push": {
       "outputs": [
@@ -11403,8 +11512,8 @@
           "description": "Service name -> repo@sha256:... the registry returned."
         },
         {
-          "name": "push_status",
-          "tf_type": "map(string)",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -11413,7 +11522,15 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "Service name -> last status of the push stream (\"<tag>: digest: sha256:… size: N\")."
+          "description": "The action's outcome as one object (Q35): push_status.",
+          "fields": [
+            {
+              "name": "push_status",
+              "upstream": "push_status",
+              "tf_type": "map(string)"
+            }
+          ],
+          "fields_complete": true
         },
         {
           "name": "compose_go_version",
@@ -11442,7 +11559,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-run": {
       "outputs": [
@@ -11548,7 +11679,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     },
     "compose:cli-scale": {
       "outputs": [
@@ -11592,8 +11737,8 @@
           "description": "Service name -> replica count set."
         },
         {
-          "name": "container_states",
-          "tf_type": "list(object({...}))",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -11602,37 +11747,44 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
+          "description": "The action's outcome as one object (Q35): container_states.",
           "fields": [
             {
-              "name": "id",
-              "upstream": "Id",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Id"
-            },
-            {
-              "name": "name",
-              "upstream": "Names[0] (leading \"/\" removed)",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Names"
-            },
-            {
-              "name": "service",
-              "upstream": "Labels[com.docker.compose.service]",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Labels"
-            },
-            {
-              "name": "state",
-              "upstream": "State",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/State"
-            },
-            {
-              "name": "status",
-              "upstream": "Status",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Status"
+              "name": "container_states",
+              "upstream": "container_states",
+              "tf_type": "list(object({...}))",
+              "fields": [
+                {
+                  "name": "id",
+                  "upstream": "Id",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Id"
+                },
+                {
+                  "name": "name",
+                  "upstream": "Names[0] (leading \"/\" removed)",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Names"
+                },
+                {
+                  "name": "service",
+                  "upstream": "Labels[com.docker.compose.service]",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Labels"
+                },
+                {
+                  "name": "state",
+                  "upstream": "State",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/State"
+                },
+                {
+                  "name": "status",
+                  "upstream": "Status",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerSummary/properties/Status"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -11652,174 +11804,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
-    },
-    "compose:cli-up": {
-      "outputs": [
+      "uses_cli": false,
+      "inputs": [
         {
-          "name": "name",
+          "name": "result_path",
           "tf_type": "string",
-          "category": "identity",
+          "default": null,
+          "upstream": null,
           "source": {
-            "type": "schema",
-            "file": "upstream/compose-spec/schema/compose-spec.json",
-            "pointer": "#/properties/name"
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
           },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Project the action ran against."
-        },
-        {
-          "name": "service_names",
-          "tf_type": "list(string)",
-          "category": "identity",
-          "source": {
-            "type": "schema",
-            "file": "upstream/compose-spec/schema/compose-spec.json",
-            "pointer": "#/properties/services"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Services the action selected."
-        },
-        {
-          "name": "container_ids",
-          "tf_type": "map(list(string))",
-          "category": "identity",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/ContainerSummary/properties/Id"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Service name -> IDs of containers created, recreated or started."
-        },
-        {
-          "name": "network_ids",
-          "tf_type": "map(string)",
-          "category": "identity",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/Network/properties/Id"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Network key -> network ID."
-        },
-        {
-          "name": "volume_names",
-          "tf_type": "map(string)",
-          "category": "identity",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/Volume/properties/Name"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Volume key -> volume name."
-        },
-        {
-          "name": "container_states",
-          "tf_type": "list(object({...}))",
-          "category": "result",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/paths/~1containers~1json/get/responses/200/schema"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "State of each service container after the action, from GET /containers/json filtered by the project label.",
-          "fields": [
-            {
-              "name": "id",
-              "upstream": "Id",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Id"
-            },
-            {
-              "name": "name",
-              "upstream": "Names[0] (leading \"/\" removed)",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Names"
-            },
-            {
-              "name": "service",
-              "upstream": "Labels[com.docker.compose.service]",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Labels"
-            },
-            {
-              "name": "state",
-              "upstream": "State",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/State"
-            },
-            {
-              "name": "status",
-              "upstream": "Status",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerSummary/properties/Status"
-            }
-          ],
-          "fields_complete": true
-        },
-        {
-          "name": "compose_spec_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "compose_spec"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "Pinned compose-spec commit the structured fields follow (main @ 3a4a699...)."
-        },
-        {
-          "name": "compose_go_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "sources_md",
-            "pin": "compose_go"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "compose-go version that loads, interpolates, merges and validates the project (v2.16.2, from go.mod)."
-        },
-        {
-          "name": "engine_api_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/SystemVersion/properties/ApiVersion"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Engine API version negotiated with the daemon."
-        },
-        {
-          "name": "docker_server_version",
-          "tf_type": "string",
-          "category": "version",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/SystemVersion/properties/Version"
-          },
-          "known_after_apply": true,
-          "sensitive": false,
-          "description": "Docker Engine version of the daemon."
+          "description": "Optional local file the action writes its result object to (Q35)."
         }
-      ],
-      "outputs_status": "missing",
-      "uses_cli": false
+      ]
     },
     "compose:cli-wait": {
       "outputs": [
@@ -11850,8 +11849,8 @@
           "description": "Services the action selected."
         },
         {
-          "name": "results",
-          "tf_type": "map(object({...}))",
+          "name": "result",
+          "tf_type": "object({...})",
           "category": "result",
           "source": {
             "type": "swagger",
@@ -11860,19 +11859,26 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "Container name -> wait result.",
+          "description": "The action's outcome as one object (Q35): results.",
           "fields": [
             {
-              "name": "exit_code",
-              "upstream": "StatusCode",
-              "tf_type": "number",
-              "pointer": "#/definitions/ContainerWaitResponse/properties/StatusCode"
-            },
-            {
-              "name": "error",
-              "upstream": "Error.Message",
-              "tf_type": "string",
-              "pointer": "#/definitions/ContainerWaitExitError/properties/Message"
+              "name": "results",
+              "upstream": "results",
+              "tf_type": "map(object({...}))",
+              "fields": [
+                {
+                  "name": "exit_code",
+                  "upstream": "StatusCode",
+                  "tf_type": "number",
+                  "pointer": "#/definitions/ContainerWaitResponse/properties/StatusCode"
+                },
+                {
+                  "name": "error",
+                  "upstream": "Error.Message",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ContainerWaitExitError/properties/Message"
+                }
+              ]
             }
           ],
           "fields_complete": true
@@ -11892,7 +11898,21 @@
         }
       ],
       "outputs_status": "missing",
-      "uses_cli": false
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
     }
   }
 }

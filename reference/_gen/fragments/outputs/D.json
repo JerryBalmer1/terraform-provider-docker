@@ -5592,7 +5592,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "`content:<sha256>`, `path:<absolute path>`, `git:<url>#<ref>:<subpath>` or `image:<image id>`."
+          "description": "`content:<sha256>`, `path:<absolute path>`, `url:<url>`, `image:<reference>` or `blocks:<sha256>`."
         },
         {
           "name": "source_type",
@@ -5605,7 +5605,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "`content`, `path`, `git` or `image`."
+          "description": "`content`, `path`, `url`, `image` or `blocks`."
         },
         {
           "name": "git_commit",
@@ -5618,7 +5618,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "Git mode only: resolved commit SHA; null otherwise."
+          "description": "Always null since Pass 5 (the git source became `url`); kept for a later git source."
         },
         {
           "name": "image_digest_ref",
@@ -5673,19 +5673,6 @@
           "description": "Union of LABEL instructions of the final stage."
         },
         {
-          "name": "reconstructed",
-          "tf_type": "bool",
-          "category": "result",
-          "source": {
-            "type": "swagger",
-            "file": "upstream/engine-api/api/swagger.yaml",
-            "pointer": "#/definitions/ImageHistoryResponseItem"
-          },
-          "known_after_apply": false,
-          "sensitive": false,
-          "description": "true in image mode (instructions rebuilt from image history), false for content/path/git."
-        },
-        {
           "name": "fidelity",
           "tf_type": "string",
           "category": "result",
@@ -5713,7 +5700,20 @@
           "serializes": "stages"
         },
         {
-          "name": "content_sha256",
+          "name": "source_dockerfile",
+          "tf_type": "string",
+          "category": "raw",
+          "source": {
+            "type": "doc",
+            "file": "upstream/dockerfile/frontend/dockerfile/docs/reference.md",
+            "anchor": "#format"
+          },
+          "known_after_apply": false,
+          "sensitive": true,
+          "description": "The Dockerfile text exactly as read from content / path / url, before parsing (Q47); null in image and blocks mode."
+        },
+        {
+          "name": "dockerfile_sha256",
           "tf_type": "string",
           "category": "hash",
           "source": {
@@ -6270,6 +6270,20 @@
           "known_after_apply": false,
           "sensitive": false,
           "description": "Image mode only; null otherwise."
+        },
+        {
+          "name": "source_dockerfile_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "source_dockerfile",
+            "how": "sha256 of the UTF-8 bytes"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "hash_of": "source_dockerfile",
+          "description": "sha256 of `source_dockerfile` (Q34)."
         }
       ],
       "outputs_status": "missing",

@@ -1,0 +1,1140 @@
+{
+  "lane": "P5",
+  "notes": [
+    "Pass 5 Lane 0: outputs of the items in fragments/pass5.json."
+  ],
+  "naming_questions": [],
+  "items": {
+    "swarm:node": {
+      "outputs": [
+        {
+          "name": "inspect_json",
+          "tf_type": "string",
+          "category": "raw",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/Node"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "The exact Engine API inspect response for the node, as JSON.",
+          "serializes": "inspect",
+          "provided": false
+        },
+        {
+          "name": "inspect",
+          "tf_type": "object({...})",
+          "category": "structured",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/Node"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "The node inspect response as a nested object mirroring Node field by field (snake_case).",
+          "fields": [
+            {
+              "name": "id",
+              "upstream": "ID",
+              "tf_type": "string",
+              "pointer": "#/definitions/Node/properties/ID"
+            },
+            {
+              "name": "version",
+              "upstream": "Version",
+              "tf_type": "object({...})",
+              "pointer": "#/definitions/ObjectVersion",
+              "fields": [
+                {
+                  "name": "index",
+                  "upstream": "Index",
+                  "tf_type": "number",
+                  "pointer": "#/definitions/ObjectVersion/properties/Index"
+                }
+              ]
+            },
+            {
+              "name": "created_at",
+              "upstream": "CreatedAt",
+              "tf_type": "string",
+              "pointer": "#/definitions/Node/properties/CreatedAt"
+            },
+            {
+              "name": "updated_at",
+              "upstream": "UpdatedAt",
+              "tf_type": "string",
+              "pointer": "#/definitions/Node/properties/UpdatedAt"
+            },
+            {
+              "name": "spec",
+              "upstream": "Spec",
+              "tf_type": "object({...})",
+              "pointer": "#/definitions/NodeSpec",
+              "fields": [
+                {
+                  "name": "name",
+                  "upstream": "Name",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/NodeSpec/properties/Name"
+                },
+                {
+                  "name": "labels",
+                  "upstream": "Labels",
+                  "tf_type": "map(string)",
+                  "pointer": "#/definitions/NodeSpec/properties/Labels"
+                },
+                {
+                  "name": "role",
+                  "upstream": "Role",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/NodeSpec/properties/Role"
+                },
+                {
+                  "name": "availability",
+                  "upstream": "Availability",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/NodeSpec/properties/Availability"
+                }
+              ]
+            },
+            {
+              "name": "description",
+              "upstream": "Description",
+              "tf_type": "object({...})",
+              "pointer": "#/definitions/NodeDescription",
+              "fields": [
+                {
+                  "name": "hostname",
+                  "upstream": "Hostname",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/NodeDescription/properties/Hostname"
+                },
+                {
+                  "name": "platform",
+                  "upstream": "Platform",
+                  "tf_type": "object({...})",
+                  "pointer": "#/definitions/Platform",
+                  "fields": [
+                    {
+                      "name": "architecture",
+                      "upstream": "Architecture",
+                      "tf_type": "string",
+                      "pointer": "#/definitions/Platform/properties/Architecture"
+                    },
+                    {
+                      "name": "os",
+                      "upstream": "OS",
+                      "tf_type": "string",
+                      "pointer": "#/definitions/Platform/properties/OS"
+                    }
+                  ]
+                },
+                {
+                  "name": "resources",
+                  "upstream": "Resources",
+                  "tf_type": "object({...})",
+                  "pointer": "#/definitions/ResourceObject",
+                  "fields": [
+                    {
+                      "name": "nano_cpus",
+                      "upstream": "NanoCPUs",
+                      "tf_type": "number",
+                      "pointer": "#/definitions/ResourceObject/properties/NanoCPUs"
+                    },
+                    {
+                      "name": "memory_bytes",
+                      "upstream": "MemoryBytes",
+                      "tf_type": "number",
+                      "pointer": "#/definitions/ResourceObject/properties/MemoryBytes"
+                    },
+                    {
+                      "name": "generic_resources",
+                      "upstream": "GenericResources",
+                      "tf_type": "list(object({...}))",
+                      "pointer": "#/definitions/GenericResources",
+                      "fields": [
+                        {
+                          "name": "named_resource_spec",
+                          "upstream": "NamedResourceSpec",
+                          "tf_type": "object({...})",
+                          "pointer": "#/definitions/GenericResources/items/properties/NamedResourceSpec",
+                          "fields": [
+                            {
+                              "name": "kind",
+                              "upstream": "Kind",
+                              "tf_type": "string",
+                              "pointer": "#/definitions/GenericResources/items/properties/NamedResourceSpec/properties/Kind"
+                            },
+                            {
+                              "name": "value",
+                              "upstream": "Value",
+                              "tf_type": "string",
+                              "pointer": "#/definitions/GenericResources/items/properties/NamedResourceSpec/properties/Value"
+                            }
+                          ]
+                        },
+                        {
+                          "name": "discrete_resource_spec",
+                          "upstream": "DiscreteResourceSpec",
+                          "tf_type": "object({...})",
+                          "pointer": "#/definitions/GenericResources/items/properties/DiscreteResourceSpec",
+                          "fields": [
+                            {
+                              "name": "kind",
+                              "upstream": "Kind",
+                              "tf_type": "string",
+                              "pointer": "#/definitions/GenericResources/items/properties/DiscreteResourceSpec/properties/Kind"
+                            },
+                            {
+                              "name": "value",
+                              "upstream": "Value",
+                              "tf_type": "number",
+                              "pointer": "#/definitions/GenericResources/items/properties/DiscreteResourceSpec/properties/Value"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "engine",
+                  "upstream": "Engine",
+                  "tf_type": "object({...})",
+                  "pointer": "#/definitions/EngineDescription",
+                  "fields": [
+                    {
+                      "name": "engine_version",
+                      "upstream": "EngineVersion",
+                      "tf_type": "string",
+                      "pointer": "#/definitions/EngineDescription/properties/EngineVersion"
+                    },
+                    {
+                      "name": "labels",
+                      "upstream": "Labels",
+                      "tf_type": "map(string)",
+                      "pointer": "#/definitions/EngineDescription/properties/Labels"
+                    },
+                    {
+                      "name": "plugins",
+                      "upstream": "Plugins",
+                      "tf_type": "list(object({...}))",
+                      "pointer": "#/definitions/EngineDescription/properties/Plugins",
+                      "fields": [
+                        {
+                          "name": "type",
+                          "upstream": "Type",
+                          "tf_type": "string",
+                          "pointer": "#/definitions/EngineDescription/properties/Plugins/items/properties/Type"
+                        },
+                        {
+                          "name": "name",
+                          "upstream": "Name",
+                          "tf_type": "string",
+                          "pointer": "#/definitions/EngineDescription/properties/Plugins/items/properties/Name"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "tls_info",
+                  "upstream": "TLSInfo",
+                  "tf_type": "object({...})",
+                  "pointer": "#/definitions/TLSInfo",
+                  "fields": [
+                    {
+                      "name": "trust_root",
+                      "upstream": "TrustRoot",
+                      "tf_type": "string",
+                      "pointer": "#/definitions/TLSInfo/properties/TrustRoot"
+                    },
+                    {
+                      "name": "cert_issuer_subject",
+                      "upstream": "CertIssuerSubject",
+                      "tf_type": "string",
+                      "pointer": "#/definitions/TLSInfo/properties/CertIssuerSubject"
+                    },
+                    {
+                      "name": "cert_issuer_public_key",
+                      "upstream": "CertIssuerPublicKey",
+                      "tf_type": "string",
+                      "pointer": "#/definitions/TLSInfo/properties/CertIssuerPublicKey"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "status",
+              "upstream": "Status",
+              "tf_type": "object({...})",
+              "pointer": "#/definitions/NodeStatus",
+              "fields": [
+                {
+                  "name": "state",
+                  "upstream": "State",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/NodeState"
+                },
+                {
+                  "name": "message",
+                  "upstream": "Message",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/NodeStatus/properties/Message"
+                },
+                {
+                  "name": "addr",
+                  "upstream": "Addr",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/NodeStatus/properties/Addr"
+                }
+              ]
+            },
+            {
+              "name": "manager_status",
+              "upstream": "ManagerStatus",
+              "tf_type": "object({...})",
+              "pointer": "#/definitions/ManagerStatus",
+              "fields": [
+                {
+                  "name": "leader",
+                  "upstream": "Leader",
+                  "tf_type": "bool",
+                  "pointer": "#/definitions/ManagerStatus/properties/Leader"
+                },
+                {
+                  "name": "reachability",
+                  "upstream": "Reachability",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/Reachability"
+                },
+                {
+                  "name": "addr",
+                  "upstream": "Addr",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ManagerStatus/properties/Addr"
+                }
+              ]
+            }
+          ],
+          "fields_complete": true,
+          "provided": false
+        },
+        {
+          "name": "content_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "inspect_json",
+            "how": "sha256 (hex) of the UTF-8 bytes of inspect_json"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "SHA-256 of inspect_json; changes whenever the object changes.",
+          "hash_of": "inspect_json",
+          "provided": false
+        },
+        {
+          "name": "id",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/Node/properties/ID"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Object ID.",
+          "provided": true
+        },
+        {
+          "name": "name",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/NodeSpec/properties/Name"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Object name (Spec.Name).",
+          "provided": false
+        },
+        {
+          "name": "labels",
+          "tf_type": "map(string)",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/NodeSpec/properties/Labels"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Object labels (Spec.Labels).",
+          "provided": true
+        },
+        {
+          "name": "version_index",
+          "tf_type": "number",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/ObjectVersion/properties/Index"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Swarm object Version.Index (optimistic-concurrency counter; changes on every update). Not a version-category output.",
+          "provided": false
+        },
+        {
+          "name": "hostname",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/NodeDescription/properties/Hostname"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Description.Hostname.",
+          "provided": true
+        },
+        {
+          "name": "role",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/NodeSpec/properties/Role"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Spec.Role (worker or manager).",
+          "provided": true
+        },
+        {
+          "name": "addr",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/NodeStatus/properties/Addr"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Status.Addr: the node's IP as the managers see it.",
+          "provided": true
+        },
+        {
+          "name": "engine_api_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/ApiVersion"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).",
+          "provided": false
+        },
+        {
+          "name": "docker_server_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/Version"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "Docker Engine version of the daemon the provider talked to (GET /version Version).",
+          "provided": false
+        }
+      ],
+      "outputs_status": "missing",
+      "outputs_note": "Pass 5 (Q4): same outputs as data.docker_node.",
+      "uses_cli": false
+    },
+    "engine:system-prune": {
+      "outputs": [
+        {
+          "name": "containers_deleted",
+          "tf_type": "list(string)",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1prune/post/responses/200/schema/properties/ContainersDeleted"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "IDs of the deleted containers."
+        },
+        {
+          "name": "result",
+          "tf_type": "object({...})",
+          "category": "result",
+          "source": {
+            "type": "derived",
+            "from": "ContainerPrune, NetworkPrune, ImagePrune, BuildPrune, VolumePrune",
+            "how": "the five prune responses merged; space_reclaimed is their sum"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Every prune response merged into one object (Q35).",
+          "fields": [
+            {
+              "name": "containers_deleted",
+              "upstream": "ContainersDeleted",
+              "tf_type": "list(string)",
+              "pointer": "#/paths/~1containers~1prune/post/responses/200/schema/properties/ContainersDeleted"
+            },
+            {
+              "name": "networks_deleted",
+              "upstream": "NetworksDeleted",
+              "tf_type": "list(string)",
+              "pointer": "#/paths/~1networks~1prune/post/responses/200/schema/properties/NetworksDeleted"
+            },
+            {
+              "name": "images_deleted",
+              "upstream": "ImagesDeleted",
+              "tf_type": "list(object({...}))",
+              "pointer": "#/paths/~1images~1prune/post/responses/200/schema/properties/ImagesDeleted",
+              "fields": [
+                {
+                  "name": "untagged",
+                  "upstream": "Untagged",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ImageDeleteResponseItem/properties/Untagged"
+                },
+                {
+                  "name": "deleted",
+                  "upstream": "Deleted",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ImageDeleteResponseItem/properties/Deleted"
+                }
+              ]
+            },
+            {
+              "name": "caches_deleted",
+              "upstream": "CachesDeleted",
+              "tf_type": "list(string)",
+              "pointer": "#/paths/~1build~1prune/post/responses/200/schema/properties/CachesDeleted"
+            },
+            {
+              "name": "volumes_deleted",
+              "upstream": "VolumesDeleted",
+              "tf_type": "list(string)",
+              "pointer": "#/paths/~1volumes~1prune/post/responses/200/schema/properties/VolumesDeleted"
+            },
+            {
+              "name": "space_reclaimed",
+              "upstream": "SpaceReclaimed",
+              "tf_type": "number",
+              "pointer": "#/paths/~1containers~1prune/post/responses/200/schema/properties/SpaceReclaimed"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
+          "name": "engine_api_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/ApiVersion"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Engine API version negotiated with the daemon."
+        },
+        {
+          "name": "docker_server_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/Version"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Docker Engine version from GET /version."
+        }
+      ],
+      "uses_cli": false,
+      "outputs_status": "partial",
+      "outputs_note": "Reports space reclaimed in progress today.",
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        }
+      ]
+    },
+    "engine:registry-image-tags": {
+      "outputs": [
+        {
+          "name": "name",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "derived",
+            "from": "GET /v2/<name>/tags/list",
+            "how": "the repository name, normalized"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "The repository."
+        },
+        {
+          "name": "tags",
+          "tf_type": "list(string)",
+          "category": "identity",
+          "source": {
+            "type": "derived",
+            "from": "GET /v2/<name>/tags/list",
+            "how": "the tags array, every page"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "Every tag, in registry order."
+        },
+        {
+          "name": "tags_json",
+          "tf_type": "string",
+          "category": "raw",
+          "source": {
+            "type": "derived",
+            "from": "GET /v2/<name>/tags/list",
+            "how": "the merged pages as {name, tags} JSON"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "serializes": "tag_list",
+          "description": "The merged tags/list response."
+        },
+        {
+          "name": "tag_list",
+          "tf_type": "object({...})",
+          "category": "structured",
+          "source": {
+            "type": "derived",
+            "from": "GET /v2/<name>/tags/list",
+            "how": "OCI distribution spec content discovery response"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "fields": [
+            {
+              "name": "name",
+              "upstream": "name",
+              "tf_type": "string"
+            },
+            {
+              "name": "tags",
+              "upstream": "tags",
+              "tf_type": "list(string)"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
+          "name": "content_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "tags_json",
+            "how": "sha256 of the UTF-8 bytes"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "hash_of": "tags_json"
+        },
+        {
+          "name": "distribution_api_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "derived",
+            "from": "registry response",
+            "how": "the Docker-Distribution-API-Version response header (e.g. registry/2.0)"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "The registry's Docker-Distribution-API-Version header."
+        }
+      ],
+      "uses_cli": false
+    },
+    "swarm:swarm-tokens-data": {
+      "outputs": [
+        {
+          "name": "id",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/ClusterInfo/properties/ID"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "The swarm's cluster ID."
+        },
+        {
+          "name": "join_tokens",
+          "tf_type": "object({...})",
+          "category": "structured",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/JoinTokens"
+          },
+          "known_after_apply": false,
+          "sensitive": true,
+          "sensitive_reason": "Both fields are swarm join tokens: whoever holds one can join a node to the swarm.",
+          "fields": [
+            {
+              "name": "worker",
+              "upstream": "Worker",
+              "tf_type": "string",
+              "pointer": "#/definitions/JoinTokens/properties/Worker"
+            },
+            {
+              "name": "manager",
+              "upstream": "Manager",
+              "tf_type": "string",
+              "pointer": "#/definitions/JoinTokens/properties/Manager"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
+          "name": "engine_api_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/ApiVersion"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Engine API version negotiated with the daemon."
+        },
+        {
+          "name": "docker_server_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/Version"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Docker Engine version from GET /version."
+        }
+      ],
+      "uses_cli": false,
+      "no_raw_reason": "Only the join tokens; the whole SwarmInspect response is data.docker_swarm's inspect_json."
+    },
+    "swarm:swarm-tokens-ephemeral": {
+      "outputs": [
+        {
+          "name": "id",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/ClusterInfo/properties/ID"
+          },
+          "known_after_apply": false,
+          "sensitive": false,
+          "description": "The swarm's cluster ID."
+        },
+        {
+          "name": "join_tokens",
+          "tf_type": "object({...})",
+          "category": "structured",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/JoinTokens"
+          },
+          "known_after_apply": false,
+          "sensitive": true,
+          "sensitive_reason": "Both fields are swarm join tokens: whoever holds one can join a node to the swarm.",
+          "fields": [
+            {
+              "name": "worker",
+              "upstream": "Worker",
+              "tf_type": "string",
+              "pointer": "#/definitions/JoinTokens/properties/Worker"
+            },
+            {
+              "name": "manager",
+              "upstream": "Manager",
+              "tf_type": "string",
+              "pointer": "#/definitions/JoinTokens/properties/Manager"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
+          "name": "engine_api_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/ApiVersion"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Engine API version negotiated with the daemon."
+        },
+        {
+          "name": "docker_server_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/Version"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Docker Engine version from GET /version."
+        }
+      ],
+      "uses_cli": false
+    },
+    "engine:registry-token": {
+      "outputs": [
+        {
+          "name": "registry",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "derived",
+            "from": "registry token service response",
+            "how": "the registry host the token is for"
+          },
+          "known_after_apply": false,
+          "sensitive": false
+        },
+        {
+          "name": "token",
+          "tf_type": "object({...})",
+          "category": "structured",
+          "source": {
+            "type": "derived",
+            "from": "registry token service response",
+            "how": "the Docker token authentication response"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "fields": [
+            {
+              "name": "token",
+              "upstream": "token",
+              "tf_type": "string",
+              "sensitive": true
+            },
+            {
+              "name": "expires_in",
+              "upstream": "expires_in",
+              "tf_type": "number"
+            },
+            {
+              "name": "issued_at",
+              "upstream": "issued_at",
+              "tf_type": "string"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
+          "name": "distribution_api_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "derived",
+            "from": "registry response",
+            "how": "the Docker-Distribution-API-Version response header (e.g. registry/2.0)"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "The registry's Docker-Distribution-API-Version header."
+        }
+      ],
+      "uses_cli": false
+    },
+    "engine:exec-output": {
+      "outputs": [
+        {
+          "name": "exec_id",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/IDResponse/properties/Id"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "ID of the exec instance (POST /containers/{id}/exec)."
+        },
+        {
+          "name": "container_id",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema/properties/ContainerID"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "ID of the container the command ran in."
+        },
+        {
+          "name": "stdout",
+          "tf_type": "string",
+          "category": "raw",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1exec~1{id}~1start/post/responses/200"
+          },
+          "known_after_apply": true,
+          "sensitive": true,
+          "description": "The command's standard output (Q33)."
+        },
+        {
+          "name": "stderr",
+          "tf_type": "string",
+          "category": "raw",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1exec~1{id}~1start/post/responses/200"
+          },
+          "known_after_apply": true,
+          "sensitive": true,
+          "description": "The command's standard error (Q33)."
+        },
+        {
+          "name": "result",
+          "tf_type": "object({...})",
+          "category": "result",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "GET /exec/{id}/json after the command finished (exit_code, running, pid, process_config...).",
+          "fields": [
+            {
+              "name": "can_remove",
+              "upstream": "CanRemove",
+              "tf_type": "bool",
+              "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema/properties/CanRemove"
+            },
+            {
+              "name": "detach_keys",
+              "upstream": "DetachKeys",
+              "tf_type": "string",
+              "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema/properties/DetachKeys"
+            },
+            {
+              "name": "id",
+              "upstream": "ID",
+              "tf_type": "string",
+              "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema/properties/ID"
+            },
+            {
+              "name": "running",
+              "upstream": "Running",
+              "tf_type": "bool",
+              "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema/properties/Running"
+            },
+            {
+              "name": "exit_code",
+              "upstream": "ExitCode",
+              "tf_type": "number",
+              "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema/properties/ExitCode"
+            },
+            {
+              "name": "process_config",
+              "upstream": "ProcessConfig",
+              "tf_type": "object({...})",
+              "pointer": "#/definitions/ProcessConfig",
+              "fields": [
+                {
+                  "name": "privileged",
+                  "upstream": "privileged",
+                  "tf_type": "bool",
+                  "pointer": "#/definitions/ProcessConfig/properties/privileged"
+                },
+                {
+                  "name": "user",
+                  "upstream": "user",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ProcessConfig/properties/user"
+                },
+                {
+                  "name": "tty",
+                  "upstream": "tty",
+                  "tf_type": "bool",
+                  "pointer": "#/definitions/ProcessConfig/properties/tty"
+                },
+                {
+                  "name": "entrypoint",
+                  "upstream": "entrypoint",
+                  "tf_type": "string",
+                  "pointer": "#/definitions/ProcessConfig/properties/entrypoint"
+                },
+                {
+                  "name": "arguments",
+                  "upstream": "arguments",
+                  "tf_type": "list(string)",
+                  "pointer": "#/definitions/ProcessConfig/properties/arguments"
+                }
+              ]
+            },
+            {
+              "name": "open_stdin",
+              "upstream": "OpenStdin",
+              "tf_type": "bool",
+              "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema/properties/OpenStdin"
+            },
+            {
+              "name": "open_stderr",
+              "upstream": "OpenStderr",
+              "tf_type": "bool",
+              "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema/properties/OpenStderr"
+            },
+            {
+              "name": "open_stdout",
+              "upstream": "OpenStdout",
+              "tf_type": "bool",
+              "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema/properties/OpenStdout"
+            },
+            {
+              "name": "container_id",
+              "upstream": "ContainerID",
+              "tf_type": "string",
+              "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema/properties/ContainerID"
+            },
+            {
+              "name": "pid",
+              "upstream": "Pid",
+              "tf_type": "number",
+              "pointer": "#/paths/~1exec~1{id}~1json/get/responses/200/schema/properties/Pid"
+            }
+          ],
+          "fields_complete": true
+        },
+        {
+          "name": "engine_api_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/ApiVersion"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion)."
+        },
+        {
+          "name": "docker_server_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/Version"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Docker Engine version from GET /version."
+        },
+        {
+          "name": "stdout_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "output",
+            "how": "hex sha256 of the UTF-8 bytes of output"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "hash_of": "stdout",
+          "description": "sha256 of output."
+        },
+        {
+          "name": "stderr_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "stderr",
+            "how": "sha256 of the UTF-8 bytes"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "hash_of": "stderr",
+          "description": "sha256 of `stderr` (Q34)."
+        }
+      ],
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "container_id",
+          "tf_type": "string",
+          "default": null,
+          "upstream": "id",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1{id}~1json/get"
+          },
+          "description": "The container (ID or name) the action targets (Q40)."
+        }
+      ]
+    }
+  }
+}

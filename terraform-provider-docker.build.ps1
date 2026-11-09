@@ -7,7 +7,7 @@
     which picks up this *.build.ps1 file automatically:
 
         Invoke-Build ?                  # list tasks with their synopses
-        Invoke-Build                    # default task: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate
+        Invoke-Build                    # default task: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck
         Invoke-Build Test
         Invoke-Build Build, Vet, GenSkillCheck
         Invoke-Build Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm
@@ -62,7 +62,7 @@ $PythonExe = Resolve-Tool $Python
 
 $TfPluginDocs = 'github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs'
 $Harness = Join-Path $BuildRoot 'test/harness/Invoke-E2E.ps1'
-$SwarmAccRegex = 'TestAcc(Service|Stack|Secret|DockerConfig|SwarmTokens|Node_|Nodes_|SwarmNode|ComposeSwarm|ListSecret|P3SwarmList|Action(SwarmRotateTokens|NodeDrainActivate|ServiceScaleForceUpdateRollback))'
+$SwarmAccRegex = 'TestAcc(Service|Stack|Secret|DockerConfig|SwarmTokens|SwarmDataSources|Node_|Nodes_|NodeResource|SwarmNode|ComposeSwarm|ListSecret|P3SwarmList|ObjClusterVolume|Action(SwarmRotateTokens|NodeDrainActivate|ServiceScaleForceUpdateRollback|NodePromoteDemote|SwarmRotateCA|SwarmUnlockKey))'
 
 $RefDir = Join-Path $BuildRoot 'reference'
 $InventoryFiles = 'reference/inventory.json', 'reference/INVENTORY.md'
@@ -246,7 +246,19 @@ task Check ?FmtCheck, ?Vet, ?GenSkillCheck, ?GenSkillStrict, ?DocsValidate, {
 
 # ---------------------------------------------------------------------------- tools
 
-# Synopsis: kreuzwerker/docker v4.6.0 parity table (go run ./tools/parity).
+# Synopsis: Regenerate templates/guides/migrating-from-kreuzwerker.md.tmpl from reference/_gen/renames.json (then Docs).
+task Guide {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/parity -guide templates/guides/migrating-from-kreuzwerker.md.tmpl }
+}
+
+# Synopsis: Fail if the migration guide template is stale against reference/_gen/renames.json.
+task GuideCheck {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/parity -guide-check templates/guides/migrating-from-kreuzwerker.md.tmpl } -ErrorMessage 'Run Invoke-Build Guide, Docs.'
+}
+
+# Synopsis: kreuzwerker/docker v4.6.0 parity: every type, and every attribute against reference/_gen/renames.json (a gap: row fails).
 task Parity {
     requires -Variable GoExe
     exec { & $GoExe run ./tools/parity }
@@ -361,5 +373,50 @@ task ReferenceVerify {
     print Green 'ReferenceVerify: every upstream file matches its pinned source'
 }
 
-# Synopsis: Default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate.
-task . Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate
+# ---------------------------------------------------------------------------- registration (Pass 5)
+
+# Synopsis: Regenerate internal/provider/registry_gen.go (+ its test) from reference/inventory.json (tools/registrygen).
+task RegistryGen {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/registrygen }
+}
+
+# Synopsis: Fail if registry_gen.go differs from the inventory, or a constructor reports a type name the inventory does not have (TestRegistryGen).
+task RegistryCheck {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/registrygen -check } -ErrorMessage 'Registration differs from reference/inventory.json. Run Invoke-Build Inventory, RegistryGen.'
+    $saved = $env:TF_ACC
+    Remove-Item Env:TF_ACC -ErrorAction Ignore
+    try { exec { & $GoExe test ./internal/provider/ -run '^TestRegistryGen$' -count=1 } }
+    finally { if ($null -ne $saved) { $env:TF_ACC = $saved } }
+}
+
+# Synopsis: List the Pass 5 stubs and open markers left in internal/provider (STUB(pass5) lines), per file; prints the total.
+task StubReport {
+    $dir = Join-Path $BuildRoot 'internal/provider'
+    $hits = @(Get-ChildItem -LiteralPath $dir -Filter *.go -File |
+            Where-Object { $_.Name -notlike '*_test.go' } |
+            Select-String -Pattern '//\s*STUB\(pass5\)\s+(\S+)(\s+partial:)?' -CaseSensitive)
+    $stubs = @($hits | Where-Object { -not $_.Matches[0].Groups[2].Success })
+    $partial = @($hits | Where-Object { $_.Matches[0].Groups[2].Success })
+    foreach ($g in ($hits | Group-Object Filename | Sort-Object Name)) {
+        print Cyan ("{0}: {1}" -f $g.Name, $g.Count)
+        foreach ($h in $g.Group) { print Gray ("  " + $h.Line.Trim()) }
+    }
+    print $(if ($hits.Count) { 'Yellow' } else { 'Green' }) ("StubReport: {0} markers ({1} stubs, {2} partial)" -f $hits.Count, $stubs.Count, $partial.Count)
+}
+
+# Synopsis: Regenerate internal/provider/contract_gen.go (outputs-contract tables + per-item model structs) from reference/inventory.json (tools/contractgen).
+task ContractGen {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/contractgen }
+}
+
+# Synopsis: Fail if contract_gen.go differs from reference/inventory.json.
+task ContractCheck {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/contractgen -check } -ErrorMessage 'contract_gen.go is stale. Run Invoke-Build Inventory, ContractGen.'
+}
+
+# Synopsis: Default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck.
+task . Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck

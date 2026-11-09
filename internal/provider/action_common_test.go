@@ -142,25 +142,17 @@ func actHasProgress(r actResult, sub string) bool {
 	return false
 }
 
-// TestActionsRegistered checks every action is served with a valid schema,
-// the expected type name and a standalone first sentence.
+// TestActionsRegistered checks every implemented action is served with a valid
+// schema and a standalone first sentence (TestRegistryGen checks the names).
 func TestActionsRegistered(t *testing.T) {
 	ctx := context.Background()
-	want := map[string]bool{
-		"docker_exec": true, "docker_container_export": true, "docker_image_import": true, "docker_image_load": true,
-		"docker_image_save": true, "docker_system_prune": true, "docker_image_prune": true, "docker_swarm_rotate_tokens": true,
-		"docker_node_drain": true, "docker_node_activate": true, "docker_service_scale": true,
-		"docker_service_force_update": true, "docker_service_rollback": true,
-	}
-	for _, f := range laneActions() {
+	for _, f := range genActions() {
 		a := f()
+		if isPass5Stub(a) {
+			continue // TestRegistryGen checks stub names; stubs have no schema to check yet
+		}
 		var mr action.MetadataResponse
 		a.Metadata(ctx, action.MetadataRequest{ProviderTypeName: "docker"}, &mr)
-		if !want[mr.TypeName] {
-			t.Errorf("unexpected action %q", mr.TypeName)
-			continue
-		}
-		delete(want, mr.TypeName)
 		var sr action.SchemaResponse
 		a.Schema(ctx, action.SchemaRequest{}, &sr)
 		if d := sr.Schema.ValidateImplementation(ctx); d.HasError() {
@@ -178,9 +170,6 @@ func TestActionsRegistered(t *testing.T) {
 		if _, ok := a.(action.ActionWithConfigure); !ok {
 			t.Errorf("%s does not implement Configure", mr.TypeName)
 		}
-	}
-	for n := range want {
-		t.Errorf("action %s not registered", n)
 	}
 }
 
@@ -226,7 +215,7 @@ func TestActionsServedOverProtocol(t *testing.T) {
 	for _, d := range resp.Diagnostics {
 		t.Errorf("%s: %s", d.Summary, d.Detail)
 	}
-	if got, want := len(resp.ActionSchemas), len(laneActions()); got != want {
+	if got, want := len(resp.ActionSchemas), len(genActions()); got != want {
 		t.Errorf("%d action schemas served, want %d", got, want)
 	}
 	for _, n := range []string{"docker_exec", "docker_service_rollback", "docker_node_drain"} {
@@ -241,7 +230,10 @@ func TestActionsServedOverProtocol(t *testing.T) {
 // references it, and the -invoke comment.
 func TestActionExamples(t *testing.T) {
 	ctx := context.Background()
-	for _, f := range laneActions() {
+	for _, f := range genActions() {
+		if isPass5Stub(f()) {
+			continue
+		}
 		var mr action.MetadataResponse
 		f().Metadata(ctx, action.MetadataRequest{ProviderTypeName: "docker"}, &mr)
 		name := mr.TypeName

@@ -13,6 +13,9 @@ import argparse, json, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REF = os.path.normpath(os.path.join(HERE, ".."))
+# Kinds outside the contract: skipped items, and list resources / provider functions (Pass 5), which return the
+# managed resource's own state or a computed value rather than reading or changing a Docker object themselves.
+NO_CONTRACT = ("skip", "list_resource", "function")
 OBJECTISH = ("object(", "list(object(", "set(object(", "map(object(")
 
 ap = argparse.ArgumentParser()
@@ -63,7 +66,7 @@ if os.path.exists(args.allowed):
 violations = []  # (id, rule, text)
 checked = 0
 for it in inv["items"]:
-    if it["kind"] == "skip":
+    if it["kind"] in NO_CONTRACT:
         continue
     if args.lane and it.get("outputs_lane") != args.lane:
         continue

@@ -29,11 +29,11 @@ README_resources.md (generated) lists every type by layer.
 
 ## Repo map
 
-- `internal/provider/`: the whole provider, one Go package. Each kind or lane registers through its own `register_*.go`; `provider.go` only calls those.
+- `internal/provider/`: the whole provider, one Go package. Registration is generated: `registry_gen.go` comes from `reference/inventory.json` via `tools/registrygen` (`Invoke-Build RegistryGen`; `RegistryCheck` in the default task). Constructors are named `New<CamelName><Kind>`.
   - Tests: `*_test.go`. Unit tests use an httptest fake Engine. `TestAcc*` are acceptance tests that skip without `TF_ACC` or the environment they need.
 - `tools/genskill/`: renders `.claude/skills/terraform-provider-docker/` (SKILL.md + reference/), `.claude/skills/docker-cli-map/SKILL.md` and README_resources.md from the live provider schema. `-check` fails on drift; `-strict` fails on missing descriptions.
 - `tools/compose2stack/`: converts a compose file once into `docker_stack` HCL (swarm) or container/network/volume HCL (local).
-- `tools/parity/`: kreuzwerker/docker v4.6.0 types vs ours. The hand-maintained list is in `tools/parity/paritydata`. `-check BUILD_REPORT.md` fails on a missing type with no `[BLOCKED]` line.
+- `tools/parity/`: kreuzwerker/docker v4.6.0 types and attributes vs ours. Types: `tools/parity/paritydata` (hand-maintained). Attributes: every kreuzwerker attribute (`paritydata/kreuzwerker_v4.6.0_attrs.json`) must appear in `reference/_gen/renames.json`, mapped or dropped with a reason; a `gap:` row fails, `won't implement:` passes. `-check BUILD_REPORT.md` also fails on a missing type with no `[BLOCKED]` line. `-guide` regenerates `templates/guides/migrating-from-kreuzwerker.md.tmpl` (Invoke-Build Guide / GuideCheck).
 - `tools/apiwatch/`: diffs the pinned Docker Engine API spec (`pinned.json` + `spec/`) against the newest published one, mapped to provider types.
 - `tools/climap/commands.json`: the hand-maintained docker CLI command list behind the docker-cli-map skill.
 - `test/harness/`: the dind swarm harness (manager, worker1-3, TLS node, registry:2, Docker Hub mirror). `Invoke-E2E.ps1` is the only entry point for acceptance runs.
@@ -74,14 +74,17 @@ is an [Invoke-Build](https://github.com/nightroman/Invoke-Build) script; run it 
 
 ```
 Invoke-Build ?                   # list tasks
-Invoke-Build                     # default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate
+Invoke-Build                     # default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck
+Invoke-Build ContractGen         # regenerate internal/provider/contract_gen.go (outputs contract) from the inventory
+Invoke-Build RegistryGen         # regenerate internal/provider/registry_gen.go from reference/inventory.json
+Invoke-Build StubReport          # list the Pass 5 stubs / STUB(pass5) markers left
 Invoke-Build Build, Vet, Test    # go build + provider binary, go vet, unit tests (-short, TF_ACC unset)
 Invoke-Build Tools               # unit tests of tools/ only
 Invoke-Build GenSkill            # regenerate .claude/skills + README_resources.md (GenSkillCheck: -check)
 Invoke-Build Docs                # GenSkill, then tfplugindocs generate + validate
 Invoke-Build Check               # gofmt, vet, genskill -check/-strict, tfplugindocs validate
 Invoke-Build TestAcc             # dind harness: plain pass, then -SwarmInit pass (TF_ACC=1)
-Invoke-Build Parity              # kreuzwerker parity table
+Invoke-Build Parity              # kreuzwerker parity: types + every attribute vs reference/_gen/renames.json
 Invoke-Build ApiWatch            # Engine API drift vs tools/apiwatch/pinned.json
 Invoke-Build Inventory           # reference/inventory.json + INVENTORY.md from reference/_gen/fragments (InventoryCheck: diff must be empty)
 Invoke-Build ReferenceVerify     # re-hash reference/upstream against the SHAs pinned in reference/SOURCES.md

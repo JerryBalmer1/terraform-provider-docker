@@ -4,7 +4,8 @@
     "One new item: dockerfile:data-dockerfile (data.docker_dockerfile). Confirmed missing: no docker_dockerfile type in internal/provider (register_*.go); docker_image only takes a Dockerfile path.",
     "ImageHistory and ImageInspect are cited without primary: their primary homes are engine:image-history and engine:image-data.",
     "Image mode reads ImageHistory (#/definitions/ImageHistoryResponseItem, CreatedBy) and ImageInspect (#/definitions/ImageInspect Config); the result is approximate. Image mode cannot recover a Dockerfile. It rebuilds an approximate single-stage instruction list from the image history (ImageHistoryResponseItem.CreatedBy, newest first, reversed) plus ImageConfig for the final CMD/ENTRYPOINT/ENV/EXPOSE/USER/WORKDIR/LABEL/HEALTHCHECK/SHELL/STOPSIGNAL/VOLUME values, so fidelity = approximate: FROM and earlier stages are lost (base-image layers appear as leading history entries), COPY/ADD sources are only content hashes, RUN --mount/--network/--security flags and heredoc structure are not recorded, and images built by other tools may have empty or squashed history. History CreatedBy records build-arg values, so image-mode stages/history/dockerfile are sensitive.",
-    "Matches option (b) of z4's first naming question (one data.docker_dockerfile with ordered nested blocks)."
+    "Matches option (b) of z4's first naming question (one data.docker_dockerfile with ordered nested blocks).",
+    "Pass 5 Lane D/Z: the `git` source became `url` (a raw HTTPS fetch of one file, pure Go, 4 MiB cap, no git); `git_commit` stays in the schema and is always null. Builder mode (`stage` blocks) is a fifth source (`source_type` = blocks). Instruction order across keywords is one ordered `instruction` block per stage holding exactly one keyword block. The per-keyword structured objects stay JSON strings until their fields are mapped completely (fields_complete). Block-level outputs (instruction, stage_index, instruction_index, dockerfile, content_sha256, dockerfile_syntax) sit on each instruction / global_arg block; the `stage` block has no computed `instruction` (it would clash with the nested block), its FROM data is in stages[*]."
   ],
   "naming_questions": [],
   "items": [
@@ -13,7 +14,7 @@
       "layer": "dockerfile",
       "kind": "data_source",
       "name": "docker_dockerfile",
-      "summary": "Read one Dockerfile from exactly one source (`content` inline, `path` local file, `git` url + ref + subpath, or `image` reference), parse it into the builder's block model (directives, global ARGs, stages, every instruction with all flags, exposed ports, base images) and re-render `dockerfile`; image mode reconstructs an approximate instruction list from the image history (reconstructed = true, fidelity = approximate; exact for content/path/git).",
+      "summary": "Read one Dockerfile from exactly one source (`content` inline, `path` local file, `url` raw HTTPS fetch, `image` reference, or ordered `stage` / `instruction` blocks), parse it into the block model (directives, global ARGs, stages, every instruction with all flags, exposed ports, base images) and render `dockerfile`; image mode reconstructs an approximate instruction list from the image history (fidelity = approximate; exact otherwise).",
       "sources": [
         {
           "type": "doc",
@@ -69,9 +70,13 @@
         }
       ],
       "min_api": null,
-      "status": "missing",
-      "existing": [],
-      "cli_only": false
+      "cli_only": false,
+      "decisions": [
+        "Q27",
+        "Q47",
+        "Q48",
+        "Q49"
+      ]
     }
   ]
 }

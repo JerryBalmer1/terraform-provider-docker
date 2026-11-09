@@ -18,6 +18,7 @@ fragments/*.json  --merge.py-->  reference/inventory.json + reference/INVENTORY.
    | `fragments/z3-cli.json` | cli-only, buildx | Z3 |
    | `fragments/z3-cli-map.json` | (CLI command coverage map, copied into `cli_map`) | Z3 |
    | `fragments/z4-dockerfile.json` | dockerfile | Z4 |
+   | `fragments/pass5.json` | types registered before Pass 5 that the harvest missed, docker_node (Q4) | P5 |
 
    A new fragment file also has to be added to `FRAGS` in `merge.py`.
 2. From the repo root: `Invoke-Build Inventory`. merge.py validates every item
@@ -73,3 +74,17 @@ e.g. `cd reference/_gen/fragments/outputs; python -I -B ../../generators/lanez/m
 Replayed in that order on 9df9acf's files, the first four reproduce the Lane Z commit (df79456) byte for byte, and
 `p45c.py` then gives the current files. `p45c_docs.py` (run from the repo root) made the matching prose edits.
 They are provenance: re-running one on the current files fails or doubles its edits.
+
+## Pass 5
+
+- Names follow [../DECISIONS.md](../DECISIONS.md). `generators/pass5/p5_decisions.py` applied the decisions to the fragments of
+  97ec6bf (provenance, not re-runnable); `p5_lanes.py` writes `pass5/lanes.json` (item -> lane); `p5_markers.py` wrote the
+  first `internal/provider/pass5_todo_<lane>.go` markers; `build_renames.py` (+ `attrs.py`) builds `renames.json` from a
+  kreuzwerker v4.6.0 checkout, then `renames_post.py` applies `pass5/renames_overrides.json` (user shape decisions:
+  `shape_mappings` for logging and networks; row patches; the gap rows the lanes implemented); `renames_summary.py` prints
+  its counts. `p5_shape_fields.py` adds `input_attr` to the logging / networks fields of the structured-output maps.
+- `status` is computed: merge.py reads `internal/provider/registry_gen.go` (generated from inventory.json by tools/registrygen)
+  and the `STUB(pass5)` marker lines in `internal/provider/*.go`. After a name change run `Invoke-Build Inventory, RegistryGen, Inventory`.
+- `renames.json`: every kreuzwerker v4.6.0 attribute and every Pass 5 rename of ours,
+  `{type, kreuzwerker_attr, previous_attr, our_attr, transform, upstream, reason}`.
+- `pass5/ownership.json`: which lane owns each file under internal/provider, examples and test during Pass 5.
