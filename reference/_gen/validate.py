@@ -1,4 +1,7 @@
-"""Check the outputs contract (rules V1-V6 and L1 in SCHEMA.md) on a merged inventory.json.
+"""Check the outputs contract (rules V1-V6 and L1 in SCHEMA.md) and item status (S1) on a merged inventory.json.
+
+S1: an item whose computed status is `missing` (unregistered, or a `// STUB(pass5) <id>` placeholder) fails and cannot
+be allowed; a `partial` item (`// PARTIAL(pass5) <id> <note>`) is listed but does not fail.
 
 Run through `Invoke-Build InventoryValidate` from the repo root. Stdlib only.
 Violations listed in allowed-violations.txt (`<id><TAB><rule><TAB><reason>`) are reported as allowed;
@@ -109,6 +112,17 @@ for it in inv["items"]:
         if o["category"] in ("structured", "result") and o.get("sensitive") and not o.get("sensitive_reason"):
             violations.append((iid, "V5", "%s output %s is sensitive as a whole with no sensitive_reason; mark the secret-carrying fields instead" % (o["category"], o["name"])))
 
+# S1 (Pass 5.1): status. A `missing` item (not registered, or a STUB(pass5) placeholder) fails, and
+# allowed-violations.txt cannot excuse it. A `partial` item (PARTIAL(pass5) marker) is listed and never fails.
+missing, partial = [], []
+for it in inv["items"]:
+    if it["kind"] == "skip" or (args.lane and it.get("outputs_lane") != args.lane):
+        continue
+    if it.get("status") == "missing":
+        missing.append((it["id"], it.get("status_note", "")))
+    elif it.get("status") == "partial":
+        partial.append((it["id"], it.get("status_note", "")))
+
 failing = [v for v in violations if (v[0], v[1]) not in allowed]
 used = {(v[0], v[1]) for v in violations}
 stale = [k for k in allowed if k not in used and not args.lane]
@@ -120,7 +134,12 @@ for k in stale:
     print("STALE     allowed-violations.txt entry matches nothing: %s %s" % k)
 for b in bad_allowed:
     print("ERROR     " + b)
+for iid, note in partial:
+    print("PARTIAL   S1 %s: %s" % (iid, note))
+for iid, note in missing:
+    print("MISSING   S1 %s: %s (stubs and unregistered items fail; this cannot be allowed)" % (iid, note))
 n_out = sum(len(i.get("outputs") or []) for i in inv["items"] if not args.lane or i.get("outputs_lane") == args.lane)
 print("checked %d items, %d outputs: %d violations (%d allowed, %d failing), %d stale allowed entries"
       % (checked, n_out, len(violations), len(violations) - len(failing), len(failing), len(stale)))
-sys.exit(1 if failing or bad_allowed or stale else 0)
+print("status: %d partial (listed, not failing), %d missing (failing)" % (len(partial), len(missing)))
+sys.exit(1 if failing or bad_allowed or stale or missing else 0)

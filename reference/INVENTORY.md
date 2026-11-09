@@ -2,7 +2,7 @@
 
 The Terraform name of every item in [upstream/](upstream/) ([SOURCES.md](SOURCES.md)). Machine-readable: [inventory.json](inventory.json).
 
-Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/merge.py`: `missing` = not registered in `internal/provider/registry_gen.go`, or still a Pass 5 stub; `partial` = registered with an open Pass 5 marker (the note says what is left); `exists` = registered with no marker. `cli` = CLI-only (no Engine API endpoint, client-side). Update: `in place` / `replace` for resources.
+Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/merge.py`: `missing` = not registered in `internal/provider/registry_gen.go`, or still a Pass 5 stub (`// STUB(pass5) <id>`); `partial` = registered, with a `// PARTIAL(pass5) <id> <note>` marker for a documented sub-feature that is absent or a no-op (the note says what is missing); `exists` = registered with no marker. `cli` = CLI-only (no Engine API endpoint, client-side). Update: `in place` / `replace` for resources.
 
 ## Engine
 
@@ -32,7 +32,7 @@ Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/
 | data source | `docker_networks` |  | `GET /networks` (NetworkList)<br>`docker network ls` |  | exists |  |
 | data source | `docker_plugin` |  | `GET /plugins/{name}/json` (PluginInspect)<br>`docker plugin inspect` | 1.25 | exists |  |
 | data source | `docker_plugins` |  | `GET /plugins` (PluginList)<br>`docker plugin ls` | 1.25 | exists |  |
-| data source | `docker_registry_image` |  | `GET /distribution/{name}/json` (DistributionInspect) | 1.30 | exists | (Q45) |
+| data source | `docker_registry_image` |  | `GET /distribution/{name}/json` (DistributionInspect) | 1.30 | partial | `insecure_skip_verify` is accepted but has no effect (the read goes through the daemon) (Q45) |
 | data source | `docker_registry_image_tags` |  | `docker buildx imagetools inspect` |  | exists · cli |  |
 | data source | `docker_system_df` |  | `GET /system/df` (SystemDataUsage)<br>`docker system df` |  | exists |  |
 | data source | `docker_version` |  | `GET /version` (SystemVersion)<br>`docker version` |  | exists |  |
@@ -123,14 +123,14 @@ Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/
 
 | kind | name | update | sources | min API | status | note |
 |---|---|---|---|---|---|---|
-| resource | `docker_compose` | in place | `#/properties/configs`<br>`#/properties/configs`<br>`#/$defs/config`<br>`#/$defs/config`<br>08-configs.md#configs-top-level-element |  | exists | (Q17, Q42) ⚠ Top-level `configs` vs docker_config (Swarm config resource) vs the proposed docker_compose_config data source (CLI `compose config`, rendered model). |
+| resource | `docker_compose` | in place | `#/properties/configs`<br>`#/properties/configs`<br>`#/$defs/config`<br>`#/$defs/config`<br>08-configs.md#configs-top-level-element |  | partial | swarm mode ignores `template_driver` (plan warning) (Q17, Q42) ⚠ Top-level `configs` vs docker_config (Swarm config resource) vs the proposed docker_compose_config data source (CLI `compose config`, rendered model). |
 | resource | `docker_compose` | in place | `#/properties/include`<br>`#/properties/include`<br>`#/$defs/include`<br>`#/$defs/include`<br>14-include.md#include |  | exists | (Q17, Q42) |
 | resource | `docker_compose` | in place | `#/properties/jobs`<br>`#/properties/jobs`<br>`#/$defs/job`<br>`#/$defs/job`<br>`#/$defs/schedule`<br>`#/$defs/schedule`<br>+2 more |  | exists | (Q18) |
-| resource | `docker_compose` | in place | `#/properties/models`<br>`#/properties/models`<br>`#/$defs/model`<br>`#/$defs/model`<br>models.md#models-top-level-element |  | exists | (Q17, Q42) |
+| resource | `docker_compose` | in place | `#/properties/models`<br>`#/properties/models`<br>`#/$defs/model`<br>`#/$defs/model`<br>models.md#models-top-level-element |  | partial | models are recorded in the `models` output but never pulled or run, and service `models` bindings are ignored (Q17, Q42) |
 | resource | `docker_compose` | in place | `#/properties/name`<br>`#/properties/name`<br>04-version-and-name.md#name-top-level-element |  | exists | (Q41, Q42) |
 | resource | `docker_compose` | in place | `#/properties/networks`<br>`#/properties/networks`<br>`#/$defs/network`<br>`#/$defs/network`<br>06-networks.md#networks-top-level-element |  | exists | (Q17, Q42) ⚠ docker_compose_network would be confusable with docker_network. |
-| resource | `docker_compose` | in place | `#/properties/secrets`<br>`#/properties/secrets`<br>`#/$defs/secret`<br>`#/$defs/secret`<br>09-secrets.md#secrets-top-level-element |  | exists | (Q17, Q42) ⚠ docker_compose_secret would be confusable with docker_secret. |
-| resource | `docker_compose` | in place | `#/properties/services`<br>`#/properties/services`<br>`#/$defs/service`<br>`#/$defs/service`<br>05-services.md#services-top-level-element<br>container_spec.md#container-specification<br>+1 more |  | exists | (Q17, Q42) ⚠ A per-service type named docker_compose_service would be confusable with docker_service (swarm). Keep services inside docker_compose. |
+| resource | `docker_compose` | in place | `#/properties/secrets`<br>`#/properties/secrets`<br>`#/$defs/secret`<br>`#/$defs/secret`<br>09-secrets.md#secrets-top-level-element |  | partial | swarm mode ignores `driver` and `template_driver` (plan warning) (Q17, Q42) ⚠ docker_compose_secret would be confusable with docker_secret. |
+| resource | `docker_compose` | in place | `#/properties/services`<br>`#/properties/services`<br>`#/$defs/service`<br>`#/$defs/service`<br>05-services.md#services-top-level-element<br>container_spec.md#container-specification<br>+1 more |  | partial | local mode ignores lifecycle hooks (pre_start/post_start/pre_stop), blkio_config, credential_spec, use_api_socket and external_links (plan warning), and treats pull_policy daily/weekly/every_<n> as missing (Q17, Q42) ⚠ A per-service type named docker_compose_service would be confusable with docker_service (swarm). Keep services inside docker_compose. |
 | resource | `docker_compose` | in place | `#/properties/volumes`<br>`#/properties/volumes`<br>`#/$defs/volume`<br>`#/$defs/volume`<br>07-volumes.md#volumes-top-level-element |  | exists | (Q17, Q42) ⚠ docker_compose_volume(s) would be confusable with docker_volume and with the proposed docker_compose_volumes data source (CLI `compose volumes`). |
 | resource | `docker_image` | in place | `#/$defs/service/properties/build`<br>`#/$defs/service/properties/build`<br>build.md#compose-build-specification |  | exists |  |
 | resource | `docker_service` | in place | `#/$defs/service/properties/deploy`<br>`#/$defs/service/properties/deploy`<br>`#/$defs/deployment`<br>`#/$defs/deployment`<br>deploy.md#compose-deploy-specification |  | exists |  |
@@ -149,7 +149,7 @@ Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/
 | action | `docker_compose_export` |  | `docker compose export`<br>`docker compose export` |  | exists · cli |  |
 | action | `docker_compose_kill` |  | `docker compose kill`<br>`docker compose kill` |  | exists · cli | (Q15) ⚠ Would mirror single-container docker_container_kill actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those. |
 | action | `docker_compose_pause` |  | `docker compose pause`<br>`docker compose pause` |  | exists · cli | (Q15) ⚠ Would mirror single-container docker_container_pause actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those. |
-| action | `docker_compose_publish` |  | `docker compose publish`<br>`docker compose publish` |  | exists · cli |  |
+| action | `docker_compose_publish` |  | `docker compose publish`<br>`docker compose publish` |  | partial · cli | env files (`--with-env`), `--resolve-image-digests`, `--oci-version` and `--app` are not implemented; only the compose files are published |
 | action | `docker_compose_pull` |  | `docker compose pull`<br>`docker compose pull` |  | exists · cli |  |
 | action | `docker_compose_push` |  | `docker compose push`<br>`docker compose push` |  | exists · cli |  |
 | action | `docker_compose_restart` |  | `docker compose restart`<br>`docker compose restart` |  | exists · cli | (Q15) ⚠ Would mirror single-container docker_container_restart actions if the engine lane proposes them; decide separate compose types vs a project/service selector on those. |
@@ -222,15 +222,15 @@ Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/
 
 | kind | name | update | sources | min API | status | note |
 |---|---|---|---|---|---|---|
-| resource | `docker_buildx_builder` | in place | `docker buildx create`<br>`docker buildx create --help`<br>`docker buildx rm`<br>`docker buildx rm --help` |  | exists · cli |  |
-| resource | `docker_image` | replace | `docker buildx build`<br>`docker buildx build --help`<br>`docker build`<br>`docker build --help`<br>`docker image build`<br>`docker image build --help`<br>+3 more |  | exists · cli | (Q20) ⚠ Do not add docker_buildx_build: it would duplicate docker_image. If exporters that produce no local image are wanted, that is an action (docker_buildx_bake or docker_image_build action), not a second build resource. |
+| resource | `docker_buildx_builder` | in place | `docker buildx create`<br>`docker buildx create --help`<br>`docker buildx rm`<br>`docker buildx rm --help` |  | partial · cli | only the docker-container driver; the kubernetes and remote drivers and the buildx instance store (`docker buildx ls`, `--use`) are not implemented |
+| resource | `docker_image` | replace | `docker buildx build`<br>`docker buildx build --help`<br>`docker build`<br>`docker build --help`<br>`docker image build`<br>`docker image build --help`<br>+3 more |  | partial · cli | build.platforms takes one platform; multi-platform builds (`docker buildx build --platform a,b`) are only available through docker_buildx_bake (Q20) ⚠ Do not add docker_buildx_build: it would duplicate docker_image. If exporters that produce no local image are wanted, that is an action (docker_buildx_bake or docker_image_build action), not a second build resource. |
 | data source | `docker_buildx_builder` |  | `docker buildx inspect`<br>`docker buildx inspect --help` |  | exists · cli | (Q24) ⚠ Same name as the resource (resource/data source pair, allowed). For builders not created by Terraform, discovery is limited to buildx_buildkit_* containers on the daemon (buildx's builder store is client-side). |
 | data source | `docker_buildx_builders` |  | `docker buildx ls`<br>`docker buildx ls --help` |  | exists · cli | (Q24) |
 | data source | `docker_buildx_disk_usage` |  | `docker buildx du`<br>`docker buildx du --help`<br>`GET /system/df` (SystemDataUsage) |  | exists · cli | (Q26) ⚠ Overlaps Z1's system df data source (BuildCache section); merge or keep builder-scoped. |
-| data source | `docker_buildx_history` |  | `docker buildx history inspect`<br>`docker buildx history inspect --help` |  | exists · cli | (Q24) (was `docker_buildx_history_record`) ⚠ Could be folded into docker_buildx_history as a `ref` filter; naming question. |
+| data source | `docker_buildx_history` |  | `docker buildx history inspect`<br>`docker buildx history inspect --help` |  | partial · cli | materials are always empty and attachment bodies are not read (digests and types only) (Q24) (was `docker_buildx_history_record`) ⚠ Could be folded into docker_buildx_history as a `ref` filter; naming question. |
 | data source | `docker_buildx_history_records` |  | `docker buildx history ls`<br>`docker buildx history ls --help`<br>`docker buildx history`<br>`docker buildx history --help` |  | exists · cli | (Q24) (was `docker_buildx_history`) |
 | data source | `docker_registry_image_manifests` |  | `docker buildx imagetools inspect`<br>`docker buildx imagetools inspect --help` |  | exists · cli |  ⚠ Same type as cli-only:manifest-inspect. |
-| action | `docker_buildx_bake` |  | `docker buildx bake`<br>`docker buildx bake --help`<br>`docker bake`<br>`docker bake --help`<br>bake-reference.md#file-format |  | exists · cli | (Q20) ⚠ Overlaps docker_image (build block) for single targets. |
+| action | `docker_buildx_bake` |  | `docker buildx bake`<br>`docker buildx bake --help`<br>`docker bake`<br>`docker bake --help`<br>bake-reference.md#file-format |  | partial · cli | target `policy` and `resources` are parsed but not applied to the build; `target:` named contexts and `target.<name>.<attr>` cross-target references are not supported (Q20) ⚠ Overlaps docker_image (build block) for single targets. |
 | skip | - |  | bake-reference.md#function<br>bake-stdlib.md |  | - · cli | skip: Bake HCL is itself HCL built on the same go-cty stdlib; Terraform functions (plus provider functions) replace user functions. |
 | skip | - |  | bake-reference.md#group |  | - · cli | skip: A list of target names; in Terraform this is the docker_buildx_bake action's `targets` argument or a for_each over targets. |
 | skip | - |  | bake-reference.md#target |  | - · cli | skip: Not a Terraform type: becomes a nested `target` block of the docker_buildx_bake action (and its attributes mirror docker_image.build). `inherits` and `matrix` map to Terraform locals/for_each. |
@@ -497,13 +497,13 @@ Counts as exists / partial / missing.
 
 | layer | resources | data sources | actions | ephemeral | list resources | functions | blocks | skipped |
 |---|---|---|---|---|---|---|---|---|
-| engine | 7 (7 / 0 / 0) | 23 (23 / 0 / 0) | 22 (22 / 0 / 0) | 3 (3 / 0 / 0) | 4 (4 / 0 / 0) | 3 (3 / 0 / 0) | 0 | 7 |
+| engine | 7 (7 / 0 / 0) | 23 (22 / 1 / 0) | 22 (22 / 0 / 0) | 3 (3 / 0 / 0) | 4 (4 / 0 / 0) | 3 (3 / 0 / 0) | 0 | 7 |
 | swarm | 6 (6 / 0 / 0) | 14 (14 / 0 / 0) | 11 (11 / 0 / 0) | 1 (1 / 0 / 0) | 4 (4 / 0 / 0) | 0 | 0 | 0 |
-| compose | 11 (11 / 0 / 0) | 8 (8 / 0 / 0) | 17 (17 / 0 / 0) | 0 | 0 | 1 (1 / 0 / 0) | 0 | 30 |
+| compose | 11 (7 / 4 / 0) | 8 (8 / 0 / 0) | 17 (16 / 1 / 0) | 0 | 0 | 1 (1 / 0 / 0) | 0 | 30 |
 | dockerfile | 0 | 1 (1 / 0 / 0) | 0 | 0 | 0 | 0 | 21 (21 / 0 / 0) | 0 |
-| buildx | 2 (2 / 0 / 0) | 6 (6 / 0 / 0) | 1 (1 / 0 / 0) | 0 | 0 | 0 | 0 | 23 |
+| buildx | 2 (0 / 2 / 0) | 6 (5 / 1 / 0) | 1 (0 / 1 / 0) | 0 | 0 | 0 | 0 | 23 |
 | cli-only | 2 (2 / 0 / 0) | 3 (3 / 0 / 0) | 0 | 0 | 0 | 0 | 0 | 21 |
-| **all** | 28 (28 / 0 / 0) | 55 (55 / 0 / 0) | 51 (51 / 0 / 0) | 4 (4 / 0 / 0) | 8 (8 / 0 / 0) | 4 (4 / 0 / 0) | 21 (21 / 0 / 0) | 81 |
+| **all** | 28 (22 / 6 / 0) | 55 (53 / 2 / 0) | 51 (49 / 2 / 0) | 4 (4 / 0 / 0) | 8 (8 / 0 / 0) | 4 (4 / 0 / 0) | 21 (21 / 0 / 0) | 81 |
 
 Engine API coverage: 108 of 108 swagger operations placed.
 

@@ -20,6 +20,8 @@ package provider
 //     names match buildx's, so `docker buildx create --name X --driver
 //     docker-container` afterwards reuses them.
 //   - kubernetes and remote drivers: not Engine API objects. Not implemented.
+//
+// PARTIAL(pass5) buildx:builder only the docker-container driver; the kubernetes and remote drivers and the buildx instance store (`docker buildx ls`, `--use`) are not implemented
 
 import (
 	"archive/tar"

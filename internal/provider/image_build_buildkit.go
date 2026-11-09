@@ -59,6 +59,8 @@ func imgIsBuildKit(b *imageBuildModel) bool {
 	return b != nil && b.Builder.ValueString() == imgBuilderBuildKit
 }
 
+// PARTIAL(pass5) buildx:build build.platforms takes one platform; multi-platform builds (`docker buildx build --platform a,b`) are only available through docker_buildx_bake
+
 // imgValidateBuildKit checks the BuildKit-only attributes of a build block.
 // Unknown values are skipped (validated again at apply).
 func imgValidateBuildKit(ctx context.Context, b *imageBuildModel) diag.Diagnostics {

@@ -1,6 +1,6 @@
 {
   "generated": "2026-11-08",
-  "about": "Every Docker object, operation and spec element in reference/upstream (see SOURCES.md) with its decided Terraform name (DECISIONS.md). status is computed from internal/provider/registry_gen.go and the Pass 5 stub markers. Paths in sources are relative to reference/.",
+  "about": "Every Docker object, operation and spec element in reference/upstream (see SOURCES.md) with its decided Terraform name (DECISIONS.md). status is computed from internal/provider/registry_gen.go and the STUB(pass5) / PARTIAL(pass5) markers in internal/provider. Paths in sources are relative to reference/.",
   "pins": {
     "engine_api": "1.56 (moby api/v1.56.1 @ 14ebc602124e280ef4ae3e1a8e688dac1255baa6)",
     "compose_spec": "main @ 3a4a6995e4a971f6173dff9130cb3e38e6738651",
@@ -22,7 +22,8 @@
         "exists": 7
       },
       "data_source": {
-        "exists": 23
+        "exists": 22,
+        "partial": 1
       },
       "action": {
         "exists": 22
@@ -59,13 +60,15 @@
     },
     "compose": {
       "resource": {
-        "exists": 11
+        "partial": 4,
+        "exists": 7
       },
       "data_source": {
         "exists": 8
       },
       "action": {
-        "exists": 17
+        "exists": 16,
+        "partial": 1
       },
       "function": {
         "exists": 1
@@ -84,13 +87,14 @@
     },
     "buildx": {
       "resource": {
-        "exists": 2
+        "partial": 2
       },
       "data_source": {
-        "exists": 6
+        "exists": 5,
+        "partial": 1
       },
       "action": {
-        "exists": 1
+        "partial": 1
       },
       "skip": {
         "n/a": 23
@@ -3867,7 +3871,7 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "The exact Engine API GET /distribution/{name}/json response as JSON.",
+          "description": "The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "distribution",
           "provided": false
         },
@@ -5986,7 +5990,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact Engine API GET /containers/{id}/changes response as JSON.",
+          "description": "The Engine API GET /containers/{id}/changes response as JSON; entries sorted by Path. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "changes"
         },
         {
@@ -6140,7 +6144,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The decoded X-Docker-Container-Path-Stat header (HEAD /containers/{id}/archive) as JSON.",
+          "description": "The decoded X-Docker-Container-Path-Stat header (HEAD /containers/{id}/archive) as JSON. Re-encoded, not byte-exact: the client decodes the header, so this is the decoded value written as canonical JSON (keys sorted, compact).",
           "serializes": "stat"
         },
         {
@@ -6960,7 +6964,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact Engine API GET /containers/{id}/top response as JSON.",
+          "description": "The Engine API GET /containers/{id}/top response as JSON; process rows in the order ps printed them. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "top"
         },
         {
@@ -7093,7 +7097,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact Engine API GET /containers/json response as JSON.",
+          "description": "The Engine API GET /containers/json response as JSON; entries sorted by first name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "containers",
           "provided": false
         },
@@ -8476,7 +8480,7 @@
           },
           "known_after_apply": false,
           "sensitive": true,
-          "description": "The exact Engine API GET /images/{name}/attestations response as JSON.",
+          "description": "The Engine API GET /images/{name}/attestations response as JSON; entries in the Engine's order. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "attestations"
         },
         {
@@ -8661,7 +8665,7 @@
           },
           "known_after_apply": false,
           "sensitive": true,
-          "description": "The exact Engine API GET /images/{name}/history response as JSON.",
+          "description": "The Engine API GET /images/{name}/history response as JSON; layers in the Engine's order (newest first). Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "history"
         },
         {
@@ -8813,7 +8817,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact Engine API GET /images/search response as JSON.",
+          "description": "The Engine API GET /images/search response as JSON; results in the Engine's order. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "results"
         },
         {
@@ -8963,7 +8967,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact Engine API GET /images/json response as JSON.",
+          "description": "The Engine API GET /images/json response as JSON; entries sorted by ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "images"
         },
         {
@@ -9256,7 +9260,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact Engine API GET /info response as JSON.",
+          "description": "The Engine API GET /info response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "info"
         },
         {
@@ -10312,7 +10316,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact Engine API GET /networks response as JSON.",
+          "description": "The Engine API GET /networks response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "networks"
         },
         {
@@ -10872,7 +10876,7 @@
           },
           "known_after_apply": false,
           "sensitive": true,
-          "description": "The exact Engine API GET /plugins response as JSON.",
+          "description": "The Engine API GET /plugins response as JSON; entries sorted by name. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "plugins"
         },
         {
@@ -11628,7 +11632,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The Engine API response body as JSON.",
+          "description": "The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "inspect",
           "provided": false
         },
@@ -11679,8 +11683,12 @@
       "outputs_note": "Today: name, id (`name@digest`, ~ image_digest_ref), sha256_digest (= digest). Missing: image_ref, image_digest_ref, platforms, manifests, inspect, inspect_json, content_sha256, versions. labels, created and config stay null on this side: DistributionInspect returns only the descriptor and the platform list, not the image config or per-platform digests.",
       "uses_cli": false,
       "outputs_lane": "D",
-      "status": "exists",
+      "status": "partial",
+      "status_note": "`insecure_skip_verify` is accepted but has no effect (the read goes through the daemon)",
       "registered": "data.docker_registry_image",
+      "stub_files": [
+        "pass51_partial_s.go"
+      ],
       "lane": "Z1"
     },
     {
@@ -11844,7 +11852,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact Engine API GET /system/df response as JSON.",
+          "description": "The Engine API GET /system/df response as JSON; with verbose, each Items list sorted by ID (volumes by Name). Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "df"
         },
         {
@@ -12124,7 +12132,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact Engine API GET /version response as JSON.",
+          "description": "The Engine API GET /version response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "version"
         },
         {
@@ -12609,7 +12617,7 @@
           },
           "known_after_apply": false,
           "sensitive": true,
-          "description": "The exact Engine API GET /volumes response as JSON.",
+          "description": "The Engine API GET /volumes response as JSON; Volumes sorted by name. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "volumes"
         },
         {
@@ -16690,7 +16698,7 @@
           },
           "known_after_apply": false,
           "sensitive": true,
-          "description": "The exact Engine API POST /auth response as JSON.",
+          "description": "The Engine API POST /auth response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "auth"
         },
         {
@@ -19989,7 +19997,7 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "The exact Engine API inspect response for the swarm (its ClusterInfo part), as JSON. JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.",
+          "description": "The Engine API GET /swarm (its ClusterInfo part) response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.",
           "serializes": "inspect",
           "provided": false
         },
@@ -21290,7 +21298,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact list response (JSON array of Config) as returned by the Engine API.",
+          "description": "The Engine API GET /configs response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "configs",
           "provided": false
         },
@@ -21992,7 +22000,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact list response (JSON array of Node) as returned by the Engine API.",
+          "description": "The Engine API GET /nodes response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "nodes",
           "provided": false
         },
@@ -22674,7 +22682,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact list response (JSON array of Secret) as returned by the Engine API. Not sensitive: Data is never returned by SecretList.",
+          "description": "The Engine API GET /secrets response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Not sensitive: Data is never returned by SecretList.",
           "serializes": "secrets",
           "provided": false
         },
@@ -24759,7 +24767,7 @@
           },
           "known_after_apply": false,
           "sensitive": true,
-          "description": "The exact list response (JSON array of Service) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
+          "description": "The Engine API GET /services response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "serializes": "services",
           "provided": false
         },
@@ -26326,7 +26334,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The exact Engine API inspect response for the swarm (its ClusterInfo part), as JSON. JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.",
+          "description": "The Engine API GET /swarm (its ClusterInfo part) response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.",
           "serializes": "inspect",
           "provided": false
         },
@@ -28685,7 +28693,7 @@
           },
           "known_after_apply": false,
           "sensitive": true,
-          "description": "The exact list response (JSON array of Task) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
+          "description": "The Engine API GET /tasks response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
           "serializes": "tasks",
           "provided": false
         },
@@ -32401,8 +32409,12 @@
       "outputs_status": "missing",
       "uses_cli": false,
       "outputs_lane": "C",
-      "status": "exists",
+      "status": "partial",
+      "status_note": "swarm mode ignores `template_driver` (plan warning)",
       "registered": "docker_compose",
+      "stub_files": [
+        "pass51_partial_s.go"
+      ],
       "lane": "Z2"
     },
     {
@@ -33734,8 +33746,12 @@
       "outputs_status": "missing",
       "uses_cli": false,
       "outputs_lane": "C",
-      "status": "exists",
+      "status": "partial",
+      "status_note": "models are recorded in the `models` output but never pulled or run, and service `models` bindings are ignored",
       "registered": "docker_compose",
+      "stub_files": [
+        "pass51_partial_s.go"
+      ],
       "lane": "Z2"
     },
     {
@@ -36750,8 +36766,12 @@
       "outputs_status": "missing",
       "uses_cli": false,
       "outputs_lane": "C",
-      "status": "exists",
+      "status": "partial",
+      "status_note": "swarm mode ignores `driver` and `template_driver` (plan warning)",
       "registered": "docker_compose",
+      "stub_files": [
+        "pass51_partial_s.go"
+      ],
       "lane": "Z2"
     },
     {
@@ -38095,8 +38115,12 @@
       "outputs_note": "Today: `services` (name -> container IDs / service ID). Missing: project.services, container_names, image_refs, versions.",
       "uses_cli": false,
       "outputs_lane": "C",
-      "status": "exists",
+      "status": "partial",
+      "status_note": "local mode ignores lifecycle hooks (pre_start/post_start/pre_stop), blkio_config, credential_spec, use_api_socket and external_links (plan warning), and treats pull_policy daily/weekly/every_<n> as missing",
       "registered": "docker_compose",
+      "stub_files": [
+        "pass51_partial_s.go"
+      ],
       "lane": "Z2"
     },
     {
@@ -43920,8 +43944,12 @@
         }
       ],
       "outputs_lane": "C",
-      "status": "exists",
+      "status": "partial",
+      "status_note": "env files (`--with-env`), `--resolve-image-digests`, `--oci-version` and `--app` are not implemented; only the compose files are published",
       "registered": "action.docker_compose_publish",
+      "stub_files": [
+        "pass51_partial_s.go"
+      ],
       "lane": "Z2"
     },
     {
@@ -51397,8 +51425,12 @@
       "outputs_note": "Today: id, name, driver, endpoint, tcp_address, container_name, volume_name, buildkit_version, platforms (first node). Missing: inspect_json, builder (nodes, driver_opts, status, flags, labels, gc_policy, last_activity), labels, the three version outputs. Gaps vs `buildx inspect`: the '*' marker for manually pinned platforms and the --debug extra view.",
       "uses_cli": false,
       "outputs_lane": "E",
-      "status": "exists",
+      "status": "partial",
+      "status_note": "only the docker-container driver; the kubernetes and remote drivers and the buildx instance store (`docker buildx ls`, `--use`) are not implemented",
       "registered": "docker_buildx_builder",
+      "stub_files": [
+        "buildx_builder_resource.go"
+      ],
       "lane": "Z3"
     },
     {
@@ -51766,8 +51798,12 @@
       "outputs_note": "Today docker_image exposes id, image_id, repo_digest (= image_digest_ref), context_digest. Missing: metadata_json/build_metadata, dockerfile text, digest, platforms, labels, build_ref, the version outputs. Image inspect outputs (inspect_json) belong to the engine image item, not here.",
       "uses_cli": false,
       "outputs_lane": "E",
-      "status": "exists",
+      "status": "partial",
+      "status_note": "build.platforms takes one platform; multi-platform builds (`docker buildx build --platform a,b`) are only available through docker_buildx_bake",
       "registered": "docker_image",
+      "stub_files": [
+        "image_build_buildkit.go"
+      ],
       "lane": "Z3"
     },
     {
@@ -53009,8 +53045,12 @@
       "outputs_note": "No data source today. Gap: attachment content (provenance/SBOM bodies, `docker buildx history inspect attachment`) is not an output; only attachment digests/types. Config holds more keys than ImageResolveMode in practice (fields_complete false).",
       "uses_cli": false,
       "outputs_lane": "E",
-      "status": "exists",
+      "status": "partial",
+      "status_note": "materials are always empty and attachment bodies are not read (digests and types only)",
       "registered": "data.docker_buildx_history",
+      "stub_files": [
+        "datasource_buildx_history.go"
+      ],
       "lane": "Z3"
     },
     {
@@ -54333,8 +54373,13 @@
         }
       ],
       "outputs_lane": "E",
-      "status": "exists",
+      "status": "partial",
+      "status_note": "target `policy` and `resources` are parsed but not applied to the build; `target:` named contexts and `target.<name>.<attr>` cross-target references are not supported",
       "registered": "action.docker_buildx_bake",
+      "stub_files": [
+        "action_buildx_bake.go",
+        "buildx_bake_parse.go"
+      ],
       "lane": "Z3"
     },
     {

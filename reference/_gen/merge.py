@@ -8,7 +8,11 @@ ap = argparse.ArgumentParser(description="Merge inventory fragments (no argument
 ap.add_argument("--dry-run", action="store_true", help="validate only; write nothing under reference/")
 ap.add_argument("--emit", help="also write the merged inventory.json to this path (for validate.py)")
 ap.add_argument("--outputs", action="append", help="load only this outputs/<lane>.json (repeatable); default all")
+ap.add_argument("--self-test", action="store_true", help="only run the status-marker parser self-test, then exit")
+ap.add_argument("--provider", help="read registry_gen.go and the status markers from this directory instead of internal/provider (with --dry-run, to try markers)")
 ARGS = ap.parse_args()
+if ARGS.provider and not ARGS.dry_run:
+    ap.error("--provider needs --dry-run (the inventory is only written from internal/provider)")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REF = os.path.normpath(os.path.join(HERE, ".."))  # reference/
@@ -28,10 +32,73 @@ TFKIND = {"resource": "resource", "data_source": "data", "action": "action", "ep
           "list_resource": "list", "function": "function", "dockerfile_block": "block"}
 # Status is computed, never hand-set (Pass 5): from the registration in internal/provider/registry_gen.go
 # (generated from this inventory by tools/registrygen) and the stub markers in internal/provider/*.go.
-PROVIDER = os.path.normpath(os.path.join(REF, "..", "internal", "provider"))
+PROVIDER = os.path.abspath(ARGS.provider) if ARGS.provider else os.path.normpath(os.path.join(REF, "..", "internal", "provider"))
 REGISTRY_GEN = os.path.join(PROVIDER, "registry_gen.go")
-MARKER = re.compile(r"//\s*STUB\(pass5\)\s+([a-z-]+:[A-Za-z0-9._-]+)(?:[ \t]+partial:[ \t]*(.*))?")
 STATUSES = ["exists", "partial", "missing"]
+# Status markers in internal/provider/*.go (test files excluded), one line comment each (Pass 5.1):
+#   // STUB(pass5) <item id>             the type is a placeholder: status missing (tools/registrygen -stubs writes these)
+#   // PARTIAL(pass5) <item id> <note>   registered, but a documented sub-feature is absent or a no-op: status partial;
+#                                        the note (required) says what is missing
+# The Pass 5 form `// STUB(pass5) <id> partial: <note>` was migrated to PARTIAL(pass5) and is now an error.
+MARKER = re.compile(r"//[ \t]*(STUB|PARTIAL)\(pass5\)([^\r\n]*)")
+ITEM_ID = re.compile(r"^[a-z-]+:[A-Za-z0-9._-]+$")
+
+
+def parse_markers(text, where="?"):
+    """Return ([(kind, item id, note or None)], [error]) for the status markers in Go source text.
+
+    kind is "stub" or "partial". STUB takes exactly an item id; PARTIAL takes an item id and a non-empty note."""
+    found, errs = [], []
+    for m in MARKER.finditer(text):
+        kind, rest = m.group(1), m.group(2)
+        loc = "%s:%d" % (where, text.count("\n", 0, m.start()) + 1)
+        if rest and rest[0] not in " \t":
+            errs.append("%s: malformed %s(pass5) marker (no space after it): %s" % (loc, kind, m.group(0).strip()))
+            continue
+        parts = rest.strip().split(None, 1)
+        mid = parts[0] if parts else ""
+        note = parts[1].strip() if len(parts) > 1 else ""
+        if not ITEM_ID.match(mid):
+            errs.append("%s: %s(pass5) marker without a valid item id (layer:name): %s" % (loc, kind, m.group(0).strip()))
+            continue
+        if kind == "STUB":
+            if note.startswith("partial:"):
+                errs.append("%s: old marker form `STUB(pass5) %s partial: ...`; write `// PARTIAL(pass5) %s <note>`" % (loc, mid, mid))
+            elif note:
+                errs.append("%s: STUB(pass5) %s takes no text after the item id (a partial is `// PARTIAL(pass5) %s <note>`)" % (loc, mid, mid))
+            else:
+                found.append(("stub", mid, None))
+        elif not note:
+            errs.append("%s: PARTIAL(pass5) %s has no note (say what is missing)" % (loc, mid))
+        else:
+            found.append(("partial", mid, note))
+    return found, errs
+
+
+def marker_self_test():
+    """Check parse_markers on every marker form; returns a list of failures (empty = pass)."""
+    cases = [
+        ("// STUB(pass5) engine:new\nfunc NewNewDataSource() {}", [("stub", "engine:new", None)], 0),
+        ("\t//STUB(pass5)\tbuildx:bake", [("stub", "buildx:bake", None)], 0),
+        ("// PARTIAL(pass5) buildx:bake target: contexts are not supported",
+         [("partial", "buildx:bake", "target: contexts are not supported")], 0),
+        ("x := 1 // PARTIAL(pass5) compose:cli-publish  no --with-env  ", [("partial", "compose:cli-publish", "no --with-env")], 0),
+        ("// PARTIAL(pass5) buildx:bake", [], 1),              # no note
+        ("// PARTIAL(pass5) buildx:bake   \n", [], 1),         # blank note
+        ("// PARTIAL(pass5)", [], 1),                          # no id
+        ("// PARTIAL(pass5) docker_buildx_bake note", [], 1),  # not an item id
+        ("// STUB(pass5) buildx:bake partial: old form", [], 1),
+        ("// STUB(pass5) buildx:bake trailing", [], 1),
+        ("// STUB(pass5)buildx:bake", [], 1),
+        ("// PARTIAL(pass5) a:b one\n// STUB(pass5) c:d\n// nothing here", [("partial", "a:b", "one"), ("stub", "c:d", None)], 0),
+        ("// partial(pass5) a:b lower case is not a marker\n// STUB(pass6) a:b", [], 0),
+    ]
+    fails = []
+    for text, want, nerr in cases:
+        got, errs = parse_markers(text, "selftest")
+        if got != want or len(errs) != nerr:
+            fails.append("marker self-test %r: got %r with %d errors %r, want %r with %d" % (text, got, len(errs), errs, want, nerr))
+    return fails
 
 
 
@@ -44,7 +111,15 @@ def field_flags(fields, prefix):
         yield from field_flags(fd.get("fields") or [], p + ".")
 
 
+if ARGS.self_test:
+    _fails = marker_self_test()
+    for _f in _fails:
+        print("FAIL", _f)
+    print("marker self-test: %s" % ("FAIL" if _fails else "ok"))
+    sys.exit(1 if _fails else 0)
+
 items, notes, questions, errors = [], {}, [], []
+errors += marker_self_test()
 for fn in FRAGS + [x for x in EXTRA_FRAGS if os.path.exists(os.path.join(Z, x))]:
     with open(os.path.join(Z, fn), encoding="utf-8") as f:
         d = json.load(f)
@@ -202,29 +277,41 @@ if os.path.exists(REGISTRY_GEN):
             m = re.match(r"^\s*(New\w+),\s*//\s*(\w+)\s+(\S+)\s*$", line)
             if m:
                 registered[(m.group(2), m.group(3))] = m.group(1)
-markers = collections.defaultdict(list)  # item id -> [(file, partial note or None)]
+markers = collections.defaultdict(list)  # item id -> [(file, "stub" | "partial", note or None)]
 for fn in sorted(os.listdir(PROVIDER)) if os.path.isdir(PROVIDER) else []:
     if not fn.endswith(".go") or fn.endswith("_test.go"):
         continue
     with open(os.path.join(PROVIDER, fn), encoding="utf-8") as f:
-        for m in MARKER.finditer(f.read()):
-            markers[m.group(1)].append((fn, (m.group(2) or "").strip() or None))
+        found, errs = parse_markers(f.read(), fn)
+    errors += errs
+    for kind, mid, note in found:
+        markers[mid].append((fn, kind, note))
+
+
+def item_key(it):
+    return ("data_source", "docker_dockerfile") if it["kind"] == "dockerfile_block" else (it["kind"], it["name"])
+
+
 for mid in sorted(markers):
+    files = ", ".join(sorted({x[0] for x in markers[mid]}))
+    kinds = "/".join(sorted({x[1].upper() for x in markers[mid]}))
     if mid not in by_id:
-        errors.append("stub marker for unknown item %s in %s" % (mid, ", ".join(sorted({x[0] for x in markers[mid]}))))
+        errors.append("%s(pass5) marker for unknown item %s in %s" % (kinds, mid, files))
     elif by_id[mid]["kind"] == "skip":
-        errors.append("stub marker for skipped item %s" % mid)
+        errors.append("%s(pass5) marker for skipped item %s in %s" % (kinds, mid, files))
+    elif item_key(by_id[mid]) not in registered:
+        errors.append("%s(pass5) marker for unregistered item %s in %s (not in registry_gen.go)" % (kinds, mid, files))
 for it in items:
     if it["kind"] == "skip":
         continue
-    key = ("data_source", "docker_dockerfile") if it["kind"] == "dockerfile_block" else (it["kind"], it["name"])
+    key = item_key(it)
     mk = markers.get(it["id"], [])
     if key not in registered:
         it["status"], it["status_note"] = "missing", "not registered"
-    elif any(n is None for _, n in mk):
+    elif any(k == "stub" for _, k, _ in mk):
         it["status"], it["status_note"] = "missing", "stub: not implemented (Pass 5)"
     elif mk:
-        it["status"], it["status_note"] = "partial", "; ".join(n for _, n in mk)
+        it["status"], it["status_note"] = "partial", "; ".join(n for _, _, n in mk)
     else:
         it["status"] = "exists"
     if key in registered:
@@ -256,7 +343,7 @@ for it in sorted(items, key=lambda i: (LAYERS.index(i["layer"]), KINDS.index(i["
     out_items.append(o)
 inv = {
     "generated": "2026-11-08",
-    "about": "Every Docker object, operation and spec element in reference/upstream (see SOURCES.md) with its decided Terraform name (DECISIONS.md). status is computed from internal/provider/registry_gen.go and the Pass 5 stub markers. Paths in sources are relative to reference/.",
+    "about": "Every Docker object, operation and spec element in reference/upstream (see SOURCES.md) with its decided Terraform name (DECISIONS.md). status is computed from internal/provider/registry_gen.go and the STUB(pass5) / PARTIAL(pass5) markers in internal/provider. Paths in sources are relative to reference/.",
     "pins": {
         "engine_api": "1.56 (moby api/v1.56.1 @ 14ebc602124e280ef4ae3e1a8e688dac1255baa6)",
         "compose_spec": "main @ 3a4a6995e4a971f6173dff9130cb3e38e6738651",
@@ -306,7 +393,7 @@ KN = {"resource": "resource", "data_source": "data source", "action": "action", 
       "list_resource": "list resource", "function": "function", "dockerfile_block": "block", "skip": "skip"}
 md = ["# Inventory", "",
       "The Terraform name of every item in [upstream/](upstream/) ([SOURCES.md](SOURCES.md)). Machine-readable: [inventory.json](inventory.json).", "",
-      "Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/merge.py`: `missing` = not registered in `internal/provider/registry_gen.go`, or still a Pass 5 stub; `partial` = registered with an open Pass 5 marker (the note says what is left); `exists` = registered with no marker. `cli` = CLI-only (no Engine API endpoint, client-side). Update: `in place` / `replace` for resources.", ""]
+      "Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/merge.py`: `missing` = not registered in `internal/provider/registry_gen.go`, or still a Pass 5 stub (`// STUB(pass5) <id>`); `partial` = registered, with a `// PARTIAL(pass5) <id> <note>` marker for a documented sub-feature that is absent or a no-op (the note says what is missing); `exists` = registered with no marker. `cli` = CLI-only (no Engine API endpoint, client-side). Update: `in place` / `replace` for resources.", ""]
 TITLES = {"engine": "Engine", "swarm": "Swarm", "compose": "Compose", "dockerfile": "Dockerfile", "buildx": "Buildx", "cli-only": "CLI-only"}
 for L in LAYERS:
     rows = [i for i in out_items if i["layer"] == L]

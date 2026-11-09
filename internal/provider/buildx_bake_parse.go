@@ -14,6 +14,8 @@ package provider
 //     single-valued attributes and merges the rest (bake's merge rules).
 // Not supported: `target.<name>.<attr>` references between targets, and
 // `target:` named contexts (both need buildx's evaluation graph).
+//
+// PARTIAL(pass5) buildx:bake `target:` named contexts and `target.<name>.<attr>` cross-target references are not supported
 
 import (
 	"crypto/md5"

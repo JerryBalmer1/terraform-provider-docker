@@ -195,6 +195,9 @@ func bxhPlatforms(fattrs map[string]string) []string {
 }
 
 // bxhAttachments lists attestation descriptors per platform.
+// Materials and attachment bodies live in the builder's content store, which
+// the provider does not read.
+// PARTIAL(pass5) buildx:history-inspect materials are always empty and attachment bodies are not read (digests and types only)
 func bxhAttachments(r *controlapi.BuildHistoryRecord) []map[string]any {
 	out := []map[string]any{}
 	add := func(platform string, res *controlapi.BuildResultInfo) {

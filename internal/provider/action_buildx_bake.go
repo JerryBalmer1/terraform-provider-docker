@@ -550,6 +550,8 @@ func (a *buildxBakeAction) Invoke(ctx context.Context, req action.InvokeRequest,
 			failures = append(failures, err.Error())
 			continue
 		}
+		// BuildKit v0.34.2's client has no option for them, so they are parsed and reported, never sent.
+		// PARTIAL(pass5) buildx:bake target `policy` and `resources` are parsed but not applied to the build
 		if len(t.Resources) > 0 || len(t.Policy) > 0 {
 			actProgress(ctx, resp, "target %s: resources and policy are not applied by this provider", t.Name)
 		}
