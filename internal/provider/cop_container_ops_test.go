@@ -94,7 +94,8 @@ func TestCopContainerChanges(t *testing.T) {
 	state.GetAttribute(ctx, path.Root("container_id"), &id)
 	state.GetAttribute(ctx, path.Root("changes").AtListIndex(0).AtName("path"), &p0)
 	state.GetAttribute(ctx, path.Root("changes").AtListIndex(0).AtName("kind"), &k0)
-	if id != "c1" || p0 != "/tmp/x" || k0 != 1 {
+	// changes_json / changes are sorted by path (Pass 5.1 R).
+	if id != "c1" || p0 != "/etc" || k0 != 0 {
 		t.Errorf("container_id=%q changes[0]=%q/%v", id, p0, k0)
 	}
 }

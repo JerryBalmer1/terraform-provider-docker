@@ -163,6 +163,6 @@ func (d *networkDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 	state := networkDataFromInspect(nRes.Network, cfg.Name)
-	resp.Diagnostics.Append(state.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": nRes.Raw}})...)
+	resp.Diagnostics.Append(state.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(nRes.Raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

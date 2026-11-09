@@ -22,10 +22,7 @@ func allMappedRenames(t *testing.T, dir string) string {
 		t.Fatal(err)
 	}
 	var doc RenamesDoc
-	doc.TypeRenames = append(doc.TypeRenames, struct {
-		KreuzwerkerType string `json:"kreuzwerker_type"`
-		OurType         string `json:"our_type"`
-	}{"data.docker_logs", "data.docker_container_logs"})
+	doc.TypeRenames = append(doc.TypeRenames, TypeRename{KreuzwerkerType: "data.docker_logs", OurType: "data.docker_container_logs"})
 	for _, a := range attrs.Attributes {
 		typ := a.Type
 		if typ == "data.docker_logs" {
@@ -81,10 +78,7 @@ func TestCheckAttrs(t *testing.T) {
 		{Type: "action.docker_exec", Path: "tty", Kind: "Boolean"},
 	}
 	var doc RenamesDoc
-	doc.TypeRenames = append(doc.TypeRenames, struct {
-		KreuzwerkerType string `json:"kreuzwerker_type"`
-		OurType         string `json:"our_type"`
-	}{"data.docker_logs", "data.docker_container_logs"})
+	doc.TypeRenames = append(doc.TypeRenames, TypeRename{KreuzwerkerType: "data.docker_logs", OurType: "data.docker_container_logs"})
 	doc.Renames = []RenameRow{
 		{Type: "docker_container", KreuzwerkerAttr: sp("ports.internal"), OurAttr: sp("ports.container_port"), Transform: "rename"},
 		{Type: "docker_container", KreuzwerkerAttr: sp("shm_size"), Transform: "dropped", Reason: "gap: not in our schema; if added, name it `shm_size`."},

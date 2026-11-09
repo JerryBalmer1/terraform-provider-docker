@@ -424,7 +424,13 @@ func (d *objSystemDfDS) Schema(_ context.Context, _ datasource.SchemaRequest, re
 func objDfUsage(active, total, reclaimable, size int64, items any, verbose bool) map[string]any {
 	u := map[string]any{"ActiveCount": active, "TotalCount": total, "Reclaimable": reclaimable, "TotalSize": size}
 	if verbose {
-		u["Items"] = items
+		// The Engine builds these lists from maps; sort them (by ID, or
+		// Name for volumes) so two reads give the same df_json.
+		if sorted, err := rSortJSONArray(items, "ID", "Id", "Name"); err == nil {
+			u["Items"] = sorted
+		} else {
+			u["Items"] = items
+		}
 	}
 	return u
 }

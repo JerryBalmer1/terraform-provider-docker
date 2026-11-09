@@ -2,10 +2,11 @@ package provider
 
 // Pass 5 Lane B: outputs-contract helpers shared by the swarm resources,
 // data sources and actions (reference/CONTRACT.md). Every inspect_json is
-// the Engine's response body as received (client.*InspectResult.Raw) where
-// the client exposes it; SwarmInspect and the list endpoints do not, so
-// those raws are the decoded moby value re-encoded with encoding/json
-// (same field names, omitempty as the Engine's own types).
+// the Engine's response body as received (client.*InspectResult.Raw,
+// through rEngineBody) where the client exposes it; SwarmInspect and the
+// list endpoints do not, so those raws are the decoded moby value
+// re-encoded in canonical form (rCanonicalJSON: same field names and
+// omitempty as the Engine's own types, keys sorted, deterministic).
 
 import (
 	"context"
@@ -22,7 +23,7 @@ import (
 // raw `inspect_json` body (structured `inspect` is decoded from it).
 func swarmInspectInput(raw []byte, v any) contractFillInput {
 	in := contractFillInput{Raw: map[string][]byte{}, Structured: map[string]any{}}
-	if len(raw) > 0 {
+	if raw = rEngineBody(raw); len(raw) > 0 {
 		in.Raw["inspect_json"] = raw
 	} else if v != nil {
 		in.Structured["inspect"] = v
@@ -31,10 +32,11 @@ func swarmInspectInput(raw []byte, v any) contractFillInput {
 }
 
 // swarmListInput is the contract input of a plural data source: the list
-// under name (e.g. "nodes") and its *_json raw.
+// under name (e.g. "nodes", already sorted by name then ID) and its *_json
+// raw in canonical form.
 func swarmListInput(name string, items any) contractFillInput {
-	b, _ := json.Marshal(items)
-	if string(b) == "null" {
+	b, err := rCanonicalList(items)
+	if err != nil {
 		b = []byte("[]")
 	}
 	return contractFillInput{Raw: map[string][]byte{name + "_json": b}, Structured: map[string]any{name: json.RawMessage(b)}}

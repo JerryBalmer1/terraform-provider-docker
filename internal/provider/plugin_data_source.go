@@ -93,6 +93,6 @@ func (d *pluginDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 	rm.Alias = m.Alias
 	pluginApply(&rm, &p)
 	m.ID, m.Alias, m.Name, m.PluginReference, m.Enabled, m.Env = rm.ID, rm.Alias, rm.Name, rm.PluginReference, rm.Enabled, rm.Env
-	resp.Diagnostics.Append(m.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": pRes.Raw}})...)
+	resp.Diagnostics.Append(m.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(pRes.Raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

@@ -16,10 +16,11 @@ import (
 )
 
 // ctrFillContract fills m's contract outputs from the raw inspect body
-// (re-encoded from insp when the raw body is missing).
+// (rEngineBody; re-encoded from insp in canonical form only when the raw
+// body is missing).
 func ctrFillContract(ctx context.Context, pd *providerData, m *containerResourceModel, raw json.RawMessage, insp container.InspectResponse) diag.Diagnostics {
-	if len(raw) == 0 {
-		b, err := json.Marshal(insp)
+	if raw = rEngineBody(raw); len(raw) == 0 {
+		b, err := rCanonicalJSON(insp)
 		if err != nil {
 			var d diag.Diagnostics
 			d.AddError("Cannot encode container inspect", err.Error())

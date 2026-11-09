@@ -5,7 +5,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -34,9 +33,10 @@ func objReady(pd *providerData, diags *diag.Diagnostics) bool {
 
 // objJSON marshals an Engine API response for a `*_json` raw output. The
 // moby types carry the upstream JSON names, so the result is the daemon's
-// response re-encoded (fields the client does not model are not kept).
+// response re-encoded (fields the client does not model are not kept), in
+// the canonical form of rCanonicalJSON (deterministic: keys sorted).
 func objJSON(v any, diags *diag.Diagnostics) []byte {
-	b, err := json.Marshal(v)
+	b, err := rCanonicalJSON(v)
 	if err != nil {
 		diags.AddError("Cannot encode Engine API response", err.Error())
 		return nil

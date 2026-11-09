@@ -331,7 +331,7 @@ func (r *networkResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 	state := networkFromInspect(nRes.Network, plan)
-	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": nRes.Raw}})...)
+	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(nRes.Raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
@@ -353,7 +353,7 @@ func (r *networkResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 	state := networkFromInspect(n, prior)
-	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": nRes.Raw}})...)
+	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(nRes.Raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
@@ -372,7 +372,7 @@ func (r *networkResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 	plan = networkFromInspect(nRes.Network, plan)
-	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": nRes.Raw}})...)
+	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(nRes.Raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }

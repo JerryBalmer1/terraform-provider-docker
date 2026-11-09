@@ -166,7 +166,7 @@ func (r *volumeResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 	state = volumeFromInspect(vRes.Volume, state)
-	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": vRes.Raw}})...)
+	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(vRes.Raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
@@ -188,7 +188,7 @@ func (r *volumeResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 	state := volumeFromInspect(v, prior)
-	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": vRes.Raw}})...)
+	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(vRes.Raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
 }
@@ -223,7 +223,7 @@ func (r *volumeResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 	plan = volumeFromInspect(vRes.Volume, plan)
-	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": vRes.Raw}})...)
+	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(vRes.Raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }

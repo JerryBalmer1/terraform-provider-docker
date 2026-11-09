@@ -315,7 +315,7 @@ func (r *pluginResource) readInto(ctx context.Context, m *pluginResourceModel, d
 		return false
 	}
 	pluginApply(m, &p)
-	diags.Append(m.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": pRes.Raw}})...)
+	diags.Append(m.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(pRes.Raw)}})...)
 	return true
 }
 

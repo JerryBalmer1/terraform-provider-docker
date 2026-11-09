@@ -137,9 +137,10 @@ func regRefValues(name, digest string) (types.String, types.String) {
 
 // regDistributionFill serializes a DistributionInspect response as the raw
 // output rawName. The Engine client decodes the body without keeping it,
-// so the raw value is the re-encoded response (same fields and values).
+// so the raw value is the re-encoded response (same fields and values) in
+// canonical form (rCanonicalJSON: keys sorted, deterministic).
 func regDistributionFill(di registry.DistributionInspect, rawName string) (contractFillInput, error) {
-	b, err := regMarshal(di)
+	b, err := rCanonicalJSON(di)
 	if err != nil {
 		return contractFillInput{}, err
 	}

@@ -10,10 +10,7 @@ import (
 
 func TestGuideTemplate(t *testing.T) {
 	var doc RenamesDoc
-	doc.TypeRenames = append(doc.TypeRenames, struct {
-		KreuzwerkerType string `json:"kreuzwerker_type"`
-		OurType         string `json:"our_type"`
-	}{"data.docker_logs", "data.docker_container_logs"})
+	doc.TypeRenames = append(doc.TypeRenames, TypeRename{KreuzwerkerType: "data.docker_logs", OurType: "data.docker_container_logs"})
 	doc.Renames = []RenameRow{
 		{Type: "docker_container", KreuzwerkerAttr: sp("ports.internal"), OurAttr: sp("ports.container_port"), Transform: "rename"},
 		{Type: "docker_container", KreuzwerkerAttr: sp("name"), OurAttr: sp("name"), Transform: "identity"},

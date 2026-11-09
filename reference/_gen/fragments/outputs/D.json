@@ -4510,7 +4510,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The Engine API response body as JSON.",
+          "description": "The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
           "serializes": "inspect",
           "provided": false
         },

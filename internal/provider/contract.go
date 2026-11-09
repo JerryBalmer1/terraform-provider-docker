@@ -1261,7 +1261,8 @@ type contractFillInput struct {
 	// Raw holds the bytes of each raw output by name, e.g. "inspect_json":
 	// the exact Engine API response body, "logs": logRender(entries).
 	// A *_json raw output that is missing is serialized from its
-	// structured output (json.Marshal of the upstream value).
+	// structured output (rCanonicalJSON of the upstream value: keys
+	// sorted, numbers as encoded; see r_rawjson.go).
 	Raw map[string][]byte
 	// Structured holds the upstream value of each structured output by
 	// name (a moby struct, map[string]any, json.RawMessage...). A missing
@@ -1301,7 +1302,7 @@ func contractCompute(ctx context.Context, pd *providerData, it *contractItem, in
 		}
 		if o.Serializes != "" && strings.HasSuffix(o.Name, "_json") {
 			if sv, ok := in.Structured[o.Serializes]; ok && sv != nil {
-				b, err := json.Marshal(sv)
+				b, err := rCanonicalJSON(sv)
 				if err != nil {
 					warn(fmt.Sprintf("serializing %s for %s: %v", o.Serializes, o.Name, err))
 					continue

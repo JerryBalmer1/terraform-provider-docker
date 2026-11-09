@@ -9,7 +9,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/datasourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -354,10 +353,12 @@ func NewTaskDataSource() datasource.DataSource {
 // docker_swarm
 
 // swarmContractInput is the contract input of the swarm object: inspect
-// (re-encoded; SwarmInspect does not expose the body) and join_tokens.
+// (its ClusterInfo part, re-encoded in canonical form: SwarmInspect does not
+// expose the body) and join_tokens. JoinTokens stay out of inspect_json and
+// inspect, which are not sensitive; they go to the sensitive join_tokens.
 func swarmContractInput(sw swarm.Swarm) contractFillInput {
-	raw, _ := json.Marshal(sw)
-	in := swarmInspectInput(raw, sw)
+	raw, _ := rCanonicalJSON(sw.ClusterInfo)
+	in := swarmInspectInput(raw, sw.ClusterInfo)
 	in.Structured["join_tokens"] = sw.JoinTokens
 	return in
 }

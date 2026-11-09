@@ -126,7 +126,7 @@ func imgInspectRaw(ctx context.Context, pd *providerData, ref string, manifests 
 	if err != nil {
 		return image.InspectResponse{}, nil, err
 	}
-	return res.InspectResponse, buf.Bytes(), nil
+	return res.InspectResponse, rEngineBody(buf.Bytes()), nil
 }
 
 // imgManifestsValue maps ImageInspect.Manifests (image kind only) to the

@@ -1538,6 +1538,246 @@
         "transform": "added (gap, Pass 5): / cluster_volume_spec.access_mode.block_volume",
         "reason": "Pass 5 Lane A: implemented under the upstream name."
       }
+    },
+    {
+      "type": "ephemeral.docker_registry_token",
+      "kreuzwerker_attr": null,
+      "previous_attr": "token",
+      "add": true,
+      "set": {
+        "our_attr": "token.token",
+        "transform": "string -> object {token, expires_in, issued_at}; the bearer token is now token.token (expires_in / issued_at also stay top-level)",
+        "upstream": "distribution token spec (token response `token`, `expires_in`, `issued_at`)",
+        "reason": "Pass 5 outputs contract: `token` is the structured output of the token response; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "ephemeral.docker_exec_output",
+      "kreuzwerker_attr": null,
+      "previous_attr": "container",
+      "add": true,
+      "set": {
+        "our_attr": "container_id",
+        "transform": "rename (accepts ID or name as before)",
+        "upstream": "swagger #/definitions/ContainerSummary Id",
+        "reason": "Q40: object-named target input (as action.docker_exec); Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_configs",
+      "kreuzwerker_attr": null,
+      "previous_attr": "configs.data",
+      "add": true,
+      "set": {
+        "our_attr": "configs.spec.data",
+        "transform": "rename; flat list field -> upstream path in the configs objects",
+        "upstream": "swagger #/definitions/Config Spec.Data",
+        "reason": "Pass 5 contract: each list item mirrors Config field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_configs",
+      "kreuzwerker_attr": null,
+      "previous_attr": "configs.labels",
+      "add": true,
+      "set": {
+        "our_attr": "configs.spec.labels",
+        "transform": "rename; flat list field -> upstream path in the configs objects",
+        "upstream": "swagger #/definitions/Config Spec.Labels",
+        "reason": "Pass 5 contract: each list item mirrors Config field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_configs",
+      "kreuzwerker_attr": null,
+      "previous_attr": "configs.name",
+      "add": true,
+      "set": {
+        "our_attr": "configs.spec.name",
+        "transform": "rename; flat list field -> upstream path in the configs objects",
+        "upstream": "swagger #/definitions/Config Spec.Name",
+        "reason": "Pass 5 contract: each list item mirrors Config field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_secrets",
+      "kreuzwerker_attr": null,
+      "previous_attr": "secrets.labels",
+      "add": true,
+      "set": {
+        "our_attr": "secrets.spec.labels",
+        "transform": "rename; flat list field -> upstream path in the secrets objects",
+        "upstream": "swagger #/definitions/Secret Spec.Labels",
+        "reason": "Pass 5 contract: each list item mirrors Secret field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_secrets",
+      "kreuzwerker_attr": null,
+      "previous_attr": "secrets.name",
+      "add": true,
+      "set": {
+        "our_attr": "secrets.spec.name",
+        "transform": "rename; flat list field -> upstream path in the secrets objects",
+        "upstream": "swagger #/definitions/Secret Spec.Name",
+        "reason": "Pass 5 contract: each list item mirrors Secret field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_nodes",
+      "kreuzwerker_attr": null,
+      "previous_attr": "nodes.addr",
+      "add": true,
+      "set": {
+        "our_attr": "nodes.status.addr",
+        "transform": "rename; flat list field -> upstream path in the nodes objects",
+        "upstream": "swagger #/definitions/Node Status.Addr",
+        "reason": "Pass 5 contract: each list item mirrors Node field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_nodes",
+      "kreuzwerker_attr": null,
+      "previous_attr": "nodes.availability",
+      "add": true,
+      "set": {
+        "our_attr": "nodes.spec.availability",
+        "transform": "rename; flat list field -> upstream path in the nodes objects",
+        "upstream": "swagger #/definitions/Node Spec.Availability",
+        "reason": "Pass 5 contract: each list item mirrors Node field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_nodes",
+      "kreuzwerker_attr": null,
+      "previous_attr": "nodes.engine_version",
+      "add": true,
+      "set": {
+        "our_attr": "nodes.description.engine.engine_version",
+        "transform": "rename; flat list field -> upstream path in the nodes objects",
+        "upstream": "swagger #/definitions/Node Description.Engine.EngineVersion",
+        "reason": "Pass 5 contract: each list item mirrors Node field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_nodes",
+      "kreuzwerker_attr": null,
+      "previous_attr": "nodes.hostname",
+      "add": true,
+      "set": {
+        "our_attr": "nodes.description.hostname",
+        "transform": "rename; flat list field -> upstream path in the nodes objects",
+        "upstream": "swagger #/definitions/Node Description.Hostname",
+        "reason": "Pass 5 contract: each list item mirrors Node field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_nodes",
+      "kreuzwerker_attr": null,
+      "previous_attr": "nodes.labels",
+      "add": true,
+      "set": {
+        "our_attr": "nodes.spec.labels",
+        "transform": "rename; flat list field -> upstream path in the nodes objects",
+        "upstream": "swagger #/definitions/Node Spec.Labels",
+        "reason": "Pass 5 contract: each list item mirrors Node field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_nodes",
+      "kreuzwerker_attr": null,
+      "previous_attr": "nodes.leader",
+      "add": true,
+      "set": {
+        "our_attr": "nodes.manager_status.leader",
+        "transform": "rename; flat list field -> upstream path in the nodes objects",
+        "upstream": "swagger #/definitions/Node ManagerStatus.Leader",
+        "reason": "Pass 5 contract: each list item mirrors Node field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_nodes",
+      "kreuzwerker_attr": null,
+      "previous_attr": "nodes.role",
+      "add": true,
+      "set": {
+        "our_attr": "nodes.spec.role",
+        "transform": "rename; flat list field -> upstream path in the nodes objects",
+        "upstream": "swagger #/definitions/Node Spec.Role",
+        "reason": "Pass 5 contract: each list item mirrors Node field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_nodes",
+      "kreuzwerker_attr": null,
+      "previous_attr": "nodes.state",
+      "add": true,
+      "set": {
+        "our_attr": "nodes.status.state",
+        "transform": "rename; flat list field -> upstream path in the nodes objects",
+        "upstream": "swagger #/definitions/Node Status.State",
+        "reason": "Pass 5 contract: each list item mirrors Node field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_services",
+      "kreuzwerker_attr": null,
+      "previous_attr": "services.image",
+      "add": true,
+      "set": {
+        "our_attr": "services.spec.task_template.container_spec.image",
+        "transform": "rename; flat list field -> upstream path in the services objects",
+        "upstream": "swagger #/definitions/Service Spec.TaskTemplate.ContainerSpec.Image",
+        "reason": "Pass 5 contract: each list item mirrors Service field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_services",
+      "kreuzwerker_attr": null,
+      "previous_attr": "services.labels",
+      "add": true,
+      "set": {
+        "our_attr": "services.spec.labels",
+        "transform": "rename; flat list field -> upstream path in the services objects",
+        "upstream": "swagger #/definitions/Service Spec.Labels",
+        "reason": "Pass 5 contract: each list item mirrors Service field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_services",
+      "kreuzwerker_attr": null,
+      "previous_attr": "services.name",
+      "add": true,
+      "set": {
+        "our_attr": "services.spec.name",
+        "transform": "rename; flat list field -> upstream path in the services objects",
+        "upstream": "swagger #/definitions/Service Spec.Name",
+        "reason": "Pass 5 contract: each list item mirrors Service field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_services",
+      "kreuzwerker_attr": null,
+      "previous_attr": "services.replicas",
+      "add": true,
+      "set": {
+        "our_attr": "services.spec.mode.replicated.replicas",
+        "transform": "rename; flat list field -> upstream path in the services objects",
+        "upstream": "swagger #/definitions/Service Spec.Mode.Replicated.Replicas",
+        "reason": "Pass 5 contract: each list item mirrors Service field by field; Pass 5.1 R: row the audit missed."
+      }
+    },
+    {
+      "type": "data.docker_services",
+      "kreuzwerker_attr": null,
+      "previous_attr": "services.mode",
+      "add": true,
+      "set": {
+        "our_attr": "services.spec.mode",
+        "transform": "string \"replicated\" | \"global\" -> the upstream ServiceMode object (spec.mode.replicated / global / replicated_job / global_job; the one set is the mode)",
+        "upstream": "swagger #/definitions/Service Spec.Mode",
+        "reason": "Pass 5 contract: each list item mirrors Service field by field; Pass 5.1 R: row the audit missed."
+      }
     }
   ]
 }

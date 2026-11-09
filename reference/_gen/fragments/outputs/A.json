@@ -3481,7 +3481,7 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "The exact Engine API GET /distribution/{name}/json response as JSON.",
+     "description": "The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "distribution",
      "provided": false
     },
@@ -4618,7 +4618,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact Engine API GET /containers/{id}/changes response as JSON.",
+     "description": "The Engine API GET /containers/{id}/changes response as JSON; entries sorted by Path. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "changes"
     },
     {
@@ -4733,7 +4733,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The decoded X-Docker-Container-Path-Stat header (HEAD /containers/{id}/archive) as JSON.",
+     "description": "The decoded X-Docker-Container-Path-Stat header (HEAD /containers/{id}/archive) as JSON. Re-encoded, not byte-exact: the client decodes the header, so this is the decoded value written as canonical JSON (keys sorted, compact).",
      "serializes": "stat"
     },
     {
@@ -5315,7 +5315,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact Engine API GET /containers/{id}/top response as JSON.",
+     "description": "The Engine API GET /containers/{id}/top response as JSON; process rows in the order ps printed them. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "top"
     },
     {
@@ -5418,7 +5418,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact Engine API GET /containers/json response as JSON.",
+     "description": "The Engine API GET /containers/json response as JSON; entries sorted by first name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "containers",
      "provided": false
     },
@@ -5790,7 +5790,7 @@
      },
      "known_after_apply": false,
      "sensitive": true,
-     "description": "The exact Engine API GET /images/{name}/attestations response as JSON.",
+     "description": "The Engine API GET /images/{name}/attestations response as JSON; entries in the Engine's order. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "attestations"
     },
     {
@@ -5950,7 +5950,7 @@
      },
      "known_after_apply": false,
      "sensitive": true,
-     "description": "The exact Engine API GET /images/{name}/history response as JSON.",
+     "description": "The Engine API GET /images/{name}/history response as JSON; layers in the Engine's order (newest first). Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "history"
     },
     {
@@ -6077,7 +6077,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact Engine API GET /images/search response as JSON.",
+     "description": "The Engine API GET /images/search response as JSON; results in the Engine's order. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "results"
     },
     {
@@ -6197,7 +6197,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact Engine API GET /images/json response as JSON.",
+     "description": "The Engine API GET /images/json response as JSON; entries sorted by ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "images"
     },
     {
@@ -6460,7 +6460,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact Engine API GET /info response as JSON.",
+     "description": "The Engine API GET /info response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "info"
     },
     {
@@ -7305,7 +7305,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact Engine API GET /networks response as JSON.",
+     "description": "The Engine API GET /networks response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "networks"
     },
     {
@@ -7533,7 +7533,7 @@
      },
      "known_after_apply": false,
      "sensitive": true,
-     "description": "The exact Engine API GET /plugins response as JSON.",
+     "description": "The Engine API GET /plugins response as JSON; entries sorted by name. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "plugins"
     },
     {
@@ -7792,7 +7792,7 @@
      },
      "known_after_apply": false,
      "sensitive": true,
-     "description": "The exact Engine API POST /auth response as JSON.",
+     "description": "The Engine API POST /auth response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "auth"
     },
     {
@@ -7895,7 +7895,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact Engine API GET /system/df response as JSON.",
+     "description": "The Engine API GET /system/df response as JSON; with verbose, each Items list sorted by ID (volumes by Name). Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "df"
     },
     {
@@ -8150,7 +8150,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact Engine API GET /version response as JSON.",
+     "description": "The Engine API GET /version response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "version"
     },
     {
@@ -8340,7 +8340,7 @@
      },
      "known_after_apply": false,
      "sensitive": true,
-     "description": "The exact Engine API GET /volumes response as JSON.",
+     "description": "The Engine API GET /volumes response as JSON; Volumes sorted by name. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "volumes"
     },
     {

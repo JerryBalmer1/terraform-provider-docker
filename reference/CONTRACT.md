@@ -145,6 +145,69 @@ These values stay readable in plans by decision, not oversight:
 - **Interpolated `${VAR}` values are not hidden.** A secret interpolated into a field that is not a secret channel
   shows in plans, because the provider sees only the interpolated result and cannot tell which plain field held a
   secret; secrets belong in environment, env_file or secrets.
+- **Re-encoded, not byte-exact.** moby client v0.6.2 decodes these Engine responses without keeping the body, so
+  the raw output is the decoded value written as canonical JSON (see [Raw JSON fidelity](#raw-json-fidelity)):
+  fields the client's types do not model are lost, key order and whitespace are not the Engine's, and the hash is
+  of the canonical bytes. Each is deterministic: two reads of an unchanged object give the same bytes and the same
+  hash (tested in `internal/provider/r_rawjson_test.go`).
+  - `data.docker_containers.containers_json` (GET /containers/json; sorted by first name, then ID)
+  - `data.docker_images.images_json` (GET /images/json; sorted by ID)
+  - `data.docker_image_history.history_json` (GET /images/{name}/history; the Engine's layer order)
+  - `data.docker_image_search.results_json` (GET /images/search; the Engine's order)
+  - `data.docker_image_attestations.attestations_json` (GET /images/{name}/attestations; the Engine's order)
+  - `data.docker_info.info_json` (GET /info)
+  - `data.docker_version.version_json` (GET /version, rebuilt in the Engine's shape from the client's result)
+  - `data.docker_system_df.df_json` (GET /system/df, rebuilt in the Engine's shape; verbose `Items` sorted by ID, volumes by Name)
+  - `data.docker_networks.networks_json` (GET /networks; sorted by name, then ID)
+  - `data.docker_volumes.volumes_json` (GET /volumes; `Volumes` sorted by name)
+  - `data.docker_plugins.plugins_json` (GET /plugins; sorted by name)
+  - `data.docker_container_changes.changes_json` (GET /containers/{id}/changes; sorted by Path)
+  - `data.docker_container_top.top_json` (GET /containers/{id}/top; process rows in ps order)
+  - `data.docker_container_file.stat_json` (the X-Docker-Container-Path-Stat header, decoded by the client)
+  - `docker_registry_image.distribution_json`, `data.docker_registry_image.inspect_json` (GET /distribution/{name}/json)
+  - `ephemeral.docker_registry_login.auth_json` (POST /auth)
+  - `docker_swarm_init.inspect_json`, `data.docker_swarm.inspect_json` (GET /swarm, its ClusterInfo part; JoinTokens
+    are never in it)
+  - `data.docker_configs.configs_json`, `data.docker_nodes.nodes_json`, `data.docker_secrets.secrets_json`,
+    `data.docker_services.services_json`, `data.docker_tasks.tasks_json` (the swarm list endpoints; sorted by name,
+    then ID)
+  - Derived from Engine lists, also canonical: `data.docker_compose_containers.containers_json`,
+    `data.docker_compose_images.images_json`, `data.docker_compose_top.top_json`, `data.docker_compose_volumes.volumes_json`,
+    `data.docker_stack.services_json`.
+
+## Raw JSON fidelity
+
+A raw `*_json` output that the contract calls the Engine API response takes one of two forms (Pass 5.1):
+
+- **Byte-exact**: the response body as received, through the client's raw-body variant
+  (`*InspectResult.Raw` for container, network, volume, plugin, node, service, task, secret and config inspect;
+  `client.ImageInspectWithRawResponse` for image inspect, used by `docker_image`, `docker_tag` and
+  `data.docker_image`; the container stats body for `data.docker_container_stats`). Key order, inner whitespace and
+  number text are the Engine's. Only the whitespace around the JSON value is dropped (`rEngineBody`): the Engine
+  ends its body with `
+`, and the client's raw capture may or may not include it depending on how the body was
+  read, so keeping it would make `content_sha256` depend on read boundaries. When a raw body is missing (never on a
+  successful inspect) the output falls back to the canonical form below.
+- **Canonical (re-encoded)**: where the client keeps no body (the list under [Known exposures](#known-exposures)),
+  the decoded value is written by one helper, `rCanonicalJSON` in `internal/provider/r_rawjson.go`: compact, object
+  keys sorted at every level, numbers with the text the encoder produced (decoded with `UseNumber`, no float round
+  trip), `<`, `>` and `&` not escaped (as the Engine writes them), no trailing newline. Lists whose Engine order is
+  not stable are sorted first (by ID, or name then ID; `rSortJSONArray` for nested lists); lists whose order means
+  something (image history, search results, process rows) keep the Engine's order. The structured-only fallback of
+  the contract (`contractCompute`) uses the same helper.
+
+Outputs that are not Engine responses are outside this rule: rendered text (`dockerfile`, `compose_yaml`,
+`stack_yaml`, `logs`, exec `stdout` / `stderr`), registry bodies (`manifest_json` is the registry's bytes;
+`image_config_json`, `provenance_json`, `sbom_json`, `tags_json`), buildx/BuildKit metadata (`metadata_json`,
+`bake_json`, the buildx builder/history/disk-usage views) and CLI views (`projects_json`, `stacks_json`).
+
+## Known differences from upstream defaults
+
+Where an argument has the same name as an upstream flag but a different default, by decision:
+
+| argument | upstream default | ours | why |
+|---|---|---|---|
+| `docker_compose.remove_orphans` | `false` (`docker compose up --remove-orphans` is opt-in) | `true` | Terraform owns the whole project: a container or service labelled with the project whose service is no longer configured is drift, and apply removes it. Set `false` to leave orphans running (they are then not reported as drift). |
 
 ## Handoff
 

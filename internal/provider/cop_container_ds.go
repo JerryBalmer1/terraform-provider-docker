@@ -19,7 +19,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
 
@@ -154,11 +153,14 @@ func (d *copContainerChangesDS) Read(ctx context.Context, req datasource.ReadReq
 		resp.Diagnostics.AddError("Cannot read container changes", fmt.Sprintf("container %q: %v", ref, err))
 		return
 	}
-	changes := res.Changes
-	if changes == nil {
-		changes = []container.FilesystemChange{}
+	// Re-encoded (ContainerDiff keeps no body) in canonical form, sorted by
+	// path so the order does not depend on the snapshotter's walk.
+	sorted, err := rSortJSONArray(res.Changes, "Path")
+	if err != nil {
+		resp.Diagnostics.AddError("Cannot encode container changes", err.Error())
+		return
 	}
-	raw, err := json.Marshal(changes)
+	raw, err := rCanonicalList(sorted)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot encode container changes", err.Error())
 		return
@@ -235,7 +237,7 @@ func (d *copContainerStatsDS) Read(ctx context.Context, req datasource.ReadReque
 	}
 	m.ID = types.StringValue(insp.ID)
 	m.Name = types.StringValue(copName(insp.Name))
-	resp.Diagnostics.Append(m.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"stats_json": copTrimJSON(raw)}})...)
+	resp.Diagnostics.Append(m.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"stats_json": rEngineBody(raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
 
@@ -300,7 +302,9 @@ func (d *copContainerTopDS) Read(ctx context.Context, req datasource.ReadRequest
 	if res.Processes == nil {
 		res.Processes = [][]string{}
 	}
-	raw, err := json.Marshal(map[string]any{"Titles": res.Titles, "Processes": res.Processes})
+	// Re-encoded (ContainerTop keeps no body) in canonical form; the
+	// process rows keep the order ps printed them in.
+	raw, err := rCanonicalJSON(map[string]any{"Titles": res.Titles, "Processes": res.Processes})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot encode container processes", err.Error())
 		return
@@ -366,7 +370,9 @@ func (d *copContainerFileDS) Read(ctx context.Context, req datasource.ReadReques
 		resp.Diagnostics.AddAttributeError(path.Root("path"), "Cannot stat container path", fmt.Sprintf("%s in container %q: %v", p, ref, err))
 		return
 	}
-	statJSON, err := json.Marshal(st.Stat)
+	// The X-Docker-Container-Path-Stat header, decoded by the client and
+	// re-encoded in canonical form.
+	statJSON, err := rCanonicalJSON(st.Stat)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot encode path stat", err.Error())
 		return
@@ -416,12 +422,4 @@ func copFirstTarFile(r io.Reader, max int64) ([]byte, error) {
 		}
 		return io.ReadAll(io.LimitReader(tr, max))
 	}
-}
-
-// copTrimJSON drops the trailing newline the daemon's JSON encoder writes.
-func copTrimJSON(b []byte) []byte {
-	for len(b) > 0 && (b[len(b)-1] == '\n' || b[len(b)-1] == '\r') {
-		b = b[:len(b)-1]
-	}
-	return b
 }

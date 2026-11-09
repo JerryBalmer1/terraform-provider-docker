@@ -51,7 +51,7 @@ func copInspect(ctx context.Context, c *client.Client, ref string) (container.In
 	if err != nil {
 		return container.InspectResponse{}, nil, err
 	}
-	return res.Container, res.Raw, nil
+	return res.Container, rEngineBody(res.Raw), nil
 }
 
 // copName returns a container name without the leading slash.

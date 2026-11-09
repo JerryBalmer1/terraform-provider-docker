@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/action"
@@ -61,6 +62,11 @@ func objTarDir(dir string) (*bytes.Buffer, error) {
 			hdr.Name += "/"
 		}
 		hdr.Uid, hdr.Gid, hdr.Uname, hdr.Gname = 0, 0, "", ""
+		if runtime.GOOS == "windows" {
+			// Windows has no executable bit: tar.FileInfoHeader reports 0666, so the plugin's entrypoint
+			// could not run. Same rule as the docker CLI's archive.chmodTarEntry: permissions &= 0755, |= 0111.
+			hdr.Mode = (hdr.Mode &^ 0o777) | ((hdr.Mode & 0o755) | 0o111)
+		}
 		if err := tw.WriteHeader(hdr); err != nil {
 			return err
 		}

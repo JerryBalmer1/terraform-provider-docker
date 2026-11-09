@@ -182,9 +182,10 @@ func composeSelectServices(p *ctypes.Project, want []string) ([]ctypes.ServiceCo
 	return out, nil
 }
 
-// composeMarshal is json.Marshal with a nil slice or map written as [].
+// composeMarshal is rCanonicalJSON (deterministic: keys sorted) with a nil
+// slice or map written as [].
 func composeMarshal(v any) ([]byte, error) {
-	b, err := json.Marshal(v)
+	b, err := rCanonicalJSON(v)
 	if err == nil && string(b) == "null" {
 		return []byte("[]"), nil
 	}

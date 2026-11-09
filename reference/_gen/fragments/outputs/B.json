@@ -2133,7 +2133,7 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "The exact Engine API inspect response for the swarm (its ClusterInfo part), as JSON. JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.",
+     "description": "The Engine API GET /swarm (its ClusterInfo part) response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.",
      "serializes": "inspect",
      "provided": false
     },
@@ -7232,7 +7232,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact list response (JSON array of Config) as returned by the Engine API.",
+     "description": "The Engine API GET /configs response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "configs",
      "provided": false
     },
@@ -7420,7 +7420,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact list response (JSON array of Secret) as returned by the Engine API. Not sensitive: Data is never returned by SecretList.",
+     "description": "The Engine API GET /secrets response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Not sensitive: Data is never returned by SecretList.",
      "serializes": "secrets",
      "provided": false
     },
@@ -7628,7 +7628,7 @@
      },
      "known_after_apply": false,
      "sensitive": true,
-     "description": "The exact list response (JSON array of Service) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
+     "description": "The Engine API GET /services response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
      "serializes": "services",
      "provided": false
     },
@@ -9170,7 +9170,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact list response (JSON array of Node) as returned by the Engine API.",
+     "description": "The Engine API GET /nodes response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).",
      "serializes": "nodes",
      "provided": false
     },
@@ -9564,7 +9564,7 @@
      },
      "known_after_apply": false,
      "sensitive": true,
-     "description": "The exact list response (JSON array of Task) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
+     "description": "The Engine API GET /tasks response as JSON; entries sorted by name, then ID. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.",
      "serializes": "tasks",
      "provided": false
     },
@@ -11050,7 +11050,7 @@
      },
      "known_after_apply": false,
      "sensitive": false,
-     "description": "The exact Engine API inspect response for the swarm (its ClusterInfo part), as JSON. JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.",
+     "description": "The Engine API GET /swarm (its ClusterInfo part) response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.",
      "serializes": "inspect",
      "provided": false
     },

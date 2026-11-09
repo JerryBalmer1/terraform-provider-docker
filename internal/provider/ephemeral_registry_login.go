@@ -106,7 +106,9 @@ func (e *regLoginEphemeral) Open(ctx context.Context, req ephemeral.OpenRequest,
 		resp.Diagnostics.AddError("Registry login failed", fmt.Sprintf("%s as %s: %v", server, user, err))
 		return
 	}
-	raw, err := regMarshal(res.Auth)
+	// RegistryLogin keeps no body: auth_json is the decoded /auth response
+	// re-encoded in canonical form (rCanonicalJSON).
+	raw, err := rCanonicalJSON(res.Auth)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot encode the login response", err.Error())
 		return

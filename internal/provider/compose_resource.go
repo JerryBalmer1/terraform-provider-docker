@@ -106,7 +106,9 @@ func (r *composeResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"labelled `com.docker.stack.namespace`) like `docker stack deploy`. Refresh compares the live objects with the " +
 			"parsed project (a `com.docker.compose.config-hash` label on each object, plus container state or service " +
 			"image/replicas) and marks `spec_hash` as drifted so the next plan shows an update. An update creates what is " +
-			"missing, recreates what changed and removes objects of the project that are no longer in it. Destroy removes " +
+			"missing, recreates what changed and removes objects of the project that are no longer in it, orphans included: " +
+			"`remove_orphans` defaults to `true` here, where the compose CLI's `--remove-orphans` defaults to false, because " +
+			"Terraform owns the whole project and an orphan is drift. Destroy removes " +
 			"everything labelled with the project. In local mode a service with a `build:` section is built through BuildKit " +
 			"when its image is missing (always with `pull_policy: build`) and tagged `image` or `<project>-<service>`. " +
 			"A project that defines `jobs` plans with a warning: jobs are not run yet (use the `docker_compose_run` action). " +
@@ -142,7 +144,9 @@ func (r *composeResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"keep_volumes": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false),
 				MarkdownDescription: "Keep the project's named volumes on destroy and when they leave the project (default `false`, which removes them)."},
 			"remove_orphans": schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true),
-				MarkdownDescription: "Remove containers (local) or Swarm services (swarm) of the project whose service is no longer configured, like `docker compose up --remove-orphans` (default `true`). With `false` they are left running and not reported as drift."},
+				MarkdownDescription: "Remove containers (local) or Swarm services (swarm) of the project whose service is no longer configured, like `docker compose up --remove-orphans`. " +
+					"Default `true`, unlike the compose CLI (whose `--remove-orphans` defaults to false): Terraform owns the whole project, so an orphan is drift. " +
+					"With `false` orphans are left running and not reported as drift."},
 			"spec_hash": schema.StringAttribute{Computed: true,
 				MarkdownDescription: "Digest of the parsed project. Refresh replaces it with `drifted: <reasons>` when the live objects no longer match, which makes the next plan show an update."},
 			"services": schema.MapAttribute{ElementType: types.ListType{ElemType: types.StringType}, Computed: true,

@@ -27,11 +27,15 @@ type RenamesDoc struct {
 		Version string `json:"version"`
 		Commit  string `json:"commit"`
 	} `json:"kreuzwerker"`
-	TypeRenames []struct {
-		KreuzwerkerType string `json:"kreuzwerker_type"`
-		OurType         string `json:"our_type"`
-	} `json:"type_renames"`
-	Renames []RenameRow `json:"renames"`
+	TypeRenames []TypeRename `json:"type_renames"`
+	Renames     []RenameRow  `json:"renames"`
+}
+
+// TypeRename is one renames.json type_renames entry.
+type TypeRename struct {
+	KreuzwerkerType string `json:"kreuzwerker_type"`
+	PreviousType    string `json:"previous_type"`
+	OurType         string `json:"our_type"`
 }
 
 // RenameRow is one renames.json row.
@@ -48,7 +52,7 @@ type RenameRow struct {
 type AttrProblem struct {
 	Type   string // our type (after type renames), kind-prefixed
 	Path   string // kreuzwerker path
-	Kind   string // "unlisted", "gap" or "no reason"
+	Kind   string // "unlisted", "gap", "no reason" or "unrecorded" (CheckPrevious)
 	Reason string
 }
 
@@ -120,6 +124,7 @@ func PrintAttrProblems(w io.Writer, probs []AttrProblem) {
 		{"gap", "open gaps (renames.json our_attr null, reason \"gap:\"): implement them, or give a reason starting \"won't implement:\""},
 		{"unlisted", "kreuzwerker attributes with no renames.json row"},
 		{"no reason", "dropped attributes with no reason"},
+		{"unrecorded", "of our own pre-Pass 5 attributes are gone or changed type with no renames.json previous_attr row (add one through reference/_gen/pass5/renames_overrides.json `add`)"},
 	}
 	for _, k := range titles {
 		ps := byKind[k.kind]

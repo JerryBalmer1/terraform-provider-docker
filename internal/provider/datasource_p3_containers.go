@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"sort"
 	"strings"
 
@@ -97,7 +96,9 @@ func (d *p3ContainersDS) Read(ctx context.Context, req datasource.ReadRequest, r
 		ids = append(ids, s.ID)
 		names = append(names, p3ContainerPrimaryName(s))
 	}
-	raw, err := json.Marshal(list)
+	// ContainerList keeps no body: containers_json is the list re-encoded in
+	// canonical form (rCanonicalJSON), in the name-then-ID order above.
+	raw, err := rCanonicalList(list)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot encode container list", err.Error())
 		return

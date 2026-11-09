@@ -1,0 +1,3397 @@
+{
+  "about": "Every attribute of our own schema before Pass 5, extracted from the genskill reference (.claude/skills/terraform-provider-docker/reference) at the commit below by `go run ./tools/parity -extract-previous \u003cdir\u003e`; do not hand-edit. Kind is the Terraform type. tools/parity requires a renames.json previous_attr row for each one that is gone or changed type.",
+  "version": "pre-pass5",
+  "commit": "97ec6bf3cb38cffaa0040b0e6b5a52196e41f05e",
+  "attributes": [
+    {
+      "type": "action.docker_container_export",
+      "path": "container",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_container_export",
+      "path": "path",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_exec",
+      "path": "command",
+      "kind": "list(string)"
+    },
+    {
+      "type": "action.docker_exec",
+      "path": "container",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_exec",
+      "path": "env",
+      "kind": "map(string)"
+    },
+    {
+      "type": "action.docker_exec",
+      "path": "privileged",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_exec",
+      "path": "service",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_exec",
+      "path": "timeout",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_exec",
+      "path": "user",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_exec",
+      "path": "workdir",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_image_import",
+      "path": "changes",
+      "kind": "list(string)"
+    },
+    {
+      "type": "action.docker_image_import",
+      "path": "message",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_image_import",
+      "path": "platform",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_image_import",
+      "path": "repository",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_image_import",
+      "path": "source",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_image_import",
+      "path": "tag",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_image_load",
+      "path": "path",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_image_prune",
+      "path": "dangling",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_image_prune",
+      "path": "filters",
+      "kind": "map(string)"
+    },
+    {
+      "type": "action.docker_image_save",
+      "path": "images",
+      "kind": "list(string)"
+    },
+    {
+      "type": "action.docker_image_save",
+      "path": "path",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_node_activate",
+      "path": "node",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_node_drain",
+      "path": "node",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_node_drain",
+      "path": "timeout",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_node_drain",
+      "path": "wait",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_service_force_update",
+      "path": "service",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_service_force_update",
+      "path": "timeout",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_service_force_update",
+      "path": "wait",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_service_rollback",
+      "path": "service",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_service_rollback",
+      "path": "timeout",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_service_rollback",
+      "path": "wait",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_service_scale",
+      "path": "replicas",
+      "kind": "number"
+    },
+    {
+      "type": "action.docker_service_scale",
+      "path": "service",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_service_scale",
+      "path": "timeout",
+      "kind": "string"
+    },
+    {
+      "type": "action.docker_service_scale",
+      "path": "wait",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_swarm_rotate_tokens",
+      "path": "manager",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_swarm_rotate_tokens",
+      "path": "worker",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_system_prune",
+      "path": "all_images",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_system_prune",
+      "path": "build_cache",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_system_prune",
+      "path": "containers",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_system_prune",
+      "path": "filters",
+      "kind": "map(string)"
+    },
+    {
+      "type": "action.docker_system_prune",
+      "path": "images",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_system_prune",
+      "path": "networks",
+      "kind": "bool"
+    },
+    {
+      "type": "action.docker_system_prune",
+      "path": "volumes",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_configs",
+      "path": "configs",
+      "kind": "list(object)"
+    },
+    {
+      "type": "data.docker_configs",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_configs",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_configs",
+      "path": "configs.created_at",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_configs",
+      "path": "configs.data",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_configs",
+      "path": "configs.id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_configs",
+      "path": "configs.labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_configs",
+      "path": "configs.name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_configs",
+      "path": "configs.updated_at",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "all",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "ancestor",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers",
+      "kind": "list(object)"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "status",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.command",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.created",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.image",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.image_id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.names",
+      "kind": "list(string)"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.networks",
+      "kind": "list(string)"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.ports",
+      "kind": "list(object)"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.state",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.status",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.ports.ip",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.ports.private_port",
+      "kind": "number"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.ports.public_port",
+      "kind": "number"
+    },
+    {
+      "type": "data.docker_containers",
+      "path": "containers.ports.type",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_image",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_image",
+      "path": "image_id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_image",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_image",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_image",
+      "path": "repo_digest",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_image",
+      "path": "repo_tags",
+      "kind": "list(string)"
+    },
+    {
+      "type": "data.docker_logs",
+      "path": "container",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_logs",
+      "path": "details",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_logs",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_logs",
+      "path": "logs_list_string",
+      "kind": "list(string)"
+    },
+    {
+      "type": "data.docker_logs",
+      "path": "show_stderr",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_logs",
+      "path": "show_stdout",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_logs",
+      "path": "since",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_logs",
+      "path": "tail",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_logs",
+      "path": "timestamps",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_logs",
+      "path": "until",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "attachable",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "driver",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "ingress",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "internal",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "ipam_config",
+      "kind": "list(object)"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "ipam_driver",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "ipv6",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "options",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "scope",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "ipam_config.aux_address",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "ipam_config.gateway",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "ipam_config.ip_range",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_network",
+      "path": "ipam_config.subnet",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_node",
+      "path": "addr",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_node",
+      "path": "availability",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_node",
+      "path": "engine_version",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_node",
+      "path": "hostname",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_node",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_node",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_node",
+      "path": "leader",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_node",
+      "path": "role",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_node",
+      "path": "state",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_nodes",
+      "path": "nodes",
+      "kind": "list(object)"
+    },
+    {
+      "type": "data.docker_nodes",
+      "path": "role",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_nodes",
+      "path": "nodes.addr",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_nodes",
+      "path": "nodes.availability",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_nodes",
+      "path": "nodes.engine_version",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_nodes",
+      "path": "nodes.hostname",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_nodes",
+      "path": "nodes.id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_nodes",
+      "path": "nodes.labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_nodes",
+      "path": "nodes.leader",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_nodes",
+      "path": "nodes.role",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_nodes",
+      "path": "nodes.state",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_plugin",
+      "path": "alias",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_plugin",
+      "path": "enabled",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_plugin",
+      "path": "env",
+      "kind": "set(string)"
+    },
+    {
+      "type": "data.docker_plugin",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_plugin",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_plugin",
+      "path": "plugin_reference",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image",
+      "path": "sha256_digest",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "digest",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "insecure_skip_verify",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "manifests",
+      "kind": "list(object)"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "media_type",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "manifests.architecture",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "manifests.digest",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "manifests.media_type",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "manifests.os",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "manifests.os_version",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "manifests.size",
+      "kind": "number"
+    },
+    {
+      "type": "data.docker_registry_image_manifests",
+      "path": "manifests.variant",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_tags",
+      "path": "insecure_skip_verify",
+      "kind": "bool"
+    },
+    {
+      "type": "data.docker_registry_image_tags",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_tags",
+      "path": "page_size",
+      "kind": "number"
+    },
+    {
+      "type": "data.docker_registry_image_tags",
+      "path": "repository",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_registry_image_tags",
+      "path": "tags",
+      "kind": "list(string)"
+    },
+    {
+      "type": "data.docker_secrets",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_secrets",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_secrets",
+      "path": "secrets",
+      "kind": "list(object)"
+    },
+    {
+      "type": "data.docker_secrets",
+      "path": "secrets.created_at",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_secrets",
+      "path": "secrets.id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_secrets",
+      "path": "secrets.labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_secrets",
+      "path": "secrets.name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_secrets",
+      "path": "secrets.updated_at",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "mode",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "services",
+      "kind": "list(object)"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "services.created_at",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "services.id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "services.image",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "services.labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "services.mode",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "services.name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "services.replicas",
+      "kind": "number"
+    },
+    {
+      "type": "data.docker_services",
+      "path": "services.updated_at",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_swarm_tokens",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_swarm_tokens",
+      "path": "manager",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_swarm_tokens",
+      "path": "worker",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_volume",
+      "path": "driver",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_volume",
+      "path": "driver_opts",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_volume",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_volume",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "data.docker_volume",
+      "path": "mountpoint",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_volume",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "data.docker_volume",
+      "path": "scope",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "bootstrap",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "buildkit_config",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "buildkit_config_content",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "buildkit_flags",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "buildkit_version",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "container_name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "driver",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "endpoint",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "keep_state",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "platforms",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "tcp_address",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "tcp_port",
+      "kind": "number"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "volume_name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "docker_container.env",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "docker_container.image",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "docker_container.memory",
+      "kind": "number"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "docker_container.network",
+      "kind": "string"
+    },
+    {
+      "type": "docker_buildx_builder",
+      "path": "docker_container.restart_policy",
+      "kind": "string"
+    },
+    {
+      "type": "docker_compose",
+      "path": "content",
+      "kind": "string"
+    },
+    {
+      "type": "docker_compose",
+      "path": "env",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_compose",
+      "path": "env_file",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_compose",
+      "path": "files",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_compose",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_compose",
+      "path": "keep_volumes",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_compose",
+      "path": "mode",
+      "kind": "string"
+    },
+    {
+      "type": "docker_compose",
+      "path": "networks",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_compose",
+      "path": "profiles",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_compose",
+      "path": "project_name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_compose",
+      "path": "services",
+      "kind": "map(list(string))"
+    },
+    {
+      "type": "docker_compose",
+      "path": "spec_hash",
+      "kind": "string"
+    },
+    {
+      "type": "docker_compose",
+      "path": "volumes",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_compose",
+      "path": "wait",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_compose",
+      "path": "wait_timeout",
+      "kind": "string"
+    },
+    {
+      "type": "docker_compose",
+      "path": "working_dir",
+      "kind": "string"
+    },
+    {
+      "type": "docker_config",
+      "path": "data",
+      "kind": "string"
+    },
+    {
+      "type": "docker_config",
+      "path": "data_wo",
+      "kind": "string"
+    },
+    {
+      "type": "docker_config",
+      "path": "data_wo_version",
+      "kind": "number"
+    },
+    {
+      "type": "docker_config",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_config",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_config",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "command",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "cpu_shares",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "dns",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "dns_search",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "entrypoint",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "env",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "extra_hosts",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "gpus",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "hostname",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "image",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "image_id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "log_driver",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "log_opts",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "max_retry_count",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "memory",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "memory_swap",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "must_run",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_container",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "nano_cpus",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "privileged",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_container",
+      "path": "read_only",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_container",
+      "path": "restart",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "running",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_container",
+      "path": "security_opt",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "stdin_open",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_container",
+      "path": "stop_signal",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "stop_timeout",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "sysctls",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "tty",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_container",
+      "path": "user",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "wait",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_container",
+      "path": "wait_timeout",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "working_dir",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "capabilities.add",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "capabilities.drop",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "devices.container_path",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "devices.host_path",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "devices.permissions",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "healthcheck.interval",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "healthcheck.retries",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "healthcheck.start_period",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "healthcheck.test",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "healthcheck.timeout",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "mounts.read_only",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_container",
+      "path": "mounts.selinux_relabel",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "mounts.source",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "mounts.target",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "mounts.tmpfs_size",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "mounts.type",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "networks_advanced.aliases",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_container",
+      "path": "networks_advanced.ipv4_address",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "networks_advanced.ipv6_address",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "networks_advanced.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "ports.external",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "ports.internal",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "ports.ip",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "ports.protocol",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "ulimits.hard",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "ulimits.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "ulimits.soft",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "upload.content",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "upload.content_base64",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "upload.executable",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_container",
+      "path": "upload.file",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "upload.group",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "upload.owner",
+      "kind": "number"
+    },
+    {
+      "type": "docker_container",
+      "path": "upload.permissions",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "upload.source",
+      "kind": "string"
+    },
+    {
+      "type": "docker_container",
+      "path": "upload.source_hash",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "context_digest",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "force_remove",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_image",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "image_id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "keep_locally",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_image",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "platform",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "repo_digest",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "triggers",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.args",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.builder",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.cache_from",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.context",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.dockerfile",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.no_cache",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.platform",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.platforms",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.pull",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.target",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.secrets.env",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.secrets.id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_image",
+      "path": "build.secrets.src",
+      "kind": "string"
+    },
+    {
+      "type": "docker_network",
+      "path": "attachable",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_network",
+      "path": "driver",
+      "kind": "string"
+    },
+    {
+      "type": "docker_network",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_network",
+      "path": "ingress",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_network",
+      "path": "internal",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_network",
+      "path": "ipam_driver",
+      "kind": "string"
+    },
+    {
+      "type": "docker_network",
+      "path": "ipv6",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_network",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_network",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_network",
+      "path": "options",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_network",
+      "path": "scope",
+      "kind": "string"
+    },
+    {
+      "type": "docker_network",
+      "path": "ipam_config.aux_address",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_network",
+      "path": "ipam_config.gateway",
+      "kind": "string"
+    },
+    {
+      "type": "docker_network",
+      "path": "ipam_config.ip_range",
+      "kind": "string"
+    },
+    {
+      "type": "docker_network",
+      "path": "ipam_config.subnet",
+      "kind": "string"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "alias",
+      "kind": "string"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "enable_timeout",
+      "kind": "number"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "enabled",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "env",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "force_destroy",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "force_disable",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "grant_all_permissions",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "plugin_reference",
+      "kind": "string"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "grant_permissions.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_plugin",
+      "path": "grant_permissions.value",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_registry_image",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_registry_image",
+      "path": "insecure_skip_verify",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_registry_image",
+      "path": "keep_remotely",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_registry_image",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_registry_image",
+      "path": "push_retries",
+      "kind": "number"
+    },
+    {
+      "type": "docker_registry_image",
+      "path": "sha256_digest",
+      "kind": "string"
+    },
+    {
+      "type": "docker_registry_image",
+      "path": "triggers",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_secret",
+      "path": "data",
+      "kind": "string"
+    },
+    {
+      "type": "docker_secret",
+      "path": "data_wo",
+      "kind": "string"
+    },
+    {
+      "type": "docker_secret",
+      "path": "data_wo_version",
+      "kind": "number"
+    },
+    {
+      "type": "docker_secret",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_secret",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_secret",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "args",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "cap_add",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "cap_drop",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "command",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "container_labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "dir",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "env",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "force_update",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "hostname",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "hosts",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "image",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "max_concurrent",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "mode",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "networks",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "replicas",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "stop_grace_period",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "sysctls",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "total_completions",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "user",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "configs.config_id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "configs.config_name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "configs.file_name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "configs.gid",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "configs.mode",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "configs.uid",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "converge_config.delay",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "converge_config.timeout",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "dns.nameservers",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "dns.options",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "dns.search",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "endpoint_spec.mode",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "endpoint_spec.ports.protocol",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "endpoint_spec.ports.publish_mode",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "endpoint_spec.ports.published_port",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "endpoint_spec.ports.target_port",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "healthcheck.interval",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "healthcheck.retries",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "healthcheck.start_period",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "healthcheck.test",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "healthcheck.timeout",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "logging.driver",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "logging.options",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "mounts.read_only",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_service",
+      "path": "mounts.source",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "mounts.target",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "mounts.tmpfs_size",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "mounts.type",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "mounts.volume_driver",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "mounts.volume_driver_opts",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "mounts.volume_labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "networks_advanced.aliases",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "networks_advanced.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "placement.constraints",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "placement.max_replicas",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "placement.preferences",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_service",
+      "path": "resources.limits.memory_bytes",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "resources.limits.nano_cpus",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "resources.reservations.memory_bytes",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "resources.reservations.nano_cpus",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "restart_policy.condition",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "restart_policy.delay",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "restart_policy.max_attempts",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "restart_policy.window",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "rollback_config.delay",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "rollback_config.failure_action",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "rollback_config.max_failure_ratio",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "rollback_config.monitor",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "rollback_config.order",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "rollback_config.parallelism",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "secrets.file_name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "secrets.gid",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "secrets.mode",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "secrets.secret_id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "secrets.secret_name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "secrets.uid",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "ulimits.hard",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "ulimits.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "ulimits.soft",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "update_config.delay",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "update_config.failure_action",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "update_config.max_failure_ratio",
+      "kind": "number"
+    },
+    {
+      "type": "docker_service",
+      "path": "update_config.monitor",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "update_config.order",
+      "kind": "string"
+    },
+    {
+      "type": "docker_service",
+      "path": "update_config.parallelism",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "config.data",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "config.labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "config.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "network.attachable",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_stack",
+      "path": "network.driver",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "network.internal",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_stack",
+      "path": "network.labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "network.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "network.options",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "secret.data",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "secret.labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "secret.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.args",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.cap_add",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.cap_drop",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.command",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.container_labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.dir",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.env",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.force_update",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.hostname",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.hosts",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.image",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.max_concurrent",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.mode",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.networks",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.replicas",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.stop_grace_period",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.sysctls",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.total_completions",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.user",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.configs.config_id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.configs.config_name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.configs.file_name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.configs.gid",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.configs.mode",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.configs.uid",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.converge_config.delay",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.converge_config.timeout",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.dns.nameservers",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.dns.options",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.dns.search",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.endpoint_spec.mode",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.endpoint_spec.ports.protocol",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.endpoint_spec.ports.publish_mode",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.endpoint_spec.ports.published_port",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.endpoint_spec.ports.target_port",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.healthcheck.interval",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.healthcheck.retries",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.healthcheck.start_period",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.healthcheck.test",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.healthcheck.timeout",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.logging.driver",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.logging.options",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.mounts.read_only",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.mounts.source",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.mounts.target",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.mounts.tmpfs_size",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.mounts.type",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.mounts.volume_driver",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.mounts.volume_driver_opts",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.mounts.volume_labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.networks_advanced.aliases",
+      "kind": "set(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.networks_advanced.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.placement.constraints",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.placement.max_replicas",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.placement.preferences",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.resources.limits.memory_bytes",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.resources.limits.nano_cpus",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.resources.reservations.memory_bytes",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.resources.reservations.nano_cpus",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.restart_policy.condition",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.restart_policy.delay",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.restart_policy.max_attempts",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.restart_policy.window",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.rollback_config.delay",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.rollback_config.failure_action",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.rollback_config.max_failure_ratio",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.rollback_config.monitor",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.rollback_config.order",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.rollback_config.parallelism",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.secrets.file_name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.secrets.gid",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.secrets.mode",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.secrets.secret_id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.secrets.secret_name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.secrets.uid",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.ulimits.hard",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.ulimits.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.ulimits.soft",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.update_config.delay",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.update_config.failure_action",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.update_config.max_failure_ratio",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.update_config.monitor",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.update_config.order",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "service.update_config.parallelism",
+      "kind": "number"
+    },
+    {
+      "type": "docker_stack",
+      "path": "volume.driver",
+      "kind": "string"
+    },
+    {
+      "type": "docker_stack",
+      "path": "volume.driver_opts",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "volume.labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_stack",
+      "path": "volume.name",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "advertise_addr",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "autolock",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "cluster_id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "data_path_port",
+      "kind": "number"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "default_addr_pool",
+      "kind": "list(string)"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "force_new_cluster",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "listen_addr",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "manager_join_token",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "node_id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "subnet_size",
+      "kind": "number"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "unlock_key",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_init",
+      "path": "worker_join_token",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "advertise_addr",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "availability",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "host",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "hostname",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "join_token",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "listen_addr",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "manager_address",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "node_id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "role",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.connect_timeout",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.host",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.identity_agent",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.identity_file",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.known_hosts_file",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.password",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.password_wo",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.port",
+      "kind": "number"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.proxy_jump",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.remote_socket",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.strict_host_key_checking",
+      "kind": "bool"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "ssh.user",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "tls.ca",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "tls.cert",
+      "kind": "string"
+    },
+    {
+      "type": "docker_swarm_node",
+      "path": "tls.key",
+      "kind": "string"
+    },
+    {
+      "type": "docker_tag",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_tag",
+      "path": "source_image",
+      "kind": "string"
+    },
+    {
+      "type": "docker_tag",
+      "path": "source_image_id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_tag",
+      "path": "target_image",
+      "kind": "string"
+    },
+    {
+      "type": "docker_volume",
+      "path": "driver",
+      "kind": "string"
+    },
+    {
+      "type": "docker_volume",
+      "path": "driver_opts",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_volume",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "docker_volume",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "docker_volume",
+      "path": "mountpoint",
+      "kind": "string"
+    },
+    {
+      "type": "docker_volume",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_exec_output",
+      "path": "command",
+      "kind": "list(string)"
+    },
+    {
+      "type": "ephemeral.docker_exec_output",
+      "path": "container",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_exec_output",
+      "path": "env",
+      "kind": "map(string)"
+    },
+    {
+      "type": "ephemeral.docker_exec_output",
+      "path": "exit_code",
+      "kind": "number"
+    },
+    {
+      "type": "ephemeral.docker_exec_output",
+      "path": "stderr",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_exec_output",
+      "path": "stdout",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_exec_output",
+      "path": "timeout",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_exec_output",
+      "path": "user",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_exec_output",
+      "path": "workdir",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_registry_token",
+      "path": "expires_at",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_registry_token",
+      "path": "expires_in",
+      "kind": "number"
+    },
+    {
+      "type": "ephemeral.docker_registry_token",
+      "path": "insecure_skip_verify",
+      "kind": "bool"
+    },
+    {
+      "type": "ephemeral.docker_registry_token",
+      "path": "issued_at",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_registry_token",
+      "path": "realm",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_registry_token",
+      "path": "registry",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_registry_token",
+      "path": "scope",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_registry_token",
+      "path": "service",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_registry_token",
+      "path": "token",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_swarm_tokens",
+      "path": "id",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_swarm_tokens",
+      "path": "manager",
+      "kind": "string"
+    },
+    {
+      "type": "ephemeral.docker_swarm_tokens",
+      "path": "worker",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_config",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "list.docker_config",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_container",
+      "path": "all",
+      "kind": "bool"
+    },
+    {
+      "type": "list.docker_container",
+      "path": "ancestor",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_container",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "list.docker_container",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_container",
+      "path": "network",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_container",
+      "path": "status",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_image",
+      "path": "dangling",
+      "kind": "bool"
+    },
+    {
+      "type": "list.docker_image",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "list.docker_image",
+      "path": "reference",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_network",
+      "path": "driver",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_network",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "list.docker_network",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_network",
+      "path": "scope",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_network",
+      "path": "type",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_secret",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "list.docker_secret",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_service",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "list.docker_service",
+      "path": "mode",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_service",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_swarm_node",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "list.docker_swarm_node",
+      "path": "membership",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_swarm_node",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_swarm_node",
+      "path": "role",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_volume",
+      "path": "dangling",
+      "kind": "bool"
+    },
+    {
+      "type": "list.docker_volume",
+      "path": "driver",
+      "kind": "string"
+    },
+    {
+      "type": "list.docker_volume",
+      "path": "labels",
+      "kind": "map(string)"
+    },
+    {
+      "type": "list.docker_volume",
+      "path": "name",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "allow_credential_helpers",
+      "kind": "bool"
+    },
+    {
+      "type": "provider",
+      "path": "api_version",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "cert_path",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "context",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "disable_docker_daemon_check",
+      "kind": "bool"
+    },
+    {
+      "type": "provider",
+      "path": "host",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "min_api_version",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "registry_auth.address",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "registry_auth.auth_disabled",
+      "kind": "bool"
+    },
+    {
+      "type": "provider",
+      "path": "registry_auth.config_file",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "registry_auth.config_file_content",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "registry_auth.password",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "registry_auth.password_wo",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "registry_auth.username",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.connect_timeout",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.host",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.identity_agent",
+      "kind": "bool"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.identity_file",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.known_hosts_file",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.password",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.password_wo",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.port",
+      "kind": "number"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.proxy_jump",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.remote_socket",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.strict_host_key_checking",
+      "kind": "bool"
+    },
+    {
+      "type": "provider",
+      "path": "ssh.user",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "tls.ca",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "tls.cert",
+      "kind": "string"
+    },
+    {
+      "type": "provider",
+      "path": "tls.key",
+      "kind": "string"
+    }
+  ]
+}

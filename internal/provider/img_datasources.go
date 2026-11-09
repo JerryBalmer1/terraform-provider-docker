@@ -7,7 +7,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -38,9 +37,10 @@ func (d *imgDSBase) ready(diags *diag.Diagnostics) bool {
 	return true
 }
 
-// imgMarshal returns the JSON of v, with an empty list for a nil slice.
+// imgMarshal returns the canonical JSON of v (rCanonicalJSON), with an
+// empty list for a nil slice.
 func imgMarshal(v any) ([]byte, error) {
-	b, err := json.Marshal(v)
+	b, err := rCanonicalJSON(v)
 	if err != nil {
 		return nil, err
 	}

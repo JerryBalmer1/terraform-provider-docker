@@ -81,6 +81,6 @@ func (d *volumeDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 	state := volumeDataFromInspect(vRes.Volume)
-	resp.Diagnostics.Append(state.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": vRes.Raw}})...)
+	resp.Diagnostics.Append(state.contractFill(ctx, d.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(vRes.Raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

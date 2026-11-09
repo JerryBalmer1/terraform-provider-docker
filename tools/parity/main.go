@@ -27,6 +27,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	extract := fs.String("extract", "", "path of a kreuzwerker v4.6.0 checkout: rewrite paritydata/"+paritydata.KreuzwerkerAttrsFile+" from its docs/ and exit")
 	commit := fs.String("commit", "1e48613cd36acab30e9146aae6f036ea8e40a288", "with -extract: the checkout's commit, recorded in the file")
 	out := fs.String("out", "", "with -extract: output path (default tools/parity/paritydata/"+paritydata.KreuzwerkerAttrsFile+" under the module root)")
+	extractPrev := fs.String("extract-previous", "", "path of a genskill reference directory (.claude/skills/terraform-provider-docker/reference as of -commit): rewrite paritydata/"+paritydata.PreviousAttrsFile+" from it and exit")
+	reference := fs.String("reference", "", "with the attribute check: the current genskill reference directory (default .claude/skills/terraform-provider-docker/reference under the module root)")
 	guide := fs.String("guide", "", "write the migration guide template (templates/guides/migrating-from-kreuzwerker.md.tmpl) from renames.json and exit")
 	guideCheck := fs.String("guide-check", "", "exit 1 if this migration guide template differs from what -guide writes")
 	if err := fs.Parse(args); err != nil {
@@ -57,6 +59,23 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		fmt.Fprintf(stdout, "parity: %s is up to date\n", *guideCheck)
+		return 0
+	}
+	if *extractPrev != "" {
+		attrs, err := ParseReferenceDir(*extractPrev)
+		if err != nil {
+			fmt.Fprintln(stderr, "parity:", err)
+			return 2
+		}
+		dst := *out
+		if dst == "" {
+			dst = findRepoFile(filepath.Join("tools", "parity", "paritydata", paritydata.PreviousAttrsFile))
+		}
+		if err := WritePreviousAttrs(dst, *commit, attrs); err != nil {
+			fmt.Fprintln(stderr, "parity:", err)
+			return 2
+		}
+		fmt.Fprintf(stdout, "parity: wrote %d previous attributes to %s\n", len(attrs), dst)
 		return 0
 	}
 	if *extract != "" {
@@ -107,23 +126,56 @@ func run(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "parity: %d kreuzwerker attribute(s) not accounted for in %s\n", len(probs), path)
 			code = 1
 		}
+		// Our own schema changes since before Pass 5: the repo's reference
+		// against the repo's renames.json (with a custom -renames, only when
+		// -reference is given too).
+		if *renames != "" && *reference == "" {
+			return finishCheck(code, *check, stdout, stderr)
+		}
+		prev, err := paritydata.PreviousAttrs()
+		if err != nil {
+			fmt.Fprintln(stderr, "parity:", err)
+			return 2
+		}
+		refDir := *reference
+		if refDir == "" {
+			refDir = findRepoFile(filepath.Join(".claude", "skills", "terraform-provider-docker", "reference"))
+		}
+		cur, err := ParseReferenceDir(refDir)
+		if err != nil {
+			fmt.Fprintln(stderr, "parity:", err)
+			return 2
+		}
+		unrec := CheckPrevious(prev.Attributes, cur, doc)
+		fmt.Fprintf(stdout, "%d of our pre-Pass 5 attributes (%s): %d gone or changed type with no renames.json row\n",
+			len(prev.Attributes), prev.Commit, len(unrec))
+		if len(unrec) > 0 {
+			PrintAttrProblems(stderr, unrec)
+			code = 1
+		}
 	}
-	if *check == "" {
+	return finishCheck(code, *check, stdout, stderr)
+}
+
+// finishCheck runs the -check part (missing types logged as [BLOCKED]) and
+// returns the exit code.
+func finishCheck(code int, check string, stdout, stderr io.Writer) int {
+	if check == "" {
 		return code
 	}
-	b, err := os.ReadFile(*check)
+	b, err := os.ReadFile(check)
 	if err != nil {
 		fmt.Fprintln(stderr, "parity:", err)
 		return 2
 	}
 	unblocked := Unblocked(kreuzwerker, string(b))
 	for _, e := range unblocked {
-		fmt.Fprintf(stderr, "parity: %s %s is missing and %s has no [BLOCKED] line naming it\n", e.Kind, e.Name, *check)
+		fmt.Fprintf(stderr, "parity: %s %s is missing and %s has no [BLOCKED] line naming it\n", e.Kind, e.Name, check)
 	}
 	if len(unblocked) > 0 {
 		fmt.Fprintf(stderr, "parity: %d missing type(s) not logged; add `[P3-x] [BLOCKED] <lane> <type> <why> <what was tried>` lines or implement them\n", len(unblocked))
 		return 1
 	}
-	fmt.Fprintf(stdout, "parity: every missing type is logged as [BLOCKED] in %s\n", *check)
+	fmt.Fprintf(stdout, "parity: every missing type is logged as [BLOCKED] in %s\n", check)
 	return code
 }
