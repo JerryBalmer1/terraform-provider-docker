@@ -106,8 +106,11 @@ func TestRunCheck(t *testing.T) {
 	}
 	os.WriteFile(full, []byte(strings.Join(lines, "\n")+"\n"), 0o644)
 
+	// A renames.json that maps every kreuzwerker attribute: the attribute
+	// check passes, so only the [BLOCKED] check decides.
+	ok := allMappedRenames(t, dir)
 	var out, errb bytes.Buffer
-	if code := run(nil, &out, &errb); code != 0 {
+	if code := run([]string{"-renames", ok}, &out, &errb); code != 0 {
 		t.Errorf("plain run = %d: %s", code, errb.String())
 	}
 	if !strings.Contains(out.String(), "docker_buildx_builder") {
@@ -115,7 +118,7 @@ func TestRunCheck(t *testing.T) {
 	}
 	out.Reset()
 	errb.Reset()
-	code := run([]string{"-check", empty}, &out, &errb)
+	code := run([]string{"-renames", ok, "-check", empty}, &out, &errb)
 	if len(missing) > 0 && code != 1 {
 		t.Errorf("check against an empty report = %d, want 1", code)
 	}
@@ -125,10 +128,10 @@ func TestRunCheck(t *testing.T) {
 		}
 	}
 	errb.Reset()
-	if code := run([]string{"-check", full}, &out, &errb); code != 0 {
+	if code := run([]string{"-renames", ok, "-check", full}, &out, &errb); code != 0 {
 		t.Errorf("check against a full report = %d: %s", code, errb.String())
 	}
-	if code := run([]string{"-check", filepath.Join(dir, "nope.md")}, &out, &errb); code != 2 {
+	if code := run([]string{"-renames", ok, "-check", filepath.Join(dir, "nope.md")}, &out, &errb); code != 2 {
 		t.Errorf("missing file = %d, want 2", code)
 	}
 	if code := run([]string{"-bogus"}, &out, &errb); code != 2 {

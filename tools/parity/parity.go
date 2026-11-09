@@ -1,11 +1,27 @@
-// Command parity prints which kreuzwerker/docker v4.6.0 types this provider
-// has, has partially or is missing, plus the types only this provider has.
-// The list is maintained by hand: update it whenever a type lands or changes
-// status.
+// Command parity checks this provider against kreuzwerker/docker v4.6.0.
 //
-//	go run ./tools/parity                          # print the table
+// Types: it prints which kreuzwerker types this provider has, has partially
+// or is missing, plus the types only this provider has (hand-maintained in
+// tools/parity/paritydata).
+//
+// Attributes: every attribute of every kreuzwerker resource, data source and
+// action (paritydata/kreuzwerker_v4.6.0_attrs.json, extracted once from the
+// kreuzwerker docs) must appear in reference/_gen/renames.json, either mapped
+// (our_attr set) or dropped (our_attr null) with a reason. A dropped row whose
+// reason starts with "gap:" is open work and fails the check; an attribute
+// deliberately not implemented carries a reason starting "won't implement:".
+// Failing rows are printed grouped by type.
+//
+//	go run ./tools/parity                          # table + attribute check (exit 1 on open gaps)
 //	go run ./tools/parity -check BUILD_REPORT.md   # also exit 1 if a missing type
 //	                                               # has no [BLOCKED] line naming it
+//	go run ./tools/parity -types-only              # table only
+//	go run ./tools/parity -renames other.json      # check another renames file
+//	go run ./tools/parity -extract <kreuzwerker v4.6.0 checkout>
+//	                                               # regenerate the attribute list
+//	go run ./tools/parity -guide templates/guides/migrating-from-kreuzwerker.md.tmpl
+//	                                               # regenerate the migration guide template
+//	go run ./tools/parity -guide-check templates/guides/migrating-from-kreuzwerker.md.tmpl
 //
 // The lists themselves are in tools/parity/paritydata.
 package main
