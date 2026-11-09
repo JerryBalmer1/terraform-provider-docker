@@ -3,12 +3,12 @@
 page_title: "docker_image Data Source - docker"
 subcategory: ""
 description: |-
-  Looks up an image already present on the provider's daemon (no pull). Fails if the image does not exist locally.
+  Looks up an image already present on the provider's daemon, without pulling it (GET /images/{name}/json). Fails if the image does not exist locally. Per-platform manifests are filled on daemons with the containerd image store (API 1.48+).
 ---
 
 # docker_image (Data Source)
 
-Looks up an image already present on the provider's daemon (no pull). Fails if the image does not exist locally.
+Looks up an image already present on the provider's daemon, without pulling it (`GET /images/{name}/json`). Fails if the image does not exist locally. Per-platform `manifests` are filled on daemons with the containerd image store (API 1.48+).
 
 ## Example Usage
 
@@ -19,7 +19,7 @@ data "docker_image" "nginx" {
 }
 
 output "nginx_image_id" {
-  value = data.docker_image.nginx.image_id
+  value = data.docker_image.nginx.id
 }
 
 output "nginx_labels" {
@@ -36,8 +36,244 @@ output "nginx_labels" {
 
 ### Read-Only
 
-- `id` (String) Image ID (`sha256:...`).
-- `image_id` (String) Image ID (`sha256:...`), same as `id`.
-- `labels` (Map of String) Labels from the image config.
-- `repo_digest` (String) Repository digest (`repo@sha256:...`) for the repository of `name`, if known to the daemon.
+- `config` (Attributes) Image config (ImageInspect.Config). (see [below for nested schema](#nestedatt--config))
+- `content_sha256` (String) The `content_sha256` hash output.
+- `created` (String) ImageInspect.Created (RFC 3339).
+- `digest` (String) Manifest or index digest: `ImageInspect.Descriptor.digest` on the containerd store, else the digest part of `image_digest_ref`.
+- `docker_server_version` (String) Docker Engine version reported by GET /version.
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon for this read/build.
+- `id` (String) Image ID (`sha256:...`, `ImageInspect.Id`).
+- `image_digest_ref` (String) Repository digest reference (`repo@sha256:...`) from `RepoDigests` for the repository of `name`, if known to the daemon; null for a local-only image. Every entry is in `inspect.repo_digests`.
+- `image_ref` (String) Normalized `registry/repository:tag` form of `name` (implicit `latest` added); null when `name` is an ID or a digest reference.
+- `inspect` (Attributes) Full ImageInspect, field by field. (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String, Sensitive) The Engine API response body as JSON. Holds Config.Env, hence sensitive.
+- `labels` (Map of String) Labels from the image config (`Config.Labels`).
+- `manifests` (Attributes List) Per-platform manifests in one shape for both data sources; `filled_by` on each field says which side fills it. (see [below for nested schema](#nestedatt--manifests))
+- `platforms` (List of String) Available platforms as `os/arch[/variant]` (`Manifests[].ImageData.Platform` on the containerd store), else the image's single platform.
 - `repo_tags` (List of String) Every tag referencing this image on the daemon.
+
+<a id="nestedatt--config"></a>
+### Nested Schema for `config`
+
+Read-Only:
+
+- `args_escaped` (Boolean) Upstream `ArgsEscaped`.
+- `cmd` (List of String) Upstream `Cmd`.
+- `entrypoint` (List of String) Upstream `Entrypoint`.
+- `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
+- `exposed_ports` (List of String) Map keys (`<port>/<proto>`) as a list.
+- `healthcheck` (Attributes) Upstream `Healthcheck`. (see [below for nested schema](#nestedatt--config--healthcheck))
+- `labels` (Map of String) Upstream `Labels`.
+- `on_build` (List of String) Upstream `OnBuild`.
+- `shell` (List of String) Upstream `Shell`.
+- `stop_signal` (String) Upstream `StopSignal`.
+- `user` (String) Upstream `User`.
+- `volumes` (List of String) Map keys as a list.
+- `working_dir` (String) Upstream `WorkingDir`.
+
+<a id="nestedatt--config--healthcheck"></a>
+### Nested Schema for `config.healthcheck`
+
+Read-Only:
+
+- `interval` (Number) Upstream `Interval`.
+- `retries` (Number) Upstream `Retries`.
+- `start_interval` (Number) Upstream `StartInterval`.
+- `start_period` (Number) Upstream `StartPeriod`.
+- `test` (List of String) Upstream `Test`.
+- `timeout` (Number) Upstream `Timeout`.
+
+
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `architecture` (String) Upstream `Architecture`.
+- `author` (String) Upstream `Author`.
+- `comment` (String) Upstream `Comment`.
+- `config` (Attributes) Upstream `Config`. (see [below for nested schema](#nestedatt--inspect--config))
+- `created` (String) Upstream `Created`.
+- `descriptor` (Attributes) Upstream `Descriptor`. (see [below for nested schema](#nestedatt--inspect--descriptor))
+- `graph_driver` (Attributes) Upstream `GraphDriver`. (see [below for nested schema](#nestedatt--inspect--graph_driver))
+- `id` (String) Upstream `Id`.
+- `identity` (Attributes) Upstream `Identity`. (see [below for nested schema](#nestedatt--inspect--identity))
+- `manifests` (Attributes List) Only with a multi-platform (containerd) image store and `manifests=true`; experimental upstream. (see [below for nested schema](#nestedatt--inspect--manifests))
+- `metadata` (Attributes) Upstream `Metadata`. (see [below for nested schema](#nestedatt--inspect--metadata))
+- `os` (String) Upstream `Os`.
+- `os_version` (String) Upstream `OsVersion`.
+- `repo_digests` (List of String) Upstream `RepoDigests`.
+- `repo_tags` (List of String) Upstream `RepoTags`.
+- `root_fs` (Attributes) Upstream `RootFS`. (see [below for nested schema](#nestedatt--inspect--root_fs))
+- `size` (Number) Upstream `Size`.
+- `variant` (String) Upstream `Variant`.
+
+<a id="nestedatt--inspect--config"></a>
+### Nested Schema for `inspect.config`
+
+Read-Only:
+
+- `args_escaped` (Boolean) Upstream `ArgsEscaped`.
+- `cmd` (List of String) Upstream `Cmd`.
+- `entrypoint` (List of String) Upstream `Entrypoint`.
+- `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
+- `exposed_ports` (List of String) Map keys (`<port>/<proto>`) as a list.
+- `healthcheck` (Attributes) Upstream `Healthcheck`. (see [below for nested schema](#nestedatt--inspect--config--healthcheck))
+- `labels` (Map of String) Upstream `Labels`.
+- `on_build` (List of String) Upstream `OnBuild`.
+- `shell` (List of String) Upstream `Shell`.
+- `stop_signal` (String) Upstream `StopSignal`.
+- `user` (String) Upstream `User`.
+- `volumes` (List of String) Map keys as a list.
+- `working_dir` (String) Upstream `WorkingDir`.
+
+<a id="nestedatt--inspect--config--healthcheck"></a>
+### Nested Schema for `inspect.config.healthcheck`
+
+Read-Only:
+
+- `interval` (Number) Upstream `Interval`.
+- `retries` (Number) Upstream `Retries`.
+- `start_interval` (Number) Upstream `StartInterval`.
+- `start_period` (Number) Upstream `StartPeriod`.
+- `test` (List of String) Upstream `Test`.
+- `timeout` (Number) Upstream `Timeout`.
+
+
+
+<a id="nestedatt--inspect--descriptor"></a>
+### Nested Schema for `inspect.descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `artifact_type` (String) Upstream `artifactType`.
+- `data` (String) Upstream `data`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--inspect--descriptor--platform))
+- `size` (Number) Upstream `size`.
+- `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--inspect--descriptor--platform"></a>
+### Nested Schema for `inspect.descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
+
+
+<a id="nestedatt--inspect--graph_driver"></a>
+### Nested Schema for `inspect.graph_driver`
+
+Read-Only:
+
+- `data` (Map of String) Upstream `Data`.
+- `name` (String) Upstream `Name`.
+
+
+<a id="nestedatt--inspect--identity"></a>
+### Nested Schema for `inspect.identity`
+
+Read-Only:
+
+- `build` (List of String) Upstream `Build`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `pull` (List of String) Upstream `Pull`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `signature` (List of String) Upstream `Signature`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+
+
+<a id="nestedatt--inspect--manifests"></a>
+### Nested Schema for `inspect.manifests`
+
+Read-Only:
+
+- `attestation_data` (String) Upstream `AttestationData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `available` (Boolean) Upstream `Available`.
+- `descriptor` (Attributes) Upstream `Descriptor`. (see [below for nested schema](#nestedatt--inspect--manifests--descriptor))
+- `id` (String) Upstream `ID`.
+- `image_data` (String) Upstream `ImageData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `kind` (String) Upstream `Kind`.
+- `size` (Attributes) Upstream `Size`. (see [below for nested schema](#nestedatt--inspect--manifests--size))
+
+<a id="nestedatt--inspect--manifests--descriptor"></a>
+### Nested Schema for `inspect.manifests.descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `artifact_type` (String) Upstream `artifactType`.
+- `data` (String) Upstream `data`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--inspect--manifests--descriptor--platform))
+- `size` (Number) Upstream `size`.
+- `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--inspect--manifests--descriptor--platform"></a>
+### Nested Schema for `inspect.manifests.descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
+
+
+<a id="nestedatt--inspect--manifests--size"></a>
+### Nested Schema for `inspect.manifests.size`
+
+Read-Only:
+
+- `content` (Number) Upstream `Content`.
+- `total` (Number) Upstream `Total`.
+
+
+
+<a id="nestedatt--inspect--metadata"></a>
+### Nested Schema for `inspect.metadata`
+
+Read-Only:
+
+- `last_tag_time` (String) Upstream `LastTagTime`.
+
+
+<a id="nestedatt--inspect--root_fs"></a>
+### Nested Schema for `inspect.root_fs`
+
+Read-Only:
+
+- `layers` (List of String) Upstream `Layers`.
+- `type` (String) Upstream `Type`.
+
+
+
+<a id="nestedatt--manifests"></a>
+### Nested Schema for `manifests`
+
+Read-Only:
+
+- `available` (Boolean) Local only: whether that platform's content is present on the daemon.
+- `digest` (String) Per-platform manifest digest. Local: ImageInspect.Manifests[].Descriptor.digest (containerd store). Registry: DistributionInspect lists platforms only, so null.
+- `media_type` (String) Upstream `Descriptor.mediaType`.
+- `platform` (Attributes) Upstream `Platform (os/architecture/variant)`. (see [below for nested schema](#nestedatt--manifests--platform))
+- `size` (Number) Upstream `Descriptor.size`.
+
+<a id="nestedatt--manifests--platform"></a>
+### Nested Schema for `manifests.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.

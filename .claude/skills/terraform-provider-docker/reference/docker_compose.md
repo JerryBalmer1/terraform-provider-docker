@@ -4,28 +4,684 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A Docker Compose project applied through the Engine API, with no compose CLI plugin involved. The project is parsed with compose-go (the library `docker compose` uses) from `content` or `files`, with interpolation limited to `env` and `env_file`. In `mode = "local"` every service becomes containers named `<project>-<service>-<n>` (or `container_name`), every network `<project>_<name>` and every volume `<project>_<name>`, all labelled `com.docker.compose.project` like `docker compose up` does, so `docker compose ps` shows them. In `mode = "swarm"` the project becomes a stack (services, overlay networks, secrets and configs labelled `com.docker.stack.namespace`) like `docker stack deploy`. Refresh compares the live objects with the parsed project (a `com.docker.compose.config-hash` label on each object, plus container state or service image/replicas) and marks `spec_hash` as drifted so the next plan shows an update. An update creates what is missing, recreates what changed and removes objects of the project that are no longer in it. Destroy removes everything labelled with the project. `build` is not supported: build images with `docker_image`.
+A Docker Compose project applied through the Engine API, with no compose CLI plugin involved. The project is parsed with compose-go (the library `docker compose` uses) from `content` or `files`, with interpolation limited to `env` and `env_file`. In `mode = "local"` every service becomes containers named `<project>-<service>-<n>` (or `container_name`), every network `<project>_<name>` and every volume `<project>_<name>`, all labelled `com.docker.compose.project` like `docker compose up` does (including the `com.docker.compose.config-hash` values the CLI computes), so `docker compose ps` shows them. In `mode = "swarm"` the project becomes a stack (services, overlay networks, secrets and configs labelled `com.docker.stack.namespace`) like `docker stack deploy`. Refresh compares the live objects with the parsed project (a `com.docker.compose.config-hash` label on each object, plus container state or service image/replicas) and marks `spec_hash` as drifted so the next plan shows an update. An update creates what is missing, recreates what changed and removes objects of the project that are no longer in it. Destroy removes everything labelled with the project. In local mode a service with a `build:` section is built through BuildKit when its image is missing (always with `pull_policy: build`) and tagged `image` or `<project>-<service>`. A project that defines `jobs` plans with a warning: jobs are not run yet (use the `docker_compose_run` action). The whole normalized project is exposed as `compose_yaml` (what `docker compose config` prints) and the structured `project`.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `content` | `string` | optional |  |  | Compose YAML as a string. Exactly one of `content` and `files` must be set; relative paths in it resolve against `working_dir` (default: the Terraform working directory). |
+| `compose_go_version` | `string` | computed |  |  | compose-go version that loads, interpolates, merges and validates the project (v2.16.2, from go.mod). |
+| `compose_spec_version` | `string` | computed |  |  | Pinned compose-spec commit the structured fields follow (main @ 3a4a699...). |
+| `compose_yaml` | `string` | computed |  | yes | Normalized compose config as `docker compose config` prints it: interpolated, include/extends resolved, merged, profiles applied. |
+| `config_files` | `list(string)` | computed |  |  | The compose files that make up the project, in merge order (`com.docker.compose.project.config_files`). For `content` it is `docker-compose.yml` in the project directory. |
+| `configs` | `map(string)` | computed |  |  | Map of config key to the Swarm config ID (swarm) or the config name (local, where the content is copied into the containers). |
+| `container_names` | `map(list(string))` | computed |  |  | Map of service name to its container names (`<project>-<service>-<n>` or `container_name`); in swarm mode the Swarm service name. |
+| `content` | `string` | optional |  |  | Compose YAML as a string. Exactly one of `content` and `files` must be set; relative paths in it resolve against `project_directory` (default: the Terraform working directory). |
+| `content_sha256` | `string` | computed |  |  | Hex SHA-256 of `compose_yaml`. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon. |
 | `env` | `map(string)` | optional |  | yes | Variables for `${VAR}` interpolation and `environment:`-sourced secrets and configs. The provider's own environment is never read; values here override `env_file`. |
 | `env_file` | `list(string)` | optional |  |  | Dotenv files read for interpolation variables, later files winning. Relative paths resolve like compose file paths. |
-| `files` | `list(string)` | optional |  |  | Compose file paths, merged in order like repeated `docker compose -f`. Relative paths in them resolve against `working_dir` or, when unset, the first file's directory. |
+| `files` | `list(string)` | optional |  |  | Compose file paths, merged in order like repeated `docker compose -f`. Relative paths in them resolve against `project_directory` or, when unset, the first file's directory. |
 | `id` | `string` | computed |  |  | The project name. |
+| `image_refs` | `map(string)` | computed |  |  | Map of service name to the image reference it runs after interpolation (`image`, or `<project>-<service>` for a build-only service). |
+| `jobs` | `map(list(string))` | computed |  |  | Map of job name to the container IDs of its runs. Jobs are not run by docker_compose yet, so every list is empty; run one with the `docker_compose_run` action. |
 | `keep_volumes` | `bool` | optional, computed |  |  | Keep the project's named volumes on destroy and when they leave the project (default `false`, which removes them). |
-| `mode` | `string` | optional, computed | yes |  | Deployment target: `local` (default) or `swarm`. `local` creates containers on the provider's daemon; `swarm` creates a stack and needs a Swarm manager. Changing it forces a new resource. |
+| `labels` | `map(string)` | computed |  |  | The project label every created object carries (`com.docker.compose.project`, or `com.docker.stack.namespace` in swarm mode), usable as a label selector downstream. |
+| `mode` | `string` | optional, computed | yes |  | Deployment target: `local` (default) or `swarm`. `local` creates containers on the provider's daemon; `swarm` creates a stack and needs a Swarm manager. Forces replacement. |
+| `models` | `map(string)` | computed |  |  | Map of top-level model key to its `model` reference (an OCI artifact). Models are recorded but not run. |
+| `name` | `string` | optional, computed | yes |  | The compose project name (compose-spec top-level `name`, CLI `--project-name`), used to name and label every object. Defaults to the file's top-level `name`, then to the project directory's name. Forces replacement. |
+| `network_names` | `map(string)` | computed |  |  | Map of network key to the Engine network name (`<project>_<key>` unless `name:` is set), external networks included. |
 | `networks` | `map(string)` | computed |  |  | Map of network key to the ID of the network the project created. External networks are not listed. |
 | `profiles` | `list(string)` | optional |  |  | Profiles to enable. Services with a `profiles` list run only when one of them is enabled; services without one always run. |
-| `project_name` | `string` | optional, computed | yes |  | Project name used to name and label every object. Defaults to the file's top-level `name`, then to the working directory's name; changing it forces a new resource. |
+| `project` | `object` | computed |  |  | The whole normalized project, mirroring the compose-spec top-level schema: `project.services["web"].ports`, `project.networks`, ... |
+| `project_directory` | `string` | optional |  |  | The project directory relative paths resolve against (CLI `--project-directory`). Defaults to the first file's directory, or the Terraform working directory for `content`. |
+| `remove_orphans` | `bool` | optional, computed |  |  | Remove containers (local) or Swarm services (swarm) of the project whose service is no longer configured, like `docker compose up --remove-orphans` (default `true`). With `false` they are left running and not reported as drift. |
+| `secrets` | `map(string)` | computed |  |  | Map of secret key to the Swarm secret ID (swarm) or the secret name (local). IDs and names only, never the data. |
 | `services` | `map(list(string))` | computed |  |  | Map of service name to the IDs of its containers (local, in container-number order) or to its Swarm service ID (swarm). |
 | `spec_hash` | `string` | computed |  |  | Digest of the parsed project. Refresh replaces it with `drifted: <reasons>` when the live objects no longer match, which makes the next plan show an update. |
 | `volumes` | `map(string)` | computed |  |  | Map of volume key to the volume name. In swarm mode volumes are created by each node on first use, so the names come from the services' mounts. |
 | `wait` | `bool` | optional, computed |  |  | Wait for the project to be ready after create and update (default `true`). Local mode waits for containers to run (and be healthy when they have a healthcheck) or to exit 0; swarm mode waits for services to converge. |
 | `wait_timeout` | `string` | optional, computed |  |  | Maximum time for each wait, as a Go duration (default `2m`). It also bounds `depends_on` conditions in local mode. |
-| `working_dir` | `string` | optional |  |  | Project directory that relative paths resolve against. Defaults to the first file's directory, or the Terraform working directory for `content`. |
+
+### `project`
+
+nested attribute, object. The whole normalized project, mirroring the compose-spec top-level schema: `project.services["web"].ports`, `project.networks`, ...
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `configs` | `map(object)` | computed |  |  | Upstream `configs`. |
+| `include` | `list(object)` | computed |  |  | Upstream `include`. |
+| `jobs` | `map(object)` | computed |  |  | Upstream `jobs`. |
+| `models` | `map(object)` | computed |  |  | Upstream `models`. |
+| `name` | `string` | computed |  |  | Upstream `name`. |
+| `networks` | `map(object)` | computed |  |  | Upstream `networks`. |
+| `secrets` | `map(object)` | computed |  |  | Upstream `secrets`. |
+| `services` | `map(object)` | computed |  |  | Upstream `services`. |
+| `version` | `string` | computed |  |  | Upstream `version`. |
+| `volumes` | `map(object)` | computed |  |  | Upstream `volumes`. |
+
+### `project.configs`
+
+nested attribute, map(object). Upstream `configs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `content` | `string` | computed |  | yes | Upstream `content`. Sensitive. |
+| `environment` | `string` | computed |  | yes | Upstream `environment`. Sensitive. |
+| `external` | `bool` | computed |  |  | Upstream `external`. |
+| `file` | `string` | computed |  |  | Upstream `file`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `name` | `string` | computed |  |  | Upstream `name`. |
+| `template_driver` | `string` | computed |  |  | Upstream `template_driver`. |
+
+### `project.include`
+
+nested attribute, list(object). Upstream `include`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `env_file` | `list(string)` | computed |  | yes | Upstream `env_file`. Sensitive. |
+| `path` | `list(string)` | computed |  |  | Upstream `path`. |
+| `project_directory` | `string` | computed |  |  | Upstream `project_directory`. |
+
+### `project.jobs`
+
+nested attribute, map(object). Upstream `jobs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `blkio_config` | `string` | computed |  |  | Upstream `blkio_config`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `build` | `object` | computed |  |  | Upstream `build`. |
+| `cap_add` | `list(string)` | computed |  |  | Upstream `cap_add`. |
+| `cap_drop` | `list(string)` | computed |  |  | Upstream `cap_drop`. |
+| `cgroup` | `string` | computed |  |  | Upstream `cgroup`. |
+| `cgroup_parent` | `string` | computed |  |  | Upstream `cgroup_parent`. |
+| `command` | `list(string)` | computed |  |  | Upstream `command`. |
+| `configs` | `list(string)` | computed |  |  | Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cpu_count` | `number` | computed |  |  | Upstream `cpu_count`. |
+| `cpu_percent` | `number` | computed |  |  | Upstream `cpu_percent`. |
+| `cpu_period` | `number` | computed |  |  | Upstream `cpu_period`. |
+| `cpu_quota` | `number` | computed |  |  | Upstream `cpu_quota`. |
+| `cpu_rt_period` | `number` | computed |  |  | Upstream `cpu_rt_period`. |
+| `cpu_rt_runtime` | `number` | computed |  |  | Upstream `cpu_rt_runtime`. |
+| `cpu_shares` | `number` | computed |  |  | Upstream `cpu_shares`. |
+| `cpus` | `number` | computed |  |  | Upstream `cpus`. |
+| `cpuset` | `string` | computed |  |  | Upstream `cpuset`. |
+| `credential_spec` | `string` | computed |  |  | Upstream `credential_spec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `depends_on` | `map(string)` | computed |  |  | Upstream `depends_on`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `device_cgroup_rules` | `list(string)` | computed |  |  | Upstream `device_cgroup_rules`. |
+| `devices` | `list(string)` | computed |  |  | Upstream `devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `dns` | `list(string)` | computed |  |  | Upstream `dns`. |
+| `dns_opt` | `list(string)` | computed |  |  | Upstream `dns_opt`. |
+| `dns_search` | `list(string)` | computed |  |  | Upstream `dns_search`. |
+| `domainname` | `string` | computed |  |  | Upstream `domainname`. |
+| `entrypoint` | `list(string)` | computed |  |  | Upstream `entrypoint`. |
+| `env_file` | `list(string)` | computed |  | yes | Upstream `env_file`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `environment` | `map(string)` | computed |  | yes | Upstream `environment`. Sensitive. |
+| `expose` | `list(string)` | computed |  |  | Upstream `expose`. |
+| `extends` | `string` | computed |  |  | Upstream `extends`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `extra_hosts` | `map(list(string))` | computed |  |  | Upstream `extra_hosts`. |
+| `gpus` | `list(string)` | computed |  |  | Upstream `gpus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `group_add` | `list(string)` | computed |  |  | Upstream `group_add`. |
+| `healthcheck` | `object` | computed |  |  | Upstream `healthcheck`. |
+| `hostname` | `string` | computed |  |  | Upstream `hostname`. |
+| `image` | `string` | computed |  |  | Upstream `image`. |
+| `init` | `bool` | computed |  |  | Upstream `init`. |
+| `ipc` | `string` | computed |  |  | Upstream `ipc`. |
+| `isolation` | `string` | computed |  |  | Upstream `isolation`. |
+| `label_file` | `list(string)` | computed |  |  | Upstream `label_file`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `logging` | `string` | computed |  |  | Upstream `logging`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `mac_address` | `string` | computed |  |  | Upstream `mac_address`. |
+| `mem_limit` | `number` | computed |  |  | Upstream `mem_limit`. |
+| `mem_reservation` | `number` | computed |  |  | Upstream `mem_reservation`. |
+| `mem_swappiness` | `number` | computed |  |  | Upstream `mem_swappiness`. |
+| `memswap_limit` | `number` | computed |  |  | Upstream `memswap_limit`. |
+| `models` | `map(string)` | computed |  |  | Upstream `models`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `network_mode` | `string` | computed |  |  | Upstream `network_mode`. |
+| `networks` | `map(string)` | computed |  |  | Upstream `networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `oom_kill_disable` | `bool` | computed |  |  | Upstream `oom_kill_disable`. |
+| `oom_score_adj` | `number` | computed |  |  | Upstream `oom_score_adj`. |
+| `pid` | `string` | computed |  |  | Upstream `pid`. |
+| `pids_limit` | `number` | computed |  |  | Upstream `pids_limit`. |
+| `platform` | `string` | computed |  |  | Upstream `platform`. |
+| `ports` | `list(object)` | computed |  |  | Upstream `ports`. |
+| `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
+| `profiles` | `list(string)` | computed |  |  | Upstream `profiles`. |
+| `pull_policy` | `string` | computed |  |  | Upstream `pull_policy`. |
+| `pull_refresh_after` | `string` | computed |  |  | Upstream `pull_refresh_after`. |
+| `read_only` | `bool` | computed |  |  | Upstream `read_only`. |
+| `runtime` | `string` | computed |  |  | Upstream `runtime`. |
+| `secrets` | `list(string)` | computed |  | yes | Upstream `secrets`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `security_opt` | `list(string)` | computed |  |  | Upstream `security_opt`. |
+| `shm_size` | `number` | computed |  |  | Upstream `shm_size`. |
+| `stdin_open` | `bool` | computed |  |  | Upstream `stdin_open`. |
+| `stop_grace_period` | `string` | computed |  |  | Upstream `stop_grace_period`. |
+| `stop_signal` | `string` | computed |  |  | Upstream `stop_signal`. |
+| `storage_opt` | `map(string)` | computed |  |  | Upstream `storage_opt`. |
+| `sysctls` | `map(string)` | computed |  |  | Upstream `sysctls`. |
+| `tmpfs` | `list(string)` | computed |  |  | Upstream `tmpfs`. |
+| `triggers` | `string` | computed |  |  | Upstream `triggers`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `tty` | `bool` | computed |  |  | Upstream `tty`. |
+| `ulimits` | `map(string)` | computed |  |  | Upstream `ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `umask` | `string` | computed |  |  | Upstream `umask`. |
+| `use_api_socket` | `bool` | computed |  |  | Upstream `use_api_socket`. |
+| `user` | `string` | computed |  |  | Upstream `user`. |
+| `userns_mode` | `string` | computed |  |  | Upstream `userns_mode`. |
+| `uts` | `string` | computed |  |  | Upstream `uts`. |
+| `volumes` | `list(object)` | computed |  |  | Upstream `volumes`. |
+| `volumes_from` | `list(string)` | computed |  |  | Upstream `volumes_from`. |
+| `working_dir` | `string` | computed |  |  | Upstream `working_dir`. |
+
+### `project.jobs.build`
+
+nested attribute, object. Upstream `build`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `additional_contexts` | `map(string)` | computed |  |  | Upstream `additional_contexts`. |
+| `args` | `map(string)` | computed |  | yes | Upstream `args`. Sensitive. |
+| `cache_from` | `list(string)` | computed |  |  | Upstream `cache_from`. |
+| `cache_to` | `list(string)` | computed |  |  | Upstream `cache_to`. |
+| `context` | `string` | computed |  |  | Upstream `context`. |
+| `dockerfile` | `string` | computed |  |  | Upstream `dockerfile`. |
+| `dockerfile_inline` | `string` | computed |  | yes | Upstream `dockerfile_inline`. Sensitive. |
+| `entitlements` | `list(string)` | computed |  |  | Upstream `entitlements`. |
+| `extra_hosts` | `map(list(string))` | computed |  |  | Upstream `extra_hosts`. |
+| `isolation` | `string` | computed |  |  | Upstream `isolation`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `network` | `string` | computed |  |  | Upstream `network`. |
+| `no_cache` | `bool` | computed |  |  | Upstream `no_cache`. |
+| `no_cache_filter` | `list(string)` | computed |  |  | Upstream `no_cache_filter`. |
+| `platforms` | `list(string)` | computed |  |  | Upstream `platforms`. |
+| `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
+| `provenance` | `bool` | computed |  |  | Upstream `provenance`. |
+| `pull` | `bool` | computed |  |  | Upstream `pull`. |
+| `sbom` | `bool` | computed |  |  | Upstream `sbom`. |
+| `secrets` | `list(object)` | computed |  | yes | Upstream `secrets`. Sensitive. |
+| `shm_size` | `number` | computed |  |  | Upstream `shm_size`. |
+| `ssh` | `map(string)` | computed |  | yes | Upstream `ssh`. Sensitive. |
+| `tags` | `list(string)` | computed |  |  | Upstream `tags`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+| `ulimits` | `map(object)` | computed |  |  | Upstream `ulimits`. |
+
+### `project.jobs.build.secrets`
+
+nested attribute, list(object). Upstream `secrets`. Sensitive.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  | yes | Upstream `gid`. |
+| `mode` | `number` | computed |  | yes | Upstream `mode`. |
+| `source` | `string` | computed |  | yes | Upstream `source`. |
+| `target` | `string` | computed |  | yes | Upstream `target`. |
+| `uid` | `string` | computed |  | yes | Upstream `uid`. |
+
+### `project.jobs.build.ulimits`
+
+nested attribute, map(object). Upstream `ulimits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `hard` | `number` | computed |  |  | Upstream `hard`. |
+| `soft` | `number` | computed |  |  | Upstream `soft`. |
+
+### `project.jobs.healthcheck`
+
+nested attribute, object. Upstream `healthcheck`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `disable` | `bool` | computed |  |  | Upstream `disable`. |
+| `interval` | `string` | computed |  |  | Upstream `interval`. |
+| `retries` | `number` | computed |  |  | Upstream `retries`. |
+| `start_interval` | `string` | computed |  |  | Upstream `start_interval`. |
+| `start_period` | `string` | computed |  |  | Upstream `start_period`. |
+| `test` | `list(string)` | computed |  |  | Upstream `test`. |
+| `timeout` | `string` | computed |  |  | Upstream `timeout`. |
+
+### `project.jobs.ports`
+
+nested attribute, list(object). Upstream `ports`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `app_protocol` | `string` | computed |  |  | Upstream `app_protocol`. |
+| `host_ip` | `string` | computed |  |  | Upstream `host_ip`. |
+| `mode` | `string` | computed |  |  | Upstream `mode`. |
+| `name` | `string` | computed |  |  | Upstream `name`. |
+| `protocol` | `string` | computed |  |  | Upstream `protocol`. |
+| `published` | `number` | computed |  |  | Upstream `published`. |
+| `target` | `number` | computed |  |  | Upstream `target`. |
+
+### `project.jobs.volumes`
+
+nested attribute, list(object). Upstream `volumes`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `bind` | `object` | computed |  |  | Upstream `bind`. |
+| `consistency` | `string` | computed |  |  | Upstream `consistency`. |
+| `image` | `object` | computed |  |  | Upstream `image`. |
+| `read_only` | `bool` | computed |  |  | Upstream `read_only`. |
+| `source` | `string` | computed |  |  | Upstream `source`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+| `tmpfs` | `object` | computed |  |  | Upstream `tmpfs`. |
+| `type` | `string` | computed |  |  | Upstream `type`. |
+| `volume` | `object` | computed |  |  | Upstream `volume`. |
+
+### `project.jobs.volumes.bind`
+
+nested attribute, object. Upstream `bind`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `create_host_path` | `bool` | computed |  |  | Upstream `create_host_path`. |
+| `propagation` | `string` | computed |  |  | Upstream `propagation`. |
+| `recursive` | `string` | computed |  |  | Upstream `recursive`. |
+| `selinux` | `string` | computed |  |  | Upstream `selinux`. |
+
+### `project.jobs.volumes.image`
+
+nested attribute, object. Upstream `image`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `subpath` | `string` | computed |  |  | Upstream `subpath`. |
+
+### `project.jobs.volumes.tmpfs`
+
+nested attribute, object. Upstream `tmpfs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `number` | computed |  |  | Upstream `mode`. |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+
+### `project.jobs.volumes.volume`
+
+nested attribute, object. Upstream `volume`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `nocopy` | `bool` | computed |  |  | Upstream `nocopy`. |
+| `subpath` | `string` | computed |  |  | Upstream `subpath`. |
+
+### `project.models`
+
+nested attribute, map(object). Upstream `models`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `context_size` | `number` | computed |  |  | Upstream `context_size`. |
+| `model` | `string` | computed |  |  | Upstream `model`. |
+| `name` | `string` | computed |  |  | Upstream `name`. |
+| `runtime_flags` | `list(string)` | computed |  |  | Upstream `runtime_flags`. |
+
+### `project.networks`
+
+nested attribute, map(object). Upstream `networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `attachable` | `bool` | computed |  |  | Upstream `attachable`. |
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `driver_opts`. |
+| `enable_ipv4` | `bool` | computed |  |  | Upstream `enable_ipv4`. |
+| `enable_ipv6` | `bool` | computed |  |  | Upstream `enable_ipv6`. |
+| `external` | `bool` | computed |  |  | Upstream `external`. |
+| `internal` | `bool` | computed |  |  | Upstream `internal`. |
+| `ipam` | `object` | computed |  |  | Upstream `ipam`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `name` | `string` | computed |  |  | Upstream `name`. |
+
+### `project.networks.ipam`
+
+nested attribute, object. Upstream `ipam`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `list(string)` | computed |  |  | Upstream `config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `options`. |
+
+### `project.secrets`
+
+nested attribute, map(object). Upstream `secrets`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `driver_opts`. |
+| `environment` | `string` | computed |  | yes | Upstream `environment`. Sensitive. |
+| `external` | `bool` | computed |  |  | Upstream `external`. |
+| `file` | `string` | computed |  |  | Upstream `file`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `name` | `string` | computed |  |  | Upstream `name`. |
+| `template_driver` | `string` | computed |  |  | Upstream `template_driver`. |
+
+### `project.services`
+
+nested attribute, map(object). Upstream `services`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `attach` | `bool` | computed |  |  | Upstream `attach`. |
+| `blkio_config` | `string` | computed |  |  | Upstream `blkio_config`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `build` | `object` | computed |  |  | Upstream `build`. |
+| `cap_add` | `list(string)` | computed |  |  | Upstream `cap_add`. |
+| `cap_drop` | `list(string)` | computed |  |  | Upstream `cap_drop`. |
+| `cgroup` | `string` | computed |  |  | Upstream `cgroup`. |
+| `cgroup_parent` | `string` | computed |  |  | Upstream `cgroup_parent`. |
+| `command` | `list(string)` | computed |  |  | Upstream `command`. |
+| `configs` | `list(string)` | computed |  |  | Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `container_name` | `string` | computed |  |  | Upstream `container_name`. |
+| `cpu_count` | `number` | computed |  |  | Upstream `cpu_count`. |
+| `cpu_percent` | `number` | computed |  |  | Upstream `cpu_percent`. |
+| `cpu_period` | `number` | computed |  |  | Upstream `cpu_period`. |
+| `cpu_quota` | `number` | computed |  |  | Upstream `cpu_quota`. |
+| `cpu_rt_period` | `number` | computed |  |  | Upstream `cpu_rt_period`. |
+| `cpu_rt_runtime` | `number` | computed |  |  | Upstream `cpu_rt_runtime`. |
+| `cpu_shares` | `number` | computed |  |  | Upstream `cpu_shares`. |
+| `cpus` | `number` | computed |  |  | Upstream `cpus`. |
+| `cpuset` | `string` | computed |  |  | Upstream `cpuset`. |
+| `credential_spec` | `string` | computed |  |  | Upstream `credential_spec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `depends_on` | `map(string)` | computed |  |  | Upstream `depends_on`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `deploy` | `object` | computed |  |  | Upstream `deploy`. |
+| `develop` | `string` | computed |  |  | Upstream `develop`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `device_cgroup_rules` | `list(string)` | computed |  |  | Upstream `device_cgroup_rules`. |
+| `devices` | `list(string)` | computed |  |  | Upstream `devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `dns` | `list(string)` | computed |  |  | Upstream `dns`. |
+| `dns_opt` | `list(string)` | computed |  |  | Upstream `dns_opt`. |
+| `dns_search` | `list(string)` | computed |  |  | Upstream `dns_search`. |
+| `domainname` | `string` | computed |  |  | Upstream `domainname`. |
+| `entrypoint` | `list(string)` | computed |  |  | Upstream `entrypoint`. |
+| `env_file` | `list(string)` | computed |  | yes | Upstream `env_file`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `environment` | `map(string)` | computed |  | yes | Upstream `environment`. Sensitive. |
+| `expose` | `list(string)` | computed |  |  | Upstream `expose`. |
+| `extends` | `string` | computed |  |  | Upstream `extends`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `external_links` | `list(string)` | computed |  |  | Upstream `external_links`. |
+| `extra_hosts` | `map(list(string))` | computed |  |  | Upstream `extra_hosts`. |
+| `gpus` | `list(string)` | computed |  |  | Upstream `gpus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `group_add` | `list(string)` | computed |  |  | Upstream `group_add`. |
+| `healthcheck` | `object` | computed |  |  | Upstream `healthcheck`. |
+| `hostname` | `string` | computed |  |  | Upstream `hostname`. |
+| `image` | `string` | computed |  |  | Upstream `image`. |
+| `init` | `bool` | computed |  |  | Upstream `init`. |
+| `ipc` | `string` | computed |  |  | Upstream `ipc`. |
+| `isolation` | `string` | computed |  |  | Upstream `isolation`. |
+| `label_file` | `list(string)` | computed |  |  | Upstream `label_file`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `links` | `list(string)` | computed |  |  | Upstream `links`. |
+| `logging` | `string` | computed |  |  | Upstream `logging`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `mac_address` | `string` | computed |  |  | Upstream `mac_address`. |
+| `mem_limit` | `number` | computed |  |  | Upstream `mem_limit`. |
+| `mem_reservation` | `number` | computed |  |  | Upstream `mem_reservation`. |
+| `mem_swappiness` | `number` | computed |  |  | Upstream `mem_swappiness`. |
+| `memswap_limit` | `number` | computed |  |  | Upstream `memswap_limit`. |
+| `models` | `map(string)` | computed |  |  | Upstream `models`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `network_mode` | `string` | computed |  |  | Upstream `network_mode`. |
+| `networks` | `map(string)` | computed |  |  | Upstream `networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `oom_kill_disable` | `bool` | computed |  |  | Upstream `oom_kill_disable`. |
+| `oom_score_adj` | `number` | computed |  |  | Upstream `oom_score_adj`. |
+| `pid` | `string` | computed |  |  | Upstream `pid`. |
+| `pids_limit` | `number` | computed |  |  | Upstream `pids_limit`. |
+| `platform` | `string` | computed |  |  | Upstream `platform`. |
+| `ports` | `list(object)` | computed |  |  | Upstream `ports`. |
+| `post_start` | `list(string)` | computed |  |  | Upstream `post_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `pre_start` | `list(string)` | computed |  |  | Upstream `pre_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `pre_stop` | `list(string)` | computed |  |  | Upstream `pre_stop`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
+| `profiles` | `list(string)` | computed |  |  | Upstream `profiles`. |
+| `provider` | `string` | computed |  |  | Upstream `provider`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `pull_policy` | `string` | computed |  |  | Upstream `pull_policy`. |
+| `pull_refresh_after` | `string` | computed |  |  | Upstream `pull_refresh_after`. |
+| `read_only` | `bool` | computed |  |  | Upstream `read_only`. |
+| `restart` | `string` | computed |  |  | Upstream `restart`. |
+| `runtime` | `string` | computed |  |  | Upstream `runtime`. |
+| `scale` | `number` | computed |  |  | Upstream `scale`. |
+| `secrets` | `list(string)` | computed |  | yes | Upstream `secrets`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `security_opt` | `list(string)` | computed |  |  | Upstream `security_opt`. |
+| `shm_size` | `number` | computed |  |  | Upstream `shm_size`. |
+| `stdin_open` | `bool` | computed |  |  | Upstream `stdin_open`. |
+| `stop_grace_period` | `string` | computed |  |  | Upstream `stop_grace_period`. |
+| `stop_signal` | `string` | computed |  |  | Upstream `stop_signal`. |
+| `storage_opt` | `map(string)` | computed |  |  | Upstream `storage_opt`. |
+| `sysctls` | `map(string)` | computed |  |  | Upstream `sysctls`. |
+| `tmpfs` | `list(string)` | computed |  |  | Upstream `tmpfs`. |
+| `tty` | `bool` | computed |  |  | Upstream `tty`. |
+| `ulimits` | `map(string)` | computed |  |  | Upstream `ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `umask` | `string` | computed |  |  | Upstream `umask`. |
+| `use_api_socket` | `bool` | computed |  |  | Upstream `use_api_socket`. |
+| `user` | `string` | computed |  |  | Upstream `user`. |
+| `userns_mode` | `string` | computed |  |  | Upstream `userns_mode`. |
+| `uts` | `string` | computed |  |  | Upstream `uts`. |
+| `volumes` | `list(object)` | computed |  |  | Upstream `volumes`. |
+| `volumes_from` | `list(string)` | computed |  |  | Upstream `volumes_from`. |
+| `working_dir` | `string` | computed |  |  | Upstream `working_dir`. |
+
+### `project.services.build`
+
+nested attribute, object. Upstream `build`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `additional_contexts` | `map(string)` | computed |  |  | Upstream `additional_contexts`. |
+| `args` | `map(string)` | computed |  | yes | Upstream `args`. Sensitive. |
+| `cache_from` | `list(string)` | computed |  |  | Upstream `cache_from`. |
+| `cache_to` | `list(string)` | computed |  |  | Upstream `cache_to`. |
+| `context` | `string` | computed |  |  | Upstream `context`. |
+| `dockerfile` | `string` | computed |  |  | Upstream `dockerfile`. |
+| `dockerfile_inline` | `string` | computed |  | yes | Upstream `dockerfile_inline`. Sensitive. |
+| `entitlements` | `list(string)` | computed |  |  | Upstream `entitlements`. |
+| `extra_hosts` | `map(list(string))` | computed |  |  | Upstream `extra_hosts`. |
+| `isolation` | `string` | computed |  |  | Upstream `isolation`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `network` | `string` | computed |  |  | Upstream `network`. |
+| `no_cache` | `bool` | computed |  |  | Upstream `no_cache`. |
+| `no_cache_filter` | `list(string)` | computed |  |  | Upstream `no_cache_filter`. |
+| `platforms` | `list(string)` | computed |  |  | Upstream `platforms`. |
+| `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
+| `provenance` | `bool` | computed |  |  | Upstream `provenance`. |
+| `pull` | `bool` | computed |  |  | Upstream `pull`. |
+| `sbom` | `bool` | computed |  |  | Upstream `sbom`. |
+| `secrets` | `list(object)` | computed |  | yes | Upstream `secrets`. Sensitive. |
+| `shm_size` | `number` | computed |  |  | Upstream `shm_size`. |
+| `ssh` | `map(string)` | computed |  | yes | Upstream `ssh`. Sensitive. |
+| `tags` | `list(string)` | computed |  |  | Upstream `tags`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+| `ulimits` | `map(object)` | computed |  |  | Upstream `ulimits`. |
+
+### `project.services.build.secrets`
+
+nested attribute, list(object). Upstream `secrets`. Sensitive.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  | yes | Upstream `gid`. |
+| `mode` | `number` | computed |  | yes | Upstream `mode`. |
+| `source` | `string` | computed |  | yes | Upstream `source`. |
+| `target` | `string` | computed |  | yes | Upstream `target`. |
+| `uid` | `string` | computed |  | yes | Upstream `uid`. |
+
+### `project.services.build.ulimits`
+
+nested attribute, map(object). Upstream `ulimits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `hard` | `number` | computed |  |  | Upstream `hard`. |
+| `soft` | `number` | computed |  |  | Upstream `soft`. |
+
+### `project.services.deploy`
+
+nested attribute, object. Upstream `deploy`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `endpoint_mode` | `string` | computed |  |  | Upstream `endpoint_mode`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `mode` | `string` | computed |  |  | Upstream `mode`. |
+| `placement` | `object` | computed |  |  | Upstream `placement`. |
+| `replicas` | `number` | computed |  |  | Upstream `replicas`. |
+| `resources` | `object` | computed |  |  | Upstream `resources`. |
+| `restart_policy` | `object` | computed |  |  | Upstream `restart_policy`. |
+| `rollback_config` | `object` | computed |  |  | Upstream `rollback_config`. |
+| `update_config` | `object` | computed |  |  | Upstream `update_config`. |
+
+### `project.services.deploy.placement`
+
+nested attribute, object. Upstream `placement`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `constraints` | `list(string)` | computed |  |  | Upstream `constraints`. |
+| `max_replicas_per_node` | `number` | computed |  |  | Upstream `max_replicas_per_node`. |
+| `preferences` | `list(string)` | computed |  |  | Upstream `preferences`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `project.services.deploy.resources`
+
+nested attribute, object. Upstream `resources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `limits` | `string` | computed |  |  | Upstream `limits`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `reservations` | `string` | computed |  |  | Upstream `reservations`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `project.services.deploy.restart_policy`
+
+nested attribute, object. Upstream `restart_policy`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `condition` | `string` | computed |  |  | Upstream `condition`. |
+| `delay` | `string` | computed |  |  | Upstream `delay`. |
+| `max_attempts` | `number` | computed |  |  | Upstream `max_attempts`. |
+| `window` | `string` | computed |  |  | Upstream `window`. |
+
+### `project.services.deploy.rollback_config`
+
+nested attribute, object. Upstream `rollback_config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `delay` | `string` | computed |  |  | Upstream `delay`. |
+| `failure_action` | `string` | computed |  |  | Upstream `failure_action`. |
+| `max_failure_ratio` | `number` | computed |  |  | Upstream `max_failure_ratio`. |
+| `monitor` | `string` | computed |  |  | Upstream `monitor`. |
+| `order` | `string` | computed |  |  | Upstream `order`. |
+| `parallelism` | `number` | computed |  |  | Upstream `parallelism`. |
+
+### `project.services.deploy.update_config`
+
+nested attribute, object. Upstream `update_config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `delay` | `string` | computed |  |  | Upstream `delay`. |
+| `failure_action` | `string` | computed |  |  | Upstream `failure_action`. |
+| `max_failure_ratio` | `number` | computed |  |  | Upstream `max_failure_ratio`. |
+| `monitor` | `string` | computed |  |  | Upstream `monitor`. |
+| `order` | `string` | computed |  |  | Upstream `order`. |
+| `parallelism` | `number` | computed |  |  | Upstream `parallelism`. |
+
+### `project.services.healthcheck`
+
+nested attribute, object. Upstream `healthcheck`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `disable` | `bool` | computed |  |  | Upstream `disable`. |
+| `interval` | `string` | computed |  |  | Upstream `interval`. |
+| `retries` | `number` | computed |  |  | Upstream `retries`. |
+| `start_interval` | `string` | computed |  |  | Upstream `start_interval`. |
+| `start_period` | `string` | computed |  |  | Upstream `start_period`. |
+| `test` | `list(string)` | computed |  |  | Upstream `test`. |
+| `timeout` | `string` | computed |  |  | Upstream `timeout`. |
+
+### `project.services.ports`
+
+nested attribute, list(object). Upstream `ports`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `app_protocol` | `string` | computed |  |  | Upstream `app_protocol`. |
+| `host_ip` | `string` | computed |  |  | Upstream `host_ip`. |
+| `mode` | `string` | computed |  |  | Upstream `mode`. |
+| `name` | `string` | computed |  |  | Upstream `name`. |
+| `protocol` | `string` | computed |  |  | Upstream `protocol`. |
+| `published` | `number` | computed |  |  | Upstream `published`. |
+| `target` | `number` | computed |  |  | Upstream `target`. |
+
+### `project.services.volumes`
+
+nested attribute, list(object). Upstream `volumes`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `bind` | `object` | computed |  |  | Upstream `bind`. |
+| `consistency` | `string` | computed |  |  | Upstream `consistency`. |
+| `image` | `object` | computed |  |  | Upstream `image`. |
+| `read_only` | `bool` | computed |  |  | Upstream `read_only`. |
+| `source` | `string` | computed |  |  | Upstream `source`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+| `tmpfs` | `object` | computed |  |  | Upstream `tmpfs`. |
+| `type` | `string` | computed |  |  | Upstream `type`. |
+| `volume` | `object` | computed |  |  | Upstream `volume`. |
+
+### `project.services.volumes.bind`
+
+nested attribute, object. Upstream `bind`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `create_host_path` | `bool` | computed |  |  | Upstream `create_host_path`. |
+| `propagation` | `string` | computed |  |  | Upstream `propagation`. |
+| `recursive` | `string` | computed |  |  | Upstream `recursive`. |
+| `selinux` | `string` | computed |  |  | Upstream `selinux`. |
+
+### `project.services.volumes.image`
+
+nested attribute, object. Upstream `image`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `subpath` | `string` | computed |  |  | Upstream `subpath`. |
+
+### `project.services.volumes.tmpfs`
+
+nested attribute, object. Upstream `tmpfs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `number` | computed |  |  | Upstream `mode`. |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+
+### `project.services.volumes.volume`
+
+nested attribute, object. Upstream `volume`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `nocopy` | `bool` | computed |  |  | Upstream `nocopy`. |
+| `subpath` | `string` | computed |  |  | Upstream `subpath`. |
+
+### `project.volumes`
+
+nested attribute, map(object). Upstream `volumes`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `driver_opts` | `map(string)` | computed |  | yes | Upstream `driver_opts`. Sensitive. |
+| `external` | `bool` | computed |  |  | Upstream `external`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `name` | `string` | computed |  |  | Upstream `name`. |
 
 ## Example
 
@@ -34,8 +690,8 @@ A Docker Compose project applied through the Engine API, with no compose CLI plu
 # would run it: containers shop-web-1, shop-db-1, networks shop_default and a
 # shop_pgdata volume, all labelled com.docker.compose.project=shop.
 resource "docker_compose" "shop" {
-  project_name = "shop"
-  working_dir  = path.module
+  name              = "shop"
+  project_directory = path.module
 
   # Only these variables are visible to ${...} interpolation.
   env = {
@@ -76,8 +732,8 @@ resource "docker_compose" "shop" {
 
 # The same file format deployed as a Swarm stack (needs a Swarm manager).
 resource "docker_compose" "stack" {
-  project_name = "shopstack"
-  mode         = "swarm"
+  name = "shopstack"
+  mode = "swarm"
 
   content = <<-EOT
     services:
@@ -94,13 +750,23 @@ resource "docker_compose" "stack" {
 output "web_container_ids" {
   value = docker_compose.shop.services["web"]
 }
+
+# The normalized project (what `docker compose config` prints) and its hash,
+# for a downstream runner.
+output "compose_yaml_sha256" {
+  value = docker_compose.shop.content_sha256
+}
+
+output "web_image" {
+  value = docker_compose.shop.project.services["web"].image
+}
 ```
 
 ## Import
 
 ```shell
 # Import by project name (local mode) or "<project>:swarm". The next apply
-# adopts objects whose com.docker.compose.config-hash label matches the
+# adopts objects whose provider spec-hash label (or, for objects made before Pass 5, config-hash label) matches the
 # configuration and recreates the rest.
 terraform import docker_compose.shop shop
 terraform import docker_compose.stack shopstack:swarm

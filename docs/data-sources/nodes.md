@@ -3,12 +3,12 @@
 page_title: "docker_nodes Data Source - docker"
 subcategory: ""
 description: |-
-  Lists the swarm's nodes through the provider's Docker host (which must be a manager), sorted by hostname, optionally filtered by role.
+  Lists the swarm's nodes (GET /nodes) through the provider's Docker host (which must be a manager), sorted by name (the node name, else its hostname) then ID. nodes holds each Engine node object (nodes[0].description.hostname, nodes[0].status.state, nodes[0].manager_status.leader). Filter by role, name and node labels.
 ---
 
 # docker_nodes (Data Source)
 
-Lists the swarm's nodes through the provider's Docker host (which must be a manager), sorted by hostname, optionally filtered by `role`.
+Lists the swarm's nodes (`GET /nodes`) through the provider's Docker host (which must be a manager), sorted by name (the node name, else its hostname) then ID. `nodes` holds each Engine node object (`nodes[0].description.hostname`, `nodes[0].status.state`, `nodes[0].manager_status.leader`). Filter by `role`, `name` and node `labels`.
 
 ## Example Usage
 
@@ -18,7 +18,11 @@ data "docker_nodes" "managers" {
 }
 
 output "manager_hostnames" {
-  value = [for n in data.docker_nodes.managers.nodes : n.hostname]
+  value = [for n in data.docker_nodes.managers.nodes : n.description.hostname]
+}
+
+output "manager_ids" {
+  value = data.docker_nodes.managers.ids
 }
 ```
 
@@ -27,23 +31,155 @@ output "manager_hostnames" {
 
 ### Optional
 
+- `labels` (Map of String) Only objects carrying every one of these labels (Engine `node.label` filter); an empty value matches any value.
+- `name` (String) Only objects whose name matches (Engine `name` filter, a prefix/substring match).
 - `role` (String) Only list nodes with this role: `worker` or `manager`.
 
 ### Read-Only
 
-- `nodes` (Attributes List) The nodes, sorted by hostname then ID. (see [below for nested schema](#nestedatt--nodes))
+- `content_sha256` (String) SHA-256 of nodes_json; changes whenever the object changes.
+- `docker_server_version` (String) Docker Engine version of the daemon the provider talked to (GET /version Version).
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).
+- `ids` (List of String) IDs of the matching objects, in the order of `nodes`.
+- `names` (List of String) Names of the matching objects, in the order of `nodes`.
+- `nodes` (Attributes List) Every node returned by the list endpoint, each mirroring Node field by field (snake_case). (see [below for nested schema](#nestedatt--nodes))
+- `nodes_json` (String) The exact list response (JSON array of Node) as returned by the Engine API.
 
 <a id="nestedatt--nodes"></a>
 ### Nested Schema for `nodes`
 
 Read-Only:
 
-- `addr` (String) IP address the node is reached at.
-- `availability` (String) `active`, `pause` or `drain`.
-- `engine_version` (String) Docker Engine version.
-- `hostname` (String) Node hostname.
-- `id` (String) Node ID.
-- `labels` (Map of String) Node labels.
-- `leader` (Boolean) True for the raft leader.
-- `role` (String) `worker` or `manager`.
-- `state` (String) `ready`, `down`, `disconnected` or `unknown`.
+- `created_at` (String) Upstream `CreatedAt`.
+- `description` (Attributes) Upstream `Description`. (see [below for nested schema](#nestedatt--nodes--description))
+- `id` (String) Upstream `ID`.
+- `manager_status` (Attributes) Upstream `ManagerStatus`. (see [below for nested schema](#nestedatt--nodes--manager_status))
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--nodes--spec))
+- `status` (Attributes) Upstream `Status`. (see [below for nested schema](#nestedatt--nodes--status))
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--nodes--version))
+
+<a id="nestedatt--nodes--description"></a>
+### Nested Schema for `nodes.description`
+
+Read-Only:
+
+- `engine` (Attributes) Upstream `Engine`. (see [below for nested schema](#nestedatt--nodes--description--engine))
+- `hostname` (String) Upstream `Hostname`.
+- `platform` (Attributes) Upstream `Platform`. (see [below for nested schema](#nestedatt--nodes--description--platform))
+- `resources` (Attributes) Upstream `Resources`. (see [below for nested schema](#nestedatt--nodes--description--resources))
+- `tls_info` (Attributes) Upstream `TLSInfo`. (see [below for nested schema](#nestedatt--nodes--description--tls_info))
+
+<a id="nestedatt--nodes--description--engine"></a>
+### Nested Schema for `nodes.description.engine`
+
+Read-Only:
+
+- `engine_version` (String) Upstream `EngineVersion`.
+- `labels` (Map of String) Upstream `Labels`.
+- `plugins` (Attributes List) Upstream `Plugins`. (see [below for nested schema](#nestedatt--nodes--description--engine--plugins))
+
+<a id="nestedatt--nodes--description--engine--plugins"></a>
+### Nested Schema for `nodes.description.engine.plugins`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `type` (String) Upstream `Type`.
+
+
+
+<a id="nestedatt--nodes--description--platform"></a>
+### Nested Schema for `nodes.description.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `Architecture`.
+- `os` (String) Upstream `OS`.
+
+
+<a id="nestedatt--nodes--description--resources"></a>
+### Nested Schema for `nodes.description.resources`
+
+Read-Only:
+
+- `generic_resources` (Attributes List) Upstream `GenericResources`. (see [below for nested schema](#nestedatt--nodes--description--resources--generic_resources))
+- `memory_bytes` (Number) Upstream `MemoryBytes`.
+- `nano_cpus` (Number) Upstream `NanoCPUs`.
+
+<a id="nestedatt--nodes--description--resources--generic_resources"></a>
+### Nested Schema for `nodes.description.resources.generic_resources`
+
+Read-Only:
+
+- `discrete_resource_spec` (Attributes) Upstream `DiscreteResourceSpec`. (see [below for nested schema](#nestedatt--nodes--description--resources--generic_resources--discrete_resource_spec))
+- `named_resource_spec` (Attributes) Upstream `NamedResourceSpec`. (see [below for nested schema](#nestedatt--nodes--description--resources--generic_resources--named_resource_spec))
+
+<a id="nestedatt--nodes--description--resources--generic_resources--discrete_resource_spec"></a>
+### Nested Schema for `nodes.description.resources.generic_resources.discrete_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `Kind`.
+- `value` (Number) Upstream `Value`.
+
+
+<a id="nestedatt--nodes--description--resources--generic_resources--named_resource_spec"></a>
+### Nested Schema for `nodes.description.resources.generic_resources.named_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `Kind`.
+- `value` (String) Upstream `Value`.
+
+
+
+
+<a id="nestedatt--nodes--description--tls_info"></a>
+### Nested Schema for `nodes.description.tls_info`
+
+Read-Only:
+
+- `cert_issuer_public_key` (String) Upstream `CertIssuerPublicKey`.
+- `cert_issuer_subject` (String) Upstream `CertIssuerSubject`.
+- `trust_root` (String) Upstream `TrustRoot`.
+
+
+
+<a id="nestedatt--nodes--manager_status"></a>
+### Nested Schema for `nodes.manager_status`
+
+Read-Only:
+
+- `addr` (String) Upstream `Addr`.
+- `leader` (Boolean) Upstream `Leader`.
+- `reachability` (String) Upstream `Reachability`.
+
+
+<a id="nestedatt--nodes--spec"></a>
+### Nested Schema for `nodes.spec`
+
+Read-Only:
+
+- `availability` (String) Upstream `Availability`.
+- `labels` (Map of String) Upstream `Labels`.
+- `name` (String) Upstream `Name`.
+- `role` (String) Upstream `Role`.
+
+
+<a id="nestedatt--nodes--status"></a>
+### Nested Schema for `nodes.status`
+
+Read-Only:
+
+- `addr` (String) Upstream `Addr`.
+- `message` (String) Upstream `Message`.
+- `state` (String) Upstream `State`.
+
+
+<a id="nestedatt--nodes--version"></a>
+### Nested Schema for `nodes.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.

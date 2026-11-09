@@ -4,7 +4,7 @@
 
 Kind: ephemeral-resource. Back to [SKILL.md](../SKILL.md).
 
-Obtains a short-lived registry bearer token, as an ephemeral value that is never written to plan or state. The provider pings `GET /v2/` on the registry, follows its `WWW-Authenticate: Bearer` challenge to the token service and authenticates with the matching `registry_auth` entry (anonymous when none matches). Registries that use Basic auth issue no token and are an error.
+Obtains a short-lived registry bearer token, as an ephemeral value that is never written to plan or state. The provider pings `GET /v2/` on the registry, follows its `WWW-Authenticate: Bearer` challenge to the token service and authenticates with the matching `registry_auth` entry (anonymous when none matches). Registries that use Basic auth issue no token and are an error. The bearer token is `token.token`; send it as `Authorization: Bearer <token>`.
 
 Ephemeral resources need Terraform >= 1.10. Their values are never written to
 plan or state; reference them only from ephemeral contexts (write-only
@@ -26,15 +26,26 @@ ephemeral "docker_registry_token" "<name>" {
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `distribution_api_version` | `string` | computed |  |  | The registry's Docker-Distribution-API-Version header. |
 | `expires_at` | `string` | computed |  |  | RFC 3339 time the token expires. |
-| `expires_in` | `number` | computed |  |  | Token lifetime in seconds (60 when the token service does not say). |
+| `expires_in` | `number` | computed |  |  | Token lifetime in seconds (60 when the token service does not say); the same value as `token.expires_in`. |
 | `insecure_skip_verify` | `bool` | optional |  |  | Skip TLS certificate verification of the registry and token service. |
-| `issued_at` | `string` | computed |  |  | RFC 3339 time the token was issued. |
+| `issued_at` | `string` | computed |  |  | RFC 3339 time the token was issued; the same value as `token.issued_at`. |
 | `realm` | `string` | computed |  |  | Token service URL from the challenge. |
 | `registry` | `string` | required |  |  | Registry host, e.g. `ghcr.io`, `localhost:5000` or `docker.io` (Docker Hub). |
 | `scope` | `string` | optional |  |  | Token scope, e.g. `repository:org/app:pull,push`; several scopes separated by spaces. Omitted: the token carries no repository scope (enough for the catalog on some registries, or to prove the credentials). |
 | `service` | `string` | computed |  |  | Service name from the challenge. |
-| `token` | `string` | computed |  | yes | The bearer token. Send it as `Authorization: Bearer <token>`. |
+| `token` | `object` | computed |  |  | The `token` structured output. |
+
+### `token`
+
+nested attribute, object. The `token` structured output.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `expires_in` | `number` | computed |  |  | Upstream `expires_in`. |
+| `issued_at` | `string` | computed |  |  | Upstream `issued_at`. |
+| `token` | `string` | computed |  | yes | Upstream `token`. Sensitive. |
 
 ## Example
 
@@ -62,7 +73,7 @@ ephemeral "docker_registry_token" "app" {
 # write-only secret for a service that pulls from ghcr.io itself.
 resource "docker_secret" "ghcr_token" {
   name            = "ghcr-pull-token"
-  data_wo         = base64encode(ephemeral.docker_registry_token.app.token)
+  data_wo         = base64encode(ephemeral.docker_registry_token.app.token.token)
   data_wo_version = 1
 }
 ```

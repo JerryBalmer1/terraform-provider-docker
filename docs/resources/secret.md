@@ -3,12 +3,12 @@
 page_title: "docker_secret Resource - docker"
 subcategory: ""
 description: |-
-  A Swarm secret: an immutable blob the Swarm managers store encrypted and mount into service tasks under /run/secrets/<file_name>. Requires the provider to point at a Swarm manager. Swarm secrets cannot be changed after creation, so every change replaces the secret; a secret still referenced by a service cannot be removed, so change the referencing service in the same apply (or use create_before_destroy with a new name).
+  A Swarm secret: a blob the Swarm managers store encrypted and mount into service tasks under /run/secrets/<file_name>. Requires the provider to point at a Swarm manager. The content of a swarm secret cannot be changed after creation, so a content or name change replaces the secret, while labels are updated in place (SecretUpdate); a secret still referenced by a service cannot be removed, so change the referencing service in the same apply (or use create_before_destroy with a new name).
 ---
 
 # docker_secret (Resource)
 
-A Swarm secret: an immutable blob the Swarm managers store encrypted and mount into service tasks under `/run/secrets/<file_name>`. Requires the provider to point at a Swarm manager. Swarm secrets cannot be changed after creation, so every change replaces the secret; a secret still referenced by a service cannot be removed, so change the referencing service in the same apply (or use `create_before_destroy` with a new name).
+A Swarm secret: a blob the Swarm managers store encrypted and mount into service tasks under `/run/secrets/<file_name>`. Requires the provider to point at a Swarm manager. The content of a swarm secret cannot be changed after creation, so a content or name change replaces the secret, while labels are updated in place (`SecretUpdate`); a secret still referenced by a service cannot be removed, so change the referencing service in the same apply (or use `create_before_destroy` with a new name).
 
 ## Example Usage
 
@@ -17,15 +17,21 @@ resource "docker_secret" "db_password" {
   name = "db_password"
   data = base64encode("change-me")
 
+  # Labels update in place (SecretUpdate); a new data value replaces the secret.
   labels = {
     app = "shop"
   }
 }
 
+# The Engine's inspect body, e.g. for a downstream tool.
+output "db_password_secret" {
+  value = docker_secret.db_password.inspect.spec.name
+}
+
 # Terraform 1.11+: a write-only secret. The content never reaches plan or
 # state, so it can come from an ephemeral value (an `ephemeral = true`
 # variable, ephemeral.docker_exec_output, ...); bump data_wo_version to rotate
-# it (the secret is replaced, swarm secrets are immutable).
+# it (the secret is replaced: swarm secret content is immutable).
 resource "docker_secret" "api_key" {
   name            = "api_key_v1"
   data_wo         = base64encode("replace-with-an-ephemeral-value")
@@ -47,11 +53,65 @@ resource "docker_secret" "api_key" {
 - `data` (String, Sensitive) Secret content, base64-encoded (use `base64encode()`); it must decode. The daemon never returns secret data, so it is kept from state on refresh and ignored on import. Changing this forces a new resource. Exactly one of `data` and `data_wo` is required.
 - `data_wo` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Secret content as a write-only argument (Terraform 1.11+), base64-encoded (use `base64encode()`); it is never stored in plan or state, so it can come from an ephemeral value. Requires `data_wo_version`; bump the version to replace the secret with new content. Conflicts with `data`.
 - `data_wo_version` (Number) Version of `data_wo`. Terraform cannot see changes to a write-only value, so change this number whenever `data_wo` changes; changing it forces a new resource (swarm secrets and configs are immutable).
-- `labels` (Map of String) User labels on the secret. Changing this forces a new resource.
+- `labels` (Map of String) User labels on the secret. Updated in place (`SecretUpdate`); the content cannot change, so only labels can.
 
 ### Read-Only
 
+- `content_sha256` (String) SHA-256 of inspect_json; changes whenever the object changes.
+- `docker_server_version` (String) Docker Engine version of the daemon the provider talked to (GET /version Version).
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).
 - `id` (String) The Swarm secret ID.
+- `inspect` (Attributes) The secret inspect response as a nested object mirroring Secret field by field (snake_case). Not sensitive: SecretSpec.Data is write-only and never returned by SecretInspect. (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String) The exact Engine API inspect response for the secret, as JSON. Not sensitive: SecretSpec.Data is write-only and never returned by SecretInspect.
+- `version_index` (Number) The secret object's `Version.Index`; it changes when the labels are updated.
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `created_at` (String) Upstream `CreatedAt`.
+- `id` (String) Upstream `ID`.
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--inspect--spec))
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--inspect--version))
+
+<a id="nestedatt--inspect--spec"></a>
+### Nested Schema for `inspect.spec`
+
+Read-Only:
+
+- `data` (String) Upstream `Data`.
+- `driver` (Attributes) Upstream `Driver`. (see [below for nested schema](#nestedatt--inspect--spec--driver))
+- `labels` (Map of String) Upstream `Labels`.
+- `name` (String) Upstream `Name`.
+- `templating` (Attributes) Upstream `Templating`. (see [below for nested schema](#nestedatt--inspect--spec--templating))
+
+<a id="nestedatt--inspect--spec--driver"></a>
+### Nested Schema for `inspect.spec.driver`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `options` (Map of String) Upstream `Options`.
+
+
+<a id="nestedatt--inspect--spec--templating"></a>
+### Nested Schema for `inspect.spec.templating`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `options` (Map of String) Upstream `Options`.
+
+
+
+<a id="nestedatt--inspect--version"></a>
+### Nested Schema for `inspect.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.
 
 ## Import
 

@@ -3,12 +3,12 @@
 page_title: "docker_services Data Source - docker"
 subcategory: ""
 description: |-
-  Lists the swarm's services (GET /services), sorted by name; the provider's host must be a swarm manager. Filter by name, labels and mode.
+  Lists the swarm's services (GET /services), sorted by name; the provider's host must be a swarm manager. services holds each Engine service object field by field (services[0].spec.task_template.container_spec.image), services_json the raw list. Filter by name, labels and mode.
 ---
 
 # docker_services (Data Source)
 
-Lists the swarm's services (`GET /services`), sorted by name; the provider's host must be a swarm manager. Filter by `name`, `labels` and `mode`.
+Lists the swarm's services (`GET /services`), sorted by name; the provider's host must be a swarm manager. `services` holds each Engine service object field by field (`services[0].spec.task_template.container_spec.image`), `services_json` the raw list. Filter by `name`, `labels` and `mode`.
 
 ## Example Usage
 
@@ -19,7 +19,7 @@ data "docker_services" "replicated" {
 }
 
 output "replicas" {
-  value = { for s in data.docker_services.replicated.services : s.name => s.replicas }
+  value = { for s in data.docker_services.replicated.services : s.spec.name => s.spec.mode.replicated.replicas }
 }
 ```
 
@@ -28,24 +28,626 @@ output "replicas" {
 
 ### Optional
 
-- `labels` (Map of String) Only objects carrying every one of these labels; an empty value matches any value.
+- `labels` (Map of String) Only objects carrying every one of these labels (Engine `label` filter); an empty value matches any value.
 - `mode` (String) Only services in this mode: `replicated` or `global`.
 - `name` (String) Only objects whose name matches (Engine `name` filter, a prefix/substring match).
 
 ### Read-Only
 
-- `services` (Attributes List) The matching objects, sorted by name then ID. (see [below for nested schema](#nestedatt--services))
+- `content_sha256` (String) SHA-256 of services_json; changes whenever the object changes.
+- `docker_server_version` (String) Docker Engine version of the daemon the provider talked to (GET /version Version).
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).
+- `ids` (List of String) IDs of the matching objects, in the order of `services`.
+- `names` (List of String) Names of the matching objects, in the order of `services`.
+- `services` (Attributes List) Every service returned by the list endpoint, each mirroring Service field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans. (see [below for nested schema](#nestedatt--services))
+- `services_json` (String, Sensitive) The exact list response (JSON array of Service) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.
 
 <a id="nestedatt--services"></a>
 ### Nested Schema for `services`
 
 Read-Only:
 
-- `created_at` (String) RFC 3339 creation time.
-- `id` (String) Service ID.
-- `image` (String) Image of the service's tasks, as stored (usually pinned to a digest).
-- `labels` (Map of String) Service labels.
-- `mode` (String) `replicated`, `global`, `replicated-job` or `global-job`.
-- `name` (String) Service name.
-- `replicas` (Number) Desired replicas for `replicated` services; null otherwise.
-- `updated_at` (String) RFC 3339 time of the last update.
+- `created_at` (String) Upstream `CreatedAt`.
+- `endpoint` (Attributes) Upstream `Endpoint`. (see [below for nested schema](#nestedatt--services--endpoint))
+- `id` (String) Upstream `ID`.
+- `job_status` (Attributes) Upstream `JobStatus`. (see [below for nested schema](#nestedatt--services--job_status))
+- `service_status` (Attributes) Upstream `ServiceStatus`. (see [below for nested schema](#nestedatt--services--service_status))
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--services--spec))
+- `update_status` (Attributes) Upstream `UpdateStatus`. (see [below for nested schema](#nestedatt--services--update_status))
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--services--version))
+
+<a id="nestedatt--services--endpoint"></a>
+### Nested Schema for `services.endpoint`
+
+Read-Only:
+
+- `ports` (Attributes List) Upstream `Ports`. (see [below for nested schema](#nestedatt--services--endpoint--ports))
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--services--endpoint--spec))
+- `virtual_ips` (Attributes List) Upstream `VirtualIPs`. (see [below for nested schema](#nestedatt--services--endpoint--virtual_ips))
+
+<a id="nestedatt--services--endpoint--ports"></a>
+### Nested Schema for `services.endpoint.ports`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `protocol` (String) Upstream `Protocol`.
+- `publish_mode` (String) Upstream `PublishMode`.
+- `published_port` (Number) Upstream `PublishedPort`.
+- `target_port` (Number) Upstream `TargetPort`.
+
+
+<a id="nestedatt--services--endpoint--spec"></a>
+### Nested Schema for `services.endpoint.spec`
+
+Read-Only:
+
+- `mode` (String) Upstream `Mode`.
+- `ports` (Attributes List) Upstream `Ports`. (see [below for nested schema](#nestedatt--services--endpoint--spec--ports))
+
+<a id="nestedatt--services--endpoint--spec--ports"></a>
+### Nested Schema for `services.endpoint.spec.ports`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `protocol` (String) Upstream `Protocol`.
+- `publish_mode` (String) Upstream `PublishMode`.
+- `published_port` (Number) Upstream `PublishedPort`.
+- `target_port` (Number) Upstream `TargetPort`.
+
+
+
+<a id="nestedatt--services--endpoint--virtual_ips"></a>
+### Nested Schema for `services.endpoint.virtual_ips`
+
+Read-Only:
+
+- `addr` (String) Upstream `Addr`.
+- `network_id` (String) Upstream `NetworkID`.
+
+
+
+<a id="nestedatt--services--job_status"></a>
+### Nested Schema for `services.job_status`
+
+Read-Only:
+
+- `job_iteration` (Attributes) Upstream `JobIteration`. (see [below for nested schema](#nestedatt--services--job_status--job_iteration))
+- `last_execution` (String) Upstream `LastExecution`.
+
+<a id="nestedatt--services--job_status--job_iteration"></a>
+### Nested Schema for `services.job_status.job_iteration`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.
+
+
+
+<a id="nestedatt--services--service_status"></a>
+### Nested Schema for `services.service_status`
+
+Read-Only:
+
+- `completed_tasks` (Number) Upstream `CompletedTasks`.
+- `desired_tasks` (Number) Upstream `DesiredTasks`.
+- `running_tasks` (Number) Upstream `RunningTasks`.
+
+
+<a id="nestedatt--services--spec"></a>
+### Nested Schema for `services.spec`
+
+Read-Only:
+
+- `endpoint_spec` (Attributes) Upstream `EndpointSpec`. (see [below for nested schema](#nestedatt--services--spec--endpoint_spec))
+- `labels` (Map of String) Upstream `Labels`.
+- `mode` (Attributes) Upstream `Mode`. (see [below for nested schema](#nestedatt--services--spec--mode))
+- `name` (String) Upstream `Name`.
+- `networks` (Attributes List) Upstream `Networks`. (see [below for nested schema](#nestedatt--services--spec--networks))
+- `rollback_config` (Attributes) Upstream `RollbackConfig`. (see [below for nested schema](#nestedatt--services--spec--rollback_config))
+- `task_template` (Attributes) Upstream `TaskTemplate`. (see [below for nested schema](#nestedatt--services--spec--task_template))
+- `update_config` (Attributes) Upstream `UpdateConfig`. (see [below for nested schema](#nestedatt--services--spec--update_config))
+
+<a id="nestedatt--services--spec--endpoint_spec"></a>
+### Nested Schema for `services.spec.endpoint_spec`
+
+Read-Only:
+
+- `mode` (String) Upstream `Mode`.
+- `ports` (Attributes List) Upstream `Ports`. (see [below for nested schema](#nestedatt--services--spec--endpoint_spec--ports))
+
+<a id="nestedatt--services--spec--endpoint_spec--ports"></a>
+### Nested Schema for `services.spec.endpoint_spec.ports`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `protocol` (String) Upstream `Protocol`.
+- `publish_mode` (String) Upstream `PublishMode`.
+- `published_port` (Number) Upstream `PublishedPort`.
+- `target_port` (Number) Upstream `TargetPort`.
+
+
+
+<a id="nestedatt--services--spec--mode"></a>
+### Nested Schema for `services.spec.mode`
+
+Read-Only:
+
+- `global` (String) Upstream `Global`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `global_job` (String) Upstream `GlobalJob`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `replicated` (Attributes) Upstream `Replicated`. (see [below for nested schema](#nestedatt--services--spec--mode--replicated))
+- `replicated_job` (Attributes) Upstream `ReplicatedJob`. (see [below for nested schema](#nestedatt--services--spec--mode--replicated_job))
+
+<a id="nestedatt--services--spec--mode--replicated"></a>
+### Nested Schema for `services.spec.mode.replicated`
+
+Read-Only:
+
+- `replicas` (Number) Upstream `Replicas`.
+
+
+<a id="nestedatt--services--spec--mode--replicated_job"></a>
+### Nested Schema for `services.spec.mode.replicated_job`
+
+Read-Only:
+
+- `max_concurrent` (Number) Upstream `MaxConcurrent`.
+- `total_completions` (Number) Upstream `TotalCompletions`.
+
+
+
+<a id="nestedatt--services--spec--networks"></a>
+### Nested Schema for `services.spec.networks`
+
+Read-Only:
+
+- `aliases` (List of String) Upstream `Aliases`.
+- `driver_opts` (Map of String) Upstream `DriverOpts`.
+- `target` (String) Upstream `Target`.
+
+
+<a id="nestedatt--services--spec--rollback_config"></a>
+### Nested Schema for `services.spec.rollback_config`
+
+Read-Only:
+
+- `delay` (Number) Upstream `Delay`.
+- `failure_action` (String) Upstream `FailureAction`.
+- `max_failure_ratio` (Number) Upstream `MaxFailureRatio`.
+- `monitor` (Number) Upstream `Monitor`.
+- `order` (String) Upstream `Order`.
+- `parallelism` (Number) Upstream `Parallelism`.
+
+
+<a id="nestedatt--services--spec--task_template"></a>
+### Nested Schema for `services.spec.task_template`
+
+Read-Only:
+
+- `container_spec` (Attributes) Upstream `ContainerSpec`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec))
+- `force_update` (Number) Upstream `ForceUpdate`.
+- `log_driver` (Attributes) Upstream `LogDriver`. (see [below for nested schema](#nestedatt--services--spec--task_template--log_driver))
+- `network_attachment_spec` (Attributes) Upstream `NetworkAttachmentSpec`. (see [below for nested schema](#nestedatt--services--spec--task_template--network_attachment_spec))
+- `networks` (Attributes List) Upstream `Networks`. (see [below for nested schema](#nestedatt--services--spec--task_template--networks))
+- `placement` (Attributes) Upstream `Placement`. (see [below for nested schema](#nestedatt--services--spec--task_template--placement))
+- `plugin_spec` (Attributes) Upstream `PluginSpec`. (see [below for nested schema](#nestedatt--services--spec--task_template--plugin_spec))
+- `resources` (Attributes) Upstream `Resources`. (see [below for nested schema](#nestedatt--services--spec--task_template--resources))
+- `restart_policy` (Attributes) Upstream `RestartPolicy`. (see [below for nested schema](#nestedatt--services--spec--task_template--restart_policy))
+- `runtime` (String) Upstream `Runtime`.
+
+<a id="nestedatt--services--spec--task_template--container_spec"></a>
+### Nested Schema for `services.spec.task_template.container_spec`
+
+Read-Only:
+
+- `args` (List of String) Upstream `Args`.
+- `capability_add` (List of String) Upstream `CapabilityAdd`.
+- `capability_drop` (List of String) Upstream `CapabilityDrop`.
+- `command` (List of String) Upstream `Command`.
+- `configs` (Attributes List) Upstream `Configs`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--configs))
+- `dir` (String) Upstream `Dir`.
+- `dns_config` (Attributes) Upstream `DNSConfig`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--dns_config))
+- `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
+- `groups` (List of String) Upstream `Groups`.
+- `healthcheck` (Attributes) Upstream `Healthcheck`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--healthcheck))
+- `hostname` (String) Upstream `Hostname`.
+- `hosts` (List of String) Upstream `Hosts`.
+- `image` (String) Upstream `Image`.
+- `init` (Boolean) Upstream `Init`.
+- `isolation` (String) Upstream `Isolation`.
+- `labels` (Map of String) Upstream `Labels`.
+- `mounts` (Attributes List) Upstream `Mounts`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--mounts))
+- `oom_score_adj` (Number) Upstream `OomScoreAdj`.
+- `open_stdin` (Boolean) Upstream `OpenStdin`.
+- `privileges` (Attributes) Upstream `Privileges`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--privileges))
+- `read_only` (Boolean) Upstream `ReadOnly`.
+- `secrets` (Attributes List) Upstream `Secrets`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--secrets))
+- `stop_grace_period` (Number) Upstream `StopGracePeriod`.
+- `stop_signal` (String) Upstream `StopSignal`.
+- `sysctls` (Map of String) Upstream `Sysctls`.
+- `tty` (Boolean) Upstream `TTY`.
+- `ulimits` (Attributes List) Upstream `Ulimits`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--ulimits))
+- `user` (String) Upstream `User`.
+
+<a id="nestedatt--services--spec--task_template--container_spec--configs"></a>
+### Nested Schema for `services.spec.task_template.container_spec.configs`
+
+Read-Only:
+
+- `config_id` (String) Upstream `ConfigID`.
+- `config_name` (String) Upstream `ConfigName`.
+- `file` (Attributes) Upstream `File`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--configs--file))
+- `runtime` (String) Upstream `Runtime`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+
+<a id="nestedatt--services--spec--task_template--container_spec--configs--file"></a>
+### Nested Schema for `services.spec.task_template.container_spec.configs.file`
+
+Read-Only:
+
+- `gid` (String) Upstream `GID`.
+- `mode` (Number) Upstream `Mode`.
+- `name` (String) Upstream `Name`.
+- `uid` (String) Upstream `UID`.
+
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--dns_config"></a>
+### Nested Schema for `services.spec.task_template.container_spec.dns_config`
+
+Read-Only:
+
+- `nameservers` (List of String) Upstream `Nameservers`.
+- `options` (List of String) Upstream `Options`.
+- `search` (List of String) Upstream `Search`.
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--healthcheck"></a>
+### Nested Schema for `services.spec.task_template.container_spec.healthcheck`
+
+Read-Only:
+
+- `interval` (Number) Upstream `Interval`.
+- `retries` (Number) Upstream `Retries`.
+- `start_interval` (Number) Upstream `StartInterval`.
+- `start_period` (Number) Upstream `StartPeriod`.
+- `test` (List of String) Upstream `Test`.
+- `timeout` (Number) Upstream `Timeout`.
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--mounts"></a>
+### Nested Schema for `services.spec.task_template.container_spec.mounts`
+
+Read-Only:
+
+- `bind_options` (Attributes) Upstream `BindOptions`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--mounts--bind_options))
+- `consistency` (String) Upstream `Consistency`.
+- `image_options` (Attributes) Upstream `ImageOptions`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--mounts--image_options))
+- `read_only` (Boolean) Upstream `ReadOnly`.
+- `source` (String) Upstream `Source`.
+- `target` (String) Upstream `Target`.
+- `tmpfs_options` (Attributes) Upstream `TmpfsOptions`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--mounts--tmpfs_options))
+- `type` (String) Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `volume_options` (Attributes) Upstream `VolumeOptions`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--mounts--volume_options))
+
+<a id="nestedatt--services--spec--task_template--container_spec--mounts--bind_options"></a>
+### Nested Schema for `services.spec.task_template.container_spec.mounts.bind_options`
+
+Read-Only:
+
+- `create_mountpoint` (Boolean) Upstream `CreateMountpoint`.
+- `non_recursive` (Boolean) Upstream `NonRecursive`.
+- `propagation` (String) Upstream `Propagation`.
+- `read_only_force_recursive` (Boolean) Upstream `ReadOnlyForceRecursive`.
+- `read_only_non_recursive` (Boolean) Upstream `ReadOnlyNonRecursive`.
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--mounts--image_options"></a>
+### Nested Schema for `services.spec.task_template.container_spec.mounts.image_options`
+
+Read-Only:
+
+- `subpath` (String) Upstream `Subpath`.
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--mounts--tmpfs_options"></a>
+### Nested Schema for `services.spec.task_template.container_spec.mounts.tmpfs_options`
+
+Read-Only:
+
+- `mode` (Number) Upstream `Mode`.
+- `options` (List of List of String) Upstream `Options`.
+- `size_bytes` (Number) Upstream `SizeBytes`.
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--mounts--volume_options"></a>
+### Nested Schema for `services.spec.task_template.container_spec.mounts.volume_options`
+
+Read-Only:
+
+- `driver_config` (Attributes) Upstream `DriverConfig`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--mounts--volume_options--driver_config))
+- `labels` (Map of String) Upstream `Labels`.
+- `no_copy` (Boolean) Upstream `NoCopy`.
+- `subpath` (String) Upstream `Subpath`.
+
+<a id="nestedatt--services--spec--task_template--container_spec--mounts--volume_options--driver_config"></a>
+### Nested Schema for `services.spec.task_template.container_spec.mounts.volume_options.driver_config`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `options` (Map of String, Sensitive) Upstream `Options`. Sensitive.
+
+
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--privileges"></a>
+### Nested Schema for `services.spec.task_template.container_spec.privileges`
+
+Read-Only:
+
+- `app_armor` (Attributes) Upstream `AppArmor`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--privileges--app_armor))
+- `credential_spec` (Attributes) Upstream `CredentialSpec`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--privileges--credential_spec))
+- `no_new_privileges` (Boolean) Upstream `NoNewPrivileges`.
+- `seccomp` (Attributes) Upstream `Seccomp`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--privileges--seccomp))
+- `selinux_context` (Attributes) Upstream `SELinuxContext`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--privileges--selinux_context))
+
+<a id="nestedatt--services--spec--task_template--container_spec--privileges--app_armor"></a>
+### Nested Schema for `services.spec.task_template.container_spec.privileges.app_armor`
+
+Read-Only:
+
+- `mode` (String) Upstream `Mode`.
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--privileges--credential_spec"></a>
+### Nested Schema for `services.spec.task_template.container_spec.privileges.credential_spec`
+
+Read-Only:
+
+- `config` (String) Upstream `Config`.
+- `file` (String) Upstream `File`.
+- `registry` (String) Upstream `Registry`.
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--privileges--seccomp"></a>
+### Nested Schema for `services.spec.task_template.container_spec.privileges.seccomp`
+
+Read-Only:
+
+- `mode` (String) Upstream `Mode`.
+- `profile` (String) Upstream `Profile`.
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--privileges--selinux_context"></a>
+### Nested Schema for `services.spec.task_template.container_spec.privileges.selinux_context`
+
+Read-Only:
+
+- `disable` (Boolean) Upstream `Disable`.
+- `level` (String) Upstream `Level`.
+- `role` (String) Upstream `Role`.
+- `type` (String) Upstream `Type`.
+- `user` (String) Upstream `User`.
+
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--secrets"></a>
+### Nested Schema for `services.spec.task_template.container_spec.secrets`
+
+Read-Only:
+
+- `file` (Attributes) Upstream `File`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--secrets--file))
+- `secret_id` (String) Upstream `SecretID`.
+- `secret_name` (String) Upstream `SecretName`.
+
+<a id="nestedatt--services--spec--task_template--container_spec--secrets--file"></a>
+### Nested Schema for `services.spec.task_template.container_spec.secrets.file`
+
+Read-Only:
+
+- `gid` (String) Upstream `GID`.
+- `mode` (Number) Upstream `Mode`.
+- `name` (String) Upstream `Name`.
+- `uid` (String) Upstream `UID`.
+
+
+
+<a id="nestedatt--services--spec--task_template--container_spec--ulimits"></a>
+### Nested Schema for `services.spec.task_template.container_spec.ulimits`
+
+Read-Only:
+
+- `hard` (Number) Upstream `Hard`.
+- `name` (String) Upstream `Name`.
+- `soft` (Number) Upstream `Soft`.
+
+
+
+<a id="nestedatt--services--spec--task_template--log_driver"></a>
+### Nested Schema for `services.spec.task_template.log_driver`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `options` (Map of String) Upstream `Options`.
+
+
+<a id="nestedatt--services--spec--task_template--network_attachment_spec"></a>
+### Nested Schema for `services.spec.task_template.network_attachment_spec`
+
+Read-Only:
+
+- `container_id` (String) Upstream `ContainerID`.
+
+
+<a id="nestedatt--services--spec--task_template--networks"></a>
+### Nested Schema for `services.spec.task_template.networks`
+
+Read-Only:
+
+- `aliases` (List of String) Upstream `Aliases`.
+- `driver_opts` (Map of String) Upstream `DriverOpts`.
+- `target` (String) Upstream `Target`.
+
+
+<a id="nestedatt--services--spec--task_template--placement"></a>
+### Nested Schema for `services.spec.task_template.placement`
+
+Read-Only:
+
+- `constraints` (List of String) Upstream `Constraints`.
+- `max_replicas` (Number) Upstream `MaxReplicas`.
+- `platforms` (Attributes List) Upstream `Platforms`. (see [below for nested schema](#nestedatt--services--spec--task_template--placement--platforms))
+- `preferences` (Attributes List) Upstream `Preferences`. (see [below for nested schema](#nestedatt--services--spec--task_template--placement--preferences))
+
+<a id="nestedatt--services--spec--task_template--placement--platforms"></a>
+### Nested Schema for `services.spec.task_template.placement.platforms`
+
+Read-Only:
+
+- `architecture` (String) Upstream `Architecture`.
+- `os` (String) Upstream `OS`.
+
+
+<a id="nestedatt--services--spec--task_template--placement--preferences"></a>
+### Nested Schema for `services.spec.task_template.placement.preferences`
+
+Read-Only:
+
+- `spread` (Attributes) Upstream `Spread`. (see [below for nested schema](#nestedatt--services--spec--task_template--placement--preferences--spread))
+
+<a id="nestedatt--services--spec--task_template--placement--preferences--spread"></a>
+### Nested Schema for `services.spec.task_template.placement.preferences.spread`
+
+Read-Only:
+
+- `spread_descriptor` (String) Upstream `SpreadDescriptor`.
+
+
+
+
+<a id="nestedatt--services--spec--task_template--plugin_spec"></a>
+### Nested Schema for `services.spec.task_template.plugin_spec`
+
+Read-Only:
+
+- `disabled` (Boolean) Upstream `Disabled`.
+- `name` (String) Upstream `Name`.
+- `plugin_privilege` (Attributes List) Upstream `PluginPrivilege`. (see [below for nested schema](#nestedatt--services--spec--task_template--plugin_spec--plugin_privilege))
+- `remote` (String) Upstream `Remote`.
+
+<a id="nestedatt--services--spec--task_template--plugin_spec--plugin_privilege"></a>
+### Nested Schema for `services.spec.task_template.plugin_spec.plugin_privilege`
+
+Read-Only:
+
+- `description` (String) Upstream `Description`.
+- `name` (String) Upstream `Name`.
+- `value` (List of String) Upstream `Value`.
+
+
+
+<a id="nestedatt--services--spec--task_template--resources"></a>
+### Nested Schema for `services.spec.task_template.resources`
+
+Read-Only:
+
+- `limits` (Attributes) Upstream `Limits`. (see [below for nested schema](#nestedatt--services--spec--task_template--resources--limits))
+- `memory_swappiness` (Number) Upstream `MemorySwappiness`.
+- `reservations` (Attributes) Upstream `Reservations`. (see [below for nested schema](#nestedatt--services--spec--task_template--resources--reservations))
+- `swap_bytes` (Number) Upstream `SwapBytes`.
+
+<a id="nestedatt--services--spec--task_template--resources--limits"></a>
+### Nested Schema for `services.spec.task_template.resources.limits`
+
+Read-Only:
+
+- `memory_bytes` (Number) Upstream `MemoryBytes`.
+- `nano_cpus` (Number) Upstream `NanoCPUs`.
+- `pids` (Number) Upstream `Pids`.
+
+
+<a id="nestedatt--services--spec--task_template--resources--reservations"></a>
+### Nested Schema for `services.spec.task_template.resources.reservations`
+
+Read-Only:
+
+- `generic_resources` (Attributes List) Upstream `GenericResources`. (see [below for nested schema](#nestedatt--services--spec--task_template--resources--reservations--generic_resources))
+- `memory_bytes` (Number) Upstream `MemoryBytes`.
+- `nano_cpus` (Number) Upstream `NanoCPUs`.
+
+<a id="nestedatt--services--spec--task_template--resources--reservations--generic_resources"></a>
+### Nested Schema for `services.spec.task_template.resources.reservations.generic_resources`
+
+Read-Only:
+
+- `discrete_resource_spec` (Attributes) Upstream `DiscreteResourceSpec`. (see [below for nested schema](#nestedatt--services--spec--task_template--resources--reservations--generic_resources--discrete_resource_spec))
+- `named_resource_spec` (Attributes) Upstream `NamedResourceSpec`. (see [below for nested schema](#nestedatt--services--spec--task_template--resources--reservations--generic_resources--named_resource_spec))
+
+<a id="nestedatt--services--spec--task_template--resources--reservations--generic_resources--discrete_resource_spec"></a>
+### Nested Schema for `services.spec.task_template.resources.reservations.generic_resources.discrete_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `Kind`.
+- `value` (Number) Upstream `Value`.
+
+
+<a id="nestedatt--services--spec--task_template--resources--reservations--generic_resources--named_resource_spec"></a>
+### Nested Schema for `services.spec.task_template.resources.reservations.generic_resources.named_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `Kind`.
+- `value` (String) Upstream `Value`.
+
+
+
+
+
+<a id="nestedatt--services--spec--task_template--restart_policy"></a>
+### Nested Schema for `services.spec.task_template.restart_policy`
+
+Read-Only:
+
+- `condition` (String) Upstream `Condition`.
+- `delay` (Number) Upstream `Delay`.
+- `max_attempts` (Number) Upstream `MaxAttempts`.
+- `window` (Number) Upstream `Window`.
+
+
+
+<a id="nestedatt--services--spec--update_config"></a>
+### Nested Schema for `services.spec.update_config`
+
+Read-Only:
+
+- `delay` (Number) Upstream `Delay`.
+- `failure_action` (String) Upstream `FailureAction`.
+- `max_failure_ratio` (Number) Upstream `MaxFailureRatio`.
+- `monitor` (Number) Upstream `Monitor`.
+- `order` (String) Upstream `Order`.
+- `parallelism` (Number) Upstream `Parallelism`.
+
+
+
+<a id="nestedatt--services--update_status"></a>
+### Nested Schema for `services.update_status`
+
+Read-Only:
+
+- `completed_at` (String) Upstream `CompletedAt`.
+- `message` (String) Upstream `Message`.
+- `started_at` (String) Upstream `StartedAt`.
+- `state` (String) Upstream `State`.
+
+
+<a id="nestedatt--services--version"></a>
+### Nested Schema for `services.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.

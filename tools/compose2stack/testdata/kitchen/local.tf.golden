@@ -1,0 +1,91 @@
+# converted from testdata/kitchen/compose.yml
+# by tools/compose2stack -mode local (project "kitchen")
+
+resource "docker_network" "core" {
+  name        = "kitchen_core"
+  enable_ipv6 = true
+  labels = {
+    "com.docker.compose.network" = "core"
+    "com.docker.compose.project" = "kitchen"
+  }
+  ipam_config {
+    subnet = "172.28.0.0/16"
+  }
+}
+
+resource "docker_volume" "blobs" {
+  name   = "kitchen_blobs"
+  driver = "local"
+  driver_opts = {
+    type = "none"
+  }
+  labels = {
+    "com.docker.compose.project" = "kitchen"
+    "com.docker.compose.volume"  = "blobs"
+  }
+}
+
+resource "docker_container" "api" {
+  name  = "kitchen-api-1"
+  image = "example/api:2.1"
+  labels = {
+    "com.docker.compose.container-number" = "1"
+    "com.docker.compose.project"          = "kitchen"
+    "com.docker.compose.service"          = "api"
+  }
+  read_only           = true
+  stop_signal         = "SIGINT"
+  restart             = "on-failure"
+  maximum_retry_count = 3
+  dns                 = ["10.0.0.2"]
+  dns_search          = ["corp.example"]
+  logging {
+    driver = "json-file"
+    options = {
+      max-size = "10m"
+    }
+  }
+  ipc_mode           = "shareable"
+  shm_size           = 134217728
+  dns_options        = ["ndots:2"]
+  memory_reservation = 67108864
+  init               = true
+  group_add          = ["audio"]
+  cap_add            = ["NET_ADMIN"]
+  cap_drop           = ["MKNOD"]
+  devices {
+    path_on_host       = "/dev/fuse"
+    cgroup_permissions = "rwm"
+  }
+  mounts {
+    type = "tmpfs"
+    tmpfs_options {
+      size_bytes = 67108864
+    }
+    target = "/cache"
+  }
+  mounts {
+    type   = "volume"
+    source = docker_volume.blobs.name
+    target = "/blobs"
+  }
+  networks = {
+    (docker_network.core.name) = {
+      ipv4_address = "172.28.0.10"
+      aliases      = ["api", "api.internal"]
+    }
+    "shared_edge" = {
+      aliases = ["api"]
+    }
+  }
+  ports {
+    container_port = 8443
+    host_port      = 443
+    host_ip        = "0.0.0.0"
+  }
+  ports {
+    container_port = 53
+    host_port      = 5353
+    protocol       = "udp"
+  }
+}

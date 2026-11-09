@@ -42,9 +42,10 @@ resource "docker_container" "cache" {
   healthcheck {
     test = ["CMD", "redis-cli", "ping"]
   }
-  networks_advanced {
-    name    = docker_network.back.name
-    aliases = ["cache"]
+  networks = {
+    (docker_network.back.name) = {
+      aliases = ["cache"]
+    }
   }
   ulimits {
     name = "nofile"
@@ -84,9 +85,10 @@ resource "docker_container" "db" {
     read_only = true
   }
   # TODO: secret api_key (from environment API_KEY) cannot be mounted by docker_container: only file-backed secrets can (or use docker_compose / -mode swarm)
-  networks_advanced {
-    name    = docker_network.back.name
-    aliases = ["db"]
+  networks = {
+    (docker_network.back.name) = {
+      aliases = ["db"]
+    }
   }
 }
 
@@ -125,16 +127,16 @@ resource "docker_container" "web" {
     read_only = true
   }
   # TODO: config banner (from content) cannot be mounted by docker_container: only file-backed configs can (or use docker_compose / -mode swarm)
-  networks_advanced {
-    name    = docker_network.back.name
-    aliases = ["web"]
-  }
-  networks_advanced {
-    name    = docker_network.front.name
-    aliases = ["web"]
+  networks = {
+    (docker_network.back.name) = {
+      aliases = ["web"]
+    }
+    (docker_network.front.name) = {
+      aliases = ["web"]
+    }
   }
   ports {
-    internal = 80
-    external = 8080
+    container_port = 80
+    host_port      = 8080
   }
 }

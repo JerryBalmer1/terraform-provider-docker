@@ -4,7 +4,7 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-Initializes a Docker Swarm on the provider's Docker host (`docker swarm init` through the Engine API), making that daemon the first manager. Exposes the cluster ID and the worker/manager join tokens for `docker_swarm_node`. Destroying the resource makes the host leave the swarm with force, which dissolves a single-manager swarm.
+Initializes a Docker Swarm on the provider's Docker host (`docker swarm init` through the Engine API), making that daemon the first manager. Exposes the cluster ID and the worker/manager join tokens for `docker_swarm_node`. The spec settings `docker swarm update` changes (`labels`, `autolock`, `orchestration`, `raft`, `dispatcher`, `ca_config`) are set at init and updated in place. `id` is the cluster ID (`ClusterInfo.ID`, also `cluster_id`); `inspect` holds the whole Engine swarm object. Destroying the resource makes the host leave the swarm with force, which dissolves a single-manager swarm.
 
 ## Arguments and attributes
 
@@ -12,17 +12,198 @@ Initializes a Docker Swarm on the provider's Docker host (`docker swarm init` th
 |---|---|---|---|---|---|
 | `advertise_addr` | `string` | optional | yes |  | Address advertised to other nodes, as `<ip\|interface>[:port]`, e.g. `10.0.0.5` or `eth0:2377`. Needed when the host has several addresses. The daemon does not report it back, so the configured value is kept. Changing this forces a new resource. |
 | `autolock` | `bool` | optional, computed |  |  | Enable manager autolock: managers need `unlock_key` after a daemon restart. Updated in place through SwarmUpdate. |
+| `ca_config` | `object` | optional |  |  | CA settings (`Spec.CAConfig`). Updated in place (SwarmUpdate); rotate the root CA with `docker_swarm_rotate_ca`. |
 | `cluster_id` | `string` | computed |  |  | Swarm cluster ID reported by SwarmInspect. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json; changes whenever the object changes. |
 | `data_path_port` | `number` | optional, computed | yes |  | UDP port for VXLAN data-path traffic. Daemon default 4789. Changing this forces a new resource. |
 | `default_addr_pool` | `list(string)` | optional, computed | yes |  | CIDR pools that overlay network subnets are allocated from, e.g. `["10.20.0.0/16"]`. When unset the daemon default (`10.0.0.0/8`) is used and reported. Changing this forces a new resource. |
+| `dispatcher` | `object` | optional |  |  | Dispatcher settings (`Spec.Dispatcher`). Updated in place (SwarmUpdate). |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
 | `force_new_cluster` | `bool` | optional, computed | yes |  | Force a new single-manager cluster from the current state of this node (disaster recovery). Only read at creation. Changing this forces a new resource. |
 | `id` | `string` | computed |  |  | Swarm cluster ID (same as `cluster_id`). This is the import ID. |
+| `inspect` | `object` | computed |  |  | The swarm (its ClusterInfo part) inspect response as a nested object mirroring ClusterInfo field by field (snake_case). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here. |
+| `inspect_json` | `string` | computed |  |  | The exact Engine API inspect response for the swarm (its ClusterInfo part), as JSON. JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here. |
+| `join_tokens` | `object` | computed |  | yes | Swarm.JoinTokens (worker and manager join tokens). Sensitive: anyone holding a token can join the swarm. |
+| `labels` | `map(string)` | optional, computed |  |  | Labels on the swarm (`Spec.Labels`). When set, the swarm gets exactly these labels; unset leaves them as they are. Updated in place (SwarmUpdate). |
 | `listen_addr` | `string` | optional, computed | yes |  | Address for inter-manager communication, `<ip\|interface>[:port]`. Default `0.0.0.0:2377`. Changing this forces a new resource. |
 | `manager_join_token` | `string` | computed |  | yes | Token that joins a node as a manager. Pass it to `docker_swarm_node.join_token`. |
 | `node_id` | `string` | computed |  |  | Node ID of the initial manager (the provider's host). |
+| `orchestration` | `object` | optional |  |  | Orchestration settings (`Spec.Orchestration`). Updated in place (SwarmUpdate). |
+| `raft` | `object` | optional |  |  | Raft settings (`Spec.Raft`). Updated in place (SwarmUpdate). |
 | `subnet_size` | `number` | optional, computed | yes |  | Prefix length of each subnet carved from `default_addr_pool`. Daemon default 24. Changing this forces a new resource. |
 | `unlock_key` | `string` | computed |  | yes | Swarm unlock key when `autolock` is true, otherwise null. |
+| `version_index` | `number` | computed |  |  | The swarm object's `Version.Index`; it changes on every update of the swarm. |
 | `worker_join_token` | `string` | computed |  | yes | Token that joins a node as a worker. Pass it to `docker_swarm_node.join_token`. |
+
+### `ca_config`
+
+nested attribute, object. CA settings (`Spec.CAConfig`). Updated in place (SwarmUpdate); rotate the root CA with `docker_swarm_rotate_ca`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `node_cert_expiry` | `string` | optional |  |  | Validity of node certificates, as a Go duration such as `2160h` (`NodeCertExpiry`, `--cert-expiry`). |
+
+### `dispatcher`
+
+nested attribute, object. Dispatcher settings (`Spec.Dispatcher`). Updated in place (SwarmUpdate).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `heartbeat_period` | `string` | optional |  |  | How often agents send heartbeats, as a Go duration such as `5s` (`HeartbeatPeriod`, `--dispatcher-heartbeat`). |
+
+### `inspect`
+
+nested attribute, object. The swarm (its ClusterInfo part) inspect response as a nested object mirroring ClusterInfo field by field (snake_case). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `data_path_port` | `number` | computed |  |  | Upstream `DataPathPort`. |
+| `default_addr_pool` | `list(string)` | computed |  |  | Upstream `DefaultAddrPool`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `root_rotation_in_progress` | `bool` | computed |  |  | Upstream `RootRotationInProgress`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `subnet_size` | `number` | computed |  |  | Upstream `SubnetSize`. |
+| `tls_info` | `object` | computed |  |  | Upstream `TLSInfo`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `inspect.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ca_config` | `object` | computed |  |  | Upstream `CAConfig`. |
+| `dispatcher` | `object` | computed |  |  | Upstream `Dispatcher`. |
+| `encryption_config` | `object` | computed |  |  | Upstream `EncryptionConfig`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `orchestration` | `object` | computed |  |  | Upstream `Orchestration`. |
+| `raft` | `object` | computed |  |  | Upstream `Raft`. |
+| `task_defaults` | `object` | computed |  |  | Upstream `TaskDefaults`. |
+
+### `inspect.spec.ca_config`
+
+nested attribute, object. Upstream `CAConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `external_cas` | `list(object)` | computed |  |  | Upstream `ExternalCAs`. |
+| `force_rotate` | `number` | computed |  |  | Upstream `ForceRotate`. |
+| `node_cert_expiry` | `number` | computed |  |  | Upstream `NodeCertExpiry`. |
+| `signing_ca_cert` | `string` | computed |  |  | Upstream `SigningCACert`. |
+| `signing_ca_key` | `string` | computed |  |  | Upstream `SigningCAKey`. |
+
+### `inspect.spec.ca_config.external_cas`
+
+nested attribute, list(object). Upstream `ExternalCAs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ca_cert` | `string` | computed |  |  | Upstream `CACert`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+| `protocol` | `string` | computed |  |  | Upstream `Protocol`. |
+| `url` | `string` | computed |  |  | Upstream `URL`. |
+
+### `inspect.spec.dispatcher`
+
+nested attribute, object. Upstream `Dispatcher`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `heartbeat_period` | `number` | computed |  |  | Upstream `HeartbeatPeriod`. |
+
+### `inspect.spec.encryption_config`
+
+nested attribute, object. Upstream `EncryptionConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `auto_lock_managers` | `bool` | computed |  |  | Upstream `AutoLockManagers`. |
+
+### `inspect.spec.orchestration`
+
+nested attribute, object. Upstream `Orchestration`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `task_history_retention_limit` | `number` | computed |  |  | Upstream `TaskHistoryRetentionLimit`. |
+
+### `inspect.spec.raft`
+
+nested attribute, object. Upstream `Raft`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `election_tick` | `number` | computed |  |  | Upstream `ElectionTick`. |
+| `heartbeat_tick` | `number` | computed |  |  | Upstream `HeartbeatTick`. |
+| `keep_old_snapshots` | `number` | computed |  |  | Upstream `KeepOldSnapshots`. |
+| `log_entries_for_slow_followers` | `number` | computed |  |  | Upstream `LogEntriesForSlowFollowers`. |
+| `snapshot_interval` | `number` | computed |  |  | Upstream `SnapshotInterval`. |
+
+### `inspect.spec.task_defaults`
+
+nested attribute, object. Upstream `TaskDefaults`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `log_driver` | `object` | computed |  |  | Upstream `LogDriver`. |
+
+### `inspect.spec.task_defaults.log_driver`
+
+nested attribute, object. Upstream `LogDriver`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `inspect.tls_info`
+
+nested attribute, object. Upstream `TLSInfo`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `cert_issuer_public_key` | `string` | computed |  |  | Upstream `CertIssuerPublicKey`. |
+| `cert_issuer_subject` | `string` | computed |  |  | Upstream `CertIssuerSubject`. |
+| `trust_root` | `string` | computed |  |  | Upstream `TrustRoot`. |
+
+### `inspect.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
+
+### `join_tokens`
+
+nested attribute, object. Swarm.JoinTokens (worker and manager join tokens). Sensitive: anyone holding a token can join the swarm.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `manager` | `string` | computed |  | yes | Upstream `Manager`. |
+| `worker` | `string` | computed |  | yes | Upstream `Worker`. |
+
+### `orchestration`
+
+nested attribute, object. Orchestration settings (`Spec.Orchestration`). Updated in place (SwarmUpdate).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `task_history_retention_limit` | `number` | optional |  |  | Old tasks kept per service slot (`TaskHistoryRetentionLimit`, `docker swarm update --task-history-limit`). |
+
+### `raft`
+
+nested attribute, object. Raft settings (`Spec.Raft`). Updated in place (SwarmUpdate).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `keep_old_snapshots` | `number` | optional |  |  | Snapshots kept beyond the current one (`KeepOldSnapshots`). |
+| `log_entries_for_slow_followers` | `number` | optional |  |  | Log entries kept after a snapshot to sync slow followers (`LogEntriesForSlowFollowers`). |
+| `snapshot_interval` | `number` | optional |  |  | Log entries between raft snapshots (`SnapshotInterval`, `--snapshot-interval`). |
 
 ## Example
 
@@ -31,11 +212,30 @@ resource "docker_swarm_init" "this" {
   advertise_addr    = "10.0.0.5"
   default_addr_pool = ["10.20.0.0/16"]
   subnet_size       = 24
+
+  # `docker swarm update` settings, changed in place.
+  labels = {
+    env = "prod"
+  }
+  orchestration = {
+    task_history_retention_limit = 3
+  }
+  dispatcher = {
+    heartbeat_period = "10s"
+  }
+  ca_config = {
+    node_cert_expiry = "720h"
+  }
 }
 
 output "worker_join_token" {
   value     = docker_swarm_init.this.worker_join_token
   sensitive = true
+}
+
+# The whole Engine swarm object, e.g. the root CA certificate.
+output "swarm_trust_root" {
+  value = docker_swarm_init.this.inspect.tls_info.trust_root
 }
 ```
 

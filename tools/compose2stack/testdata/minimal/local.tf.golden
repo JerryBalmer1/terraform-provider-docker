@@ -17,21 +17,22 @@ resource "docker_container" "app" {
     type   = "tmpfs"
     target = "/tmp"
   }
-  networks_advanced {
-    name    = "traefik_public"
-    aliases = ["app"]
+  networks = {
+    "traefik_public" = {
+      aliases = ["app"]
+    }
   }
   ports {
-    internal = 3000
-    external = 3000
-    ip       = "127.0.0.1"
+    container_port = 3000
+    host_port      = 3000
+    host_ip        = "127.0.0.1"
   }
   ports {
-    internal = 9000
-    external = 9000
+    container_port = 9000
+    host_port      = 9000
   }
   ports {
-    internal = 9001
-    external = 9001
+    container_port = 9001
+    host_port      = 9001
   }
 }

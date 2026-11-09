@@ -3,12 +3,12 @@
 page_title: "docker_swarm_tokens Data Source - docker"
 subcategory: ""
 description: |-
-  Reads the join tokens of the swarm the provider's Docker host manages (SwarmInspect). Use it to join nodes to a swarm that was not created by docker_swarm_init in this configuration. The host must be a manager.
+  Reads the join tokens of the swarm the provider's Docker host manages (SwarmInspect), as worker / manager and the structured join_tokens. Use it to join nodes to a swarm that was not created by docker_swarm_init in this configuration. The host must be a manager.
 ---
 
 # docker_swarm_tokens (Data Source)
 
-Reads the join tokens of the swarm the provider's Docker host manages (SwarmInspect). Use it to join nodes to a swarm that was not created by `docker_swarm_init` in this configuration. The host must be a manager.
+Reads the join tokens of the swarm the provider's Docker host manages (SwarmInspect), as `worker` / `manager` and the structured `join_tokens`. Use it to join nodes to a swarm that was not created by `docker_swarm_init` in this configuration. The host must be a manager.
 
 ## Example Usage
 
@@ -28,6 +28,17 @@ resource "docker_swarm_node" "worker2" {
 
 ### Read-Only
 
+- `docker_server_version` (String) Docker Engine version from GET /version.
+- `engine_api_version` (String) Engine API version negotiated with the daemon.
 - `id` (String) Swarm cluster ID.
+- `join_tokens` (Attributes, Sensitive) The `join_tokens` structured output. (see [below for nested schema](#nestedatt--join_tokens))
 - `manager` (String, Sensitive) Token that joins a node as a manager.
 - `worker` (String, Sensitive) Token that joins a node as a worker.
+
+<a id="nestedatt--join_tokens"></a>
+### Nested Schema for `join_tokens`
+
+Read-Only:
+
+- `manager` (String, Sensitive) Upstream `Manager`.
+- `worker` (String, Sensitive) Upstream `Worker`.

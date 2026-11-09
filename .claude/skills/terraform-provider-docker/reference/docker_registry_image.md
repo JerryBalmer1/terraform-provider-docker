@@ -4,19 +4,63 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-Pushes an image that exists on the provider's daemon (typically a `docker_image`) to its registry, using the provider's `registry_auth` credentials. Read refreshes `sha256_digest` from the registry. A push only happens on create: tie `triggers` to the source image (e.g. `docker_image.app.image_id`) so a rebuilt image is pushed again.
+Pushes an image that exists on the provider's daemon (typically a `docker_image`) to its registry, using the provider's `registry_auth` credentials. Read refreshes `digest` and the distribution outputs from the registry (`GET /distribution/<name>/json`). A push only happens on create: tie `triggers` to the source image (e.g. `docker_image.app.id`) so a rebuilt image is pushed again.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `content_sha256` | `string` | computed |  |  | sha256 of distribution_json. |
+| `digest` | `string` | computed |  |  | Manifest (or index) digest (`sha256:...`) of the pushed image in the registry (DistributionInspect `Descriptor.digest`). |
+| `distribution` | `object` | computed |  |  | The GET /distribution/{name}/json response as a nested object, field by field. |
+| `distribution_json` | `string` | computed |  |  | The exact Engine API GET /distribution/{name}/json response as JSON. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `id` | `string` | computed |  |  | The pushed reference (same as `name`). |
+| `image_digest_ref` | `string` | computed |  |  | Pinned reference `<registry>/<repository>@<digest>`, safe to hand to a deploy tool. |
+| `image_ref` | `string` | computed |  |  | The pushed reference, normalized to `<registry>/<repository>:<tag>`. |
 | `insecure_skip_verify` | `bool` | optional, computed |  |  | Skip TLS verification when the provider itself talks to the registry (only for the delete on destroy; pushes go through the daemon and follow its insecure-registries setting). Default `false`. |
 | `keep_remotely` | `bool` | optional, computed |  |  | When false (default), destroy deletes the manifest from the registry through the Registry HTTP API v2 (`DELETE /v2/<repo>/manifests/<digest>`, the registry must allow deletes). If that fails the resource is removed from state with a warning. When true, the image is left in the registry. |
-| `name` | `string` | required | yes |  | Local image reference to push, including registry host and tag (e.g. `registry.example.com/team/app:1.2`; no tag means `latest`). The image must already exist on the daemon under this name. Changing this forces a new resource. |
+| `name` | `string` | required | yes |  | Local image reference to push, including registry host and tag (e.g. `registry.example.com/team/app:1.2`; no tag means `latest`). The image must already exist on the daemon under this name. Forces replacement. |
+| `platforms` | `list(string)` | computed |  |  | Platforms in the pushed manifest as `os/arch[/variant]`. |
 | `push_retries` | `number` | optional, computed |  |  | How many times to retry a failed push, with exponential backoff (1s, 2s, 4s, ... capped at 30s). Default `3`. |
-| `sha256_digest` | `string` | computed |  |  | Manifest digest (`sha256:...`) of the pushed image, from the push result or the registry. |
-| `triggers` | `map(string)` | optional | yes |  | Arbitrary string map; any change pushes the image again. Changing this forces a new resource. |
+| `triggers` | `map(string)` | optional | yes |  | Arbitrary string map; any change pushes the image again. Forces replacement. |
+
+### `distribution`
+
+nested attribute, object. The GET /distribution/{name}/json response as a nested object, field by field.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `descriptor` | `object` | computed |  |  | Upstream `Descriptor`. |
+| `platforms` | `list(object)` | computed |  |  | Upstream `Platforms`. |
+
+### `distribution.descriptor`
+
+nested attribute, object. Upstream `Descriptor`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `artifact_type` | `string` | computed |  |  | Upstream `artifactType`. |
+| `data` | `string` | computed |  |  | Upstream `data`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `platform` | `dynamic` | computed |  |  | Upstream `platform`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+| `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `distribution.platforms`
+
+nested attribute, list(object). Upstream `Platforms`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
 
 ## Example
 
@@ -34,12 +78,12 @@ resource "docker_registry_image" "app" {
   keep_remotely = true
   push_retries  = 5
   triggers = {
-    image_id = docker_image.app.image_id
+    image_id = docker_image.app.id
   }
 }
 
 output "app_digest" {
-  value = docker_registry_image.app.sha256_digest
+  value = docker_registry_image.app.image_digest_ref
 }
 ```
 

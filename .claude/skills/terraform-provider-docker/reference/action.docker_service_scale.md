@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Sets the replica count of a replicated swarm service, like `docker service scale`, and waits for the tasks. If a `docker_service` resource manages the service with `replicas` set, its next plan reverts the change; use this action for services whose replica count Terraform does not own, or for one-off scaling.
+Sets the replica count of a replicated swarm service, like `docker service scale`, and waits for the tasks. If a `docker_service` resource manages the service with `replicas` set, its next plan reverts the change; use this action for services whose replica count Terraform does not own, or for one-off scaling. The result object has the update warnings, the rollout status, the service mode and its running/desired task counts.
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
@@ -29,7 +29,8 @@ action "docker_service_scale" "<name>" {
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `replicas` | `number` | required |  |  | Wanted number of tasks, `0` or more. |
-| `service` | `string` | required |  |  | Service ID or name. |
+| `result_path` | `string` | optional |  |  | Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails. |
+| `service_id` | `string` | required |  |  | Target service: ID, unique ID prefix or name (resolved to the service ID). |
 | `timeout` | `string` | optional |  |  | How long to wait for convergence, as a Go duration. Default `5m`. |
 | `wait` | `bool` | optional |  |  | Wait until the service converges (every wanted task running). Default `true`. |
 
@@ -56,9 +57,10 @@ resource "terraform_data" "scale" {
 #   terraform apply -invoke=action.docker_service_scale.worker
 action "docker_service_scale" "worker" {
   config {
-    service  = "queue-worker"
-    replicas = var.worker_replicas
-    timeout  = "5m"
+    service_id  = "queue-worker"
+    result_path = "${path.module}/scale-result.json"
+    replicas    = var.worker_replicas
+    timeout     = "5m"
   }
 }
 ```

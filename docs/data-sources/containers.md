@@ -3,12 +3,12 @@
 page_title: "docker_containers Data Source - docker"
 subcategory: ""
 description: |-
-  Lists containers on the provider's Docker host (GET /containers/json), sorted by name. Every container is listed, running or not, unless all = false; the other arguments are Engine API filters.
+  Lists containers on the provider's Docker host (GET /containers/json), like docker container ls --all, sorted by name. Every container is listed, running or not, unless all = false; the other arguments are Engine API filters. containers holds the Engine's list entries field by field, ids and names the IDs and primary names in the same order.
 ---
 
 # docker_containers (Data Source)
 
-Lists containers on the provider's Docker host (`GET /containers/json`), sorted by name. Every container is listed, running or not, unless `all = false`; the other arguments are Engine API filters.
+Lists containers on the provider's Docker host (`GET /containers/json`), like `docker container ls --all`, sorted by name. Every container is listed, running or not, unless `all = false`; the other arguments are Engine API filters. `containers` holds the Engine's list entries field by field, `ids` and `names` the IDs and primary names in the same order.
 
 ## Example Usage
 
@@ -20,7 +20,11 @@ data "docker_containers" "shop" {
 }
 
 output "shop_containers" {
-  value = [for c in data.docker_containers.shop.containers : "${c.name} (${c.status})"]
+  value = [for c in data.docker_containers.shop.containers : "${trimprefix(c.names[0], "/")} (${c.status})"]
+}
+
+output "shop_container_ids" {
+  value = data.docker_containers.shop.ids
 }
 ```
 
@@ -37,32 +41,99 @@ output "shop_containers" {
 
 ### Read-Only
 
-- `containers` (Attributes List) The containers, sorted by name then ID. (see [below for nested schema](#nestedatt--containers))
+- `containers` (Attributes List) The GET /containers/json response as a nested object, field by field. (see [below for nested schema](#nestedatt--containers))
+- `containers_json` (String) The exact Engine API GET /containers/json response as JSON.
+- `content_sha256` (String) sha256 of containers_json.
+- `docker_server_version` (String) Docker Engine version from GET /version.
+- `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
+- `ids` (List of String) IDs of the listed containers, in the order of `containers`.
+- `names` (List of String) Primary names (without the leading `/`) of the listed containers, in the order of `containers`.
 
 <a id="nestedatt--containers"></a>
 ### Nested Schema for `containers`
 
 Read-Only:
 
-- `command` (String) Command line the container runs.
-- `created` (String) RFC 3339 creation time.
-- `id` (String) Container ID.
-- `image` (String) Image the container was created from, as given.
-- `image_id` (String) Image ID.
-- `labels` (Map of String) Container labels.
-- `name` (String) Primary name, without the leading `/`.
-- `names` (List of String) Every name, without the leading `/`.
-- `networks` (List of String) Names of attached networks, sorted.
-- `ports` (Attributes List) Published and exposed ports. (see [below for nested schema](#nestedatt--containers--ports))
-- `state` (String) State, e.g. `running` or `exited`.
-- `status` (String) Human-readable status, e.g. `Up 2 hours`.
+- `command` (String) Upstream `Command`.
+- `created` (Number) Upstream `Created`.
+- `health` (Attributes) Upstream `Health`. (see [below for nested schema](#nestedatt--containers--health))
+- `host_config` (Attributes) Upstream `HostConfig`. (see [below for nested schema](#nestedatt--containers--host_config))
+- `id` (String) Upstream `Id`.
+- `image` (String) Upstream `Image`.
+- `image_id` (String) Upstream `ImageID`.
+- `image_manifest_descriptor` (Attributes) Upstream `ImageManifestDescriptor`. (see [below for nested schema](#nestedatt--containers--image_manifest_descriptor))
+- `labels` (Map of String) Upstream `Labels`.
+- `mounts` (Attributes List) Upstream `Mounts`. (see [below for nested schema](#nestedatt--containers--mounts))
+- `names` (List of String) Upstream `Names`.
+- `network_settings` (Attributes) Upstream `NetworkSettings`. (see [below for nested schema](#nestedatt--containers--network_settings))
+- `ports` (Attributes List) Upstream `Ports`. (see [below for nested schema](#nestedatt--containers--ports))
+- `size_root_fs` (Number) Upstream `SizeRootFs`.
+- `size_rw` (Number) Upstream `SizeRw`.
+- `state` (String) Upstream `State`.
+- `status` (String) Upstream `Status`.
+
+<a id="nestedatt--containers--health"></a>
+### Nested Schema for `containers.health`
+
+Read-Only:
+
+- `failing_streak` (Number) Upstream `FailingStreak`.
+- `status` (String) Upstream `Status`.
+
+
+<a id="nestedatt--containers--host_config"></a>
+### Nested Schema for `containers.host_config`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `Annotations`.
+- `network_mode` (String) Upstream `NetworkMode`.
+
+
+<a id="nestedatt--containers--image_manifest_descriptor"></a>
+### Nested Schema for `containers.image_manifest_descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `artifact_type` (String) Upstream `artifactType`.
+- `data` (String) Upstream `data`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `platform` (String) Upstream `platform`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `size` (Number) Upstream `size`.
+- `urls` (List of String) Upstream `urls`.
+
+
+<a id="nestedatt--containers--mounts"></a>
+### Nested Schema for `containers.mounts`
+
+Read-Only:
+
+- `destination` (String) Upstream `Destination`.
+- `driver` (String) Upstream `Driver`.
+- `mode` (String) Upstream `Mode`.
+- `name` (String) Upstream `Name`.
+- `propagation` (String) Upstream `Propagation`.
+- `rw` (Boolean) Upstream `RW`.
+- `source` (String) Upstream `Source`.
+- `type` (String) Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+
+
+<a id="nestedatt--containers--network_settings"></a>
+### Nested Schema for `containers.network_settings`
+
+Read-Only:
+
+- `networks` (Map of String) Upstream `Networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+
 
 <a id="nestedatt--containers--ports"></a>
 ### Nested Schema for `containers.ports`
 
 Read-Only:
 
-- `ip` (String) Host IP the port is published on, empty when only exposed.
-- `private_port` (Number) Container port.
-- `public_port` (Number) Host port, 0 when only exposed.
-- `type` (String) `tcp`, `udp` or `sctp`.
+- `ip` (String) Upstream `IP`.
+- `private_port` (Number) Upstream `PrivatePort`.
+- `public_port` (Number) Upstream `PublicPort`.
+- `type` (String) Upstream `Type`.

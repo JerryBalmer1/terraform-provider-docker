@@ -4,7 +4,7 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Lists containers on the provider's Docker host (`GET /containers/json`), sorted by name. Every container is listed, running or not, unless `all = false`; the other arguments are Engine API filters.
+Lists containers on the provider's Docker host (`GET /containers/json`), like `docker container ls --all`, sorted by name. Every container is listed, running or not, unless `all = false`; the other arguments are Engine API filters. `containers` holds the Engine's list entries field by field, `ids` and `names` the IDs and primary names in the same order.
 
 ## Arguments and attributes
 
@@ -12,40 +12,107 @@ Lists containers on the provider's Docker host (`GET /containers/json`), sorted 
 |---|---|---|---|---|---|
 | `all` | `bool` | optional |  |  | Include stopped containers. Default `true`; `false` lists only running ones, like `docker ps`. |
 | `ancestor` | `string` | optional |  |  | Only containers created from this image or a descendant of it. |
-| `containers` | `list(object)` | computed |  |  | The containers, sorted by name then ID. |
+| `containers` | `list(object)` | computed |  |  | The GET /containers/json response as a nested object, field by field. |
+| `containers_json` | `string` | computed |  |  | The exact Engine API GET /containers/json response as JSON. |
+| `content_sha256` | `string` | computed |  |  | sha256 of containers_json. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
+| `ids` | `list(string)` | computed |  |  | IDs of the listed containers, in the order of `containers`. |
 | `labels` | `map(string)` | optional |  |  | Only containers carrying every one of these labels; an empty value matches any value. |
 | `name` | `string` | optional |  |  | Only containers whose name matches (Engine `name` filter, a substring/regex match). |
+| `names` | `list(string)` | computed |  |  | Primary names (without the leading `/`) of the listed containers, in the order of `containers`. |
 | `status` | `string` | optional |  |  | Only containers in this state: `created`, `restarting`, `running`, `removing`, `paused`, `exited` or `dead`. |
 
 ### `containers`
 
-nested attribute, list(object). The containers, sorted by name then ID.
+nested attribute, list(object). The GET /containers/json response as a nested object, field by field.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `command` | `string` | computed |  |  | Command line the container runs. |
-| `created` | `string` | computed |  |  | RFC 3339 creation time. |
-| `id` | `string` | computed |  |  | Container ID. |
-| `image` | `string` | computed |  |  | Image the container was created from, as given. |
-| `image_id` | `string` | computed |  |  | Image ID. |
-| `labels` | `map(string)` | computed |  |  | Container labels. |
-| `name` | `string` | computed |  |  | Primary name, without the leading `/`. |
-| `names` | `list(string)` | computed |  |  | Every name, without the leading `/`. |
-| `networks` | `list(string)` | computed |  |  | Names of attached networks, sorted. |
-| `ports` | `list(object)` | computed |  |  | Published and exposed ports. |
-| `state` | `string` | computed |  |  | State, e.g. `running` or `exited`. |
-| `status` | `string` | computed |  |  | Human-readable status, e.g. `Up 2 hours`. |
+| `command` | `string` | computed |  |  | Upstream `Command`. |
+| `created` | `number` | computed |  |  | Upstream `Created`. |
+| `health` | `object` | computed |  |  | Upstream `Health`. |
+| `host_config` | `object` | computed |  |  | Upstream `HostConfig`. |
+| `id` | `string` | computed |  |  | Upstream `Id`. |
+| `image` | `string` | computed |  |  | Upstream `Image`. |
+| `image_id` | `string` | computed |  |  | Upstream `ImageID`. |
+| `image_manifest_descriptor` | `object` | computed |  |  | Upstream `ImageManifestDescriptor`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `mounts` | `list(object)` | computed |  |  | Upstream `Mounts`. |
+| `names` | `list(string)` | computed |  |  | Upstream `Names`. |
+| `network_settings` | `object` | computed |  |  | Upstream `NetworkSettings`. |
+| `ports` | `list(object)` | computed |  |  | Upstream `Ports`. |
+| `size_root_fs` | `number` | computed |  |  | Upstream `SizeRootFs`. |
+| `size_rw` | `number` | computed |  |  | Upstream `SizeRw`. |
+| `state` | `string` | computed |  |  | Upstream `State`. |
+| `status` | `string` | computed |  |  | Upstream `Status`. |
+
+### `containers.health`
+
+nested attribute, object. Upstream `Health`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `failing_streak` | `number` | computed |  |  | Upstream `FailingStreak`. |
+| `status` | `string` | computed |  |  | Upstream `Status`. |
+
+### `containers.host_config`
+
+nested attribute, object. Upstream `HostConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `Annotations`. |
+| `network_mode` | `string` | computed |  |  | Upstream `NetworkMode`. |
+
+### `containers.image_manifest_descriptor`
+
+nested attribute, object. Upstream `ImageManifestDescriptor`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `artifact_type` | `string` | computed |  |  | Upstream `artifactType`. |
+| `data` | `string` | computed |  |  | Upstream `data`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `platform` | `string` | computed |  |  | Upstream `platform`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+| `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `containers.mounts`
+
+nested attribute, list(object). Upstream `Mounts`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `destination` | `string` | computed |  |  | Upstream `Destination`. |
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `propagation` | `string` | computed |  |  | Upstream `Propagation`. |
+| `rw` | `bool` | computed |  |  | Upstream `RW`. |
+| `source` | `string` | computed |  |  | Upstream `Source`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `containers.network_settings`
+
+nested attribute, object. Upstream `NetworkSettings`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `networks` | `map(string)` | computed |  |  | Upstream `Networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 
 ### `containers.ports`
 
-nested attribute, list(object). Published and exposed ports.
+nested attribute, list(object). Upstream `Ports`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `ip` | `string` | computed |  |  | Host IP the port is published on, empty when only exposed. |
-| `private_port` | `number` | computed |  |  | Container port. |
-| `public_port` | `number` | computed |  |  | Host port, 0 when only exposed. |
-| `type` | `string` | computed |  |  | `tcp`, `udp` or `sctp`. |
+| `ip` | `string` | computed |  |  | Upstream `IP`. |
+| `private_port` | `number` | computed |  |  | Upstream `PrivatePort`. |
+| `public_port` | `number` | computed |  |  | Upstream `PublicPort`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
 
 ## Example
 
@@ -57,6 +124,10 @@ data "docker_containers" "shop" {
 }
 
 output "shop_containers" {
-  value = [for c in data.docker_containers.shop.containers : "${c.name} (${c.status})"]
+  value = [for c in data.docker_containers.shop.containers : "${trimprefix(c.names[0], "/")} (${c.status})"]
+}
+
+output "shop_container_ids" {
+  value = data.docker_containers.shop.ids
 }
 ```

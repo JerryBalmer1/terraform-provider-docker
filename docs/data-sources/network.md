@@ -3,12 +3,12 @@
 page_title: "docker_network Data Source - docker"
 subcategory: ""
 description: |-
-  Looks up an existing Docker network (e.g. bridge, host, or one created outside Terraform) by name or ID.
+  Looks up an existing Docker network (e.g. bridge, host, or one created outside Terraform) by name or ID (GET /networks/{id}). containers lists the containers attached on this daemon; inspect holds the whole response.
 ---
 
 # docker_network (Data Source)
 
-Looks up an existing Docker network (e.g. `bridge`, `host`, or one created outside Terraform) by name or ID.
+Looks up an existing Docker network (e.g. `bridge`, `host`, or one created outside Terraform) by name or ID (`GET /networks/{id}`). `containers` lists the containers attached on this daemon; `inspect` holds the whole response.
 
 ## Example Usage
 
@@ -32,16 +32,107 @@ output "bridge_subnet" {
 ### Read-Only
 
 - `attachable` (Boolean) Whether standalone containers can attach (overlay).
+- `containers` (Attributes Map) Containers attached to the network on this daemon, keyed by container ID (`Containers` in `GET /networks/{id}`). (see [below for nested schema](#nestedatt--containers))
+- `content_sha256` (String) sha256 of inspect_json.
+- `docker_server_version` (String) Docker Engine version from GET /version.
 - `driver` (String) Network driver.
+- `enable_ipv6` (Boolean) Whether IPv6 is enabled (`EnableIPv6`).
+- `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `id` (String) Network ID.
 - `ingress` (Boolean) Whether this is the Swarm ingress network.
+- `inspect` (Attributes) The GET /networks/{id} response as a nested object, field by field. (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String) The exact Engine API GET /networks/{id} response as JSON.
 - `internal` (Boolean) Whether external access is restricted.
 - `ipam_config` (Attributes List) IPAM pools, including daemon-assigned ones. (see [below for nested schema](#nestedatt--ipam_config))
 - `ipam_driver` (String) IPAM driver.
-- `ipv6` (Boolean) Whether IPv6 is enabled.
 - `labels` (Map of String) Network labels.
 - `options` (Map of String) Driver options.
 - `scope` (String) `local` or `swarm`.
+
+<a id="nestedatt--containers"></a>
+### Nested Schema for `containers`
+
+Read-Only:
+
+- `endpoint_id` (String) Endpoint ID of the attachment.
+- `ipv4_address` (String) IPv4 address with prefix length, e.g. `172.19.0.2/16`.
+- `ipv6_address` (String) IPv6 address with prefix length, empty without IPv6.
+- `mac_address` (String) MAC address of the endpoint.
+- `name` (String) Container name.
+
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `attachable` (Boolean) Upstream `Attachable`.
+- `config_from` (Attributes) Upstream `ConfigFrom`. (see [below for nested schema](#nestedatt--inspect--config_from))
+- `config_only` (Boolean) Upstream `ConfigOnly`.
+- `containers` (Attributes Map) Upstream `Containers`. (see [below for nested schema](#nestedatt--inspect--containers))
+- `created` (String) Upstream `Created`.
+- `driver` (String) Upstream `Driver`.
+- `enable_ipv4` (Boolean) Upstream `EnableIPv4`.
+- `enable_ipv6` (Boolean) Upstream `EnableIPv6`.
+- `id` (String) Upstream `Id`.
+- `ingress` (Boolean) Upstream `Ingress`.
+- `internal` (Boolean) Upstream `Internal`.
+- `ipam` (Attributes) Upstream `IPAM`. (see [below for nested schema](#nestedatt--inspect--ipam))
+- `labels` (Map of String) Upstream `Labels`.
+- `name` (String) Upstream `Name`.
+- `options` (Map of String) Upstream `Options`.
+- `peers` (Attributes List) Upstream `Peers`. (see [below for nested schema](#nestedatt--inspect--peers))
+- `scope` (String) Upstream `Scope`.
+- `services` (Dynamic) Upstream `Services`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `status` (Attributes) Upstream `Status`. (see [below for nested schema](#nestedatt--inspect--status))
+
+<a id="nestedatt--inspect--config_from"></a>
+### Nested Schema for `inspect.config_from`
+
+Read-Only:
+
+- `network` (String) Upstream `Network`.
+
+
+<a id="nestedatt--inspect--containers"></a>
+### Nested Schema for `inspect.containers`
+
+Read-Only:
+
+- `endpoint_id` (String) Upstream `EndpointID`.
+- `ipv4_address` (String) Upstream `IPv4Address`.
+- `ipv6_address` (String) Upstream `IPv6Address`.
+- `mac_address` (String) Upstream `MacAddress`.
+- `name` (String) Upstream `Name`.
+
+
+<a id="nestedatt--inspect--ipam"></a>
+### Nested Schema for `inspect.ipam`
+
+Read-Only:
+
+- `config` (List of String) Upstream `Config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `driver` (String) Upstream `Driver`.
+- `options` (Map of String) Upstream `Options`.
+
+
+<a id="nestedatt--inspect--peers"></a>
+### Nested Schema for `inspect.peers`
+
+Read-Only:
+
+- `ip` (String) Upstream `IP`.
+- `name` (String) Upstream `Name`.
+
+
+<a id="nestedatt--inspect--status"></a>
+### Nested Schema for `inspect.status`
+
+Read-Only:
+
+- `ipam` (Dynamic) Upstream `IPAM`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+
+
 
 <a id="nestedatt--ipam_config"></a>
 ### Nested Schema for `ipam_config`

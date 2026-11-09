@@ -4,7 +4,7 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-Joins a Docker host to an existing swarm. The join is sent to the joining node's OWN daemon (`host`, optionally with a `tls` block, or over SSH with an `ssh://` host and an `ssh` block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
+Joins a Docker host to an existing swarm (`docker swarm join`); to manage a node that already joined without joining or leaving, use `docker_node`. The join is sent to the joining node's OWN daemon (`host`, optionally with a `tls` block, or over SSH with an `ssh://` host and an `ssh` block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
 
 Import with the node ID; `host`, `join_token` and `manager_address` must then be set in configuration (the next apply records them without replacing the node).
 
@@ -12,19 +12,168 @@ Import with the node ID; `host`, `join_token` and `manager_address` must then be
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `addr` | `string` | computed |  |  | IP address the manager reaches the node at (`Status.Addr`). |
 | `advertise_addr` | `string` | optional | yes |  | Address the node advertises, `<ip\|interface>[:port]`. Changing this forces a new resource. |
 | `availability` | `string` | optional, computed |  |  | Scheduling availability: `active`, `pause` or `drain`. Default `active`. Updated in place through the manager. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json; changes whenever the object changes. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
 | `host` | `string` | required | yes |  | Docker endpoint of the JOINING node, e.g. `tcp://10.0.0.6:2376` or `ssh://admin@10.0.0.6` (with an optional `ssh` block for credentials). Changing this forces a new resource. |
 | `hostname` | `string` | computed |  |  | Hostname the node reports to the swarm. |
 | `id` | `string` | computed |  |  | Swarm node ID (same as `node_id`). |
+| `inspect` | `object` | computed |  |  | The node inspect response as a nested object mirroring Node field by field (snake_case). |
+| `inspect_json` | `string` | computed |  |  | The exact Engine API inspect response for the node, as JSON. |
 | `join_token` | `string` | required | yes | yes | Worker or manager join token, e.g. `docker_swarm_init.this.worker_join_token`. Changing this forces a new resource. |
 | `labels` | `map(string)` | optional |  |  | Node labels (`node.labels.*` in placement constraints). Updated in place; labels set outside Terraform are removed. |
 | `listen_addr` | `string` | optional, computed | yes |  | Listen address for swarm traffic on the node. Default `0.0.0.0:2377`. Changing this forces a new resource. |
 | `manager_address` | `string` | required | yes |  | Address of an existing manager as seen from the joining node, e.g. `10.0.0.5:2377`. Changing this forces a new resource. |
+| `name` | `string` | computed |  |  | Node name (`Spec.Name`), else the hostname. |
 | `node_id` | `string` | computed |  |  | Swarm node ID, read from the joining daemon after the join. |
 | `role` | `string` | optional, computed |  |  | Node role: `worker` or `manager`. Default `worker`. Updated in place (promote/demote) through the manager, whichever token was used to join. |
+| `version_index` | `number` | computed |  |  | The node object's `Version.Index`; it changes on every update of the node. |
 
 Nested blocks: `ssh` (single block), `tls` (single block).
+
+### `inspect`
+
+nested attribute, object. The node inspect response as a nested object mirroring Node field by field (snake_case).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `description` | `object` | computed |  |  | Upstream `Description`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `manager_status` | `object` | computed |  |  | Upstream `ManagerStatus`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `status` | `object` | computed |  |  | Upstream `Status`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `inspect.description`
+
+nested attribute, object. Upstream `Description`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `engine` | `object` | computed |  |  | Upstream `Engine`. |
+| `hostname` | `string` | computed |  |  | Upstream `Hostname`. |
+| `platform` | `object` | computed |  |  | Upstream `Platform`. |
+| `resources` | `object` | computed |  |  | Upstream `Resources`. |
+| `tls_info` | `object` | computed |  |  | Upstream `TLSInfo`. |
+
+### `inspect.description.engine`
+
+nested attribute, object. Upstream `Engine`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `engine_version` | `string` | computed |  |  | Upstream `EngineVersion`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `plugins` | `list(object)` | computed |  |  | Upstream `Plugins`. |
+
+### `inspect.description.engine.plugins`
+
+nested attribute, list(object). Upstream `Plugins`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+
+### `inspect.description.platform`
+
+nested attribute, object. Upstream `Platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `Architecture`. |
+| `os` | `string` | computed |  |  | Upstream `OS`. |
+
+### `inspect.description.resources`
+
+nested attribute, object. Upstream `Resources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `generic_resources` | `list(object)` | computed |  |  | Upstream `GenericResources`. |
+| `memory_bytes` | `number` | computed |  |  | Upstream `MemoryBytes`. |
+| `nano_cpus` | `number` | computed |  |  | Upstream `NanoCPUs`. |
+
+### `inspect.description.resources.generic_resources`
+
+nested attribute, list(object). Upstream `GenericResources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `discrete_resource_spec` | `object` | computed |  |  | Upstream `DiscreteResourceSpec`. |
+| `named_resource_spec` | `object` | computed |  |  | Upstream `NamedResourceSpec`. |
+
+### `inspect.description.resources.generic_resources.discrete_resource_spec`
+
+nested attribute, object. Upstream `DiscreteResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `number` | computed |  |  | Upstream `Value`. |
+
+### `inspect.description.resources.generic_resources.named_resource_spec`
+
+nested attribute, object. Upstream `NamedResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `string` | computed |  |  | Upstream `Value`. |
+
+### `inspect.description.tls_info`
+
+nested attribute, object. Upstream `TLSInfo`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `cert_issuer_public_key` | `string` | computed |  |  | Upstream `CertIssuerPublicKey`. |
+| `cert_issuer_subject` | `string` | computed |  |  | Upstream `CertIssuerSubject`. |
+| `trust_root` | `string` | computed |  |  | Upstream `TrustRoot`. |
+
+### `inspect.manager_status`
+
+nested attribute, object. Upstream `ManagerStatus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `addr` | `string` | computed |  |  | Upstream `Addr`. |
+| `leader` | `bool` | computed |  |  | Upstream `Leader`. |
+| `reachability` | `string` | computed |  |  | Upstream `Reachability`. |
+
+### `inspect.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `availability` | `string` | computed |  |  | Upstream `Availability`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `role` | `string` | computed |  |  | Upstream `Role`. |
+
+### `inspect.status`
+
+nested attribute, object. Upstream `Status`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `addr` | `string` | computed |  |  | Upstream `Addr`. |
+| `message` | `string` | computed |  |  | Upstream `Message`. |
+| `state` | `string` | computed |  |  | Upstream `State`. |
+
+### `inspect.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
 
 ### `ssh`
 

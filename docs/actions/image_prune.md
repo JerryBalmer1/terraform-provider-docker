@@ -3,12 +3,12 @@
 page_title: "docker_image_prune Action - docker"
 subcategory: ""
 description: |-
-  Removes unused images, like docker image prune, and reports the space reclaimed. By default only dangling (untagged) images go; with dangling = false every image no container uses is removed (docker image prune -a).
+  Removes unused images, like docker image prune, and reports what it removed and the space reclaimed. By default only dangling (untagged) images go; with dangling = false every image no container uses is removed (docker image prune -a). The result object is the POST /images/prune response: images_deleted and space_reclaimed.
 ---
 
 # docker_image_prune (Action)
 
-Removes unused images, like `docker image prune`, and reports the space reclaimed. By default only dangling (untagged) images go; with `dangling = false` every image no container uses is removed (`docker image prune -a`).
+Removes unused images, like `docker image prune`, and reports what it removed and the space reclaimed. By default only dangling (untagged) images go; with `dangling = false` every image no container uses is removed (`docker image prune -a`). The `result` object is the `POST /images/prune` response: `images_deleted` and `space_reclaimed`.
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_image_prune.<name>] } }`
@@ -46,3 +46,4 @@ action "docker_image_prune" "dangling" {
 
 - `dangling` (Boolean) Remove only dangling images. Default `true`; `false` removes all unused images.
 - `filters` (Map of String) Prune filters, one value per key: `until` (e.g. `24h` or a timestamp; not applied to volumes), `label` (`key` or `key=value`) and `label!` (the negation).
+- `result_path` (String) Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails.

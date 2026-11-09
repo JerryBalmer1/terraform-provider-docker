@@ -3,12 +3,12 @@
 page_title: "docker_container_export Action - docker"
 subcategory: ""
 description: |-
-  Writes a container's filesystem to a local tar file, like docker export. The file is written next to its final name and renamed into place, so a failed export never leaves a partial tar at path.
+  Writes a container's filesystem to a local tar file, like docker container export --output. The file is written next to its final name and renamed into place, so a failed export never leaves a partial tar at output. The result object holds the archive size; archive_sha256 is the file's sha256.
 ---
 
 # docker_container_export (Action)
 
-Writes a container's filesystem to a local tar file, like `docker export`. The file is written next to its final name and renamed into place, so a failed export never leaves a partial tar at `path`.
+Writes a container's filesystem to a local tar file, like `docker container export --output`. The file is written next to its final name and renamed into place, so a failed export never leaves a partial tar at `output`. The result object holds the archive size; `archive_sha256` is the file's sha256.
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_container_export.<name>] } }`
@@ -35,8 +35,9 @@ resource "docker_container" "build" {
 #   terraform apply -invoke=action.docker_container_export.rootfs
 action "docker_container_export" "rootfs" {
   config {
-    container = docker_container.build.id
-    path      = "${path.module}/out/rootfs.tar"
+    container_id = docker_container.build.id
+    output       = "${path.module}/out/rootfs.tar"
+    result_path  = "${path.module}/out/rootfs.json"
   }
 }
 ```
@@ -46,5 +47,9 @@ action "docker_container_export" "rootfs" {
 
 ### Required
 
-- `container` (String) Name or ID of the container (running or stopped).
-- `path` (String) Local file to write, on the machine running Terraform. Parent directories are created; an existing file is replaced. `~` expands to the home directory.
+- `container_id` (String) The container to export (running or stopped), by ID or name.
+- `output` (String) Local file to write, on the machine running Terraform (CLI `--output`). Parent directories are created; an existing file is replaced. `~` expands to the home directory.
+
+### Optional
+
+- `result_path` (String) Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails.

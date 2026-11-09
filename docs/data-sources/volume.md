@@ -3,12 +3,12 @@
 page_title: "docker_volume Data Source - docker"
 subcategory: ""
 description: |-
-  Looks up an existing Docker volume by name.
+  Looks up an existing Docker volume by name (GET /volumes/{name}). The raw inspect_json output is sensitive because driver options can hold credentials.
 ---
 
 # docker_volume (Data Source)
 
-Looks up an existing Docker volume by name.
+Looks up an existing Docker volume by name (`GET /volumes/{name}`). The raw `inspect_json` output is sensitive because driver options can hold credentials.
 
 ## Example Usage
 
@@ -31,9 +31,52 @@ output "data_mountpoint" {
 
 ### Read-Only
 
+- `content_sha256` (String) sha256 of inspect_json.
+- `docker_server_version` (String) Docker Engine version from GET /version.
 - `driver` (String) Volume driver.
 - `driver_opts` (Map of String) Driver options.
+- `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `id` (String) Volume name (volumes have no separate ID).
+- `inspect` (Attributes) The GET /volumes/{name} response as a nested object, field by field. (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String, Sensitive) The exact Engine API GET /volumes/{name} response as JSON.
 - `labels` (Map of String) Volume labels.
 - `mountpoint` (String) Host path of the volume data.
 - `scope` (String) `local` or `global`.
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `cluster_volume` (Attributes) Upstream `ClusterVolume`. (see [below for nested schema](#nestedatt--inspect--cluster_volume))
+- `created_at` (String) Upstream `CreatedAt`.
+- `driver` (String) Upstream `Driver`.
+- `labels` (Map of String) Upstream `Labels`.
+- `mountpoint` (String) Upstream `Mountpoint`.
+- `name` (String) Upstream `Name`.
+- `options` (Map of String, Sensitive) Upstream `Options`. Sensitive.
+- `scope` (String) Upstream `Scope`.
+- `status` (Dynamic) Upstream `Status`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `usage_data` (Attributes) Upstream `UsageData`. (see [below for nested schema](#nestedatt--inspect--usage_data))
+
+<a id="nestedatt--inspect--cluster_volume"></a>
+### Nested Schema for `inspect.cluster_volume`
+
+Read-Only:
+
+- `created_at` (String) Upstream `CreatedAt`.
+- `id` (String) Upstream `ID`.
+- `info` (Dynamic) Upstream `Info`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `publish_status` (List of String) Upstream `PublishStatus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `spec` (Dynamic) Upstream `Spec`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Dynamic) Upstream `Version`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+
+
+<a id="nestedatt--inspect--usage_data"></a>
+### Nested Schema for `inspect.usage_data`
+
+Read-Only:
+
+- `ref_count` (Number) Upstream `RefCount`.
+- `size` (Number) Upstream `Size`.

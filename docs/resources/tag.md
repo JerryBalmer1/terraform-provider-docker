@@ -19,8 +19,15 @@ resource "docker_image" "app" {
 
 # Same image under a second name, e.g. before pushing it to a private registry.
 resource "docker_tag" "release" {
-  source_image = docker_image.app.image_id
+  source_image = docker_image.app.id
   target_image = "registry.example.com/web/nginx:stable"
+
+  # Re-tag whenever the source image is rebuilt.
+  triggers = { source = docker_image.app.id }
+}
+
+output "tag_ref" {
+  value = docker_tag.release.image_ref
 }
 
 output "tagged_image_id" {
@@ -33,10 +40,129 @@ output "tagged_image_id" {
 
 ### Required
 
-- `source_image` (String) Existing image to tag: a name, `name:tag`, or image ID (e.g. a `docker_image`'s `image_id`). Changing this forces a new resource.
-- `target_image` (String) New reference, `repository[:tag]` (no tag means `latest`), e.g. `registry.example.com/app:1.0`. Changing this forces a new resource.
+- `source_image` (String) Existing image to tag: a name, `name:tag`, or image ID (e.g. a `docker_image`'s `id`). Forces replacement.
+- `target_image` (String) New reference, `repository[:tag]` (no tag means `latest`), e.g. `registry.example.com/app:1.0`. Forces replacement.
+
+### Optional
+
+- `triggers` (Map of String) Arbitrary string map; any change re-applies the tag (for example after `source_image` was rebuilt under the same name). Forces replacement.
 
 ### Read-Only
 
-- `id` (String) `<source_image_id>.<target_image>`.
+- `content_sha256` (String) sha256 of inspect_json.
+- `docker_server_version` (String) Docker Engine version from GET /version.
+- `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
+- `id` (String) ID (`sha256:...`) of the tagged image, the image `source_image` resolved to.
+- `image_ref` (String) The new tag in normalized `registry/repository:tag` form (implicit `latest` added).
+- `inspect` (Attributes) The GET /images/{name}/json for the target tag response as a nested object, field by field. (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String) The exact Engine API GET /images/{name}/json for the target tag response as JSON.
+- `repo_digests` (List of String) Repository digest references (`repo@sha256:...`) the daemon knows for the tagged image (`RepoDigests`).
 - `source_image_id` (String) ID (`sha256:...`) of the image `source_image` resolved to when the tag was set.
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `architecture` (String) Upstream `Architecture`.
+- `author` (String) Upstream `Author`.
+- `comment` (String) Upstream `Comment`.
+- `config` (Attributes) Upstream `Config`. (see [below for nested schema](#nestedatt--inspect--config))
+- `created` (String) Upstream `Created`.
+- `descriptor` (Attributes) Upstream `Descriptor`. (see [below for nested schema](#nestedatt--inspect--descriptor))
+- `graph_driver` (Attributes) Upstream `GraphDriver`. (see [below for nested schema](#nestedatt--inspect--graph_driver))
+- `id` (String) Upstream `Id`.
+- `identity` (Attributes) Upstream `Identity`. (see [below for nested schema](#nestedatt--inspect--identity))
+- `manifests` (Attributes List) Upstream `Manifests`. (see [below for nested schema](#nestedatt--inspect--manifests))
+- `metadata` (Attributes) Upstream `Metadata`. (see [below for nested schema](#nestedatt--inspect--metadata))
+- `os` (String) Upstream `Os`.
+- `os_version` (String) Upstream `OsVersion`.
+- `repo_digests` (List of String) Upstream `RepoDigests`.
+- `repo_tags` (List of String) Upstream `RepoTags`.
+- `root_fs` (Attributes) Upstream `RootFS`. (see [below for nested schema](#nestedatt--inspect--root_fs))
+- `size` (Number) Upstream `Size`.
+- `variant` (String) Upstream `Variant`.
+
+<a id="nestedatt--inspect--config"></a>
+### Nested Schema for `inspect.config`
+
+Read-Only:
+
+- `args_escaped` (Boolean) Upstream `ArgsEscaped`.
+- `cmd` (List of String) Upstream `Cmd`.
+- `entrypoint` (List of String) Upstream `Entrypoint`.
+- `env` (List of String) Upstream `Env`.
+- `exposed_ports` (Dynamic) Upstream `ExposedPorts`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `healthcheck` (Dynamic) Upstream `Healthcheck`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `labels` (Map of String) Upstream `Labels`.
+- `on_build` (List of String) Upstream `OnBuild`.
+- `shell` (List of String) Upstream `Shell`.
+- `stop_signal` (String) Upstream `StopSignal`.
+- `user` (String) Upstream `User`.
+- `volumes` (Dynamic) Upstream `Volumes`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `working_dir` (String) Upstream `WorkingDir`.
+
+
+<a id="nestedatt--inspect--descriptor"></a>
+### Nested Schema for `inspect.descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `artifact_type` (String) Upstream `artifactType`.
+- `data` (String) Upstream `data`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `platform` (Dynamic) Upstream `platform`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `size` (Number) Upstream `size`.
+- `urls` (List of String) Upstream `urls`.
+
+
+<a id="nestedatt--inspect--graph_driver"></a>
+### Nested Schema for `inspect.graph_driver`
+
+Read-Only:
+
+- `data` (Map of String) Upstream `Data`.
+- `name` (String) Upstream `Name`.
+
+
+<a id="nestedatt--inspect--identity"></a>
+### Nested Schema for `inspect.identity`
+
+Read-Only:
+
+- `build` (List of String) Upstream `Build`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `pull` (List of String) Upstream `Pull`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `signature` (List of String) Upstream `Signature`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+
+
+<a id="nestedatt--inspect--manifests"></a>
+### Nested Schema for `inspect.manifests`
+
+Read-Only:
+
+- `attestation_data` (String) Upstream `AttestationData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `available` (Boolean) Upstream `Available`.
+- `descriptor` (String) Upstream `Descriptor`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `id` (String) Upstream `ID`.
+- `image_data` (String) Upstream `ImageData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `kind` (String) Upstream `Kind`.
+- `size` (String) Upstream `Size`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+
+
+<a id="nestedatt--inspect--metadata"></a>
+### Nested Schema for `inspect.metadata`
+
+Read-Only:
+
+- `last_tag_time` (String) Upstream `LastTagTime`.
+
+
+<a id="nestedatt--inspect--root_fs"></a>
+### Nested Schema for `inspect.root_fs`
+
+Read-Only:
+
+- `layers` (List of String) Upstream `Layers`.
+- `type` (String) Upstream `Type`.

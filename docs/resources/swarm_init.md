@@ -3,12 +3,12 @@
 page_title: "docker_swarm_init Resource - docker"
 subcategory: ""
 description: |-
-  Initializes a Docker Swarm on the provider's Docker host (docker swarm init through the Engine API), making that daemon the first manager. Exposes the cluster ID and the worker/manager join tokens for docker_swarm_node. Destroying the resource makes the host leave the swarm with force, which dissolves a single-manager swarm.
+  Initializes a Docker Swarm on the provider's Docker host (docker swarm init through the Engine API), making that daemon the first manager. Exposes the cluster ID and the worker/manager join tokens for docker_swarm_node. The spec settings docker swarm update changes (labels, autolock, orchestration, raft, dispatcher, ca_config) are set at init and updated in place. id is the cluster ID (ClusterInfo.ID, also cluster_id); inspect holds the whole Engine swarm object. Destroying the resource makes the host leave the swarm with force, which dissolves a single-manager swarm.
 ---
 
 # docker_swarm_init (Resource)
 
-Initializes a Docker Swarm on the provider's Docker host (`docker swarm init` through the Engine API), making that daemon the first manager. Exposes the cluster ID and the worker/manager join tokens for `docker_swarm_node`. Destroying the resource makes the host leave the swarm with force, which dissolves a single-manager swarm.
+Initializes a Docker Swarm on the provider's Docker host (`docker swarm init` through the Engine API), making that daemon the first manager. Exposes the cluster ID and the worker/manager join tokens for `docker_swarm_node`. The spec settings `docker swarm update` changes (`labels`, `autolock`, `orchestration`, `raft`, `dispatcher`, `ca_config`) are set at init and updated in place. `id` is the cluster ID (`ClusterInfo.ID`, also `cluster_id`); `inspect` holds the whole Engine swarm object. Destroying the resource makes the host leave the swarm with force, which dissolves a single-manager swarm.
 
 ## Example Usage
 
@@ -17,11 +17,30 @@ resource "docker_swarm_init" "this" {
   advertise_addr    = "10.0.0.5"
   default_addr_pool = ["10.20.0.0/16"]
   subnet_size       = 24
+
+  # `docker swarm update` settings, changed in place.
+  labels = {
+    env = "prod"
+  }
+  orchestration = {
+    task_history_retention_limit = 3
+  }
+  dispatcher = {
+    heartbeat_period = "10s"
+  }
+  ca_config = {
+    node_cert_expiry = "720h"
+  }
 }
 
 output "worker_join_token" {
   value     = docker_swarm_init.this.worker_join_token
   sensitive = true
+}
+
+# The whole Engine swarm object, e.g. the root CA certificate.
+output "swarm_trust_root" {
+  value = docker_swarm_init.this.inspect.tls_info.trust_root
 }
 ```
 
@@ -32,20 +51,200 @@ output "worker_join_token" {
 
 - `advertise_addr` (String) Address advertised to other nodes, as `<ip|interface>[:port]`, e.g. `10.0.0.5` or `eth0:2377`. Needed when the host has several addresses. The daemon does not report it back, so the configured value is kept. Changing this forces a new resource.
 - `autolock` (Boolean) Enable manager autolock: managers need `unlock_key` after a daemon restart. Updated in place through SwarmUpdate.
+- `ca_config` (Attributes) CA settings (`Spec.CAConfig`). Updated in place (SwarmUpdate); rotate the root CA with `docker_swarm_rotate_ca`. (see [below for nested schema](#nestedatt--ca_config))
 - `data_path_port` (Number) UDP port for VXLAN data-path traffic. Daemon default 4789. Changing this forces a new resource.
 - `default_addr_pool` (List of String) CIDR pools that overlay network subnets are allocated from, e.g. `["10.20.0.0/16"]`. When unset the daemon default (`10.0.0.0/8`) is used and reported. Changing this forces a new resource.
+- `dispatcher` (Attributes) Dispatcher settings (`Spec.Dispatcher`). Updated in place (SwarmUpdate). (see [below for nested schema](#nestedatt--dispatcher))
 - `force_new_cluster` (Boolean) Force a new single-manager cluster from the current state of this node (disaster recovery). Only read at creation. Changing this forces a new resource.
+- `labels` (Map of String) Labels on the swarm (`Spec.Labels`). When set, the swarm gets exactly these labels; unset leaves them as they are. Updated in place (SwarmUpdate).
 - `listen_addr` (String) Address for inter-manager communication, `<ip|interface>[:port]`. Default `0.0.0.0:2377`. Changing this forces a new resource.
+- `orchestration` (Attributes) Orchestration settings (`Spec.Orchestration`). Updated in place (SwarmUpdate). (see [below for nested schema](#nestedatt--orchestration))
+- `raft` (Attributes) Raft settings (`Spec.Raft`). Updated in place (SwarmUpdate). (see [below for nested schema](#nestedatt--raft))
 - `subnet_size` (Number) Prefix length of each subnet carved from `default_addr_pool`. Daemon default 24. Changing this forces a new resource.
 
 ### Read-Only
 
 - `cluster_id` (String) Swarm cluster ID reported by SwarmInspect.
+- `content_sha256` (String) SHA-256 of inspect_json; changes whenever the object changes.
+- `docker_server_version` (String) Docker Engine version of the daemon the provider talked to (GET /version Version).
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).
 - `id` (String) Swarm cluster ID (same as `cluster_id`). This is the import ID.
+- `inspect` (Attributes) The swarm (its ClusterInfo part) inspect response as a nested object mirroring ClusterInfo field by field (snake_case). JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here. (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String) The exact Engine API inspect response for the swarm (its ClusterInfo part), as JSON. JoinTokens are excluded (see join_tokens); the daemon redacts Spec.CAConfig.SigningCAKey and never returns the unlock key here.
+- `join_tokens` (Attributes, Sensitive) Swarm.JoinTokens (worker and manager join tokens). Sensitive: anyone holding a token can join the swarm. (see [below for nested schema](#nestedatt--join_tokens))
 - `manager_join_token` (String, Sensitive) Token that joins a node as a manager. Pass it to `docker_swarm_node.join_token`.
 - `node_id` (String) Node ID of the initial manager (the provider's host).
 - `unlock_key` (String, Sensitive) Swarm unlock key when `autolock` is true, otherwise null.
+- `version_index` (Number) The swarm object's `Version.Index`; it changes on every update of the swarm.
 - `worker_join_token` (String, Sensitive) Token that joins a node as a worker. Pass it to `docker_swarm_node.join_token`.
+
+<a id="nestedatt--ca_config"></a>
+### Nested Schema for `ca_config`
+
+Optional:
+
+- `node_cert_expiry` (String) Validity of node certificates, as a Go duration such as `2160h` (`NodeCertExpiry`, `--cert-expiry`).
+
+
+<a id="nestedatt--dispatcher"></a>
+### Nested Schema for `dispatcher`
+
+Optional:
+
+- `heartbeat_period` (String) How often agents send heartbeats, as a Go duration such as `5s` (`HeartbeatPeriod`, `--dispatcher-heartbeat`).
+
+
+<a id="nestedatt--orchestration"></a>
+### Nested Schema for `orchestration`
+
+Optional:
+
+- `task_history_retention_limit` (Number) Old tasks kept per service slot (`TaskHistoryRetentionLimit`, `docker swarm update --task-history-limit`).
+
+
+<a id="nestedatt--raft"></a>
+### Nested Schema for `raft`
+
+Optional:
+
+- `keep_old_snapshots` (Number) Snapshots kept beyond the current one (`KeepOldSnapshots`).
+- `log_entries_for_slow_followers` (Number) Log entries kept after a snapshot to sync slow followers (`LogEntriesForSlowFollowers`).
+- `snapshot_interval` (Number) Log entries between raft snapshots (`SnapshotInterval`, `--snapshot-interval`).
+
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `created_at` (String) Upstream `CreatedAt`.
+- `data_path_port` (Number) Upstream `DataPathPort`.
+- `default_addr_pool` (List of String) Upstream `DefaultAddrPool`.
+- `id` (String) Upstream `ID`.
+- `root_rotation_in_progress` (Boolean) Upstream `RootRotationInProgress`.
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--inspect--spec))
+- `subnet_size` (Number) Upstream `SubnetSize`.
+- `tls_info` (Attributes) Upstream `TLSInfo`. (see [below for nested schema](#nestedatt--inspect--tls_info))
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--inspect--version))
+
+<a id="nestedatt--inspect--spec"></a>
+### Nested Schema for `inspect.spec`
+
+Read-Only:
+
+- `ca_config` (Attributes) Upstream `CAConfig`. (see [below for nested schema](#nestedatt--inspect--spec--ca_config))
+- `dispatcher` (Attributes) Upstream `Dispatcher`. (see [below for nested schema](#nestedatt--inspect--spec--dispatcher))
+- `encryption_config` (Attributes) Upstream `EncryptionConfig`. (see [below for nested schema](#nestedatt--inspect--spec--encryption_config))
+- `labels` (Map of String) Upstream `Labels`.
+- `name` (String) Upstream `Name`.
+- `orchestration` (Attributes) Upstream `Orchestration`. (see [below for nested schema](#nestedatt--inspect--spec--orchestration))
+- `raft` (Attributes) Upstream `Raft`. (see [below for nested schema](#nestedatt--inspect--spec--raft))
+- `task_defaults` (Attributes) Upstream `TaskDefaults`. (see [below for nested schema](#nestedatt--inspect--spec--task_defaults))
+
+<a id="nestedatt--inspect--spec--ca_config"></a>
+### Nested Schema for `inspect.spec.ca_config`
+
+Read-Only:
+
+- `external_cas` (Attributes List) Upstream `ExternalCAs`. (see [below for nested schema](#nestedatt--inspect--spec--ca_config--external_cas))
+- `force_rotate` (Number) Upstream `ForceRotate`.
+- `node_cert_expiry` (Number) Upstream `NodeCertExpiry`.
+- `signing_ca_cert` (String) Upstream `SigningCACert`.
+- `signing_ca_key` (String) Upstream `SigningCAKey`.
+
+<a id="nestedatt--inspect--spec--ca_config--external_cas"></a>
+### Nested Schema for `inspect.spec.ca_config.external_cas`
+
+Read-Only:
+
+- `ca_cert` (String) Upstream `CACert`.
+- `options` (Map of String) Upstream `Options`.
+- `protocol` (String) Upstream `Protocol`.
+- `url` (String) Upstream `URL`.
+
+
+
+<a id="nestedatt--inspect--spec--dispatcher"></a>
+### Nested Schema for `inspect.spec.dispatcher`
+
+Read-Only:
+
+- `heartbeat_period` (Number) Upstream `HeartbeatPeriod`.
+
+
+<a id="nestedatt--inspect--spec--encryption_config"></a>
+### Nested Schema for `inspect.spec.encryption_config`
+
+Read-Only:
+
+- `auto_lock_managers` (Boolean) Upstream `AutoLockManagers`.
+
+
+<a id="nestedatt--inspect--spec--orchestration"></a>
+### Nested Schema for `inspect.spec.orchestration`
+
+Read-Only:
+
+- `task_history_retention_limit` (Number) Upstream `TaskHistoryRetentionLimit`.
+
+
+<a id="nestedatt--inspect--spec--raft"></a>
+### Nested Schema for `inspect.spec.raft`
+
+Read-Only:
+
+- `election_tick` (Number) Upstream `ElectionTick`.
+- `heartbeat_tick` (Number) Upstream `HeartbeatTick`.
+- `keep_old_snapshots` (Number) Upstream `KeepOldSnapshots`.
+- `log_entries_for_slow_followers` (Number) Upstream `LogEntriesForSlowFollowers`.
+- `snapshot_interval` (Number) Upstream `SnapshotInterval`.
+
+
+<a id="nestedatt--inspect--spec--task_defaults"></a>
+### Nested Schema for `inspect.spec.task_defaults`
+
+Read-Only:
+
+- `log_driver` (Attributes) Upstream `LogDriver`. (see [below for nested schema](#nestedatt--inspect--spec--task_defaults--log_driver))
+
+<a id="nestedatt--inspect--spec--task_defaults--log_driver"></a>
+### Nested Schema for `inspect.spec.task_defaults.log_driver`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `options` (Map of String) Upstream `Options`.
+
+
+
+
+<a id="nestedatt--inspect--tls_info"></a>
+### Nested Schema for `inspect.tls_info`
+
+Read-Only:
+
+- `cert_issuer_public_key` (String) Upstream `CertIssuerPublicKey`.
+- `cert_issuer_subject` (String) Upstream `CertIssuerSubject`.
+- `trust_root` (String) Upstream `TrustRoot`.
+
+
+<a id="nestedatt--inspect--version"></a>
+### Nested Schema for `inspect.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.
+
+
+
+<a id="nestedatt--join_tokens"></a>
+### Nested Schema for `join_tokens`
+
+Read-Only:
+
+- `manager` (String, Sensitive) Upstream `Manager`.
+- `worker` (String, Sensitive) Upstream `Worker`.
 
 ## Import
 

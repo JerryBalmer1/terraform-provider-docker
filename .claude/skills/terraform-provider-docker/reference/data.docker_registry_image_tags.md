@@ -4,17 +4,30 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Lists every tag of a repository straight from its registry (`GET /v2/<name>/tags/list`), following pagination, with the provider's `registry_auth`. Tags come back in the registry's order, which for distribution-based registries is lexical.
+Lists every tag of a repository straight from its registry (`GET /v2/<name>/tags/list`), following pagination, with the provider's `registry_auth`. Tags come back in the registry's order, which for distribution-based registries is lexical. `tags_json` holds the pages merged into one `{name, tags}` document.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `content_sha256` | `string` | computed |  |  | The `content_sha256` hash output. |
+| `distribution_api_version` | `string` | computed |  |  | The registry's Docker-Distribution-API-Version header. |
 | `insecure_skip_verify` | `bool` | optional |  |  | Skip TLS certificate verification of the registry. |
 | `name` | `string` | required |  |  | Repository, e.g. `nginx`, `ghcr.io/org/app` or `localhost:5000/app`. A tag or digest in it is ignored. |
 | `page_size` | `number` | optional |  |  | Tags requested per page (`n`). Default: the registry's own page size. |
 | `repository` | `string` | computed |  |  | Normalized `registry/repository`, e.g. `docker.io/library/nginx`. |
+| `tag_list` | `object` | computed |  |  | The `tag_list` structured output. |
 | `tags` | `list(string)` | computed |  |  | The tags. |
+| `tags_json` | `string` | computed |  |  | The merged tags/list response. |
+
+### `tag_list`
+
+nested attribute, object. The `tag_list` structured output.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `name`. |
+| `tags` | `list(string)` | computed |  |  | Upstream `tags`. |
 
 ## Example
 

@@ -4,18 +4,69 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Looks up a managed plugin installed on the provider's daemon by `id` or `alias` (`PluginInspectWithRaw`). Fails if no such plugin exists.
+Looks up a managed plugin installed on the provider's daemon by `id` or `alias` (`GET /plugins/{name}/json`). Fails if no such plugin exists. The raw `inspect_json` output is sensitive because plugin settings can hold credentials.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `alias` | `string` | optional, computed |  |  | Plugin name on the daemon, e.g. `vieux/sshfs:latest` or an install alias such as `sshfs`. |
+| `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `enabled` | `bool` | computed |  |  | Whether the plugin is enabled. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `env` | `set(string)` | computed |  |  | Current plugin settings as `KEY=VALUE`. |
 | `id` | `string` | optional, computed |  |  | Plugin ID (or unique ID prefix). Exactly one of `id` and `alias` is required. |
+| `inspect` | `object` | computed |  |  | The GET /plugins/{name}/json response as a nested object, field by field. |
+| `inspect_json` | `string` | computed |  | yes | The exact Engine API GET /plugins/{name}/json response as JSON. |
 | `name` | `string` | computed |  |  | Familiar reference of the plugin, e.g. `vieux/sshfs:latest` (same spelling as `docker_plugin.name`). |
 | `plugin_reference` | `string` | computed |  |  | Fully qualified reference the plugin was installed from, e.g. `docker.io/vieux/sshfs:latest`. |
+
+### `inspect`
+
+nested attribute, object. The GET /plugins/{name}/json response as a nested object, field by field.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `object` | computed |  |  | Upstream `Config`. |
+| `enabled` | `bool` | computed |  |  | Upstream `Enabled`. |
+| `id` | `string` | computed |  |  | Upstream `Id`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `plugin_reference` | `string` | computed |  |  | Upstream `PluginReference`. |
+| `settings` | `object` | computed |  |  | Upstream `Settings`. |
+
+### `inspect.config`
+
+nested attribute, object. Upstream `Config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args` | `dynamic` | computed |  |  | Upstream `Args`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `description` | `string` | computed |  |  | Upstream `Description`. |
+| `documentation` | `string` | computed |  |  | Upstream `Documentation`. |
+| `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
+| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `interface` | `dynamic` | computed |  |  | Upstream `Interface`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `ipc_host` | `bool` | computed |  |  | Upstream `IpcHost`. |
+| `linux` | `dynamic` | computed |  |  | Upstream `Linux`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `mounts` | `list(string)` | computed |  |  | Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `network` | `dynamic` | computed |  |  | Upstream `Network`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `pid_host` | `bool` | computed |  |  | Upstream `PidHost`. |
+| `propagated_mount` | `string` | computed |  |  | Upstream `PropagatedMount`. |
+| `rootfs` | `dynamic` | computed |  |  | Upstream `rootfs`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `user` | `dynamic` | computed |  |  | Upstream `User`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `work_dir` | `string` | computed |  |  | Upstream `WorkDir`. |
+
+### `inspect.settings`
+
+nested attribute, object. Upstream `Settings`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args` | `list(string)` | computed |  |  | Upstream `Args`. |
+| `devices` | `list(string)` | computed |  |  | Upstream `Devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
+| `mounts` | `list(string)` | computed |  |  | Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 
 ## Example
 

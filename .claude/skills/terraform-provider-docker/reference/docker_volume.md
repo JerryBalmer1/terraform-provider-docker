@@ -4,18 +4,125 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A local Docker volume (`VolumeCreate`). Volumes cannot be changed after creation, so every argument forces a new volume (and its data is lost). Destroy fails while a container still uses the volume. Import by volume name.
+A Docker volume (`VolumeCreate`). Volumes cannot be changed after creation, so every argument except `cluster_volume_spec.availability` forces a new volume (and its data is lost). Destroy fails while a container still uses the volume. Import by volume name. Swarm cluster (CSI) volumes are created with `cluster_volume_spec` (their `availability` updates in place). The raw `inspect_json` output is sensitive because driver options can hold credentials.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `cluster_volume_id` | `string` | computed |  |  | Swarm object ID of a cluster volume (`ClusterVolume.ID`); null for a local volume. |
+| `cluster_volume_spec` | `object` | optional | yes |  | Swarm cluster (CSI) volume specification (`ClusterVolumeSpec`, API 1.42+); setting it creates a cluster volume through the Swarm manager instead of a local volume, so the provider must point at a manager and `driver` must name an installed CSI plugin. Changing anything except `availability` forces replacement. |
+| `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `driver` | `string` | optional, computed | yes |  | Volume driver. Default `local`. Changing this forces a new resource. |
 | `driver_opts` | `map(string)` | optional | yes |  | Driver options, e.g. `{ type = "nfs", o = "addr=10.0.0.1,rw", device = ":/export" }` for `local`. Changing this forces a new resource. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `id` | `string` | computed |  |  | Volume name (volumes have no separate ID). |
+| `inspect` | `object` | computed |  |  | The GET /volumes/{name} response as a nested object, field by field. |
+| `inspect_json` | `string` | computed |  | yes | The exact Engine API GET /volumes/{name} response as JSON. |
 | `labels` | `map(string)` | optional | yes |  | Volume labels. Changing this forces a new resource. |
 | `mountpoint` | `string` | computed |  |  | Host path of the volume's data, as reported by the driver. |
 | `name` | `string` | optional, computed | yes |  | Volume name. Unset lets the daemon generate one. Changing this forces a new resource. |
+
+### `cluster_volume_spec`
+
+nested attribute, object. Swarm cluster (CSI) volume specification (`ClusterVolumeSpec`, API 1.42+); setting it creates a cluster volume through the Swarm manager instead of a local volume, so the provider must point at a manager and `driver` must name an installed CSI plugin. Changing anything except `availability` forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `access_mode` | `object` | optional | yes |  | How the volume may be used by tasks (`AccessMode`). Forces replacement. |
+| `accessibility_requirements` | `object` | optional | yes |  | Topology constraints on where the volume is created (`AccessibilityRequirements`). Forces replacement. |
+| `availability` | `string` | optional, computed |  |  | Scheduling availability: `active`, `pause` or `drain` (default `active`). Updated in place with `VolumeUpdate`. |
+| `capacity_range` | `object` | optional | yes |  | Size bounds passed to the CSI plugin (`CapacityRange`). Forces replacement. |
+| `group` | `string` | optional | yes |  | Volume group; services can request any volume of a group (`group:<name>`). Forces replacement. |
+| `secrets` | `list(object)` | optional | yes |  | Swarm secrets passed to the CSI plugin. Forces replacement. |
+
+### `cluster_volume_spec.access_mode`
+
+nested attribute, object. How the volume may be used by tasks (`AccessMode`). Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `block_volume` | `bool` | optional | yes |  | Use the volume as a raw block device (`BlockVolume`) instead of a mount. Forces replacement. |
+| `mount_volume` | `object` | optional | yes |  | Use the volume as a mounted filesystem (`MountVolume`). Forces replacement. |
+| `scope` | `string` | optional | yes |  | `single` (one node at a time) or `multi` (several nodes). Forces replacement. |
+| `sharing` | `string` | optional | yes |  | Sharing between tasks: `none`, `readonly`, `onewriter` or `all`. Forces replacement. |
+
+### `cluster_volume_spec.access_mode.mount_volume`
+
+nested attribute, object. Use the volume as a mounted filesystem (`MountVolume`). Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `fs_type` | `string` | optional | yes |  | Filesystem type, e.g. `ext4`. Forces replacement. |
+| `mount_flags` | `list(string)` | optional | yes |  | Mount flags. Forces replacement. |
+
+### `cluster_volume_spec.accessibility_requirements`
+
+nested attribute, object. Topology constraints on where the volume is created (`AccessibilityRequirements`). Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `preferred` | `list(map(string))` | optional | yes |  | Topologies (segment maps) preferred for the volume, in order. Forces replacement. |
+| `requisite` | `list(map(string))` | optional | yes |  | Topologies (segment maps) the volume must be accessible from. Forces replacement. |
+
+### `cluster_volume_spec.capacity_range`
+
+nested attribute, object. Size bounds passed to the CSI plugin (`CapacityRange`). Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `limit_bytes` | `number` | optional | yes |  | Maximum size in bytes. Forces replacement. |
+| `required_bytes` | `number` | optional | yes |  | Minimum size in bytes. Forces replacement. |
+
+### `cluster_volume_spec.secrets`
+
+nested attribute, list(object). Swarm secrets passed to the CSI plugin. Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `key` | `string` | required | yes |  | Key the plugin receives the secret under. Forces replacement. |
+| `secret` | `string` | required | yes |  | Name or ID of the Swarm secret. Forces replacement. |
+
+### `inspect`
+
+nested attribute, object. The GET /volumes/{name} response as a nested object, field by field.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `cluster_volume` | `object` | computed |  |  | Upstream `ClusterVolume`. |
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `mountpoint` | `string` | computed |  |  | Upstream `Mountpoint`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  | yes | Upstream `Options`. Sensitive. |
+| `scope` | `string` | computed |  |  | Upstream `Scope`. |
+| `status` | `dynamic` | computed |  |  | Upstream `Status`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `usage_data` | `object` | computed |  |  | Upstream `UsageData`. |
+
+### `inspect.cluster_volume`
+
+nested attribute, object. Upstream `ClusterVolume`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `info` | `dynamic` | computed |  |  | Upstream `Info`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `publish_status` | `list(string)` | computed |  |  | Upstream `PublishStatus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `spec` | `dynamic` | computed |  |  | Upstream `Spec`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `dynamic` | computed |  |  | Upstream `Version`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+
+### `inspect.usage_data`
+
+nested attribute, object. Upstream `UsageData`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ref_count` | `number` | computed |  |  | Upstream `RefCount`. |
+| `size` | `number` | computed |  |  | Upstream `Size`. |
 
 ## Example
 
@@ -33,6 +140,28 @@ resource "docker_volume" "nfs" {
     type   = "nfs"
     o      = "addr=10.0.0.10,rw,nfsvers=4"
     device = ":/export/shared"
+  }
+}
+
+# A Swarm cluster (CSI) volume: the provider must point at a swarm manager
+# and the CSI plugin must be installed on the nodes. Only availability
+# changes in place.
+resource "docker_volume" "csi" {
+  name   = "db-data"
+  driver = "csi-driver-nfs"
+  cluster_volume_spec = {
+    group        = "db"
+    availability = "active"
+    access_mode = {
+      scope   = "single"
+      sharing = "none"
+      mount_volume = {
+        fs_type = "ext4"
+      }
+    }
+    capacity_range = {
+      required_bytes = 10737418240
+    }
   }
 }
 ```

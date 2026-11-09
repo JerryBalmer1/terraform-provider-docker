@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Writes one or more images to a local tar archive, like `docker save`. The archive keeps every tag and can be loaded with `docker load` or the `docker_image_load` action; it is written to a temporary name and renamed into place.
+Writes one or more images to a local tar archive, like `docker save`. The archive keeps every tag and can be loaded with `docker load` or the `docker_image_load` action; it is written to a temporary name and renamed into place. The result object holds `images`, `path`, `archive_sha256` and `result.archive_size`.
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
@@ -29,7 +29,9 @@ action "docker_image_save" "<name>" {
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `images` | `list(string)` | required |  |  | Image names, tags or IDs to save, e.g. `[docker_image.app.name]`. All must exist on the daemon. |
-| `path` | `string` | required |  |  | Local tar file to write. Parent directories are created; an existing file is replaced. |
+| `output` | `string` | required |  |  | Local tar file to write, like `docker save --output`. Parent directories are created; an existing file is replaced. |
+| `platform` | `string` | optional |  |  | Only this platform of multi-platform images, `os[/arch[/variant]]` (`docker save --platform`; API 1.48+ with the containerd image store). Default: all platforms. |
+| `result_path` | `string` | optional |  |  | Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails. |
 
 ## Example
 
@@ -49,8 +51,9 @@ resource "docker_image" "app" {
 #   terraform apply -invoke=action.docker_image_save.bundle
 action "docker_image_save" "bundle" {
   config {
-    images = [docker_image.app.name]
-    path   = "${path.module}/out/images.tar"
+    images      = [docker_image.app.name]
+    output      = "${path.module}/out/images.tar"
+    result_path = "${path.module}/out/save-result.json"
   }
 }
 ```

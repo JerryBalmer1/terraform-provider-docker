@@ -4,58 +4,368 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A single-host Docker container, created with `ContainerCreate`, attached to its networks and started. Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `max_retry_count`, `memory`, `memory_swap`, `cpu_shares` and `nano_cpus` update in place (`ContainerRename`/`ContainerUpdate`); `upload` blocks are copied in with `CopyToContainer` before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
+A single-host Docker container, created with `ContainerCreate`, attached to its networks and started. Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `maximum_retry_count`, `memory`, `memory_swap`, `memory_reservation`, `cpu_shares`, `nano_cpus`, `cpu_period`, `cpu_quota` and `cpuset_cpus` update in place (`ContainerRename`/`ContainerUpdate`); `networks` entries are connected and disconnected in place (`NetworkConnect`/`NetworkDisconnect`); `files` blocks are copied in with `PutContainerArchive` before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `auto_remove` | `bool` | optional, computed | yes |  | Remove the container when its process exits (`HostConfig.AutoRemove`, `docker run --rm`); Terraform then plans a new one. Default `false`. Forces replacement. |
+| `cap_add` | `set(string)` | optional | yes |  | Linux capabilities to add, e.g. `NET_ADMIN` (`HostConfig.CapAdd`). Forces replacement. |
+| `cap_drop` | `set(string)` | optional | yes |  | Linux capabilities to drop, e.g. `ALL` (`HostConfig.CapDrop`). Forces replacement. |
+| `cgroup_parent` | `string` | optional | yes |  | Parent cgroup of the container (`HostConfig.CgroupParent`). Forces replacement. |
+| `cgroupns_mode` | `string` | optional | yes |  | Cgroup namespace mode (`HostConfig.CgroupnsMode`): `private` or `host`. Unset uses the daemon default, which is not reported. Forces replacement. |
 | `command` | `list(string)` | optional | yes |  | Command (`CMD`) override. Unset uses the image's. Changing this forces a new resource. |
+| `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `cpu_period` | `number` | optional | yes |  | CPU CFS period in microseconds (`HostConfig.CpuPeriod`). Updated in place; removing it forces a new resource. |
+| `cpu_quota` | `number` | optional | yes |  | CPU CFS quota in microseconds per `cpu_period` (`HostConfig.CpuQuota`). Updated in place; removing it forces a new resource. |
 | `cpu_shares` | `number` | optional | yes |  | Relative CPU weight (default 1024 in the daemon). Updated in place; removing it forces a new resource. |
+| `cpuset_cpus` | `string` | optional | yes |  | CPUs the container may use, e.g. `0-2` or `0,1` (`HostConfig.CpusetCpus`). Updated in place; removing it forces a new resource. |
+| `device_cgroup_rules` | `list(string)` | optional | yes |  | Rules added to the device cgroup, e.g. `c 1:3 mr` (`HostConfig.DeviceCgroupRules`). Forces replacement. |
 | `dns` | `list(string)` | optional | yes |  | DNS server IPs for the container's resolver (`HostConfig.Dns`). Unset uses the daemon/network default. Forces replacement. |
+| `dns_options` | `list(string)` | optional | yes |  | Resolver options, e.g. `ndots:2` (`HostConfig.DnsOptions`). Forces replacement. |
 | `dns_search` | `list(string)` | optional | yes |  | DNS search domains (`HostConfig.DnsSearch`). Forces replacement. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
+| `domainname` | `string` | optional | yes |  | Domain name of the container (`Config.Domainname`). Forces replacement. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `entrypoint` | `list(string)` | optional | yes |  | Entrypoint override. Unset uses the image's; setting it also drops the image's `CMD` unless `command` is set. Changing this forces a new resource. |
 | `env` | `map(string)` | optional | yes |  | Environment variables, merged over the image's. Image-provided variables are not reported in state. Changing this forces a new resource. |
+| `exit_code` | `number` | computed |  |  | Exit code of the container's main process at the last refresh (`State.ExitCode`); 0 while it runs. |
 | `extra_hosts` | `list(string)` | optional | yes |  | Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` exactly like `docker run --add-host` (e.g. `"db.local:10.0.0.5"`, or `"host.docker.internal:host-gateway"` for the host's gateway IP). Forces replacement. |
 | `gpus` | `string` | optional | yes |  | GPUs to expose, like `docker run --gpus`: `"all"`, a count such as `"2"`, or `"device=0,1"` (indexes or UUIDs). Sent as a `HostConfig.DeviceRequests` entry with driver `nvidia` and capabilities `[["gpu"]]`; the host needs the NVIDIA container toolkit. Forces replacement. |
+| `group_add` | `set(string)` | optional | yes |  | Additional groups the container process runs as (`HostConfig.GroupAdd`). Forces replacement. |
 | `hostname` | `string` | optional | yes |  | Container hostname (`Config.Hostname`). Unset: the daemon uses the first 12 characters of the container ID, which is not reported in state. Forces replacement. |
 | `id` | `string` | computed |  |  | Full container ID. |
 | `image` | `string` | required | yes |  | Image reference to run, e.g. `nginx:1.27` or a `docker_image` resource's `name`. Pulled (with matching `registry_auth`) when not present locally. Changing this forces a new resource. |
 | `image_id` | `string` | computed |  |  | ID (`sha256:...`) of the image the container runs. |
+| `init` | `bool` | optional | yes |  | Run an init process inside the container that forwards signals and reaps processes (`HostConfig.Init`, `docker run --init`). Unset uses the daemon setting. Forces replacement. |
+| `inspect` | `object` | computed |  |  | The GET /containers/{id}/json response as a nested object, field by field. |
+| `inspect_json` | `string` | computed |  | yes | The exact Engine API GET /containers/{id}/json response as JSON. |
+| `ipc_mode` | `string` | optional | yes |  | IPC namespace (`HostConfig.IpcMode`): `none`, `private`, `shareable`, `host` or `container:<name\|id>`. Unset uses the daemon default, which is not reported. Forces replacement. |
 | `labels` | `map(string)` | optional | yes |  | Container labels. Image labels are not reported in state. Docker cannot change labels of an existing container, so changing this forces a new resource. |
-| `log_driver` | `string` | optional, computed | yes |  | Logging driver, e.g. `json-file`, `local`, `syslog`. Unset uses the daemon default (reported after create). Changing this forces a new resource. |
-| `log_opts` | `map(string)` | optional, computed | yes |  | Logging driver options, e.g. `{ max-size = "10m" }`. Unset uses the daemon defaults. Changing this forces a new resource. |
-| `max_retry_count` | `number` | optional, computed |  |  | Maximum restart attempts for `restart = "on-failure"` (0 = unlimited). Ignored by other policies. Updated in place. |
+| `maximum_retry_count` | `number` | optional, computed |  |  | Maximum restart attempts for `restart = "on-failure"` (0 = unlimited). Ignored by other policies. Updated in place. |
 | `memory` | `number` | optional | yes |  | Memory limit in bytes. Updated in place; removing the limit forces a new resource. |
+| `memory_reservation` | `number` | optional | yes |  | Memory soft limit in bytes (`HostConfig.MemoryReservation`). Updated in place; removing it forces a new resource. |
 | `memory_swap` | `number` | optional, computed |  |  | Total memory + swap limit in bytes (`-1` = unlimited swap). Unset: the daemon uses twice `memory` when `memory` is set. Updated in place. |
 | `must_run` | `bool` | optional, computed |  |  | When `true` (default) a container found stopped on refresh is planned for start (`running` goes to `true`) and started by the next apply. |
 | `name` | `string` | required |  |  | Container name. Changing it renames the container in place. |
 | `nano_cpus` | `number` | optional | yes |  | CPU quota in units of 1e-9 CPUs (`1500000000` = 1.5 CPUs). Updated in place; removing it forces a new resource. |
+| `network_mode` | `string` | optional | yes |  | Network mode (`HostConfig.NetworkMode`): `bridge`, `host`, `none`, `container:<name\|id>` or a network name. Unset: the alphabetically first `networks` key, else the daemon default `bridge`. Forces replacement. |
+| `networks` | `map(object)` | optional |  |  | Networks the container is attached to, keyed by network name (e.g. a `docker_network`'s `name`); each value mirrors `NetworkingConfig.EndpointsConfig` (`EndpointSettings`). Use `{}` for an endpoint with no settings. All endpoints are configured at create; the container's `NetworkMode` is `network_mode` when set, else the alphabetically first key. Adding or removing a key, or changing an endpoint's settings, connects or disconnects the container in place (`NetworkConnect` / `NetworkDisconnect`) without replacing it. Unset, the container joins the daemon's default `bridge`, which is not reported. |
+| `pid_mode` | `string` | optional | yes |  | PID namespace (`HostConfig.PidMode`): `host` or `container:<name\|id>`. Forces replacement. |
+| `platform` | `string` | optional | yes |  | Platform of the image to run, `os[/arch[/variant]]`, e.g. `linux/arm64` (the create `platform` parameter). Forces replacement. |
 | `privileged` | `bool` | optional, computed | yes |  | Run the container privileged. Changing this forces a new resource. |
+| `publish_all_ports` | `bool` | optional, computed | yes |  | Publish every exposed port on a random host port (`HostConfig.PublishAllPorts`, `docker run -P`). Default `false`. Forces replacement. |
 | `read_only` | `bool` | optional, computed | yes |  | Mount the container's root filesystem read-only (`docker run --read-only`); use `mounts` (e.g. tmpfs) for writable paths. Default `false`. Forces replacement. |
 | `restart` | `string` | optional, computed |  |  | Restart policy: `no` (default), `always`, `unless-stopped` or `on-failure`. Updated in place. |
 | `running` | `bool` | computed |  |  | Whether the container was running at the last refresh. Planned `true` when `must_run` is set. |
+| `runtime` | `string` | optional | yes |  | OCI runtime, e.g. `runc` or `nvidia` (`HostConfig.Runtime`). Unset uses the daemon default, which is not reported. Forces replacement. |
 | `security_opt` | `set(string)` | optional | yes |  | Security options (`HostConfig.SecurityOpt`), e.g. `no-new-privileges:true`, `apparmor=unconfined`, `seccomp=unconfined`, `label=disable`. Forces replacement. |
+| `shm_size` | `number` | optional | yes |  | Size of `/dev/shm` in bytes (`HostConfig.ShmSize`). Unset uses the daemon default (64 MiB), which is not reported. Forces replacement. |
 | `stdin_open` | `bool` | optional, computed | yes |  | Keep stdin open (`docker run -i`); with `tty` this keeps shells such as `sh` from exiting immediately. Default `false`. Forces replacement. |
 | `stop_signal` | `string` | optional | yes |  | Signal sent to stop the container, e.g. `SIGTERM` or `SIGQUIT`. Unset uses the image's `STOPSIGNAL` (else `SIGTERM`); the image value is not reported in state. Forces replacement. |
 | `stop_timeout` | `number` | optional | yes |  | Seconds to wait after the stop signal before killing the container. Unset uses the daemon default (10s). Forces replacement. |
+| `storage_opt` | `map(string)` | optional | yes |  | Storage driver options, e.g. `{ size = "20G" }` (`HostConfig.StorageOpt`). Forces replacement. |
 | `sysctls` | `map(string)` | optional | yes |  | Namespaced kernel parameters, e.g. `{ "net.core.somaxconn" = "1024" }`. Only keys you set are reported (except on import). Forces replacement. |
+| `tmpfs` | `map(string)` | optional | yes |  | tmpfs mounts keyed by container path, values are mount options such as `rw,size=64m` (`HostConfig.Tmpfs`, `docker run --tmpfs`). `mounts` with `type = "tmpfs"` is the structured alternative. Forces replacement. |
 | `tty` | `bool` | optional, computed | yes |  | Allocate a pseudo-TTY (`docker run -t`). Default `false`. Forces replacement. |
 | `user` | `string` | optional | yes |  | User (and optionally `:group`) to run as. Unset uses the image's. Changing this forces a new resource. |
+| `userns_mode` | `string` | optional | yes |  | User namespace mode (`HostConfig.UsernsMode`), e.g. `host`. Forces replacement. |
+| `volumes_from` | `list(string)` | optional | yes |  | Mount the volumes of other containers, `<name\|id>[:ro\|:rw]` (`HostConfig.VolumesFrom`). Forces replacement. |
 | `wait` | `bool` | optional, computed |  |  | Wait after start until the container's healthcheck reports `healthy` (or, without a healthcheck, until it is running). Fails if the container exits or `wait_timeout` elapses. |
 | `wait_timeout` | `string` | optional, computed |  |  | How long `wait` waits, as a Go duration. Default `60s`. |
 | `working_dir` | `string` | optional | yes |  | Working directory. Unset uses the image's. Changing this forces a new resource. |
 
-Nested blocks: `capabilities` (single block, forces replacement), `devices` (list of blocks, forces replacement), `healthcheck` (single block, forces replacement), `mounts` (list of blocks, forces replacement), `networks_advanced` (list of blocks, forces replacement), `ports` (list of blocks, forces replacement), `ulimits` (list of blocks, forces replacement), `upload` (list of blocks, forces replacement).
+Nested blocks: `blkio_device_read_bps` (list of blocks, forces replacement), `blkio_device_read_iops` (list of blocks, forces replacement), `blkio_device_write_bps` (list of blocks, forces replacement), `blkio_device_write_iops` (list of blocks, forces replacement), `device_requests` (list of blocks, forces replacement), `devices` (list of blocks, forces replacement), `files` (list of blocks, forces replacement), `healthcheck` (single block, forces replacement), `logging` (single block, forces replacement), `mounts` (list of blocks, forces replacement), `ports` (list of blocks, forces replacement), `ulimits` (list of blocks, forces replacement).
 
-### `capabilities`
+### `inspect`
 
-single block. Linux capabilities to add or drop. Changing it forces a new resource.
+nested attribute, object. The GET /containers/{id}/json response as a nested object, field by field.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `add` | `set(string)` | optional |  |  | Capabilities to add, e.g. `NET_ADMIN`. |
-| `drop` | `set(string)` | optional |  |  | Capabilities to drop, e.g. `ALL`. |
+| `app_armor_profile` | `string` | computed |  |  | Upstream `AppArmorProfile`. |
+| `args` | `list(string)` | computed |  |  | Upstream `Args`. |
+| `config` | `object` | computed |  |  | Upstream `Config`. |
+| `created` | `string` | computed |  |  | Upstream `Created`. |
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `exec_ids` | `list(string)` | computed |  |  | Upstream `ExecIDs`. |
+| `graph_driver` | `object` | computed |  |  | Upstream `GraphDriver`. |
+| `host_config` | `object` | computed |  |  | Upstream `HostConfig`. |
+| `hostname_path` | `string` | computed |  |  | Upstream `HostnamePath`. |
+| `hosts_path` | `string` | computed |  |  | Upstream `HostsPath`. |
+| `id` | `string` | computed |  |  | Upstream `Id`. |
+| `image` | `string` | computed |  |  | Upstream `Image`. |
+| `image_manifest_descriptor` | `object` | computed |  |  | Upstream `ImageManifestDescriptor`. |
+| `log_path` | `string` | computed |  |  | Upstream `LogPath`. |
+| `mount_label` | `string` | computed |  |  | Upstream `MountLabel`. |
+| `mounts` | `list(object)` | computed |  |  | Upstream `Mounts`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `network_settings` | `object` | computed |  |  | Upstream `NetworkSettings`. |
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `platform` | `string` | computed |  |  | Upstream `Platform`. |
+| `process_label` | `string` | computed |  |  | Upstream `ProcessLabel`. |
+| `resolv_conf_path` | `string` | computed |  |  | Upstream `ResolvConfPath`. |
+| `restart_count` | `number` | computed |  |  | Upstream `RestartCount`. |
+| `size_root_fs` | `number` | computed |  |  | Upstream `SizeRootFs`. |
+| `size_rw` | `number` | computed |  |  | Upstream `SizeRw`. |
+| `state` | `object` | computed |  |  | Upstream `State`. |
+| `storage` | `object` | computed |  |  | Upstream `Storage`. |
+
+### `inspect.config`
+
+nested attribute, object. Upstream `Config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args_escaped` | `bool` | computed |  |  | Upstream `ArgsEscaped`. |
+| `attach_stderr` | `bool` | computed |  |  | Upstream `AttachStderr`. |
+| `attach_stdin` | `bool` | computed |  |  | Upstream `AttachStdin`. |
+| `attach_stdout` | `bool` | computed |  |  | Upstream `AttachStdout`. |
+| `cmd` | `list(string)` | computed |  |  | Upstream `Cmd`. |
+| `domainname` | `string` | computed |  |  | Upstream `Domainname`. |
+| `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
+| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
+| `exposed_ports` | `dynamic` | computed |  |  | Upstream `ExposedPorts`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `healthcheck` | `dynamic` | computed |  |  | Upstream `Healthcheck`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `hostname` | `string` | computed |  |  | Upstream `Hostname`. |
+| `image` | `string` | computed |  |  | Upstream `Image`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `network_disabled` | `bool` | computed |  |  | Upstream `NetworkDisabled`. |
+| `on_build` | `list(string)` | computed |  |  | Upstream `OnBuild`. |
+| `open_stdin` | `bool` | computed |  |  | Upstream `OpenStdin`. |
+| `shell` | `list(string)` | computed |  |  | Upstream `Shell`. |
+| `stdin_once` | `bool` | computed |  |  | Upstream `StdinOnce`. |
+| `stop_signal` | `string` | computed |  |  | Upstream `StopSignal`. |
+| `stop_timeout` | `number` | computed |  |  | Upstream `StopTimeout`. |
+| `tty` | `bool` | computed |  |  | Upstream `Tty`. |
+| `user` | `string` | computed |  |  | Upstream `User`. |
+| `volumes` | `dynamic` | computed |  |  | Upstream `Volumes`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `working_dir` | `string` | computed |  |  | Upstream `WorkingDir`. |
+
+### `inspect.graph_driver`
+
+nested attribute, object. Upstream `GraphDriver`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `data` | `map(string)` | computed |  |  | Upstream `Data`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+
+### `inspect.host_config`
+
+nested attribute, object. Upstream `HostConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `Annotations`. |
+| `auto_remove` | `bool` | computed |  |  | Upstream `AutoRemove`. |
+| `binds` | `list(string)` | computed |  |  | Upstream `Binds`. |
+| `blkio_device_read_bps` | `list(string)` | computed |  |  | Upstream `BlkioDeviceReadBps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `blkio_device_read_iops` | `list(string)` | computed |  |  | Upstream `BlkioDeviceReadIOps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `blkio_device_write_bps` | `list(string)` | computed |  |  | Upstream `BlkioDeviceWriteBps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `blkio_device_write_iops` | `list(string)` | computed |  |  | Upstream `BlkioDeviceWriteIOps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `blkio_weight` | `number` | computed |  |  | Upstream `BlkioWeight`. |
+| `blkio_weight_device` | `list(string)` | computed |  |  | Upstream `BlkioWeightDevice`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cap_add` | `list(string)` | computed |  |  | Upstream `CapAdd`. |
+| `cap_drop` | `list(string)` | computed |  |  | Upstream `CapDrop`. |
+| `cgroup` | `string` | computed |  |  | Upstream `Cgroup`. |
+| `cgroup_parent` | `string` | computed |  |  | Upstream `CgroupParent`. |
+| `cgroupns_mode` | `string` | computed |  |  | Upstream `CgroupnsMode`. |
+| `console_size` | `list(number)` | computed |  |  | Upstream `ConsoleSize`. |
+| `container_id_file` | `string` | computed |  |  | Upstream `ContainerIDFile`. |
+| `cpu_count` | `number` | computed |  |  | Upstream `CpuCount`. |
+| `cpu_percent` | `number` | computed |  |  | Upstream `CpuPercent`. |
+| `cpu_period` | `number` | computed |  |  | Upstream `CpuPeriod`. |
+| `cpu_quota` | `number` | computed |  |  | Upstream `CpuQuota`. |
+| `cpu_realtime_period` | `number` | computed |  |  | Upstream `CpuRealtimePeriod`. |
+| `cpu_realtime_runtime` | `number` | computed |  |  | Upstream `CpuRealtimeRuntime`. |
+| `cpu_shares` | `number` | computed |  |  | Upstream `CpuShares`. |
+| `cpuset_cpus` | `string` | computed |  |  | Upstream `CpusetCpus`. |
+| `cpuset_mems` | `string` | computed |  |  | Upstream `CpusetMems`. |
+| `device_cgroup_rules` | `list(string)` | computed |  |  | Upstream `DeviceCgroupRules`. |
+| `device_requests` | `list(string)` | computed |  |  | Upstream `DeviceRequests`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `devices` | `list(string)` | computed |  |  | Upstream `Devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `dns` | `list(string)` | computed |  |  | Upstream `Dns`. |
+| `dns_options` | `list(string)` | computed |  |  | Upstream `DnsOptions`. |
+| `dns_search` | `list(string)` | computed |  |  | Upstream `DnsSearch`. |
+| `extra_hosts` | `list(string)` | computed |  |  | Upstream `ExtraHosts`. |
+| `group_add` | `list(string)` | computed |  |  | Upstream `GroupAdd`. |
+| `init` | `bool` | computed |  |  | Upstream `Init`. |
+| `io_maximum_bandwidth` | `number` | computed |  |  | Upstream `IOMaximumBandwidth`. |
+| `io_maximum_iops` | `number` | computed |  |  | Upstream `IOMaximumIOps`. |
+| `ipc_mode` | `string` | computed |  |  | Upstream `IpcMode`. |
+| `isolation` | `string` | computed |  |  | Upstream `Isolation`. |
+| `links` | `list(string)` | computed |  |  | Upstream `Links`. |
+| `log_config` | `dynamic` | computed |  |  | Upstream `LogConfig`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `masked_paths` | `list(string)` | computed |  |  | Upstream `MaskedPaths`. |
+| `memory` | `number` | computed |  |  | Upstream `Memory`. |
+| `memory_reservation` | `number` | computed |  |  | Upstream `MemoryReservation`. |
+| `memory_swap` | `number` | computed |  |  | Upstream `MemorySwap`. |
+| `memory_swappiness` | `number` | computed |  |  | Upstream `MemorySwappiness`. |
+| `mounts` | `list(string)` | computed |  |  | Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `nano_cpus` | `number` | computed |  |  | Upstream `NanoCpus`. |
+| `network_mode` | `string` | computed |  |  | Upstream `NetworkMode`. |
+| `oom_kill_disable` | `bool` | computed |  |  | Upstream `OomKillDisable`. |
+| `oom_score_adj` | `number` | computed |  |  | Upstream `OomScoreAdj`. |
+| `pid_mode` | `string` | computed |  |  | Upstream `PidMode`. |
+| `pids_limit` | `number` | computed |  |  | Upstream `PidsLimit`. |
+| `port_bindings` | `map(list(string))` | computed |  |  | Upstream `PortBindings`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `privileged` | `bool` | computed |  |  | Upstream `Privileged`. |
+| `publish_all_ports` | `bool` | computed |  |  | Upstream `PublishAllPorts`. |
+| `readonly_paths` | `list(string)` | computed |  |  | Upstream `ReadonlyPaths`. |
+| `readonly_rootfs` | `bool` | computed |  |  | Upstream `ReadonlyRootfs`. |
+| `restart_policy` | `dynamic` | computed |  |  | Upstream `RestartPolicy`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `runtime` | `string` | computed |  |  | Upstream `Runtime`. |
+| `security_opt` | `list(string)` | computed |  |  | Upstream `SecurityOpt`. |
+| `shm_size` | `number` | computed |  |  | Upstream `ShmSize`. |
+| `storage_opt` | `map(string)` | computed |  |  | Upstream `StorageOpt`. |
+| `sysctls` | `map(string)` | computed |  |  | Upstream `Sysctls`. |
+| `tmpfs` | `map(string)` | computed |  |  | Upstream `Tmpfs`. |
+| `ulimits` | `list(string)` | computed |  |  | Upstream `Ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `umask` | `number` | computed |  |  | Upstream `Umask`. |
+| `userns_mode` | `string` | computed |  |  | Upstream `UsernsMode`. |
+| `uts_mode` | `string` | computed |  |  | Upstream `UTSMode`. |
+| `volume_driver` | `string` | computed |  |  | Upstream `VolumeDriver`. |
+| `volumes_from` | `list(string)` | computed |  |  | Upstream `VolumesFrom`. |
+
+### `inspect.image_manifest_descriptor`
+
+nested attribute, object. Upstream `ImageManifestDescriptor`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `artifact_type` | `string` | computed |  |  | Upstream `artifactType`. |
+| `data` | `string` | computed |  |  | Upstream `data`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `platform` | `dynamic` | computed |  |  | Upstream `platform`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+| `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `inspect.mounts`
+
+nested attribute, list(object). Upstream `Mounts`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `destination` | `string` | computed |  |  | Upstream `Destination`. |
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `propagation` | `string` | computed |  |  | Upstream `Propagation`. |
+| `rw` | `bool` | computed |  |  | Upstream `RW`. |
+| `source` | `string` | computed |  |  | Upstream `Source`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `inspect.network_settings`
+
+nested attribute, object. Upstream `NetworkSettings`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `networks` | `map(string)` | computed |  |  | Upstream `Networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `ports` | `map(list(string))` | computed |  |  | Upstream `Ports`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `sandbox_id` | `string` | computed |  |  | Upstream `SandboxID`. |
+| `sandbox_key` | `string` | computed |  |  | Upstream `SandboxKey`. |
+
+### `inspect.state`
+
+nested attribute, object. Upstream `State`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `dead` | `bool` | computed |  |  | Upstream `Dead`. |
+| `error` | `string` | computed |  |  | Upstream `Error`. |
+| `exit_code` | `number` | computed |  |  | Upstream `ExitCode`. |
+| `finished_at` | `string` | computed |  |  | Upstream `FinishedAt`. |
+| `health` | `dynamic` | computed |  |  | Upstream `Health`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `oom_killed` | `bool` | computed |  |  | Upstream `OOMKilled`. |
+| `paused` | `bool` | computed |  |  | Upstream `Paused`. |
+| `pid` | `number` | computed |  |  | Upstream `Pid`. |
+| `restarting` | `bool` | computed |  |  | Upstream `Restarting`. |
+| `running` | `bool` | computed |  |  | Upstream `Running`. |
+| `started_at` | `string` | computed |  |  | Upstream `StartedAt`. |
+| `status` | `string` | computed |  |  | Upstream `Status`. |
+
+### `inspect.storage`
+
+nested attribute, object. Upstream `Storage`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `root_fs` | `dynamic` | computed |  |  | Upstream `RootFS`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+
+### `networks`
+
+nested attribute, map(object). Networks the container is attached to, keyed by network name (e.g. a `docker_network`'s `name`); each value mirrors `NetworkingConfig.EndpointsConfig` (`EndpointSettings`). Use `{}` for an endpoint with no settings. All endpoints are configured at create; the container's `NetworkMode` is `network_mode` when set, else the alphabetically first key. Adding or removing a key, or changing an endpoint's settings, connects or disconnects the container in place (`NetworkConnect` / `NetworkDisconnect`) without replacing it. Unset, the container joins the daemon's default `bridge`, which is not reported.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `set(string)` | optional |  |  | Extra DNS names of the container on this network (`Aliases`). |
+| `driver_opts` | `map(string)` | optional |  |  | Driver-specific endpoint options (`DriverOpts`). |
+| `endpoint_id` | `string` | computed |  |  | ID of the endpoint (`EndpointID`). |
+| `gateway` | `string` | computed |  |  | IPv4 gateway of the network (`Gateway`). |
+| `global_ipv6_address` | `string` | computed |  |  | Global IPv6 address of the container on this network (`GlobalIPv6Address`). |
+| `global_ipv6_prefix_len` | `number` | computed |  |  | Global IPv6 prefix length (`GlobalIPv6PrefixLen`). |
+| `gw_priority` | `number` | optional |  |  | Gateway priority (`GwPriority`): the endpoint with the highest priority provides the container's default gateway. Needs Engine API >= 1.48. |
+| `ip_address` | `string` | computed |  |  | IPv4 address of the container on this network (`IPAddress`). |
+| `ip_prefix_len` | `number` | computed |  |  | IPv4 prefix length (`IPPrefixLen`). |
+| `ipv4_address` | `string` | optional |  |  | Static IPv4 address (`IPAMConfig.IPv4Address`); needs a user-defined subnet. |
+| `ipv6_address` | `string` | optional |  |  | Static IPv6 address (`IPAMConfig.IPv6Address`); needs an IPv6-enabled network with a user-defined IPv6 subnet. |
+| `ipv6_gateway` | `string` | computed |  |  | IPv6 gateway of the network (`IPv6Gateway`). |
+| `link_local_ips` | `set(string)` | optional |  |  | Link-local addresses (`IPAMConfig.LinkLocalIPs`). |
+| `mac_address` | `string` | optional, computed |  |  | MAC address of the endpoint (`MacAddress`). Unset, the daemon generates one, which is reported. |
+| `network_id` | `string` | computed |  |  | ID of the network (`NetworkID`). |
+
+### `blkio_device_read_bps`
+
+list of blocks. Per-device limit in bytes per second (`HostConfig.BlkioDeviceReadBps`). Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | required |  |  | Device path on the host, e.g. `/dev/sda`. |
+| `rate` | `number` | required |  |  | Limit in bytes per second. |
+
+### `blkio_device_read_iops`
+
+list of blocks. Per-device limit in IO operations per second (`HostConfig.BlkioDeviceReadIOps`). Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | required |  |  | Device path on the host, e.g. `/dev/sda`. |
+| `rate` | `number` | required |  |  | Limit in IO operations per second. |
+
+### `blkio_device_write_bps`
+
+list of blocks. Per-device limit in bytes per second (`HostConfig.BlkioDeviceWriteBps`). Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | required |  |  | Device path on the host, e.g. `/dev/sda`. |
+| `rate` | `number` | required |  |  | Limit in bytes per second. |
+
+### `blkio_device_write_iops`
+
+list of blocks. Per-device limit in IO operations per second (`HostConfig.BlkioDeviceWriteIOps`). Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | required |  |  | Device path on the host, e.g. `/dev/sda`. |
+| `rate` | `number` | required |  |  | Limit in IO operations per second. |
+
+### `device_requests`
+
+list of blocks. Device requests to device drivers (`HostConfig.DeviceRequests`), e.g. GPUs from a driver other than the one `gpus` uses. Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `capabilities` | `list(list(string))` | optional |  |  | Capability sets: the request matches a device having every capability of any one inner list, e.g. `[["gpu"]]`. |
+| `count` | `number` | optional |  |  | Number of devices to request; `-1` requests all. Conflicts with `device_ids` in the daemon. |
+| `device_ids` | `list(string)` | optional |  |  | Device IDs or indexes to request. |
+| `driver` | `string` | optional |  |  | Device driver, e.g. `nvidia`. |
+| `options` | `map(string)` | optional |  |  | Driver-specific options. |
 
 ### `devices`
 
@@ -63,9 +373,24 @@ list of blocks. Host devices mapped into the container (`HostConfig.Devices`, li
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `container_path` | `string` | optional |  |  | Path inside the container. Unset uses `host_path`. |
-| `host_path` | `string` | required |  |  | Device path on the host, e.g. `/dev/fuse`. |
-| `permissions` | `string` | optional, computed |  |  | Cgroup permissions, a combination of `r` (read), `w` (write) and `m` (mknod). Default `rwm`. |
+| `cgroup_permissions` | `string` | optional, computed |  |  | Cgroup permissions (`CgroupPermissions`), a combination of `r` (read), `w` (write) and `m` (mknod). Default `rwm`. |
+| `path_in_container` | `string` | optional |  |  | Path inside the container (`PathInContainer`). Unset uses `path_on_host`. |
+| `path_on_host` | `string` | required |  |  | Device path on the host, e.g. `/dev/fuse` (`PathOnHost`). |
+
+### `files`
+
+list of blocks. Files written into the container with `PutContainerArchive` after create and before start (like `docker cp`). Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `path` must already exist in the image. Files are not read back from the daemon. Changing a file forces a new container, unless the container is stopped (`must_run = false` and not running), in which case the files are copied in place. To copy files into a running container at any time use the `docker_container_cp` action.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `content` | `string` | optional |  |  | Literal file content (UTF-8 text). |
+| `content_base64` | `string` | optional |  |  | File content, base64-encoded (use `filebase64()` for binary files). |
+| `gid` | `number` | optional |  |  | Numeric group ID that owns the file. Default `0`. |
+| `mode` | `string` | optional |  |  | File mode as an octal string, e.g. `"0640"` or `"0755"` for an executable. Unset uploads with `0644`. |
+| `path` | `string` | required |  |  | Absolute path of the file inside the container, e.g. `/etc/app/config.json`. |
+| `source` | `string` | optional |  |  | Path of a local file (on the machine running Terraform) whose content is uploaded. It is read at apply; set `source_hash` (e.g. `filesha256(...)`) so content changes are planned. |
+| `source_hash` | `string` | optional |  |  | Any string that changes when the `source` file changes, e.g. `filesha256("app.conf")`. Only used to trigger a re-upload. |
+| `uid` | `number` | optional |  |  | Numeric user ID that owns the file. Default `0`. |
 
 ### `healthcheck`
 
@@ -75,9 +400,19 @@ single block. Healthcheck override. Without this block the image's healthcheck (
 |---|---|---|---|---|---|
 | `interval` | `string` | optional |  |  | Time between checks, Go duration (e.g. `30s`). |
 | `retries` | `number` | optional |  |  | Consecutive failures before `unhealthy`. |
+| `start_interval` | `string` | optional |  |  | Time between checks during the start period, Go duration (`StartInterval`). |
 | `start_period` | `string` | optional |  |  | Grace period before failures count. |
 | `test` | `list(string)` | optional |  |  | Test command, e.g. `["CMD", "curl", "-f", "http://localhost/"]`, `["CMD-SHELL", "..."]` or `["NONE"]`. Required when the block is present. |
 | `timeout` | `string` | optional |  |  | Time before a check is considered hung. |
+
+### `logging`
+
+single block. Logging driver and its options (`HostConfig.LogConfig`). Without this block the daemon defaults apply and are not reported. Adding or changing the block forces a new resource; removing it keeps the container as it is.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `driver` | `string` | optional, computed |  |  | Logging driver, e.g. `json-file`, `local` or `syslog` (`LogConfig.Type`). Unset uses the daemon default, which is then reported. |
+| `options` | `map(string)` | optional, computed |  |  | Driver options, e.g. `{ max-size = "10m" }` (`LogConfig.Config`). Unset uses the daemon defaults. |
 
 ### `mounts`
 
@@ -89,19 +424,47 @@ list of blocks. Mounts (`HostConfig.Mounts`). Changing mounts forces a new resou
 | `selinux_relabel` | `string` | optional | yes |  | SELinux relabel for a `bind` or named `volume` mount: `z` (shared label) or `Z` (private label), like the `docker run -v src:dst:z` suffix. The entry is then sent as a `HostConfig.Binds` string, because the `Mounts` API has no relabel option. Forces replacement like any mounts change. |
 | `source` | `string` | optional |  |  | Host path (bind) or volume name (volume; unset = anonymous volume). Not allowed for tmpfs. |
 | `target` | `string` | required |  |  | Path inside the container. |
-| `tmpfs_size` | `number` | optional |  |  | tmpfs size in bytes (tmpfs only). |
 | `type` | `string` | required |  |  | `bind`, `volume` or `tmpfs`. |
 
-### `networks_advanced`
+Nested blocks: `bind_options` (single block), `tmpfs_options` (single block), `volume_options` (single block).
 
-list of blocks. Networks to attach. The first is used at create (`NetworkMode`), the rest are connected before start. Without this block the container joins the daemon's default `bridge`. Changing networks forces a new resource.
+### `mounts.bind_options`
+
+single block. Bind mount options (`BindOptions`); `type = "bind"` only.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `aliases` | `set(string)` | optional |  |  | DNS aliases on this network. |
-| `ipv4_address` | `string` | optional |  |  | Static IPv4 address (needs a user-defined subnet). |
-| `ipv6_address` | `string` | optional |  |  | Static IPv6 address (needs an IPv6-enabled network with a user-defined IPv6 subnet). |
-| `name` | `string` | required |  |  | Network name or ID (e.g. a `docker_network`'s `name`). |
+| `propagation` | `string` | optional |  |  | Mount propagation (`Propagation`): `private`, `rprivate`, `shared`, `rshared`, `slave` or `rslave`. |
+
+### `mounts.tmpfs_options`
+
+single block. tmpfs options (`TmpfsOptions`); `type = "tmpfs"` only.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | optional |  |  | Permission bits of the tmpfs root as an octal string, e.g. `"1777"` (`Mode`). |
+| `size_bytes` | `number` | optional |  |  | Size of the tmpfs in bytes (`SizeBytes`). Unset is unlimited. |
+
+### `mounts.volume_options`
+
+single block. Volume mount options (`VolumeOptions`); `type = "volume"` only.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `labels` | `map(string)` | optional |  |  | Labels for a volume the mount creates (`Labels`). |
+| `no_copy` | `bool` | optional |  |  | Do not copy the image's content at the target into a new volume (`NoCopy`). |
+| `subpath` | `string` | optional |  |  | Path inside the volume to mount instead of its root (`Subpath`). |
+
+Nested blocks: `driver_config` (single block).
+
+### `mounts.volume_options.driver_config`
+
+single block. Volume driver for a volume the mount creates (`DriverConfig`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | optional |  |  | Volume driver name (`Name`). |
+| `options` | `map(string)` | optional |  |  | Driver options (`Options`). |
 
 ### `ports`
 
@@ -109,9 +472,9 @@ list of blocks. Published ports (`HostConfig.PortBindings`). Changing ports forc
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `external` | `number` | optional |  |  | Host port. Unset lets the daemon pick an ephemeral port. |
-| `internal` | `number` | required |  |  | Container port. |
-| `ip` | `string` | optional |  |  | Host IP to bind. Unset binds all interfaces. |
+| `container_port` | `number` | required |  |  | Container port (the `PortBindings` key's port). |
+| `host_ip` | `string` | optional |  |  | Host IP to bind (`PortBinding.HostIp`). Unset binds all interfaces. |
+| `host_port` | `number` | optional |  |  | Host port (`PortBinding.HostPort`). Unset lets the daemon pick an ephemeral port. |
 | `protocol` | `string` | optional, computed |  |  | `tcp` (default), `udp` or `sctp`. |
 
 ### `ulimits`
@@ -123,22 +486,6 @@ list of blocks. Resource ulimits. Changing them forces a new resource.
 | `hard` | `number` | required |  |  | Hard limit. |
 | `name` | `string` | required |  |  | Ulimit name, e.g. `nofile`. |
 | `soft` | `number` | required |  |  | Soft limit. |
-
-### `upload`
-
-list of blocks. Files written into the container with `CopyToContainer` after create and before start (like `docker cp`). Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `file` must already exist in the image. Uploads are not read back from the daemon. Changing an upload forces a new container, unless the container is stopped (`must_run = false` and not running), in which case the files are copied in place.
-
-| Name | Type | Status | Forces replacement | Sensitive | Description |
-|---|---|---|---|---|---|
-| `content` | `string` | optional |  |  | Literal file content (UTF-8 text). |
-| `content_base64` | `string` | optional |  |  | File content, base64-encoded (use `filebase64()` for binary files). |
-| `executable` | `bool` | optional, computed |  |  | Upload with mode `0744` instead of `0644`. Default `false`. Conflicts with `permissions`. |
-| `file` | `string` | required |  |  | Absolute path of the file inside the container, e.g. `/etc/app/config.json`. |
-| `group` | `number` | optional |  |  | Numeric group ID that owns the file. Default `0`. |
-| `owner` | `number` | optional |  |  | Numeric user ID that owns the file. Default `0`. |
-| `permissions` | `string` | optional |  |  | File mode as an octal string, e.g. `"0640"` or `"755"`. Default `0644`. Conflicts with `executable`. |
-| `source` | `string` | optional |  |  | Path of a local file (on the machine running Terraform) whose content is uploaded. It is read at apply; set `source_hash` (e.g. `filesha256(...)`) so content changes are planned. |
-| `source_hash` | `string` | optional |  |  | Any string that changes when the `source` file changes, e.g. `filesha256("app.conf")`. Only used to trigger a re-upload. |
 
 ## Example
 
@@ -160,8 +507,8 @@ resource "docker_container" "web" {
   labels = { team = "web" }
 
   ports {
-    internal = 80
-    external = 8080
+    container_port = 80
+    host_port      = 8080
   }
 
   mounts {
@@ -171,9 +518,12 @@ resource "docker_container" "web" {
   }
 
   mounts {
-    type       = "tmpfs"
-    target     = "/var/cache/nginx"
-    tmpfs_size = 67108864
+    type   = "tmpfs"
+    target = "/var/cache/nginx"
+    tmpfs_options {
+      size_bytes = 67108864
+      mode       = "1777"
+    }
   }
 
   # SELinux hosts: relabel the bind source for this container (`-v src:dst:z`).
@@ -186,38 +536,40 @@ resource "docker_container" "web" {
   }
 
   # Files copied in after create and before start.
-  upload {
-    file        = "/etc/nginx/snippets/headers.conf"
-    content     = "add_header X-Served-By terraform;\n"
-    permissions = "0640"
-    owner       = 0
-    group       = 101 # nginx
+  files {
+    path    = "/etc/nginx/snippets/headers.conf"
+    content = "add_header X-Served-By terraform;\n"
+    mode    = "0640"
+    uid     = 0
+    gid     = 101 # nginx
   }
 
   # For a local file use `source = "${path.module}/banner.sh"` together with
   # `source_hash = filesha256("${path.module}/banner.sh")`.
-  upload {
-    file           = "/docker-entrypoint.d/99-banner.sh"
+  files {
+    path           = "/docker-entrypoint.d/99-banner.sh"
     content_base64 = base64encode("#!/bin/sh\necho web starting\n")
-    executable     = true
+    mode           = "0755"
   }
 
-  networks_advanced {
-    name    = docker_network.app.name
-    aliases = ["www"]
+  # Keyed by network name; adding or removing a network connects or
+  # disconnects the container in place.
+  networks = {
+    (docker_network.app.name) = {
+      aliases = ["www"]
+    }
   }
 
   healthcheck {
-    test         = ["CMD", "curl", "-fsS", "http://localhost/"]
-    interval     = "10s"
-    timeout      = "3s"
-    start_period = "5s"
-    retries      = 3
+    test           = ["CMD", "curl", "-fsS", "http://localhost/"]
+    interval       = "10s"
+    timeout        = "3s"
+    start_period   = "5s"
+    start_interval = "1s"
+    retries        = 3
   }
 
-  capabilities {
-    drop = ["NET_RAW"]
-  }
+  cap_drop = ["NET_RAW"]
 
   ulimits {
     name = "nofile"
@@ -233,13 +585,17 @@ resource "docker_container" "web" {
   stop_timeout = 30
   sysctls      = { "net.core.somaxconn" = "1024" }
   security_opt = ["no-new-privileges:true"]
+  init         = true
+  shm_size     = 134217728 # 128 MiB
 
   devices {
-    host_path = "/dev/fuse"
+    path_on_host = "/dev/fuse"
   }
 
-  log_driver = "json-file"
-  log_opts   = { max-size = "10m", max-file = "3" }
+  logging {
+    driver  = "json-file"
+    options = { max-size = "10m", max-file = "3" }
+  }
 
   memory    = 268435456 # 256 MiB, updated in place
   nano_cpus = 500000000 # 0.5 CPU, updated in place
@@ -247,6 +603,12 @@ resource "docker_container" "web" {
   must_run     = true
   wait         = true
   wait_timeout = "2m"
+}
+
+# Read-only endpoint values sit beside the settings in each networks entry;
+# the full ContainerInspect document is in `inspect` (object) and `inspect_json`.
+output "web_ip" {
+  value = docker_container.web.networks["app"].ip_address
 }
 ```
 

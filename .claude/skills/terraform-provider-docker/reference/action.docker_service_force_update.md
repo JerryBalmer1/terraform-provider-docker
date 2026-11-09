@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Redeploys every task of a swarm service without changing its spec, like `docker service update --force`. The rollout follows the service's update_config. It bumps TaskTemplate.ForceUpdate; a `docker_service` that leaves `force_update` unset ignores the new value.
+Redeploys every task of a swarm service without changing its spec, like `docker service update --force`. The rollout follows the service's update_config. It bumps TaskTemplate.ForceUpdate; a `docker_service` that leaves `force_update` unset ignores the new value. The result object has the update warnings, the rollout status and the new `force_update` counter.
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
@@ -28,7 +28,8 @@ action "docker_service_force_update" "<name>" {
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `service` | `string` | required |  |  | Service ID or name. |
+| `result_path` | `string` | optional |  |  | Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails. |
+| `service_id` | `string` | required |  |  | Target service: ID, unique ID prefix or name (resolved to the service ID). |
 | `timeout` | `string` | optional |  |  | How long to wait for convergence, as a Go duration. Default `5m`. |
 | `wait` | `bool` | optional |  |  | Wait until the service converges (every wanted task running). Default `true`. |
 
@@ -59,8 +60,8 @@ variable "worker_join_token" {
 #   terraform apply -invoke=action.docker_service_force_update.web
 action "docker_service_force_update" "web" {
   config {
-    service = "web"
-    timeout = "10m"
+    service_id = "web"
+    timeout    = "10m"
   }
 }
 ```

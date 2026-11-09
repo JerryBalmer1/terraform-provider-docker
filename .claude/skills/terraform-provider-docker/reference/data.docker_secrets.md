@@ -4,27 +4,71 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Lists the swarm's secrets (`GET /secrets`), sorted by name; the provider's host must be a swarm manager. Secret data is never returned by the daemon, so only metadata is listed.
+Lists the swarm's secrets (`GET /secrets`), sorted by name; the provider's host must be a swarm manager. Secret data is never returned by the daemon, so `secrets` holds the metadata (ID, version, times, name, labels, driver).
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `labels` | `map(string)` | optional |  |  | Only objects carrying every one of these labels; an empty value matches any value. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 of secrets_json; changes whenever the object changes. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
+| `ids` | `list(string)` | computed |  |  | IDs of the matching objects, in the order of `secrets`. |
+| `labels` | `map(string)` | optional |  |  | Only objects carrying every one of these labels (Engine `label` filter); an empty value matches any value. |
 | `name` | `string` | optional |  |  | Only objects whose name matches (Engine `name` filter, a prefix/substring match). |
-| `secrets` | `list(object)` | computed |  |  | The matching objects, sorted by name then ID. |
+| `names` | `list(string)` | computed |  |  | Names of the matching objects, in the order of `secrets`. |
+| `secrets` | `list(object)` | computed |  |  | Every secret returned by the list endpoint, each mirroring Secret field by field (snake_case). Not sensitive: Data is never returned by SecretList. |
+| `secrets_json` | `string` | computed |  |  | The exact list response (JSON array of Secret) as returned by the Engine API. Not sensitive: Data is never returned by SecretList. |
 
 ### `secrets`
 
-nested attribute, list(object). The matching objects, sorted by name then ID.
+nested attribute, list(object). Every secret returned by the list endpoint, each mirroring Secret field by field (snake_case). Not sensitive: Data is never returned by SecretList.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `created_at` | `string` | computed |  |  | RFC 3339 creation time. |
-| `id` | `string` | computed |  |  | Secret ID. |
-| `labels` | `map(string)` | computed |  |  | Secret labels. |
-| `name` | `string` | computed |  |  | Secret name. |
-| `updated_at` | `string` | computed |  |  | RFC 3339 time of the last update. |
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `secrets.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `data` | `string` | computed |  |  | Upstream `Data`. |
+| `driver` | `object` | computed |  |  | Upstream `Driver`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `templating` | `object` | computed |  |  | Upstream `Templating`. |
+
+### `secrets.spec.driver`
+
+nested attribute, object. Upstream `Driver`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `secrets.spec.templating`
+
+nested attribute, object. Upstream `Templating`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `secrets.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
 
 ## Example
 
@@ -34,6 +78,6 @@ data "docker_secrets" "shop" {
 }
 
 output "shop_secret_names" {
-  value = data.docker_secrets.shop.secrets[*].name
+  value = data.docker_secrets.shop.names
 }
 ```

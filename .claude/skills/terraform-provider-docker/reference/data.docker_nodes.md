@@ -4,30 +4,163 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Lists the swarm's nodes through the provider's Docker host (which must be a manager), sorted by hostname, optionally filtered by `role`.
+Lists the swarm's nodes (`GET /nodes`) through the provider's Docker host (which must be a manager), sorted by name (the node name, else its hostname) then ID. `nodes` holds each Engine node object (`nodes[0].description.hostname`, `nodes[0].status.state`, `nodes[0].manager_status.leader`). Filter by `role`, `name` and node `labels`.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `nodes` | `list(object)` | computed |  |  | The nodes, sorted by hostname then ID. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 of nodes_json; changes whenever the object changes. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
+| `ids` | `list(string)` | computed |  |  | IDs of the matching objects, in the order of `nodes`. |
+| `labels` | `map(string)` | optional |  |  | Only objects carrying every one of these labels (Engine `node.label` filter); an empty value matches any value. |
+| `name` | `string` | optional |  |  | Only objects whose name matches (Engine `name` filter, a prefix/substring match). |
+| `names` | `list(string)` | computed |  |  | Names of the matching objects, in the order of `nodes`. |
+| `nodes` | `list(object)` | computed |  |  | Every node returned by the list endpoint, each mirroring Node field by field (snake_case). |
+| `nodes_json` | `string` | computed |  |  | The exact list response (JSON array of Node) as returned by the Engine API. |
 | `role` | `string` | optional |  |  | Only list nodes with this role: `worker` or `manager`. |
 
 ### `nodes`
 
-nested attribute, list(object). The nodes, sorted by hostname then ID.
+nested attribute, list(object). Every node returned by the list endpoint, each mirroring Node field by field (snake_case).
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `addr` | `string` | computed |  |  | IP address the node is reached at. |
-| `availability` | `string` | computed |  |  | `active`, `pause` or `drain`. |
-| `engine_version` | `string` | computed |  |  | Docker Engine version. |
-| `hostname` | `string` | computed |  |  | Node hostname. |
-| `id` | `string` | computed |  |  | Node ID. |
-| `labels` | `map(string)` | computed |  |  | Node labels. |
-| `leader` | `bool` | computed |  |  | True for the raft leader. |
-| `role` | `string` | computed |  |  | `worker` or `manager`. |
-| `state` | `string` | computed |  |  | `ready`, `down`, `disconnected` or `unknown`. |
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `description` | `object` | computed |  |  | Upstream `Description`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `manager_status` | `object` | computed |  |  | Upstream `ManagerStatus`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `status` | `object` | computed |  |  | Upstream `Status`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `nodes.description`
+
+nested attribute, object. Upstream `Description`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `engine` | `object` | computed |  |  | Upstream `Engine`. |
+| `hostname` | `string` | computed |  |  | Upstream `Hostname`. |
+| `platform` | `object` | computed |  |  | Upstream `Platform`. |
+| `resources` | `object` | computed |  |  | Upstream `Resources`. |
+| `tls_info` | `object` | computed |  |  | Upstream `TLSInfo`. |
+
+### `nodes.description.engine`
+
+nested attribute, object. Upstream `Engine`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `engine_version` | `string` | computed |  |  | Upstream `EngineVersion`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `plugins` | `list(object)` | computed |  |  | Upstream `Plugins`. |
+
+### `nodes.description.engine.plugins`
+
+nested attribute, list(object). Upstream `Plugins`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+
+### `nodes.description.platform`
+
+nested attribute, object. Upstream `Platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `Architecture`. |
+| `os` | `string` | computed |  |  | Upstream `OS`. |
+
+### `nodes.description.resources`
+
+nested attribute, object. Upstream `Resources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `generic_resources` | `list(object)` | computed |  |  | Upstream `GenericResources`. |
+| `memory_bytes` | `number` | computed |  |  | Upstream `MemoryBytes`. |
+| `nano_cpus` | `number` | computed |  |  | Upstream `NanoCPUs`. |
+
+### `nodes.description.resources.generic_resources`
+
+nested attribute, list(object). Upstream `GenericResources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `discrete_resource_spec` | `object` | computed |  |  | Upstream `DiscreteResourceSpec`. |
+| `named_resource_spec` | `object` | computed |  |  | Upstream `NamedResourceSpec`. |
+
+### `nodes.description.resources.generic_resources.discrete_resource_spec`
+
+nested attribute, object. Upstream `DiscreteResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `number` | computed |  |  | Upstream `Value`. |
+
+### `nodes.description.resources.generic_resources.named_resource_spec`
+
+nested attribute, object. Upstream `NamedResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `string` | computed |  |  | Upstream `Value`. |
+
+### `nodes.description.tls_info`
+
+nested attribute, object. Upstream `TLSInfo`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `cert_issuer_public_key` | `string` | computed |  |  | Upstream `CertIssuerPublicKey`. |
+| `cert_issuer_subject` | `string` | computed |  |  | Upstream `CertIssuerSubject`. |
+| `trust_root` | `string` | computed |  |  | Upstream `TrustRoot`. |
+
+### `nodes.manager_status`
+
+nested attribute, object. Upstream `ManagerStatus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `addr` | `string` | computed |  |  | Upstream `Addr`. |
+| `leader` | `bool` | computed |  |  | Upstream `Leader`. |
+| `reachability` | `string` | computed |  |  | Upstream `Reachability`. |
+
+### `nodes.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `availability` | `string` | computed |  |  | Upstream `Availability`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `role` | `string` | computed |  |  | Upstream `Role`. |
+
+### `nodes.status`
+
+nested attribute, object. Upstream `Status`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `addr` | `string` | computed |  |  | Upstream `Addr`. |
+| `message` | `string` | computed |  |  | Upstream `Message`. |
+| `state` | `string` | computed |  |  | Upstream `State`. |
+
+### `nodes.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
 
 ## Example
 
@@ -37,6 +170,10 @@ data "docker_nodes" "managers" {
 }
 
 output "manager_hostnames" {
-  value = [for n in data.docker_nodes.managers.nodes : n.hostname]
+  value = [for n in data.docker_nodes.managers.nodes : n.description.hostname]
+}
+
+output "manager_ids" {
+  value = data.docker_nodes.managers.ids
 }
 ```

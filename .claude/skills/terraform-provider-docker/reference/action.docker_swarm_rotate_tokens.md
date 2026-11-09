@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Rotates the swarm join tokens, like `docker swarm join-token --rotate`. Nodes already in the swarm are not affected; the old token stops working for new joins. The provider's host must be a swarm manager. Read the new tokens with the `docker_swarm_tokens` data source; they are never printed.
+Rotates the swarm join tokens, like `docker swarm join-token --rotate`. Nodes already in the swarm are not affected; the old token stops working for new joins. The provider's host must be a swarm manager. The result object carries the new tokens (`result.join_tokens`, `worker_join_token`, `manager_join_token`): they show as `(sensitive)` in the progress message and are written in full only to `result_path`; the `docker_swarm_tokens` data source or ephemeral resource reads them too.
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
@@ -29,6 +29,7 @@ action "docker_swarm_rotate_tokens" "<name>" {
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `manager` | `bool` | optional |  |  | Rotate the manager join token. Default `false`. |
+| `result_path` | `string` | optional |  |  | Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails. |
 | `worker` | `bool` | optional |  |  | Rotate the worker join token. Default `true`. |
 
 ## Example

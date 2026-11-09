@@ -3,12 +3,12 @@
 page_title: "docker_node_activate Action - docker"
 subcategory: ""
 description: |-
-  Sets a swarm node's availability back to active, like docker node update --availability active. The scheduler can then place new tasks on it; running services are not rebalanced. The provider's host must be a swarm manager.
+  Sets a swarm node's availability back to active, like docker node update --availability active. The scheduler can then place new tasks on it; running services are not rebalanced. The provider's host must be a swarm manager. The result object has the node's spec afterwards.
 ---
 
 # docker_node_activate (Action)
 
-Sets a swarm node's availability back to `active`, like `docker node update --availability active`. The scheduler can then place new tasks on it; running services are not rebalanced. The provider's host must be a swarm manager.
+Sets a swarm node's availability back to `active`, like `docker node update --availability active`. The scheduler can then place new tasks on it; running services are not rebalanced. The provider's host must be a swarm manager. The result object has the node's spec afterwards.
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_node_activate.<name>] } }`
@@ -38,7 +38,7 @@ resource "terraform_data" "back_in_service" {
 #   terraform apply -invoke=action.docker_node_activate.back
 action "docker_node_activate" "back" {
   config {
-    node = var.node
+    node_id = var.node
   }
 }
 ```
@@ -48,4 +48,8 @@ action "docker_node_activate" "back" {
 
 ### Required
 
-- `node` (String) Node ID, hostname or node name.
+- `node_id` (String) Target node: ID, unique ID prefix, hostname or node name (resolved to the node ID).
+
+### Optional
+
+- `result_path` (String) Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails.

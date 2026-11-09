@@ -16,8 +16,8 @@ provisioners that run `docker`. Express every compose concept as a resource
 into HCL with `go run ./tools/compose2stack` (worked example 2); after that the
 generated `.tf` is the source of truth.
 
-This build registers 15 resources, 15 data sources,
-13 actions, 3 ephemeral resources, 8 list resources
+This build registers 17 resources, 54 data sources,
+51 actions, 4 ephemeral resources, 8 list resources
 and 4 provider functions. Per-type argument tables are in
 [reference/](reference/) and are generated from the provider schema, so they are
 authoritative over anything written here.
@@ -50,9 +50,10 @@ below it.
 
 Pull, build, tag and push images. Everything else consumes an image reference.
 
-- Resources: [`docker_buildx_builder`](reference/docker_buildx_builder.md), [`docker_image`](reference/docker_image.md), [`docker_registry_image`](reference/docker_registry_image.md), [`docker_tag`](reference/docker_tag.md)
-- Data sources: [`docker_image`](reference/data.docker_image.md), [`docker_registry_image`](reference/data.docker_registry_image.md), [`docker_registry_image_manifests`](reference/data.docker_registry_image_manifests.md), [`docker_registry_image_tags`](reference/data.docker_registry_image_tags.md)
-- Actions: [`docker_image_import`](reference/action.docker_image_import.md), [`docker_image_load`](reference/action.docker_image_load.md), [`docker_image_save`](reference/action.docker_image_save.md)
+- Resources: [`docker_buildx_builder`](reference/docker_buildx_builder.md), [`docker_image`](reference/docker_image.md), [`docker_registry_image`](reference/docker_registry_image.md), [`docker_registry_manifest_list`](reference/docker_registry_manifest_list.md), [`docker_tag`](reference/docker_tag.md)
+- Data sources: [`docker_buildx_builder`](reference/data.docker_buildx_builder.md), [`docker_buildx_builders`](reference/data.docker_buildx_builders.md), [`docker_buildx_disk_usage`](reference/data.docker_buildx_disk_usage.md), [`docker_buildx_history`](reference/data.docker_buildx_history.md), [`docker_buildx_history_records`](reference/data.docker_buildx_history_records.md), [`docker_dockerfile`](reference/data.docker_dockerfile.md), [`docker_image`](reference/data.docker_image.md), [`docker_image_attestations`](reference/data.docker_image_attestations.md), [`docker_image_history`](reference/data.docker_image_history.md), [`docker_image_search`](reference/data.docker_image_search.md), [`docker_images`](reference/data.docker_images.md), [`docker_registry_image`](reference/data.docker_registry_image.md), [`docker_registry_image_manifests`](reference/data.docker_registry_image_manifests.md), [`docker_registry_image_tags`](reference/data.docker_registry_image_tags.md)
+- Actions: [`docker_builder_prune`](reference/action.docker_builder_prune.md), [`docker_buildx_bake`](reference/action.docker_buildx_bake.md), [`docker_image_commit`](reference/action.docker_image_commit.md), [`docker_image_import`](reference/action.docker_image_import.md), [`docker_image_load`](reference/action.docker_image_load.md), [`docker_image_prune`](reference/action.docker_image_prune.md), [`docker_image_save`](reference/action.docker_image_save.md)
+- Ephemeral resources: [`docker_registry_login`](reference/ephemeral.docker_registry_login.md), [`docker_registry_token`](reference/ephemeral.docker_registry_token.md)
 - List resources: [`docker_image`](reference/list.docker_image.md)
 
 ### 2. Single-host primitives
@@ -60,16 +61,18 @@ Pull, build, tag and push images. Everything else consumes an image reference.
 Networks, volumes, plugins and plain containers on the daemon the provider points at.
 
 - Resources: [`docker_compose`](reference/docker_compose.md), [`docker_container`](reference/docker_container.md), [`docker_network`](reference/docker_network.md), [`docker_plugin`](reference/docker_plugin.md), [`docker_volume`](reference/docker_volume.md)
-- Data sources: [`docker_containers`](reference/data.docker_containers.md), [`docker_logs`](reference/data.docker_logs.md), [`docker_network`](reference/data.docker_network.md), [`docker_plugin`](reference/data.docker_plugin.md), [`docker_volume`](reference/data.docker_volume.md)
-- Actions: [`docker_container_export`](reference/action.docker_container_export.md), [`docker_exec`](reference/action.docker_exec.md), [`docker_system_prune`](reference/action.docker_system_prune.md)
+- Data sources: [`docker_compose_config`](reference/data.docker_compose_config.md), [`docker_compose_containers`](reference/data.docker_compose_containers.md), [`docker_compose_images`](reference/data.docker_compose_images.md), [`docker_compose_logs`](reference/data.docker_compose_logs.md), [`docker_compose_port`](reference/data.docker_compose_port.md), [`docker_compose_projects`](reference/data.docker_compose_projects.md), [`docker_compose_top`](reference/data.docker_compose_top.md), [`docker_compose_volumes`](reference/data.docker_compose_volumes.md), [`docker_container`](reference/data.docker_container.md), [`docker_container_changes`](reference/data.docker_container_changes.md), [`docker_container_file`](reference/data.docker_container_file.md), [`docker_container_logs`](reference/data.docker_container_logs.md), [`docker_container_stats`](reference/data.docker_container_stats.md), [`docker_container_top`](reference/data.docker_container_top.md), [`docker_containers`](reference/data.docker_containers.md), [`docker_info`](reference/data.docker_info.md), [`docker_network`](reference/data.docker_network.md), [`docker_networks`](reference/data.docker_networks.md), [`docker_plugin`](reference/data.docker_plugin.md), [`docker_plugins`](reference/data.docker_plugins.md), [`docker_system_df`](reference/data.docker_system_df.md), [`docker_version`](reference/data.docker_version.md), [`docker_volume`](reference/data.docker_volume.md), [`docker_volumes`](reference/data.docker_volumes.md)
+- Actions: [`docker_compose_build`](reference/action.docker_compose_build.md), [`docker_compose_commit`](reference/action.docker_compose_commit.md), [`docker_compose_cp`](reference/action.docker_compose_cp.md), [`docker_compose_exec`](reference/action.docker_compose_exec.md), [`docker_compose_export`](reference/action.docker_compose_export.md), [`docker_compose_kill`](reference/action.docker_compose_kill.md), [`docker_compose_pause`](reference/action.docker_compose_pause.md), [`docker_compose_publish`](reference/action.docker_compose_publish.md), [`docker_compose_pull`](reference/action.docker_compose_pull.md), [`docker_compose_push`](reference/action.docker_compose_push.md), [`docker_compose_restart`](reference/action.docker_compose_restart.md), [`docker_compose_run`](reference/action.docker_compose_run.md), [`docker_compose_scale`](reference/action.docker_compose_scale.md), [`docker_compose_start`](reference/action.docker_compose_start.md), [`docker_compose_stop`](reference/action.docker_compose_stop.md), [`docker_compose_unpause`](reference/action.docker_compose_unpause.md), [`docker_compose_wait`](reference/action.docker_compose_wait.md), [`docker_container_cp`](reference/action.docker_container_cp.md), [`docker_container_export`](reference/action.docker_container_export.md), [`docker_container_kill`](reference/action.docker_container_kill.md), [`docker_container_pause`](reference/action.docker_container_pause.md), [`docker_container_prune`](reference/action.docker_container_prune.md), [`docker_container_restart`](reference/action.docker_container_restart.md), [`docker_container_start`](reference/action.docker_container_start.md), [`docker_container_stop`](reference/action.docker_container_stop.md), [`docker_container_unpause`](reference/action.docker_container_unpause.md), [`docker_container_wait`](reference/action.docker_container_wait.md), [`docker_exec`](reference/action.docker_exec.md), [`docker_network_prune`](reference/action.docker_network_prune.md), [`docker_plugin_create`](reference/action.docker_plugin_create.md), [`docker_plugin_push`](reference/action.docker_plugin_push.md), [`docker_system_prune`](reference/action.docker_system_prune.md), [`docker_volume_prune`](reference/action.docker_volume_prune.md)
+- Ephemeral resources: [`docker_exec_output`](reference/ephemeral.docker_exec_output.md)
 - List resources: [`docker_container`](reference/list.docker_container.md), [`docker_network`](reference/list.docker_network.md), [`docker_volume`](reference/list.docker_volume.md)
 
 ### 3. Swarm topology
 
 Turn the provider's daemon into a Swarm manager and join further hosts as workers or managers.
 
-- Resources: [`docker_swarm_init`](reference/docker_swarm_init.md), [`docker_swarm_node`](reference/docker_swarm_node.md)
-- Data sources: [`docker_node`](reference/data.docker_node.md), [`docker_nodes`](reference/data.docker_nodes.md), [`docker_swarm_tokens`](reference/data.docker_swarm_tokens.md)
+- Resources: [`docker_node`](reference/docker_node.md), [`docker_swarm_init`](reference/docker_swarm_init.md), [`docker_swarm_node`](reference/docker_swarm_node.md)
+- Data sources: [`docker_node`](reference/data.docker_node.md), [`docker_nodes`](reference/data.docker_nodes.md), [`docker_swarm`](reference/data.docker_swarm.md), [`docker_swarm_tokens`](reference/data.docker_swarm_tokens.md)
+- Actions: [`docker_node_activate`](reference/action.docker_node_activate.md), [`docker_node_demote`](reference/action.docker_node_demote.md), [`docker_node_drain`](reference/action.docker_node_drain.md), [`docker_node_promote`](reference/action.docker_node_promote.md), [`docker_swarm_rotate_ca`](reference/action.docker_swarm_rotate_ca.md), [`docker_swarm_rotate_tokens`](reference/action.docker_swarm_rotate_tokens.md), [`docker_swarm_rotate_unlock_key`](reference/action.docker_swarm_rotate_unlock_key.md), [`docker_swarm_unlock`](reference/action.docker_swarm_unlock.md)
 - Ephemeral resources: [`docker_swarm_tokens`](reference/ephemeral.docker_swarm_tokens.md)
 - List resources: [`docker_swarm_node`](reference/list.docker_swarm_node.md)
 
@@ -78,8 +81,8 @@ Turn the provider's daemon into a Swarm manager and join further hosts as worker
 Secrets, configs, services and stacks scheduled by the Swarm. Needs layer 3.
 
 - Resources: [`docker_config`](reference/docker_config.md), [`docker_secret`](reference/docker_secret.md), [`docker_service`](reference/docker_service.md), [`docker_stack`](reference/docker_stack.md)
-- Data sources: none registered in this build
-- Actions: [`docker_service_scale`](reference/action.docker_service_scale.md)
+- Data sources: [`docker_config`](reference/data.docker_config.md), [`docker_configs`](reference/data.docker_configs.md), [`docker_secret`](reference/data.docker_secret.md), [`docker_secrets`](reference/data.docker_secrets.md), [`docker_service`](reference/data.docker_service.md), [`docker_service_logs`](reference/data.docker_service_logs.md), [`docker_services`](reference/data.docker_services.md), [`docker_stack`](reference/data.docker_stack.md), [`docker_stacks`](reference/data.docker_stacks.md), [`docker_task`](reference/data.docker_task.md), [`docker_task_logs`](reference/data.docker_task_logs.md), [`docker_tasks`](reference/data.docker_tasks.md)
+- Actions: [`docker_service_force_update`](reference/action.docker_service_force_update.md), [`docker_service_rollback`](reference/action.docker_service_rollback.md), [`docker_service_scale`](reference/action.docker_service_scale.md)
 - List resources: [`docker_config`](reference/list.docker_config.md), [`docker_secret`](reference/list.docker_secret.md), [`docker_service`](reference/list.docker_service.md)
 
 ### Other
@@ -87,9 +90,7 @@ Secrets, configs, services and stacks scheduled by the Swarm. Needs layer 3.
 Registered types not mapped to a layer yet.
 
 - Resources: none registered in this build
-- Data sources: [`docker_configs`](reference/data.docker_configs.md), [`docker_secrets`](reference/data.docker_secrets.md), [`docker_services`](reference/data.docker_services.md)
-- Actions: [`docker_image_prune`](reference/action.docker_image_prune.md), [`docker_node_activate`](reference/action.docker_node_activate.md), [`docker_node_drain`](reference/action.docker_node_drain.md), [`docker_service_force_update`](reference/action.docker_service_force_update.md), [`docker_service_rollback`](reference/action.docker_service_rollback.md), [`docker_swarm_rotate_tokens`](reference/action.docker_swarm_rotate_tokens.md)
-- Ephemeral resources: [`docker_exec_output`](reference/ephemeral.docker_exec_output.md), [`docker_registry_token`](reference/ephemeral.docker_registry_token.md)
+- Data sources: none registered in this build
 - Functions: [`provider::docker::compose_env`](reference/function.compose_env.md), [`provider::docker::image_ref`](reference/function.image_ref.md), [`provider::docker::parse_image_ref`](reference/function.parse_image_ref.md), [`provider::docker::port_spec`](reference/function.port_spec.md)
 
 Layer 2 primitives also work inside a Swarm: `docker_network` with
@@ -139,82 +140,150 @@ object (some are conditional; the description says when).
 
 | Resource | Attribute | Description |
 |---|---|---|
-| `docker_buildx_builder` | `bootstrap` | Start the builder and wait until BuildKit lists its workers (`--bootstrap`). |
-| `docker_buildx_builder` | `buildkit_config` | Path of a local `buildkitd.toml` (`--buildkitd-config`), read at apply and copied to `/etc/buildkit/buildkitd.toml` in the container. |
-| `docker_buildx_builder` | `buildkit_config_content` | `buildkitd.toml` content, copied like `buildkit_config`. |
-| `docker_buildx_builder` | `buildkit_flags` | Flags for buildkitd (`--buildkitd-flags`), whitespace-separated with no shell quoting, e.g. `"--debug --allow-insecure-entitlement=security.insecure"`. |
+| `docker_buildx_builder` | `append` | Whether this node joins an existing builder of the same `name` (`--append`). |
+| `docker_buildx_builder` | `bootstrap` | Whether to start the builder and wait until BuildKit lists its workers (`--bootstrap`). |
+| `docker_buildx_builder` | `buildkitd_config` | Path of a local `buildkitd.toml` (`--buildkitd-config`), read at apply and copied to `/etc/buildkit/buildkitd.toml` in the container. |
+| `docker_buildx_builder` | `buildkitd_config_content` | Content of `buildkitd.toml`, copied like `buildkitd_config`. |
+| `docker_buildx_builder` | `buildkitd_flags` | Flags for buildkitd (`--buildkitd-flags`), whitespace-separated with no shell quoting, e.g. `"--debug --allow-insecure-entitlement=security.insecure"`. |
 | `docker_buildx_builder` | `driver` | Builder driver. |
-| `docker_buildx_builder` | `name` | Builder name, as for `docker buildx create --name`. |
-| `docker_buildx_builder` | `tcp_port` | Also serve BuildKit on TCP: buildkitd listens on `tcp://0.0.0.0:1234` in the container and the port is published on this host port. |
+| `docker_buildx_builder` | `name` | Builder name, as for `docker buildx create --name`; pass it to `docker_image.build.builder`. |
+| `docker_buildx_builder` | `node` | Node name (`--node`); the node container is `buildx_buildkit_<node>`. |
+| `docker_buildx_builder` | `platform` | Platforms this node is pinned to (`--platform`), listed first in `platforms`. |
+| `docker_buildx_builder` | `tcp_port` | Host port on which BuildKit is also served over TCP: buildkitd listens on `tcp://0.0.0.0:1234` in the container and the port is published on this host port. |
 | `docker_buildx_builder` | `docker_container` (block) | Settings for the BuildKit container (`--driver-opt`). |
 | `docker_compose` | `mode` | Deployment target: `local` (default) or `swarm`. |
-| `docker_compose` | `project_name` | Project name used to name and label every object. |
+| `docker_compose` | `name` | The compose project name (compose-spec top-level `name`, CLI `--project-name`), used to name and label every object. |
 | `docker_config` | `data` | Config content, base64-encoded (use `base64encode()`); it must decode. |
 | `docker_config` | `data_wo_version` | Version of `data_wo`. |
-| `docker_config` | `labels` | User labels on the config. |
 | `docker_config` | `name` | Config name, unique in the Swarm. |
+| `docker_container` | `auto_remove` | Remove the container when its process exits (`HostConfig.AutoRemove`, `docker run --rm`); Terraform then plans a new one. |
+| `docker_container` | `cap_add` | Linux capabilities to add, e.g. `NET_ADMIN` (`HostConfig.CapAdd`). |
+| `docker_container` | `cap_drop` | Linux capabilities to drop, e.g. `ALL` (`HostConfig.CapDrop`). |
+| `docker_container` | `cgroup_parent` | Parent cgroup of the container (`HostConfig.CgroupParent`). |
+| `docker_container` | `cgroupns_mode` | Cgroup namespace mode (`HostConfig.CgroupnsMode`): `private` or `host`. |
 | `docker_container` | `command` | Command (`CMD`) override. |
+| `docker_container` | `cpu_period` | CPU CFS period in microseconds (`HostConfig.CpuPeriod`). |
+| `docker_container` | `cpu_quota` | CPU CFS quota in microseconds per `cpu_period` (`HostConfig.CpuQuota`). |
 | `docker_container` | `cpu_shares` | Relative CPU weight (default 1024 in the daemon). |
+| `docker_container` | `cpuset_cpus` | CPUs the container may use, e.g. `0-2` or `0,1` (`HostConfig.CpusetCpus`). |
+| `docker_container` | `device_cgroup_rules` | Rules added to the device cgroup, e.g. `c 1:3 mr` (`HostConfig.DeviceCgroupRules`). |
 | `docker_container` | `dns` | DNS server IPs for the container's resolver (`HostConfig.Dns`). |
+| `docker_container` | `dns_options` | Resolver options, e.g. `ndots:2` (`HostConfig.DnsOptions`). |
 | `docker_container` | `dns_search` | DNS search domains (`HostConfig.DnsSearch`). |
+| `docker_container` | `domainname` | Domain name of the container (`Config.Domainname`). |
 | `docker_container` | `entrypoint` | Entrypoint override. |
 | `docker_container` | `env` | Environment variables, merged over the image's. |
 | `docker_container` | `extra_hosts` | Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` exactly like `docker run --add-host` (e.g. `"db.local:10.0.0.5"`, or `"host.docker.internal:host-gateway"` for the host's gateway IP). |
 | `docker_container` | `gpus` | GPUs to expose, like `docker run --gpus`: `"all"`, a count such as `"2"`, or `"device=0,1"` (indexes or UUIDs). |
+| `docker_container` | `group_add` | Additional groups the container process runs as (`HostConfig.GroupAdd`). |
 | `docker_container` | `hostname` | Container hostname (`Config.Hostname`). |
 | `docker_container` | `image` | Image reference to run, e.g. `nginx:1.27` or a `docker_image` resource's `name`. |
+| `docker_container` | `init` | Run an init process inside the container that forwards signals and reaps processes (`HostConfig.Init`, `docker run --init`). |
+| `docker_container` | `ipc_mode` | IPC namespace (`HostConfig.IpcMode`): `none`, `private`, `shareable`, `host` or `container:<name\|id>`. |
 | `docker_container` | `labels` | Container labels. |
-| `docker_container` | `log_driver` | Logging driver, e.g. `json-file`, `local`, `syslog`. |
-| `docker_container` | `log_opts` | Logging driver options, e.g. `{ max-size = "10m" }`. |
 | `docker_container` | `memory` | Memory limit in bytes. |
+| `docker_container` | `memory_reservation` | Memory soft limit in bytes (`HostConfig.MemoryReservation`). |
 | `docker_container` | `nano_cpus` | CPU quota in units of 1e-9 CPUs (`1500000000` = 1.5 CPUs). |
+| `docker_container` | `network_mode` | Network mode (`HostConfig.NetworkMode`): `bridge`, `host`, `none`, `container:<name\|id>` or a network name. |
+| `docker_container` | `pid_mode` | PID namespace (`HostConfig.PidMode`): `host` or `container:<name\|id>`. |
+| `docker_container` | `platform` | Platform of the image to run, `os[/arch[/variant]]`, e.g. `linux/arm64` (the create `platform` parameter). |
 | `docker_container` | `privileged` | Run the container privileged. |
+| `docker_container` | `publish_all_ports` | Publish every exposed port on a random host port (`HostConfig.PublishAllPorts`, `docker run -P`). |
 | `docker_container` | `read_only` | Mount the container's root filesystem read-only (`docker run --read-only`); use `mounts` (e.g. tmpfs) for writable paths. |
+| `docker_container` | `runtime` | OCI runtime, e.g. `runc` or `nvidia` (`HostConfig.Runtime`). |
 | `docker_container` | `security_opt` | Security options (`HostConfig.SecurityOpt`), e.g. `no-new-privileges:true`, `apparmor=unconfined`, `seccomp=unconfined`, `label=disable`. |
+| `docker_container` | `shm_size` | Size of `/dev/shm` in bytes (`HostConfig.ShmSize`). |
 | `docker_container` | `stdin_open` | Keep stdin open (`docker run -i`); with `tty` this keeps shells such as `sh` from exiting immediately. |
 | `docker_container` | `stop_signal` | Signal sent to stop the container, e.g. `SIGTERM` or `SIGQUIT`. |
 | `docker_container` | `stop_timeout` | Seconds to wait after the stop signal before killing the container. |
+| `docker_container` | `storage_opt` | Storage driver options, e.g. `{ size = "20G" }` (`HostConfig.StorageOpt`). |
 | `docker_container` | `sysctls` | Namespaced kernel parameters, e.g. `{ "net.core.somaxconn" = "1024" }`. |
+| `docker_container` | `tmpfs` | tmpfs mounts keyed by container path, values are mount options such as `rw,size=64m` (`HostConfig.Tmpfs`, `docker run --tmpfs`). |
 | `docker_container` | `tty` | Allocate a pseudo-TTY (`docker run -t`). |
 | `docker_container` | `user` | User (and optionally `:group`) to run as. |
+| `docker_container` | `userns_mode` | User namespace mode (`HostConfig.UsernsMode`), e.g. `host`. |
+| `docker_container` | `volumes_from` | Mount the volumes of other containers, `<name\|id>[:ro\|:rw]` (`HostConfig.VolumesFrom`). |
 | `docker_container` | `working_dir` | Working directory. |
-| `docker_container` | `capabilities` (block) | Linux capabilities to add or drop. |
+| `docker_container` | `blkio_device_read_bps` (block) | Per-device limit in bytes per second (`HostConfig.BlkioDeviceReadBps`). |
+| `docker_container` | `blkio_device_read_iops` (block) | Per-device limit in IO operations per second (`HostConfig.BlkioDeviceReadIOps`). |
+| `docker_container` | `blkio_device_write_bps` (block) | Per-device limit in bytes per second (`HostConfig.BlkioDeviceWriteBps`). |
+| `docker_container` | `blkio_device_write_iops` (block) | Per-device limit in IO operations per second (`HostConfig.BlkioDeviceWriteIOps`). |
+| `docker_container` | `device_requests` (block) | Device requests to device drivers (`HostConfig.DeviceRequests`), e.g. GPUs from a driver other than the one `gpus` uses. |
 | `docker_container` | `devices` (block) | Host devices mapped into the container (`HostConfig.Devices`, like `docker run --device`). |
+| `docker_container` | `files` (block) | Files written into the container with `PutContainerArchive` after create and before start (like `docker cp`). |
 | `docker_container` | `healthcheck` (block) | Healthcheck override. |
+| `docker_container` | `logging` (block) | Logging driver and its options (`HostConfig.LogConfig`). |
 | `docker_container` | `mounts` (block) | Mounts (`HostConfig.Mounts`). |
 | `docker_container` | `mounts.selinux_relabel` | SELinux relabel for a `bind` or named `volume` mount: `z` (shared label) or `Z` (private label), like the `docker run -v src:dst:z` suffix. |
-| `docker_container` | `networks_advanced` (block) | Networks to attach. |
 | `docker_container` | `ports` (block) | Published ports (`HostConfig.PortBindings`). |
 | `docker_container` | `ulimits` (block) | Resource ulimits. |
-| `docker_container` | `upload` (block) | Files written into the container with `CopyToContainer` after create and before start (like `docker cp`). |
 | `docker_image` | `name` | Image reference. |
 | `docker_image` | `platform` | Platform to pull or build, `os[/arch[/variant]]` such as `linux/amd64`. |
 | `docker_image` | `triggers` | Arbitrary string map; any change re-pulls or rebuilds the image. |
-| `docker_image` | `build` (block) | Build the image from a local directory instead of pulling it. |
-| `docker_image` | `build.builder` | Builder backend: `classic` (default; the legacy builder, `DOCKER_BUILDKIT=0`) or `buildkit`. |
+| `docker_image` | `build` (block) | Build the image instead of pulling it, like `docker build`. |
+| `docker_image` | `build.additional_contexts` | BuildKit only. |
+| `docker_image` | `build.args` | Build arguments (`--build-arg`). |
+| `docker_image` | `build.attestations` | BuildKit only. |
+| `docker_image` | `build.builder` | Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit) or the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`). |
 | `docker_image` | `build.cache_from` | BuildKit only. |
+| `docker_image` | `build.cache_to` | BuildKit only. |
+| `docker_image` | `build.cgroup_parent` | Classic builder only. |
+| `docker_image` | `build.context` | Path of the build context directory, relative to the directory Terraform runs in (use `${path.module}/...`); exactly one of `context` and `remote` is required. |
+| `docker_image` | `build.cpu_period` | Classic builder only. |
+| `docker_image` | `build.cpu_quota` | Classic builder only. |
+| `docker_image` | `build.cpu_shares` | Classic builder only. |
+| `docker_image` | `build.cpuset_cpus` | Classic builder only. |
+| `docker_image` | `build.cpuset_mems` | Classic builder only. |
+| `docker_image` | `build.dockerfile` | Dockerfile path relative to `context` (or absolute). |
+| `docker_image` | `build.extra_hosts` | Extra `/etc/hosts` entries for `RUN`, as `host:ip` (`--add-host`). |
+| `docker_image` | `build.force_rm` | Classic builder: always remove intermediate containers, even after a failed step (`--force-rm`). |
+| `docker_image` | `build.isolation` | Classic builder only. |
+| `docker_image` | `build.labels` | Labels set on the built image. |
+| `docker_image` | `build.memory` | Classic builder only. |
+| `docker_image` | `build.memswap` | Classic builder only. |
+| `docker_image` | `build.network` | Network mode for `RUN` instructions (`--network`): `default`, `none`, `host`, or (classic builder) a network name. |
+| `docker_image` | `build.no_cache` | Do not use the build cache (`--no-cache`). |
+| `docker_image` | `build.no_cache_filter` | BuildKit only. |
+| `docker_image` | `build.outputs` | BuildKit only. |
+| `docker_image` | `build.platform` | Build platform, e.g. `linux/arm64`. |
 | `docker_image` | `build.platforms` | BuildKit only. |
+| `docker_image` | `build.provenance` | BuildKit only. |
+| `docker_image` | `build.pull` | Always attempt to pull newer versions of base images (`--pull`). |
+| `docker_image` | `build.remote` | Classic builder only. |
+| `docker_image` | `build.sbom` | BuildKit only. |
+| `docker_image` | `build.shm_size` | Size of `/dev/shm` in bytes for `RUN` (`--shm-size`). |
+| `docker_image` | `build.squash` | Classic builder only (experimental daemons). |
+| `docker_image` | `build.ssh` | BuildKit only. |
+| `docker_image` | `build.ssh.id` | SSH ID, usually `default`. |
+| `docker_image` | `build.ssh.paths` | Agent socket or private key paths; empty uses `SSH_AUTH_SOCK` of the provider process. |
+| `docker_image` | `build.tags` | Extra references to tag the built image with, besides `name` (`-t`, repeated). |
+| `docker_image` | `build.target` | Multi-stage target to build (`--target`). |
+| `docker_image` | `build.ulimits` | Resource limits for `RUN`, keyed by limit name such as `nofile` or `nproc` (`--ulimit name=soft:hard`). |
+| `docker_image` | `build.ulimits.hard` | Hard limit. |
+| `docker_image` | `build.ulimits.soft` | Soft limit. |
 | `docker_image` | `build.secrets` (block) | BuildKit only. |
 | `docker_image` | `build.secrets.env` | Name of an environment variable of the provider process holding the secret. |
 | `docker_image` | `build.secrets.id` | Secret ID referenced by `RUN --mount=type=secret,id=...`. |
 | `docker_image` | `build.secrets.src` | Path of a file holding the secret (max 500 KiB). |
 | `docker_network` | `attachable` | Let standalone containers attach to an `overlay` network. |
 | `docker_network` | `driver` | Network driver: `bridge` (default), `overlay` (Swarm manager only), `macvlan`, `ipvlan`, or a plugin. |
+| `docker_network` | `enable_ipv6` | Enable IPv6 on the network (`EnableIPv6`). |
 | `docker_network` | `ingress` | Create the Swarm routing-mesh (ingress) network. |
 | `docker_network` | `internal` | Restrict external access to the network. |
 | `docker_network` | `ipam_driver` | IPAM driver. |
-| `docker_network` | `ipv6` | Enable IPv6. |
+| `docker_network` | `ipam_options` | IPAM driver options (`IPAM.Options`), e.g. for a third-party IPAM plugin. |
 | `docker_network` | `labels` | Network labels. |
 | `docker_network` | `name` | Network name. |
 | `docker_network` | `options` | Driver options, e.g. `{ "com.docker.network.bridge.name" = "br-app" }`. |
 | `docker_network` | `ipam_config` (block) | Static IPAM pools. |
+| `docker_node` | `node_id` | The node to manage: ID, unique ID prefix, hostname or node name (resolved to the node ID, see `id`). |
 | `docker_plugin` | `alias` | Local name of the plugin (`docker plugin install --alias`), used by volume and network drivers. |
 | `docker_plugin` | `name` | Plugin reference to install from a registry, e.g. `vieux/sshfs:latest` or `ghcr.io/org/plugin:1.0` (`registry_auth` credentials apply). |
 | `docker_registry_image` | `name` | Local image reference to push, including registry host and tag (e.g. `registry.example.com/team/app:1.2`; no tag means `latest`). |
 | `docker_registry_image` | `triggers` | Arbitrary string map; any change pushes the image again. |
+| `docker_registry_manifest_list` | `name` | Reference the index is pushed under, with registry and tag, e.g. `registry.example.com/team/app:1.2` (no tag means `latest`; a digest is not allowed). |
 | `docker_secret` | `data` | Secret content, base64-encoded (use `base64encode()`); it must decode. |
 | `docker_secret` | `data_wo_version` | Version of `data_wo`. |
-| `docker_secret` | `labels` | User labels on the secret. |
 | `docker_secret` | `name` | Secret name, unique in the Swarm. |
 | `docker_service` | `mode` | `replicated` (default; runs `replicas` tasks), `global` (one task per eligible node), `replicated_job` (runs `total_completions` tasks to completion, `max_concurrent` at a time) or `global_job` (one run-to-completion task per eligible node). |
 | `docker_service` | `name` | Service name. |
@@ -230,8 +299,27 @@ object (some are conditional; the description says when).
 | `docker_swarm_node` | `join_token` | Worker or manager join token, e.g. `docker_swarm_init.this.worker_join_token`. |
 | `docker_swarm_node` | `listen_addr` | Listen address for swarm traffic on the node. |
 | `docker_swarm_node` | `manager_address` | Address of an existing manager as seen from the joining node, e.g. `10.0.0.5:2377`. |
-| `docker_tag` | `source_image` | Existing image to tag: a name, `name:tag`, or image ID (e.g. a `docker_image`'s `image_id`). |
+| `docker_tag` | `source_image` | Existing image to tag: a name, `name:tag`, or image ID (e.g. a `docker_image`'s `id`). |
 | `docker_tag` | `target_image` | New reference, `repository[:tag]` (no tag means `latest`), e.g. `registry.example.com/app:1.0`. |
+| `docker_tag` | `triggers` | Arbitrary string map; any change re-applies the tag (for example after `source_image` was rebuilt under the same name). |
+| `docker_volume` | `cluster_volume_spec` | Swarm cluster (CSI) volume specification (`ClusterVolumeSpec`, API 1.42+); setting it creates a cluster volume through the Swarm manager instead of a local volume, so the provider must point at a manager and `driver` must name an installed CSI plugin. |
+| `docker_volume` | `cluster_volume_spec.access_mode` | How the volume may be used by tasks (`AccessMode`). |
+| `docker_volume` | `cluster_volume_spec.access_mode.block_volume` | Use the volume as a raw block device (`BlockVolume`) instead of a mount. |
+| `docker_volume` | `cluster_volume_spec.access_mode.mount_volume` | Use the volume as a mounted filesystem (`MountVolume`). |
+| `docker_volume` | `cluster_volume_spec.access_mode.mount_volume.fs_type` | Filesystem type, e.g. `ext4`. |
+| `docker_volume` | `cluster_volume_spec.access_mode.mount_volume.mount_flags` | Mount flags. |
+| `docker_volume` | `cluster_volume_spec.access_mode.scope` | `single` (one node at a time) or `multi` (several nodes). |
+| `docker_volume` | `cluster_volume_spec.access_mode.sharing` | Sharing between tasks: `none`, `readonly`, `onewriter` or `all`. |
+| `docker_volume` | `cluster_volume_spec.accessibility_requirements` | Topology constraints on where the volume is created (`AccessibilityRequirements`). |
+| `docker_volume` | `cluster_volume_spec.accessibility_requirements.preferred` | Topologies (segment maps) preferred for the volume, in order. |
+| `docker_volume` | `cluster_volume_spec.accessibility_requirements.requisite` | Topologies (segment maps) the volume must be accessible from. |
+| `docker_volume` | `cluster_volume_spec.capacity_range` | Size bounds passed to the CSI plugin (`CapacityRange`). |
+| `docker_volume` | `cluster_volume_spec.capacity_range.limit_bytes` | Maximum size in bytes. |
+| `docker_volume` | `cluster_volume_spec.capacity_range.required_bytes` | Minimum size in bytes. |
+| `docker_volume` | `cluster_volume_spec.group` | Volume group; services can request any volume of a group (`group:<name>`). |
+| `docker_volume` | `cluster_volume_spec.secrets` | Swarm secrets passed to the CSI plugin. |
+| `docker_volume` | `cluster_volume_spec.secrets.key` | Key the plugin receives the secret under. |
+| `docker_volume` | `cluster_volume_spec.secrets.secret` | Name or ID of the Swarm secret. |
 | `docker_volume` | `driver` | Volume driver. |
 | `docker_volume` | `driver_opts` | Driver options, e.g. `{ type = "nfs", o = "addr=10.0.0.1,rw", device = ":/export" }` for `local`. |
 | `docker_volume` | `labels` | Volume labels. |
@@ -252,7 +340,7 @@ Gotchas to plan around:
   Put a content hash in `triggers` (for example
   `sha1(join("", [for f in fileset(path.module, "app/**") : filesha1("${path.module}/${f}")]))`)
   to rebuild when the build context changes. Pin services to
-  `docker_image.x.repo_digest` so a new pull of the same tag rolls the service.
+  `docker_image.x.image_digest_ref` so a new pull of the same tag rolls the service.
 - **`docker_swarm_init` destroy = leave the swarm.** Destroying or replacing it
   makes the manager leave and tears down every Swarm object with it. Changing
   `advertise_addr` or `listen_addr` therefore rebuilds the whole cluster; guard
@@ -301,19 +389,57 @@ want Terraform to keep converging a value, use a resource argument instead
 
 Registered in this build:
 
-- [`action.docker_container_export`](reference/action.docker_container_export.md): Writes a container's filesystem to a local tar file, like `docker export`.
+- [`action.docker_builder_prune`](reference/action.docker_builder_prune.md): Removes build cache, like `docker builder prune`, and reports the cache records removed and the space reclaimed.
+- [`action.docker_buildx_bake`](reference/action.docker_buildx_bake.md): Builds one or more targets from a bake definition, like `docker buildx bake`.
+- [`action.docker_compose_build`](reference/action.docker_compose_build.md): Builds every service of a compose project that has a `build:` section, like `docker compose build`, through BuildKit (no docker CLI or buildx binary), and tags each image `image` or `<project>-<service>` plus `build.tags`.
+- [`action.docker_compose_commit`](reference/action.docker_compose_commit.md): Creates an image from a compose service container's changes, like `docker compose commit`.
+- [`action.docker_compose_cp`](reference/action.docker_compose_cp.md): Copies files between a compose service container and the machine running Terraform, like `docker compose cp`.
+- [`action.docker_compose_exec`](reference/action.docker_compose_exec.md): Runs a command in a running container of a compose service, like `docker compose exec`, and fails when it exits non-zero.
+- [`action.docker_compose_export`](reference/action.docker_compose_export.md): Exports a compose service container's filesystem as a tar archive to a local file, like `docker compose export -o`.
+- [`action.docker_compose_kill`](reference/action.docker_compose_kill.md): Sends a signal (default `SIGKILL`) to the running containers of a compose project, like `docker compose kill`.
+- [`action.docker_compose_pause`](reference/action.docker_compose_pause.md): Pauses the running containers of a compose project, like `docker compose pause`.
+- [`action.docker_compose_publish`](reference/action.docker_compose_publish.md): Publishes a compose application as an OCI artifact, like `docker compose publish`: each compose file becomes a `application/vnd.docker.compose.file+yaml` layer of an OCI manifest with artifact type `application/vnd.docker.compose.project`, pushed with the registry HTTP API v2 (credentials from `registry_auth`).
+- [`action.docker_compose_pull`](reference/action.docker_compose_pull.md): Pulls the image of every service of a compose project, like `docker compose pull`, with the provider's `registry_auth`.
+- [`action.docker_compose_push`](reference/action.docker_compose_push.md): Pushes the image of every service of a compose project that names one (`image`), like `docker compose push`, with the provider's `registry_auth`.
+- [`action.docker_compose_restart`](reference/action.docker_compose_restart.md): Restarts the containers of a compose project (stopped ones included), like `docker compose restart`.
+- [`action.docker_compose_run`](reference/action.docker_compose_run.md): Runs a one-off container for a compose service, like `docker compose run`: the container `<project>-<service>-run-<id>` is created from the service's compose model (image pulled or built, networks, volumes, secrets and configs as for `docker_compose`), labelled `com.docker.compose.oneoff=True`, waited for and removed.
+- [`action.docker_compose_scale`](reference/action.docker_compose_scale.md): Sets the number of containers of compose services on the provider's daemon, like `docker compose scale web=3`: missing `<project>-<service>-<n>` containers are created from the compose model (pulled or built as needed) and the highest-numbered extra ones are removed; kept containers that are stopped are started.
+- [`action.docker_compose_start`](reference/action.docker_compose_start.md): Starts the existing stopped containers of a compose project, like `docker compose start`.
+- [`action.docker_compose_stop`](reference/action.docker_compose_stop.md): Stops the running containers of a compose project without removing them, like `docker compose stop`.
+- [`action.docker_compose_unpause`](reference/action.docker_compose_unpause.md): Unpauses the paused containers of a compose project, like `docker compose unpause`.
+- [`action.docker_compose_wait`](reference/action.docker_compose_wait.md): Blocks until the containers of compose services stop, like `docker compose wait`.
+- [`action.docker_container_cp`](reference/action.docker_container_cp.md): Copies a file or directory into an existing container at any time, like `docker container cp SRC CONTAINER:PATH`.
+- [`action.docker_container_export`](reference/action.docker_container_export.md): Writes a container's filesystem to a local tar file, like `docker container export --output`.
+- [`action.docker_container_kill`](reference/action.docker_container_kill.md): Sends a signal to a running container, like `docker container kill`.
+- [`action.docker_container_pause`](reference/action.docker_container_pause.md): Freezes all processes of a running container, like `docker container pause` (the cgroup freezer).
+- [`action.docker_container_prune`](reference/action.docker_container_prune.md): Removes stopped containers, like `docker container prune`, and reports what it removed and the space reclaimed.
+- [`action.docker_container_restart`](reference/action.docker_container_restart.md): Restarts a container, like `docker container restart`: a stop (signal, grace period, SIGKILL) followed by a start.
+- [`action.docker_container_start`](reference/action.docker_container_start.md): Starts a stopped or created container, like `docker container start`.
+- [`action.docker_container_stop`](reference/action.docker_container_stop.md): Stops a running container, like `docker container stop`: it sends the stop signal, waits for the grace period and then sends SIGKILL.
+- [`action.docker_container_unpause`](reference/action.docker_container_unpause.md): Resumes the processes of a paused container, like `docker container unpause`.
+- [`action.docker_container_wait`](reference/action.docker_container_wait.md): Blocks until a container reaches a condition and reports its exit code, like `docker container wait`.
 - [`action.docker_exec`](reference/action.docker_exec.md): Runs a command inside a running container, like `docker exec`, and fails when it exits non-zero.
+- [`action.docker_image_commit`](reference/action.docker_image_commit.md): Creates an image from a container's filesystem changes, like `docker container commit` (`POST /commit`).
 - [`action.docker_image_import`](reference/action.docker_image_import.md): Creates an image from a filesystem tarball, like `docker import`.
 - [`action.docker_image_load`](reference/action.docker_image_load.md): Loads images from a local tar archive into the daemon, like `docker load`.
-- [`action.docker_image_prune`](reference/action.docker_image_prune.md): Removes unused images, like `docker image prune`, and reports the space reclaimed.
+- [`action.docker_image_prune`](reference/action.docker_image_prune.md): Removes unused images, like `docker image prune`, and reports what it removed and the space reclaimed.
 - [`action.docker_image_save`](reference/action.docker_image_save.md): Writes one or more images to a local tar archive, like `docker save`.
+- [`action.docker_network_prune`](reference/action.docker_network_prune.md): Removes networks no container uses, like `docker network prune`, and reports what it removed.
 - [`action.docker_node_activate`](reference/action.docker_node_activate.md): Sets a swarm node's availability back to `active`, like `docker node update --availability active`.
+- [`action.docker_node_demote`](reference/action.docker_node_demote.md): Demotes a swarm manager to worker, like `docker node demote` (NodeUpdate with `Role = worker`).
 - [`action.docker_node_drain`](reference/action.docker_node_drain.md): Sets a swarm node's availability to `drain` and waits until its tasks have left, like `docker node update --availability drain`.
+- [`action.docker_node_promote`](reference/action.docker_node_promote.md): Promotes a swarm worker to manager, like `docker node promote` (NodeUpdate with `Role = manager`).
+- [`action.docker_plugin_create`](reference/action.docker_plugin_create.md): Creates a local plugin from a host directory holding `config.json` and a `rootfs/` directory, like `docker plugin create` (`POST /plugins/create`).
+- [`action.docker_plugin_push`](reference/action.docker_plugin_push.md): Pushes a local plugin to its registry, like `docker plugin push` (`POST /plugins/{name}/push`), using the provider's `registry_auth` credentials for the plugin's registry.
 - [`action.docker_service_force_update`](reference/action.docker_service_force_update.md): Redeploys every task of a swarm service without changing its spec, like `docker service update --force`.
 - [`action.docker_service_rollback`](reference/action.docker_service_rollback.md): Rolls a swarm service back to its previous spec, like `docker service rollback`, and waits for the rollback to complete.
 - [`action.docker_service_scale`](reference/action.docker_service_scale.md): Sets the replica count of a replicated swarm service, like `docker service scale`, and waits for the tasks.
+- [`action.docker_swarm_rotate_ca`](reference/action.docker_swarm_rotate_ca.md): Rotates the swarm root CA, like `docker swarm ca --rotate`: a new self-signed root, or the given signing certificate and key (`Spec.CAConfig.SigningCACert` / `SigningCAKey`), with `CAConfig.ForceRotate` incremented.
 - [`action.docker_swarm_rotate_tokens`](reference/action.docker_swarm_rotate_tokens.md): Rotates the swarm join tokens, like `docker swarm join-token --rotate`.
-- [`action.docker_system_prune`](reference/action.docker_system_prune.md): Removes unused Docker objects, like `docker system prune`, and reports the space reclaimed.
+- [`action.docker_swarm_rotate_unlock_key`](reference/action.docker_swarm_rotate_unlock_key.md): Rotates the manager unlock key of an autolocked swarm, like `docker swarm unlock-key --rotate`.
+- [`action.docker_swarm_unlock`](reference/action.docker_swarm_unlock.md): Unlocks a locked swarm manager, like `docker swarm unlock`: after a daemon restart, a manager of an autolocked swarm stays locked until it gets the unlock key.
+- [`action.docker_system_prune`](reference/action.docker_system_prune.md): Removes unused Docker objects, like `docker system prune`, and reports what it removed and the space reclaimed.
+- [`action.docker_volume_prune`](reference/action.docker_volume_prune.md): Removes volumes no container uses (anonymous ones only, unless `all = true`), like `docker volume prune`, and reports what it removed and the space reclaimed.
 
 Declare an action with its arguments in a `config` block, then either trigger
 it from a resource's lifecycle or invoke it by hand:
@@ -359,7 +485,8 @@ it to a `*_wo` argument or to a provider block, so it never lands in state.
 
 Registered in this build:
 
-- [`ephemeral.docker_exec_output`](reference/ephemeral.docker_exec_output.md): Runs a command in a running container (`docker exec`) and returns its standard output as an ephemeral value that is never written to plan or state.
+- [`ephemeral.docker_exec_output`](reference/ephemeral.docker_exec_output.md): Runs a command in a running container (`docker exec`) and returns its standard output and error as ephemeral values that are never written to plan or state.
+- [`ephemeral.docker_registry_login`](reference/ephemeral.docker_registry_login.md): Validates registry credentials through the daemon (`POST /auth`, like `docker login`) and returns the identity token the registry issues, if any.
 - [`ephemeral.docker_registry_token`](reference/ephemeral.docker_registry_token.md): Obtains a short-lived registry bearer token, as an ephemeral value that is never written to plan or state.
 - [`ephemeral.docker_swarm_tokens`](reference/ephemeral.docker_swarm_tokens.md): Reads the worker and manager join tokens of the swarm the provider's Docker host manages, as ephemeral values that are never written to plan or state.
 
@@ -508,11 +635,11 @@ resource "docker_secret" "db_password" {
 
 resource "docker_service" "web" {
   name     = "web"
-  image    = docker_image.web.repo_digest
+  image    = docker_image.web.image_digest_ref
   mode     = "replicated"
   replicas = 3
 
-  networks = [docker_network.app.id]
+  networks = { (docker_network.app.id) = {} }
 
   placement {
     constraints = ["node.role==worker"]
@@ -623,7 +750,7 @@ resource "docker_stack" "shop" {
       POSTGRES_DB            = "shop"
       POSTGRES_PASSWORD_FILE = "/run/secrets/db_password"
     }
-    networks = ["backend"]
+    networks = { backend = {} }
 
     secrets {
       secret_id = "db_password"
@@ -641,7 +768,7 @@ resource "docker_stack" "shop" {
     name     = "web"
     image    = "nginx:1.27-alpine"
     replicas = 2
-    networks = ["backend"]
+    networks = { backend = {} }
 
     endpoint_spec {
       ports {
@@ -682,16 +809,16 @@ resource "docker_swarm_init" "this" {
 # Runs inside a running task of shop_db on the provider's daemon.
 action "docker_exec" "seed_db" {
   config {
-    service = "shop_db"
-    command = ["sh", "-c", "until pg_isready -U postgres; do sleep 1; done; psql -U postgres -d shop -c 'CREATE TABLE IF NOT EXISTS items (id serial PRIMARY KEY, name text)'"]
+    service_id = "shop_db"
+    command    = ["sh", "-c", "until pg_isready -U postgres; do sleep 1; done; psql -U postgres -d shop -c 'CREATE TABLE IF NOT EXISTS items (id serial PRIMARY KEY, name text)'"]
   }
 }
 
 # Not triggered by any resource: run it on demand.
 action "docker_service_scale" "web_peak" {
   config {
-    service  = "shop_web"
-    replicas = 6
+    service_id = "shop_web"
+    replicas   = 6
   }
 }
 ```
@@ -722,48 +849,128 @@ before choosing argument names.
 - [`provider "docker"`](reference/provider.md): Owns the whole Docker chain through the Docker Engine API: image build and push, single-host networks, volumes and containers, Swarm init and node join, and Swarm secrets, configs, services and stacks.
 - [`docker_buildx_builder`](reference/docker_buildx_builder.md): A BuildKit builder run by the daemon as a `docker-container` driver node, the same container and state volume `docker buildx create --driver docker-container --bootstrap` makes, created through the Engine API without the buildx CLI.
 - [`docker_compose`](reference/docker_compose.md): A Docker Compose project applied through the Engine API, with no compose CLI plugin involved.
-- [`docker_config`](reference/docker_config.md): A Swarm config: an immutable, non-secret blob mounted into service tasks as a file.
+- [`docker_config`](reference/docker_config.md): A Swarm config: a non-secret blob mounted into service tasks as a file.
 - [`docker_container`](reference/docker_container.md): A single-host Docker container, created with `ContainerCreate`, attached to its networks and started.
-- [`docker_image`](reference/docker_image.md): A Docker image on the provider's daemon.
+- [`docker_image`](reference/docker_image.md): A Docker image on the provider's daemon, pulled from its registry or built from a local context.
 - [`docker_network`](reference/docker_network.md): A Docker network (`NetworkCreate`): a local `bridge`/`macvlan`/`ipvlan` network, or a Swarm-scoped `overlay` network when the daemon is a Swarm manager.
+- [`docker_node`](reference/docker_node.md): Manages the labels, availability and role of a swarm node that has already joined, like `docker node update`, through the provider's Docker host (which must be a manager).
 - [`docker_plugin`](reference/docker_plugin.md): A managed Docker Engine plugin installed from a registry, like `docker plugin install`.
 - [`docker_registry_image`](reference/docker_registry_image.md): Pushes an image that exists on the provider's daemon (typically a `docker_image`) to its registry, using the provider's `registry_auth` credentials.
-- [`docker_secret`](reference/docker_secret.md): A Swarm secret: an immutable blob the Swarm managers store encrypted and mount into service tasks under `/run/secrets/<file_name>`.
+- [`docker_registry_manifest_list`](reference/docker_registry_manifest_list.md): Pushes a multi-platform image index (OCI image index or Docker manifest list) under a tag, assembled from images that are already in the same registry, like `docker manifest create` + `annotate` + `push` or `docker buildx imagetools create`.
+- [`docker_secret`](reference/docker_secret.md): A Swarm secret: a blob the Swarm managers store encrypted and mount into service tasks under `/run/secrets/<file_name>`.
 - [`docker_service`](reference/docker_service.md): A Swarm service: a desired number of tasks (containers) of one image scheduled across the Swarm.
 - [`docker_stack`](reference/docker_stack.md): A Swarm stack built from API primitives (not a compose file, no CLI): services, overlay networks, secrets and configs, each named `<stack>_<name>` and labelled `com.docker.stack.namespace=<stack>` so `docker stack ls/ps` show them.
 - [`docker_swarm_init`](reference/docker_swarm_init.md): Initializes a Docker Swarm on the provider's Docker host (`docker swarm init` through the Engine API), making that daemon the first manager.
-- [`docker_swarm_node`](reference/docker_swarm_node.md): Joins a Docker host to an existing swarm.
+- [`docker_swarm_node`](reference/docker_swarm_node.md): Joins a Docker host to an existing swarm (`docker swarm join`); to manage a node that already joined without joining or leaving, use `docker_node`.
 - [`docker_tag`](reference/docker_tag.md): Adds a tag to an image already on the provider's daemon, like `docker tag SOURCE TARGET`.
-- [`docker_volume`](reference/docker_volume.md): A local Docker volume (`VolumeCreate`).
-- [`data.docker_configs`](reference/data.docker_configs.md): Lists the swarm's configs (`GET /configs`), sorted by name, with their content; the provider's host must be a swarm manager.
-- [`data.docker_containers`](reference/data.docker_containers.md): Lists containers on the provider's Docker host (`GET /containers/json`), sorted by name.
-- [`data.docker_image`](reference/data.docker_image.md): Looks up an image already present on the provider's daemon (no pull).
-- [`data.docker_logs`](reference/data.docker_logs.md): Reads a container's logs (`GET /containers/{id}/logs`) as a list of lines.
-- [`data.docker_network`](reference/data.docker_network.md): Looks up an existing Docker network (e.g. `bridge`, `host`, or one created outside Terraform) by name or ID.
-- [`data.docker_node`](reference/data.docker_node.md): Looks up one swarm node through the provider's Docker host (which must be a manager), by `id` (full ID or unique prefix) or `hostname`.
-- [`data.docker_nodes`](reference/data.docker_nodes.md): Lists the swarm's nodes through the provider's Docker host (which must be a manager), sorted by hostname, optionally filtered by `role`.
-- [`data.docker_plugin`](reference/data.docker_plugin.md): Looks up a managed plugin installed on the provider's daemon by `id` or `alias` (`PluginInspectWithRaw`).
-- [`data.docker_registry_image`](reference/data.docker_registry_image.md): Reads the current manifest digest of an image tag from its registry, through the daemon's distribution endpoint (`GET /distribution/<name>/json`) with the provider's `registry_auth`.
-- [`data.docker_registry_image_manifests`](reference/data.docker_registry_image_manifests.md): Reads the per-platform manifests of a multi-platform image straight from its registry, with the provider's `registry_auth`.
+- [`docker_volume`](reference/docker_volume.md): A Docker volume (`VolumeCreate`).
+- [`data.docker_buildx_builder`](reference/data.docker_buildx_builder.md): Reads one buildx builder, like `docker buildx inspect`: driver, nodes with endpoint, status, buildkitd flags, driver options, BuildKit version, platforms, worker labels and GC policy.
+- [`data.docker_buildx_builders`](reference/data.docker_buildx_builders.md): Lists the buildx builders on the provider's daemon, like `docker buildx ls`: the daemon's `default` builder and every docker-container builder (its `buildx_buildkit_*` node containers), each with its nodes, status, BuildKit version and platforms.
+- [`data.docker_buildx_disk_usage`](reference/data.docker_buildx_disk_usage.md): Reads the build cache of a buildx builder, like `docker buildx du --verbose`: one entry per cache record with size, type, sharing and usage, plus the shared, private, reclaimable and total sizes printed under the table.
+- [`data.docker_buildx_history`](reference/data.docker_buildx_history.md): Reads one build record of a buildx builder, like `docker buildx history inspect`: context, Dockerfile, target, platforms, status, timing, step counts and attestation attachments.
+- [`data.docker_buildx_history_records`](reference/data.docker_buildx_history_records.md): Lists the build records of a buildx builder, like `docker buildx history ls`: ref, name, status, start time and duration of each build, newest first.
+- [`data.docker_compose_config`](reference/data.docker_compose_config.md): Renders a compose project the way `docker compose config` does, without the CLI and without contacting the daemon.
+- [`data.docker_compose_containers`](reference/data.docker_compose_containers.md): Lists the containers of a compose project, like `docker compose ps`, by the `com.docker.compose.project` label (one-off `run` containers excluded).
+- [`data.docker_compose_images`](reference/data.docker_compose_images.md): Lists the images the containers of a compose project use, like `docker compose images`: one entry per container (stopped ones included) with the image inspect fields.
+- [`data.docker_compose_logs`](reference/data.docker_compose_logs.md): Reads the logs of a compose project's containers, like `docker compose logs --timestamps`.
+- [`data.docker_compose_port`](reference/data.docker_compose_port.md): Finds the public port of a service's port binding, like `docker compose port <service> <port>`, from the container's `NetworkSettings.Ports`.
+- [`data.docker_compose_projects`](reference/data.docker_compose_projects.md): Lists the compose projects on the daemon, like `docker compose ls`: containers grouped by the `com.docker.compose.project` label, each with a status such as `running(2), exited(1)` and its config files.
+- [`data.docker_compose_top`](reference/data.docker_compose_top.md): Lists the processes running in a compose project's containers, like `docker compose top`.
+- [`data.docker_compose_volumes`](reference/data.docker_compose_volumes.md): Lists the volumes of a compose project, like `docker compose volumes`, by the `com.docker.compose.project` label.
+- [`data.docker_config`](reference/data.docker_config.md): Looks up one swarm config (`GET /configs/{id}`) by `id` or `name`; the provider's host must be a swarm manager.
+- [`data.docker_configs`](reference/data.docker_configs.md): Lists the swarm's configs (`GET /configs`), sorted by name, with their content (`configs[*].spec.data`, base64); the provider's host must be a swarm manager.
+- [`data.docker_container`](reference/data.docker_container.md): Looks up one container on the provider's Docker host by ID or name, like `docker container inspect`.
+- [`data.docker_container_changes`](reference/data.docker_container_changes.md): Lists the filesystem changes of a container against its image, like `docker container diff`.
+- [`data.docker_container_file`](reference/data.docker_container_file.md): Reads a path inside a container: its stat (name, size, mode, mtime, link target) and, for a regular file, its content as base64.
+- [`data.docker_container_logs`](reference/data.docker_container_logs.md): Reads a container's logs (`GET /containers/{id}/logs`), like `docker container logs --timestamps`.
+- [`data.docker_container_stats`](reference/data.docker_container_stats.md): Reads one resource usage sample of a container (CPU, memory, network, block I/O, PIDs), like `docker container stats --no-stream`.
+- [`data.docker_container_top`](reference/data.docker_container_top.md): Lists the processes running in a container, like `docker container top`.
+- [`data.docker_containers`](reference/data.docker_containers.md): Lists containers on the provider's Docker host (`GET /containers/json`), like `docker container ls --all`, sorted by name.
+- [`data.docker_dockerfile`](reference/data.docker_dockerfile.md): Reads, parses and renders one Dockerfile: from `content`, a local `path`, an https `url`, an `image` history (approximate), or written with ordered `stage` / `instruction` blocks.
+- [`data.docker_image`](reference/data.docker_image.md): Looks up an image already present on the provider's daemon, without pulling it (`GET /images/{name}/json`).
+- [`data.docker_image_attestations`](reference/data.docker_image_attestations.md): Reads the in-toto attestations (SBOM, provenance) stored with a local image (`GET /images/{name}/attestations`, Engine API 1.55+).
+- [`data.docker_image_history`](reference/data.docker_image_history.md): Reads the layer history of a local image, like `docker image history` (`GET /images/{name}/history`).
+- [`data.docker_image_search`](reference/data.docker_image_search.md): Searches Docker Hub (or the registry named in `term`) through the daemon, like `docker search` (`GET /images/search`).
+- [`data.docker_images`](reference/data.docker_images.md): Lists the images in the provider's daemon image store, like `docker image ls` (`GET /images/json`), sorted by ID.
+- [`data.docker_info`](reference/data.docker_info.md): Reads daemon and host information from the provider's Docker host (`GET /info`), like `docker info`.
+- [`data.docker_network`](reference/data.docker_network.md): Looks up an existing Docker network (e.g. `bridge`, `host`, or one created outside Terraform) by name or ID (`GET /networks/{id}`).
+- [`data.docker_networks`](reference/data.docker_networks.md): Lists the networks on the provider's Docker host (`GET /networks`), like `docker network ls`.
+- [`data.docker_node`](reference/data.docker_node.md): Looks up one swarm node (`GET /nodes/{id}`) through the provider's Docker host (which must be a manager), by `id` (full ID or unique prefix) or `hostname`.
+- [`data.docker_nodes`](reference/data.docker_nodes.md): Lists the swarm's nodes (`GET /nodes`) through the provider's Docker host (which must be a manager), sorted by name (the node name, else its hostname) then ID.
+- [`data.docker_plugin`](reference/data.docker_plugin.md): Looks up a managed plugin installed on the provider's daemon by `id` or `alias` (`GET /plugins/{name}/json`).
+- [`data.docker_plugins`](reference/data.docker_plugins.md): Lists the managed plugins installed on the provider's Docker host (`GET /plugins`), like `docker plugin ls`.
+- [`data.docker_registry_image`](reference/data.docker_registry_image.md): Reads the current manifest digest and platforms of an image tag from its registry, through the daemon's distribution endpoint (`GET /distribution/<name>/json`) with the provider's `registry_auth`.
+- [`data.docker_registry_image_manifests`](reference/data.docker_registry_image_manifests.md): Reads the manifest of an image straight from its registry, with the provider's `registry_auth`, like `docker buildx imagetools inspect` or `docker manifest inspect`.
 - [`data.docker_registry_image_tags`](reference/data.docker_registry_image_tags.md): Lists every tag of a repository straight from its registry (`GET /v2/<name>/tags/list`), following pagination, with the provider's `registry_auth`.
+- [`data.docker_secret`](reference/data.docker_secret.md): Looks up one swarm secret's metadata (`GET /secrets/{id}`) by `id` or `name`; the provider's host must be a swarm manager.
 - [`data.docker_secrets`](reference/data.docker_secrets.md): Lists the swarm's secrets (`GET /secrets`), sorted by name; the provider's host must be a swarm manager.
+- [`data.docker_service`](reference/data.docker_service.md): Looks up one swarm service (`GET /services/{id}`) by `id` or `name`; the provider's host must be a swarm manager.
+- [`data.docker_service_logs`](reference/data.docker_service_logs.md): Reads a snapshot of a swarm service's logs, aggregated over its tasks (`GET /services/{id}/logs`), like `docker service logs`.
 - [`data.docker_services`](reference/data.docker_services.md): Lists the swarm's services (`GET /services`), sorted by name; the provider's host must be a swarm manager.
-- [`data.docker_swarm_tokens`](reference/data.docker_swarm_tokens.md): Reads the join tokens of the swarm the provider's Docker host manages (SwarmInspect).
-- [`data.docker_volume`](reference/data.docker_volume.md): Looks up an existing Docker volume by name.
-- [`action.docker_container_export`](reference/action.docker_container_export.md): Writes a container's filesystem to a local tar file, like `docker export`.
+- [`data.docker_stack`](reference/data.docker_stack.md): Reads the services of one Swarm stack, like `docker stack services`: mode, `running/desired` replicas, image and published ports per service.
+- [`data.docker_stacks`](reference/data.docker_stacks.md): Lists the Swarm stacks, like `docker stack ls`: services grouped by the `com.docker.stack.namespace` label, with the number of services in each (`services_count`).
+- [`data.docker_swarm`](reference/data.docker_swarm.md): Reads the swarm the provider's Docker host manages (`GET /swarm`): ID, spec, join tokens, root CA and data path port.
+- [`data.docker_swarm_tokens`](reference/data.docker_swarm_tokens.md): Reads the join tokens of the swarm the provider's Docker host manages (SwarmInspect), as `worker` / `manager` and the structured `join_tokens`.
+- [`data.docker_system_df`](reference/data.docker_system_df.md): Reads disk usage by images, containers, volumes and build cache on the provider's Docker host (`GET /system/df`), like `docker system df`.
+- [`data.docker_task`](reference/data.docker_task.md): Looks up one swarm task (`GET /tasks/{id}`) by `id`; the provider's host must be a swarm manager.
+- [`data.docker_task_logs`](reference/data.docker_task_logs.md): Reads a snapshot of one swarm task's logs (`GET /tasks/{id}/logs`), like `docker service logs <task id>`.
+- [`data.docker_tasks`](reference/data.docker_tasks.md): Lists swarm tasks (`GET /tasks`), like `docker service ps`, `docker node ps` and `docker stack ps`; the provider's host must be a swarm manager.
+- [`data.docker_version`](reference/data.docker_version.md): Reads the Docker Engine version, API version range and component versions of the provider's Docker host (`GET /version`), like the server half of `docker version`.
+- [`data.docker_volume`](reference/data.docker_volume.md): Looks up an existing Docker volume by name (`GET /volumes/{name}`).
+- [`data.docker_volumes`](reference/data.docker_volumes.md): Lists the volumes on the provider's Docker host (`GET /volumes`), like `docker volume ls`.
+- [`action.docker_builder_prune`](reference/action.docker_builder_prune.md): Removes build cache, like `docker builder prune`, and reports the cache records removed and the space reclaimed.
+- [`action.docker_buildx_bake`](reference/action.docker_buildx_bake.md): Builds one or more targets from a bake definition, like `docker buildx bake`.
+- [`action.docker_compose_build`](reference/action.docker_compose_build.md): Builds every service of a compose project that has a `build:` section, like `docker compose build`, through BuildKit (no docker CLI or buildx binary), and tags each image `image` or `<project>-<service>` plus `build.tags`.
+- [`action.docker_compose_commit`](reference/action.docker_compose_commit.md): Creates an image from a compose service container's changes, like `docker compose commit`.
+- [`action.docker_compose_cp`](reference/action.docker_compose_cp.md): Copies files between a compose service container and the machine running Terraform, like `docker compose cp`.
+- [`action.docker_compose_exec`](reference/action.docker_compose_exec.md): Runs a command in a running container of a compose service, like `docker compose exec`, and fails when it exits non-zero.
+- [`action.docker_compose_export`](reference/action.docker_compose_export.md): Exports a compose service container's filesystem as a tar archive to a local file, like `docker compose export -o`.
+- [`action.docker_compose_kill`](reference/action.docker_compose_kill.md): Sends a signal (default `SIGKILL`) to the running containers of a compose project, like `docker compose kill`.
+- [`action.docker_compose_pause`](reference/action.docker_compose_pause.md): Pauses the running containers of a compose project, like `docker compose pause`.
+- [`action.docker_compose_publish`](reference/action.docker_compose_publish.md): Publishes a compose application as an OCI artifact, like `docker compose publish`: each compose file becomes a `application/vnd.docker.compose.file+yaml` layer of an OCI manifest with artifact type `application/vnd.docker.compose.project`, pushed with the registry HTTP API v2 (credentials from `registry_auth`).
+- [`action.docker_compose_pull`](reference/action.docker_compose_pull.md): Pulls the image of every service of a compose project, like `docker compose pull`, with the provider's `registry_auth`.
+- [`action.docker_compose_push`](reference/action.docker_compose_push.md): Pushes the image of every service of a compose project that names one (`image`), like `docker compose push`, with the provider's `registry_auth`.
+- [`action.docker_compose_restart`](reference/action.docker_compose_restart.md): Restarts the containers of a compose project (stopped ones included), like `docker compose restart`.
+- [`action.docker_compose_run`](reference/action.docker_compose_run.md): Runs a one-off container for a compose service, like `docker compose run`: the container `<project>-<service>-run-<id>` is created from the service's compose model (image pulled or built, networks, volumes, secrets and configs as for `docker_compose`), labelled `com.docker.compose.oneoff=True`, waited for and removed.
+- [`action.docker_compose_scale`](reference/action.docker_compose_scale.md): Sets the number of containers of compose services on the provider's daemon, like `docker compose scale web=3`: missing `<project>-<service>-<n>` containers are created from the compose model (pulled or built as needed) and the highest-numbered extra ones are removed; kept containers that are stopped are started.
+- [`action.docker_compose_start`](reference/action.docker_compose_start.md): Starts the existing stopped containers of a compose project, like `docker compose start`.
+- [`action.docker_compose_stop`](reference/action.docker_compose_stop.md): Stops the running containers of a compose project without removing them, like `docker compose stop`.
+- [`action.docker_compose_unpause`](reference/action.docker_compose_unpause.md): Unpauses the paused containers of a compose project, like `docker compose unpause`.
+- [`action.docker_compose_wait`](reference/action.docker_compose_wait.md): Blocks until the containers of compose services stop, like `docker compose wait`.
+- [`action.docker_container_cp`](reference/action.docker_container_cp.md): Copies a file or directory into an existing container at any time, like `docker container cp SRC CONTAINER:PATH`.
+- [`action.docker_container_export`](reference/action.docker_container_export.md): Writes a container's filesystem to a local tar file, like `docker container export --output`.
+- [`action.docker_container_kill`](reference/action.docker_container_kill.md): Sends a signal to a running container, like `docker container kill`.
+- [`action.docker_container_pause`](reference/action.docker_container_pause.md): Freezes all processes of a running container, like `docker container pause` (the cgroup freezer).
+- [`action.docker_container_prune`](reference/action.docker_container_prune.md): Removes stopped containers, like `docker container prune`, and reports what it removed and the space reclaimed.
+- [`action.docker_container_restart`](reference/action.docker_container_restart.md): Restarts a container, like `docker container restart`: a stop (signal, grace period, SIGKILL) followed by a start.
+- [`action.docker_container_start`](reference/action.docker_container_start.md): Starts a stopped or created container, like `docker container start`.
+- [`action.docker_container_stop`](reference/action.docker_container_stop.md): Stops a running container, like `docker container stop`: it sends the stop signal, waits for the grace period and then sends SIGKILL.
+- [`action.docker_container_unpause`](reference/action.docker_container_unpause.md): Resumes the processes of a paused container, like `docker container unpause`.
+- [`action.docker_container_wait`](reference/action.docker_container_wait.md): Blocks until a container reaches a condition and reports its exit code, like `docker container wait`.
 - [`action.docker_exec`](reference/action.docker_exec.md): Runs a command inside a running container, like `docker exec`, and fails when it exits non-zero.
+- [`action.docker_image_commit`](reference/action.docker_image_commit.md): Creates an image from a container's filesystem changes, like `docker container commit` (`POST /commit`).
 - [`action.docker_image_import`](reference/action.docker_image_import.md): Creates an image from a filesystem tarball, like `docker import`.
 - [`action.docker_image_load`](reference/action.docker_image_load.md): Loads images from a local tar archive into the daemon, like `docker load`.
-- [`action.docker_image_prune`](reference/action.docker_image_prune.md): Removes unused images, like `docker image prune`, and reports the space reclaimed.
+- [`action.docker_image_prune`](reference/action.docker_image_prune.md): Removes unused images, like `docker image prune`, and reports what it removed and the space reclaimed.
 - [`action.docker_image_save`](reference/action.docker_image_save.md): Writes one or more images to a local tar archive, like `docker save`.
+- [`action.docker_network_prune`](reference/action.docker_network_prune.md): Removes networks no container uses, like `docker network prune`, and reports what it removed.
 - [`action.docker_node_activate`](reference/action.docker_node_activate.md): Sets a swarm node's availability back to `active`, like `docker node update --availability active`.
+- [`action.docker_node_demote`](reference/action.docker_node_demote.md): Demotes a swarm manager to worker, like `docker node demote` (NodeUpdate with `Role = worker`).
 - [`action.docker_node_drain`](reference/action.docker_node_drain.md): Sets a swarm node's availability to `drain` and waits until its tasks have left, like `docker node update --availability drain`.
+- [`action.docker_node_promote`](reference/action.docker_node_promote.md): Promotes a swarm worker to manager, like `docker node promote` (NodeUpdate with `Role = manager`).
+- [`action.docker_plugin_create`](reference/action.docker_plugin_create.md): Creates a local plugin from a host directory holding `config.json` and a `rootfs/` directory, like `docker plugin create` (`POST /plugins/create`).
+- [`action.docker_plugin_push`](reference/action.docker_plugin_push.md): Pushes a local plugin to its registry, like `docker plugin push` (`POST /plugins/{name}/push`), using the provider's `registry_auth` credentials for the plugin's registry.
 - [`action.docker_service_force_update`](reference/action.docker_service_force_update.md): Redeploys every task of a swarm service without changing its spec, like `docker service update --force`.
 - [`action.docker_service_rollback`](reference/action.docker_service_rollback.md): Rolls a swarm service back to its previous spec, like `docker service rollback`, and waits for the rollback to complete.
 - [`action.docker_service_scale`](reference/action.docker_service_scale.md): Sets the replica count of a replicated swarm service, like `docker service scale`, and waits for the tasks.
+- [`action.docker_swarm_rotate_ca`](reference/action.docker_swarm_rotate_ca.md): Rotates the swarm root CA, like `docker swarm ca --rotate`: a new self-signed root, or the given signing certificate and key (`Spec.CAConfig.SigningCACert` / `SigningCAKey`), with `CAConfig.ForceRotate` incremented.
 - [`action.docker_swarm_rotate_tokens`](reference/action.docker_swarm_rotate_tokens.md): Rotates the swarm join tokens, like `docker swarm join-token --rotate`.
-- [`action.docker_system_prune`](reference/action.docker_system_prune.md): Removes unused Docker objects, like `docker system prune`, and reports the space reclaimed.
-- [`ephemeral.docker_exec_output`](reference/ephemeral.docker_exec_output.md): Runs a command in a running container (`docker exec`) and returns its standard output as an ephemeral value that is never written to plan or state.
+- [`action.docker_swarm_rotate_unlock_key`](reference/action.docker_swarm_rotate_unlock_key.md): Rotates the manager unlock key of an autolocked swarm, like `docker swarm unlock-key --rotate`.
+- [`action.docker_swarm_unlock`](reference/action.docker_swarm_unlock.md): Unlocks a locked swarm manager, like `docker swarm unlock`: after a daemon restart, a manager of an autolocked swarm stays locked until it gets the unlock key.
+- [`action.docker_system_prune`](reference/action.docker_system_prune.md): Removes unused Docker objects, like `docker system prune`, and reports what it removed and the space reclaimed.
+- [`action.docker_volume_prune`](reference/action.docker_volume_prune.md): Removes volumes no container uses (anonymous ones only, unless `all = true`), like `docker volume prune`, and reports what it removed and the space reclaimed.
+- [`ephemeral.docker_exec_output`](reference/ephemeral.docker_exec_output.md): Runs a command in a running container (`docker exec`) and returns its standard output and error as ephemeral values that are never written to plan or state.
+- [`ephemeral.docker_registry_login`](reference/ephemeral.docker_registry_login.md): Validates registry credentials through the daemon (`POST /auth`, like `docker login`) and returns the identity token the registry issues, if any.
 - [`ephemeral.docker_registry_token`](reference/ephemeral.docker_registry_token.md): Obtains a short-lived registry bearer token, as an ephemeral value that is never written to plan or state.
 - [`ephemeral.docker_swarm_tokens`](reference/ephemeral.docker_swarm_tokens.md): Reads the worker and manager join tokens of the swarm the provider's Docker host manages, as ephemeral values that are never written to plan or state.
 - [`list.docker_config`](reference/list.docker_config.md): Lists swarm configs as `docker_config` resources, for `terraform query` and bulk import; the provider's host must be a swarm manager.
@@ -790,13 +997,13 @@ resources:
 |---|---|---|
 | `services.<name>` | one `docker_service` | one `docker_container` |
 | `image` | `image` | `image` |
-| `build` | `docker_image` with a `build` block, then `docker_registry_image` so workers can pull | `docker_image` with a `build` block; `image = docker_image.x.image_id` |
+| `build` | `docker_image` with a `build` block, then `docker_registry_image` so workers can pull | `docker_image` with a `build` block; `image = docker_image.x.id` |
 | `command` / `entrypoint` | `args` / `command` | `command` / `entrypoint` |
 | `environment` | `env` map | `env` map |
-| `ports: ["8080:80"]` | `endpoint_spec { ports { target_port = 80, published_port = 8080 } }` | `ports { internal = 80, external = 8080 }` |
+| `ports: ["8080:80"]` | `endpoint_spec { ports { target_port = 80, published_port = 8080 } }` | `ports { container_port = 80, host_port = 8080 }` |
 | `volumes` (named) | `docker_volume` + `mounts { type = "volume", source, target }` | `docker_volume` + `mounts { type = "volume", source, target }` |
 | `volumes` (bind) | `mounts { type = "bind", source, target }` | `mounts { type = "bind", source, target }` |
-| `networks` | `docker_network` (`driver = "overlay"`) + `networks = [id]` | `docker_network` + `networks_advanced { name }` |
+| `networks` | `docker_network` (`driver = "overlay"`) + `networks = { (id) = {} }` (aliases in the value) | `docker_network` + `networks = { (name) = { aliases = [...] } }` |
 | `secrets` / `configs` | `docker_secret` / `docker_config` + `secrets {}` / `configs {}` blocks | not supported by the Engine for plain containers; use a bind or tmpfs mount |
 | `deploy.replicas` / `deploy.mode` | `replicas` / `mode` | n/a |
 | `deploy.placement` | `placement { constraints, preferences }` | n/a |
@@ -805,7 +1012,7 @@ resources:
 | `deploy.restart_policy` / `restart` | `restart_policy {}` | `restart = "unless-stopped"` |
 | `deploy.labels` / `labels` | `labels` / `container_labels` | `labels` |
 | `healthcheck` | `healthcheck {}` | `healthcheck {}` |
-| `logging` | `logging { driver, options }` | `log_driver`, `log_opts` |
+| `logging` | `logging { driver, options }` | `logging { driver, options }` |
 | `depends_on` | Terraform references or `depends_on` (orders creation only, not readiness) | same |
 | whole file / `docker stack deploy` | `docker_stack` with `service`, `network`, `volume`, `secret`, `config` blocks, or separate resources | separate resources |
 

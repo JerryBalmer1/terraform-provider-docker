@@ -97,7 +97,7 @@ func TestConvertSpecifics(t *testing.T) {
 		`name  = "webapp-web-${count.index + 1}"`,
 		`depends_on = [docker_container.cache, docker_container.db]`,
 		`source = docker_volume.pgdata.name`,
-		`name    = docker_network.back.name`,
+		`(docker_network.back.name) = {`,
 		`# TODO: network_mode host`,
 		`# TODO: secret api_key (from environment API_KEY) cannot be mounted`,
 		`source    = abspath("${path.module}/secrets/db_password.txt")`,
@@ -206,7 +206,9 @@ func checkBody(t *testing.T, where string, b *hclsyntax.Body, s blockSchema, top
 		if !sa.IsRequired() && !sa.IsOptional() {
 			t.Errorf("%s: attribute %q is computed only", where, name)
 		}
-		_ = a
+		if want, got := attrShape(sa), exprShape(a.Expr); want != "" && got != "" && want != got {
+			t.Errorf("%s: attribute %q is a %s in the schema, the output writes a %s", where, name, want, got)
+		}
 	}
 	for _, r := range s.required {
 		if _, ok := b.Attributes[r]; !ok {
@@ -226,4 +228,28 @@ func checkBody(t *testing.T, where string, b *hclsyntax.Body, s blockSchema, top
 		}
 		checkBody(t, fmt.Sprintf("%s.%s", where, blk.Type), blk.Body, nestedSchema(sb), false)
 	}
+}
+
+// attrShape is "list" for list/set attributes and "object" for map/object
+// ones ("" for scalars).
+func attrShape(a schema.Attribute) string {
+	switch a.(type) {
+	case schema.ListAttribute, schema.SetAttribute, schema.ListNestedAttribute, schema.SetNestedAttribute:
+		return "list"
+	case schema.MapAttribute, schema.MapNestedAttribute, schema.SingleNestedAttribute, schema.ObjectAttribute:
+		return "object"
+	}
+	return ""
+}
+
+// exprShape is the literal shape of an expression ("" when it is not a
+// tuple or object literal, e.g. a reference or a function call).
+func exprShape(e hclsyntax.Expression) string {
+	switch e.(type) {
+	case *hclsyntax.TupleConsExpr:
+		return "list"
+	case *hclsyntax.ObjectConsExpr:
+		return "object"
+	}
+	return ""
 }

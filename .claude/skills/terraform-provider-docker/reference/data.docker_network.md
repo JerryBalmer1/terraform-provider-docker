@@ -4,24 +4,115 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Looks up an existing Docker network (e.g. `bridge`, `host`, or one created outside Terraform) by name or ID.
+Looks up an existing Docker network (e.g. `bridge`, `host`, or one created outside Terraform) by name or ID (`GET /networks/{id}`). `containers` lists the containers attached on this daemon; `inspect` holds the whole response.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `attachable` | `bool` | computed |  |  | Whether standalone containers can attach (overlay). |
+| `containers` | `map(object)` | computed |  |  | Containers attached to the network on this daemon, keyed by container ID (`Containers` in `GET /networks/{id}`). |
+| `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `driver` | `string` | computed |  |  | Network driver. |
+| `enable_ipv6` | `bool` | computed |  |  | Whether IPv6 is enabled (`EnableIPv6`). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `id` | `string` | computed |  |  | Network ID. |
 | `ingress` | `bool` | computed |  |  | Whether this is the Swarm ingress network. |
+| `inspect` | `object` | computed |  |  | The GET /networks/{id} response as a nested object, field by field. |
+| `inspect_json` | `string` | computed |  |  | The exact Engine API GET /networks/{id} response as JSON. |
 | `internal` | `bool` | computed |  |  | Whether external access is restricted. |
 | `ipam_config` | `list(object)` | computed |  |  | IPAM pools, including daemon-assigned ones. |
 | `ipam_driver` | `string` | computed |  |  | IPAM driver. |
-| `ipv6` | `bool` | computed |  |  | Whether IPv6 is enabled. |
 | `labels` | `map(string)` | computed |  |  | Network labels. |
 | `name` | `string` | required |  |  | Network name, ID or unique ID prefix. |
 | `options` | `map(string)` | computed |  |  | Driver options. |
 | `scope` | `string` | computed |  |  | `local` or `swarm`. |
+
+### `containers`
+
+nested attribute, map(object). Containers attached to the network on this daemon, keyed by container ID (`Containers` in `GET /networks/{id}`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `endpoint_id` | `string` | computed |  |  | Endpoint ID of the attachment. |
+| `ipv4_address` | `string` | computed |  |  | IPv4 address with prefix length, e.g. `172.19.0.2/16`. |
+| `ipv6_address` | `string` | computed |  |  | IPv6 address with prefix length, empty without IPv6. |
+| `mac_address` | `string` | computed |  |  | MAC address of the endpoint. |
+| `name` | `string` | computed |  |  | Container name. |
+
+### `inspect`
+
+nested attribute, object. The GET /networks/{id} response as a nested object, field by field.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `attachable` | `bool` | computed |  |  | Upstream `Attachable`. |
+| `config_from` | `object` | computed |  |  | Upstream `ConfigFrom`. |
+| `config_only` | `bool` | computed |  |  | Upstream `ConfigOnly`. |
+| `containers` | `map(object)` | computed |  |  | Upstream `Containers`. |
+| `created` | `string` | computed |  |  | Upstream `Created`. |
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `enable_ipv4` | `bool` | computed |  |  | Upstream `EnableIPv4`. |
+| `enable_ipv6` | `bool` | computed |  |  | Upstream `EnableIPv6`. |
+| `id` | `string` | computed |  |  | Upstream `Id`. |
+| `ingress` | `bool` | computed |  |  | Upstream `Ingress`. |
+| `internal` | `bool` | computed |  |  | Upstream `Internal`. |
+| `ipam` | `object` | computed |  |  | Upstream `IPAM`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+| `peers` | `list(object)` | computed |  |  | Upstream `Peers`. |
+| `scope` | `string` | computed |  |  | Upstream `Scope`. |
+| `services` | `dynamic` | computed |  |  | Upstream `Services`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `status` | `object` | computed |  |  | Upstream `Status`. |
+
+### `inspect.config_from`
+
+nested attribute, object. Upstream `ConfigFrom`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `network` | `string` | computed |  |  | Upstream `Network`. |
+
+### `inspect.containers`
+
+nested attribute, map(object). Upstream `Containers`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `endpoint_id` | `string` | computed |  |  | Upstream `EndpointID`. |
+| `ipv4_address` | `string` | computed |  |  | Upstream `IPv4Address`. |
+| `ipv6_address` | `string` | computed |  |  | Upstream `IPv6Address`. |
+| `mac_address` | `string` | computed |  |  | Upstream `MacAddress`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+
+### `inspect.ipam`
+
+nested attribute, object. Upstream `IPAM`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `list(string)` | computed |  |  | Upstream `Config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `inspect.peers`
+
+nested attribute, list(object). Upstream `Peers`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ip` | `string` | computed |  |  | Upstream `IP`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+
+### `inspect.status`
+
+nested attribute, object. Upstream `Status`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ipam` | `dynamic` | computed |  |  | Upstream `IPAM`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
 
 ### `ipam_config`
 

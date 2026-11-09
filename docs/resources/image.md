@@ -3,12 +3,12 @@
 page_title: "docker_image Resource - docker"
 subcategory: ""
 description: |-
-  A Docker image on the provider's daemon. Without a build block the image name is pulled from its registry (credentials from the provider's registry_auth); with a build block the image is built from a local context directory through the Engine API (classic builder by default, or BuildKit with build.builder = "buildkit"; the context is tarred by the provider honouring .dockerignore) and tagged name. On destroy the tag is removed (and the image deleted when no other tag references it) unless keep_locally is true. Edits to files in the build context change context_digest at plan time and force a rebuild.
+  A Docker image on the provider's daemon, pulled from its registry or built from a local context. Without a build block the image name is pulled (credentials from the provider's registry_auth); with a build block the image is built and tagged name: by the classic Engine builder (POST /build, the default) or by BuildKit with build.builder = "buildkit" or a buildx builder name (through the provider's BuildKit build path, which also fills metadata_json, build_metadata, build_ref and buildx_version). The context is tarred by the provider honouring .dockerignore, or fetched by the daemon from build.remote. On destroy the tag (and build.tags) are removed, and the image deleted when no other tag references it, unless keep_locally is true. Edits to files in the build context change context_digest at plan time and force a rebuild.
 ---
 
 # docker_image (Resource)
 
-A Docker image on the provider's daemon. Without a `build` block the image `name` is pulled from its registry (credentials from the provider's `registry_auth`); with a `build` block the image is built from a local context directory through the Engine API (classic builder by default, or BuildKit with `build.builder = "buildkit"`; the context is tarred by the provider honouring `.dockerignore`) and tagged `name`. On destroy the tag is removed (and the image deleted when no other tag references it) unless `keep_locally` is true. Edits to files in the build context change `context_digest` at plan time and force a rebuild.
+A Docker image on the provider's daemon, pulled from its registry or built from a local context. Without a `build` block the image `name` is pulled (credentials from the provider's `registry_auth`); with a `build` block the image is built and tagged `name`: by the classic Engine builder (`POST /build`, the default) or by BuildKit with `build.builder = "buildkit"` or a buildx builder name (through the provider's BuildKit build path, which also fills `metadata_json`, `build_metadata`, `build_ref` and `buildx_version`). The context is tarred by the provider honouring `.dockerignore`, or fetched by the daemon from `build.remote`. On destroy the tag (and `build.tags`) are removed, and the image deleted when no other tag references it, unless `keep_locally` is true. Edits to files in the build context change `context_digest` at plan time and force a rebuild.
 
 ## Example Usage
 
@@ -26,7 +26,7 @@ data "docker_registry_image" "redis" {
 
 resource "docker_image" "redis" {
   name     = data.docker_registry_image.redis.name
-  triggers = { digest = data.docker_registry_image.redis.sha256_digest }
+  triggers = { digest = data.docker_registry_image.redis.digest }
 }
 
 # Build from a local context. Editing any file in ./app that .dockerignore
@@ -46,6 +46,37 @@ resource "docker_image" "app" {
       "org.opencontainers.image.source" = "https://github.com/example/app"
     }
     pull = true
+
+    # Classic-builder resource limits and extra tags.
+    memory      = 2147483648
+    shm_size    = 268435456
+    network     = "host"
+    tags        = ["registry.example.com/team/app:latest"]
+    extra_hosts = ["internal.example.com:10.0.0.5"]
+    ulimits = {
+      nofile = { soft = 65536, hard = 65536 }
+    }
+  }
+}
+
+# Hand-off values: the digest reference for a pinned deployment, the image ID
+# and the stages the Dockerfile declares.
+output "app_image" {
+  value = {
+    id     = docker_image.app.id
+    ref    = docker_image.app.image_ref
+    pinned = docker_image.app.image_digest_ref
+    stages = [for s in docker_image.app.stages : s.name]
+  }
+}
+
+# Build from a Git repository the daemon fetches (classic builder only).
+resource "docker_image" "remote" {
+  name = "example/hello:git"
+
+  build {
+    remote     = "https://github.com/docker-library/hello-world.git#master:amd64/hello-world"
+    dockerfile = "Dockerfile"
   }
 }
 
@@ -68,6 +99,11 @@ resource "docker_image" "web" {
 
     platforms = ["linux/arm64"]
 
+    # Export cache and attach attestations.
+    cache_to   = ["type=inline"]
+    provenance = "min"
+    sbom       = true
+
     secrets {
       id  = "npm_token"
       env = "NPM_TOKEN"
@@ -85,40 +121,82 @@ resource "docker_image" "web" {
 
 ### Required
 
-- `name` (String) Image reference. Without `build`, the reference to pull (e.g. `nginx:1.27`, `ghcr.io/org/app:1.0`; no tag means `latest`). With `build`, the tag given to the built image. Changing this forces a new resource.
+- `name` (String) Image reference. Without `build`, the reference to pull (e.g. `nginx:1.27`, `ghcr.io/org/app:1.0`; no tag means `latest`). With `build`, the tag given to the built image. Forces replacement.
 
 ### Optional
 
-- `build` (Block, Optional) Build the image from a local directory instead of pulling it. Changing anything in this block forces a new resource. (see [below for nested schema](#nestedblock--build))
+- `build` (Block, Optional) Build the image instead of pulling it, like `docker build`. Changing anything in this block forces a new resource. (see [below for nested schema](#nestedblock--build))
 - `force_remove` (Boolean) Remove the image on destroy even when stopped containers use it (`docker rmi -f`). Default `false`.
 - `keep_locally` (Boolean) When true, destroy only removes the image from Terraform state and leaves it on the daemon. Default `false`.
-- `platform` (String) Platform to pull or build, `os[/arch[/variant]]` such as `linux/amd64`. Used for the build too unless `build.platform` is set. Default: the daemon's platform. Changing this forces a new resource.
-- `triggers` (Map of String) Arbitrary string map; any change re-pulls or rebuilds the image. Use it to force a refresh of a moving tag (e.g. a timestamp) or to tie the image to other resources. Changing this forces a new resource.
+- `platform` (String) Platform to pull or build, `os[/arch[/variant]]` such as `linux/amd64`. Used for the build too unless `build.platform` is set. Default: the daemon's platform. Forces replacement.
+- `triggers` (Map of String) Arbitrary string map; any change re-pulls or rebuilds the image. Use it to force a refresh of a moving tag (e.g. a timestamp) or to tie the image to other resources. Forces replacement.
 
 ### Read-Only
 
-- `context_digest` (String) SHA-256 over the build context as it would be sent (paths, modes, symlink targets and file contents after `.dockerignore`; not mtimes) plus the Dockerfile. Computed at plan time; a change forces a rebuild. Null without `build`.
-- `id` (String) Image ID (`sha256:...`), same as `image_id`.
-- `image_id` (String) Content-addressable image ID (`sha256:...`) reported by the daemon.
-- `repo_digest` (String) Repository digest (`repo@sha256:...`) of the image for `name`'s repository, when the daemon knows one (pulled images, or built images after a push). Null for a built image that was never pushed.
+- `build_metadata` (Attributes) The build result field by field (dotted metadata keys become snake_case). (see [below for nested schema](#nestedatt--build_metadata))
+- `build_ref` (String) BuildKit build record reference (`buildx.build.ref`, builder/node/ref) of a BuildKit build, the input of `docker_buildx_history`; null for classic builds, pulls and imports.
+- `buildx_version` (String) The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx.
+- `context_digest` (String) SHA-256 over the build context as it would be sent (paths, modes, symlink targets and file contents after `.dockerignore`; not mtimes) plus the Dockerfile. Computed at plan time; a change forces a rebuild. Null without `build` or with `build.remote`.
+- `digest` (String) Manifest or index digest (`sha256:...`): `ImageInspect.Descriptor.digest` on the containerd image store, else the digest part of `image_digest_ref`; null when neither is known.
+- `docker_server_version` (String) Docker Engine version reported by GET /version.
+- `dockerfile` (String, Sensitive) The Dockerfile actually sent to the builder (null for a pulled image). ENV values and ARG defaults are inline, hence sensitive.
+- `dockerfile_sha256` (String) The `dockerfile_sha256` hash output.
+- `dockerfile_syntax` (String) The built Dockerfile's `# syntax=` value, else the default frontend `docker/dockerfile:1` (pinned reference 1.28.0); null for a pulled image.
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon for this read/build.
+- `id` (String) Image ID (`sha256:...`, `ImageInspect.Id`).
+- `image_digest_ref` (String) Repository digest reference (`repo@sha256:...`) of the image for `name`'s repository, from `RepoDigests`, when the daemon knows one (pulled images, or built images after a push). Null for a built image that was never pushed. Every upstream entry is in `inspect.repo_digests`.
+- `image_ref` (String) Normalized `registry/repository:tag` form of `name` (implicit `latest` added); null when `name` has no tag.
+- `inspect` (Attributes) ImageInspect of the result, field by field. (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String, Sensitive) ImageInspect of the result as JSON. Holds Config.Env, hence sensitive.
+- `inspect_json_sha256` (String) The `inspect_json_sha256` hash output.
+- `labels` (Map of String) Labels of the resulting image config (`Config.Labels`: base image labels, `LABEL` instructions, `build.labels` and the provider's management label).
+- `metadata_json` (String, Sensitive) Build result metadata (`--metadata-file`). Sensitive: buildx.build.provenance can record build args.
+- `metadata_json_sha256` (String) SHA-256 of metadata_json, to detect drift without diffing the document.
+- `platforms` (List of String) Platforms of the image as `os/arch[/variant]`: one per image manifest on the containerd store, else the image's own platform.
+- `stages` (Attributes List) Build stages in order: name, base image (as written, resolved ref and digest when available) and every instruction with all its flags, in the dockerfile:* block model. (see [below for nested schema](#nestedatt--stages))
 
 <a id="nestedblock--build"></a>
 ### Nested Schema for `build`
 
 Optional:
 
-- `args` (Map of String) Build arguments (`--build-arg`).
-- `builder` (String) Builder backend: `classic` (default; the legacy builder, `DOCKER_BUILDKIT=0`) or `buildkit`. With `buildkit` the provider opens a BuildKit session to the daemon (serving `secrets` and `registry_auth` credentials) so Dockerfile features such as `RUN --mount=type=secret` and heredocs work. Requires a daemon with BuildKit enabled (default since Docker 23). Forces replacement.
-- `cache_from` (List of String) BuildKit only. Image references to use as cache sources (`--cache-from`); the images must carry inline cache metadata (built with build arg `BUILDKIT_INLINE_CACHE=1`). Exporting cache (`--cache-to`) is not possible through the Engine API and needs buildx. Forces replacement.
-- `context` (String) **Required inside `build`.** Path of the build context directory, relative to the directory Terraform runs in (use `${path.module}/...`). Files matched by its `.dockerignore` are not sent; the Dockerfile and `.dockerignore` always are.
-- `dockerfile` (String) Dockerfile path relative to `context` (or absolute). Default `Dockerfile`. A Dockerfile outside the context is sent under a generated name, like the docker CLI does.
-- `labels` (Map of String) Labels set on the built image. The provider also adds `io.terraform.provider=JerryBalmer1/docker`.
-- `no_cache` (Boolean) Do not use the build cache (`--no-cache`).
-- `platform` (String) Build platform, e.g. `linux/arm64`. Default: the top-level `platform`, else the daemon's.
-- `platforms` (List of String) BuildKit only. Target platform list; exactly one element is supported (sent as the build platform, like `platform`). Multi-platform builds are rejected: the Engine API `/build` endpoint takes a single platform, use one `docker_image` per platform. Conflicts with `build.platform`. Forces replacement.
-- `pull` (Boolean) Always attempt to pull newer versions of base images (`--pull`).
+- `additional_contexts` (Map of String) BuildKit only. Named build contexts (`--build-context name=value`): a local directory, `docker-image://ref` or a URL, used by `FROM name` / `COPY --from=name`. Forces replacement.
+- `args` (Map of String) Build arguments (`--build-arg`). Forces replacement.
+- `attestations` (List of String) BuildKit only. Extra attestation specs (`--attest`), e.g. `type=sbom,generator=image`; `provenance` and `sbom` cover the common cases. Forces replacement.
+- `builder` (String) Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit) or the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`). With BuildKit the build runs with a session (serving `secrets`, `ssh` and `registry_auth` credentials) so Dockerfile features such as `RUN --mount=type=secret` and heredocs work, and `cache_to`, `ssh`, `outputs`, `attestations`, `provenance`, `sbom` and `no_cache_filter` become available. Requires a daemon with BuildKit enabled (default since Docker 23). Forces replacement.
+- `cache_from` (List of String) BuildKit only. Cache sources (`--cache-from`): image references carrying inline cache metadata, or buildx cache specs such as `type=registry,ref=...`. Forces replacement.
+- `cache_to` (List of String) BuildKit only. Cache export specs (`--cache-to`), e.g. `type=inline` or `type=registry,ref=registry.example.com/app:cache`. Forces replacement.
+- `cgroup_parent` (String) Classic builder only. Parent cgroup for the `RUN` containers (`--cgroup-parent`). Forces replacement.
+- `context` (String) Path of the build context directory, relative to the directory Terraform runs in (use `${path.module}/...`); exactly one of `context` and `remote` is required. Files matched by its `.dockerignore` are not sent; the Dockerfile and `.dockerignore` always are. Forces replacement.
+- `cpu_period` (Number) Classic builder only. CPU CFS period in microseconds for `RUN` containers (`--cpu-period`). Forces replacement.
+- `cpu_quota` (Number) Classic builder only. CPU CFS quota in microseconds for `RUN` containers (`--cpu-quota`). Forces replacement.
+- `cpu_shares` (Number) Classic builder only. Relative CPU weight of the `RUN` containers (`--cpu-shares`). Forces replacement.
+- `cpuset_cpus` (String) Classic builder only. CPUs the `RUN` containers may use, e.g. `0-3` or `0,1` (`--cpuset-cpus`). Forces replacement.
+- `cpuset_mems` (String) Classic builder only. Memory nodes the `RUN` containers may use (`--cpuset-mems`). Forces replacement.
+- `dockerfile` (String) Dockerfile path relative to `context` (or absolute). Default `Dockerfile`. A Dockerfile outside the context is sent under a generated name, like the docker CLI does. Forces replacement.
+- `extra_hosts` (List of String) Extra `/etc/hosts` entries for `RUN`, as `host:ip` (`--add-host`). Forces replacement.
+- `force_rm` (Boolean) Classic builder: always remove intermediate containers, even after a failed step (`--force-rm`). Default `true` (the provider never leaves build containers behind). Forces replacement.
+- `isolation` (String) Classic builder only. Isolation technology of the `RUN` containers on Windows daemons: `default`, `process` or `hyperv` (`--isolation`). Forces replacement.
+- `labels` (Map of String) Labels set on the built image. The provider also adds `io.terraform.provider=JerryBalmer1/docker`. Forces replacement.
+- `memory` (Number) Classic builder only. Memory limit in bytes for `RUN` containers (`--memory`). Forces replacement.
+- `memswap` (Number) Classic builder only. Memory plus swap limit in bytes for `RUN` containers; `-1` means unlimited swap (`--memory-swap`). Forces replacement.
+- `network` (String) Network mode for `RUN` instructions (`--network`): `default`, `none`, `host`, or (classic builder) a network name. Forces replacement.
+- `no_cache` (Boolean) Do not use the build cache (`--no-cache`). Forces replacement.
+- `no_cache_filter` (List of String) BuildKit only. Stages to build without cache (`--no-cache-filter`). Forces replacement.
+- `outputs` (List of String) BuildKit only. Extra exporters besides loading the image into the daemon (`--output`), e.g. `type=local,dest=out` or `type=registry` (push `name` and `tags`). Forces replacement.
+- `platform` (String) Build platform, e.g. `linux/arm64`. Default: the top-level `platform`, else the daemon's. Forces replacement.
+- `platforms` (List of String) BuildKit only. Target platform list; exactly one element is supported (sent as the build platform, like `platform`): the image lands in the daemon's image store, which holds one platform per tag. Use one `docker_image` per platform. Conflicts with `build.platform`. Forces replacement.
+- `provenance` (String) BuildKit only. Provenance attestation mode (`--provenance`): `min`, `max` or `false`. Forces replacement.
+- `pull` (Boolean) Always attempt to pull newer versions of base images (`--pull`). Forces replacement.
+- `remote` (String) Classic builder only. Remote build context the daemon fetches instead of a local `context`: a Git URL (`https://github.com/org/repo.git#ref:dir`) or the URL of a tarball or plain Dockerfile (`docker build <URL>`). `dockerfile` is then relative to the remote context. Exactly one of `context` and `remote`. Forces replacement.
+- `sbom` (Boolean) BuildKit only. Add an SBOM attestation (`--sbom`). Forces replacement.
 - `secrets` (Block List) BuildKit only. Build secrets exposed to `RUN --mount=type=secret,id=<id>`. Values are read by the provider at build time from a file or an environment variable of the provider process and are never stored in state. Forces replacement (but changing a secret's value does not trigger a rebuild; use `triggers`). (see [below for nested schema](#nestedblock--build--secrets))
-- `target` (String) Multi-stage target to build (`--target`).
+- `shm_size` (Number) Size of `/dev/shm` in bytes for `RUN` (`--shm-size`). Forces replacement.
+- `squash` (Boolean) Classic builder only (experimental daemons). Squash the new layers into one (`--squash`). Forces replacement.
+- `ssh` (Attributes List) BuildKit only. SSH agent sockets or keys exposed to `RUN --mount=type=ssh` (`--ssh id=paths`). Forces replacement. (see [below for nested schema](#nestedatt--build--ssh))
+- `tags` (List of String) Extra references to tag the built image with, besides `name` (`-t`, repeated). They are untagged on destroy unless `keep_locally` is set. Forces replacement.
+- `target` (String) Multi-stage target to build (`--target`). Forces replacement.
+- `ulimits` (Attributes Map) Resource limits for `RUN`, keyed by limit name such as `nofile` or `nproc` (`--ulimit name=soft:hard`). Forces replacement. (see [below for nested schema](#nestedatt--build--ulimits))
 
 <a id="nestedblock--build--secrets"></a>
 ### Nested Schema for `build.secrets`
@@ -131,6 +209,269 @@ Optional:
 
 - `env` (String) Name of an environment variable of the provider process holding the secret. Exactly one of `src` or `env`. Forces replacement.
 - `src` (String) Path of a file holding the secret (max 500 KiB). Exactly one of `src` or `env`. Forces replacement.
+
+
+<a id="nestedatt--build--ssh"></a>
+### Nested Schema for `build.ssh`
+
+Required:
+
+- `id` (String) SSH ID, usually `default`. Forces replacement.
+
+Optional:
+
+- `paths` (List of String) Agent socket or private key paths; empty uses `SSH_AUTH_SOCK` of the provider process. Forces replacement.
+
+
+<a id="nestedatt--build--ulimits"></a>
+### Nested Schema for `build.ulimits`
+
+Required:
+
+- `hard` (Number) Hard limit. Forces replacement.
+- `soft` (Number) Soft limit. Forces replacement.
+
+
+
+<a id="nestedatt--build_metadata"></a>
+### Nested Schema for `build_metadata`
+
+Read-Only:
+
+- `buildx_build_provenance` (Dynamic, Sensitive) Upstream `buildx.build.provenance`. Sensitive. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `buildx_build_ref` (String) Upstream `buildx.build.ref`.
+- `buildx_build_warnings` (Dynamic) Upstream `buildx.build.warnings`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `containerimage_config_digest` (String) Upstream `containerimage.config.digest`.
+- `containerimage_descriptor` (Attributes) Upstream `containerimage.descriptor`. (see [below for nested schema](#nestedatt--build_metadata--containerimage_descriptor))
+- `containerimage_digest` (String) Upstream `containerimage.digest`.
+
+<a id="nestedatt--build_metadata--containerimage_descriptor"></a>
+### Nested Schema for `build_metadata.containerimage_descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `size` (Number) Upstream `size`.
+
+
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `architecture` (String) Upstream `Architecture`.
+- `author` (String) Upstream `Author`.
+- `comment` (String) Upstream `Comment`.
+- `config` (Attributes) Upstream `Config`. (see [below for nested schema](#nestedatt--inspect--config))
+- `created` (String) Upstream `Created`.
+- `descriptor` (Attributes) Upstream `Descriptor`. (see [below for nested schema](#nestedatt--inspect--descriptor))
+- `graph_driver` (Attributes) Upstream `GraphDriver`. (see [below for nested schema](#nestedatt--inspect--graph_driver))
+- `id` (String) Upstream `Id`.
+- `identity` (Attributes) Upstream `Identity`. (see [below for nested schema](#nestedatt--inspect--identity))
+- `manifests` (Attributes List) Only with a multi-platform (containerd) image store and `manifests=true`; experimental upstream. (see [below for nested schema](#nestedatt--inspect--manifests))
+- `metadata` (Attributes) Upstream `Metadata`. (see [below for nested schema](#nestedatt--inspect--metadata))
+- `os` (String) Upstream `Os`.
+- `os_version` (String) Upstream `OsVersion`.
+- `repo_digests` (List of String) Upstream `RepoDigests`.
+- `repo_tags` (List of String) Upstream `RepoTags`.
+- `root_fs` (Attributes) Upstream `RootFS`. (see [below for nested schema](#nestedatt--inspect--root_fs))
+- `size` (Number) Upstream `Size`.
+- `variant` (String) Upstream `Variant`.
+
+<a id="nestedatt--inspect--config"></a>
+### Nested Schema for `inspect.config`
+
+Read-Only:
+
+- `args_escaped` (Boolean) Upstream `ArgsEscaped`.
+- `cmd` (List of String) Upstream `Cmd`.
+- `entrypoint` (List of String) Upstream `Entrypoint`.
+- `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
+- `exposed_ports` (List of String) Map keys (`<port>/<proto>`) as a list.
+- `healthcheck` (Attributes) Upstream `Healthcheck`. (see [below for nested schema](#nestedatt--inspect--config--healthcheck))
+- `labels` (Map of String) Upstream `Labels`.
+- `on_build` (List of String) Upstream `OnBuild`.
+- `shell` (List of String) Upstream `Shell`.
+- `stop_signal` (String) Upstream `StopSignal`.
+- `user` (String) Upstream `User`.
+- `volumes` (List of String) Map keys as a list.
+- `working_dir` (String) Upstream `WorkingDir`.
+
+<a id="nestedatt--inspect--config--healthcheck"></a>
+### Nested Schema for `inspect.config.healthcheck`
+
+Read-Only:
+
+- `interval` (Number) Upstream `Interval`.
+- `retries` (Number) Upstream `Retries`.
+- `start_interval` (Number) Upstream `StartInterval`.
+- `start_period` (Number) Upstream `StartPeriod`.
+- `test` (List of String) Upstream `Test`.
+- `timeout` (Number) Upstream `Timeout`.
+
+
+
+<a id="nestedatt--inspect--descriptor"></a>
+### Nested Schema for `inspect.descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `artifact_type` (String) Upstream `artifactType`.
+- `data` (String) Upstream `data`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--inspect--descriptor--platform))
+- `size` (Number) Upstream `size`.
+- `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--inspect--descriptor--platform"></a>
+### Nested Schema for `inspect.descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
+
+
+<a id="nestedatt--inspect--graph_driver"></a>
+### Nested Schema for `inspect.graph_driver`
+
+Read-Only:
+
+- `data` (Map of String) Upstream `Data`.
+- `name` (String) Upstream `Name`.
+
+
+<a id="nestedatt--inspect--identity"></a>
+### Nested Schema for `inspect.identity`
+
+Read-Only:
+
+- `build` (List of String) Upstream `Build`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `pull` (List of String) Upstream `Pull`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `signature` (List of String) Upstream `Signature`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+
+
+<a id="nestedatt--inspect--manifests"></a>
+### Nested Schema for `inspect.manifests`
+
+Read-Only:
+
+- `attestation_data` (String) Upstream `AttestationData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `available` (Boolean) Upstream `Available`.
+- `descriptor` (Attributes) Upstream `Descriptor`. (see [below for nested schema](#nestedatt--inspect--manifests--descriptor))
+- `id` (String) Upstream `ID`.
+- `image_data` (String) Upstream `ImageData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `kind` (String) Upstream `Kind`.
+- `size` (Attributes) Upstream `Size`. (see [below for nested schema](#nestedatt--inspect--manifests--size))
+
+<a id="nestedatt--inspect--manifests--descriptor"></a>
+### Nested Schema for `inspect.manifests.descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `artifact_type` (String) Upstream `artifactType`.
+- `data` (String) Upstream `data`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--inspect--manifests--descriptor--platform))
+- `size` (Number) Upstream `size`.
+- `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--inspect--manifests--descriptor--platform"></a>
+### Nested Schema for `inspect.manifests.descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
+
+
+<a id="nestedatt--inspect--manifests--size"></a>
+### Nested Schema for `inspect.manifests.size`
+
+Read-Only:
+
+- `content` (Number) Upstream `Content`.
+- `total` (Number) Upstream `Total`.
+
+
+
+<a id="nestedatt--inspect--metadata"></a>
+### Nested Schema for `inspect.metadata`
+
+Read-Only:
+
+- `last_tag_time` (String) Upstream `LastTagTime`.
+
+
+<a id="nestedatt--inspect--root_fs"></a>
+### Nested Schema for `inspect.root_fs`
+
+Read-Only:
+
+- `layers` (List of String) Upstream `Layers`.
+- `type` (String) Upstream `Type`.
+
+
+
+<a id="nestedatt--stages"></a>
+### Nested Schema for `stages`
+
+Read-Only:
+
+- `base_image` (String) As written (after global ARG substitution where resolvable).
+- `base_image_digest` (String) Digest the build resolved the base to, when the build reports it (BuildKit) or the base is inspected after pull.
+- `base_image_ref` (String) Normalized `registry/repo:tag` of the base image (implicit `latest` added); null for scratch or a stage base.
+- `base_stage` (String) Name of an earlier stage this stage builds on; null for an image base.
+- `index` (Number) Upstream `(stage position)`.
+- `instructions` (Attributes List) Upstream `(instructions after FROM)`. (see [below for nested schema](#nestedatt--stages--instructions))
+- `name` (String) Upstream `AS <name>`.
+- `platform` (String) Upstream `FROM --platform`.
+
+<a id="nestedatt--stages--instructions"></a>
+### Nested Schema for `stages.instructions`
+
+Read-Only:
+
+- `add` (String) Set when keyword = ADD; shape = the `add` output of dockerfile:ADD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `arg` (String, Sensitive) Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `cmd` (String) Set when keyword = CMD; shape = the `cmd` output of dockerfile:CMD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `comment` (String) Upstream `Comment`.
+- `copy` (String) Set when keyword = COPY; shape = the `copy` output of dockerfile:COPY. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `created` (Number) Image mode only: Unix time of the history entry.
+- `created_by` (String, Sensitive) Image mode only: the history entry this instruction was reconstructed from. Sensitive.
+- `dockerfile` (String) Upstream `(rendered instruction text)`.
+- `entrypoint` (String) Set when keyword = ENTRYPOINT; shape = the `entrypoint` output of dockerfile:ENTRYPOINT. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `env` (String, Sensitive) Set when keyword = ENV; shape = the `env` output of dockerfile:ENV. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `expose` (String) Set when keyword = EXPOSE; shape = the `expose` output of dockerfile:EXPOSE. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `healthcheck` (String) Set when keyword = HEALTHCHECK; shape = the `healthcheck` output of dockerfile:HEALTHCHECK. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `index` (Number) Upstream `(position in stage)`.
+- `keyword` (String) Upstream `INSTRUCTION`.
+- `label` (String) Set when keyword = LABEL; shape = the `label` output of dockerfile:LABEL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `layer_size` (Number) Upstream `Size`.
+- `line` (Number) 1-based start line; null in image mode.
+- `maintainer` (String) Set when keyword = MAINTAINER; shape = the `maintainer` output of dockerfile:MAINTAINER. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `onbuild` (String) Set when keyword = ONBUILD; shape = the `onbuild` output of dockerfile:ONBUILD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `run` (String) Set when keyword = RUN; shape = the `run` output of dockerfile:RUN. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `shell` (String) Set when keyword = SHELL; shape = the `shell` output of dockerfile:SHELL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `stopsignal` (String) Set when keyword = STOPSIGNAL; shape = the `stopsignal` output of dockerfile:STOPSIGNAL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `user` (String) Set when keyword = USER; shape = the `user` output of dockerfile:USER. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `volume` (String) Set when keyword = VOLUME; shape = the `volume` output of dockerfile:VOLUME. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `workdir` (String) Set when keyword = WORKDIR; shape = the `workdir` output of dockerfile:WORKDIR. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 
 ## Import
 

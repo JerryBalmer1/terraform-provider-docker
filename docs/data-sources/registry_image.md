@@ -3,12 +3,12 @@
 page_title: "docker_registry_image Data Source - docker"
 subcategory: ""
 description: |-
-  Reads the current manifest digest of an image tag from its registry, through the daemon's distribution endpoint (GET /distribution/<name>/json) with the provider's registry_auth. Nothing is pulled. Feed sha256_digest into docker_image.triggers to re-pull when a moving tag changes.
+  Reads the current manifest digest and platforms of an image tag from its registry, through the daemon's distribution endpoint (GET /distribution/<name>/json) with the provider's registry_auth. Nothing is pulled. Feed digest into docker_image.triggers to re-pull when a moving tag changes. The registry side returns no image config, so labels, created and config are always null here; use docker_registry_image_manifests for the config.
 ---
 
 # docker_registry_image (Data Source)
 
-Reads the current manifest digest of an image tag from its registry, through the daemon's distribution endpoint (`GET /distribution/<name>/json`) with the provider's `registry_auth`. Nothing is pulled. Feed `sha256_digest` into `docker_image.triggers` to re-pull when a moving tag changes.
+Reads the current manifest digest and platforms of an image tag from its registry, through the daemon's distribution endpoint (`GET /distribution/<name>/json`) with the provider's `registry_auth`. Nothing is pulled. Feed `digest` into `docker_image.triggers` to re-pull when a moving tag changes. The registry side returns no image config, so `labels`, `created` and `config` are always null here; use `docker_registry_image_manifests` for the config.
 
 ## Example Usage
 
@@ -19,7 +19,7 @@ data "docker_registry_image" "alpine" {
 }
 
 output "alpine_digest" {
-  value = data.docker_registry_image.alpine.sha256_digest
+  value = data.docker_registry_image.alpine.digest
 }
 ```
 
@@ -30,7 +30,126 @@ output "alpine_digest" {
 
 - `name` (String) Image reference in the registry, e.g. `nginx:1.27` or `ghcr.io/org/app:main` (no tag means `latest`).
 
+### Optional
+
+- `insecure_skip_verify` (Boolean) Accepted for configurations migrated from other providers; it has no effect. The read goes through the daemon, which follows its own `insecure-registries` setting.
+
 ### Read-Only
 
-- `id` (String) `<name>@<sha256_digest>`.
-- `sha256_digest` (String) Manifest (or manifest list / index) digest, `sha256:...`.
+- `config` (Attributes) Same shape as data.docker_image.config; the registry side cannot fill it (DistributionInspect has no config), always null. (see [below for nested schema](#nestedatt--config))
+- `content_sha256` (String) The `content_sha256` hash output.
+- `created` (String) Registry side cannot fill (no image config via the Engine API); always null.
+- `digest` (String) Manifest (or manifest list / index) digest, `sha256:...` (DistributionInspect `Descriptor.digest`).
+- `docker_server_version` (String) Docker Engine version reported by GET /version.
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon for this read/build.
+- `id` (String) `<name>@<digest>`, the reference as given pinned to the digest.
+- `image_digest_ref` (String) Pinned reference `<registry>/<repository>@<digest>`.
+- `image_ref` (String) Normalized `<registry>/<repository>:<tag>` of `name`.
+- `inspect` (Attributes) Full DistributionInspect, field by field. (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String) The Engine API response body as JSON.
+- `labels` (Map of String) Always null: the distribution endpoint returns no image config. Present so both image data sources share one shape.
+- `manifests` (Attributes List) Per-platform manifests in one shape for both data sources; `filled_by` on each field says which side fills it. (see [below for nested schema](#nestedatt--manifests))
+- `platforms` (List of String) Platforms of the image as `os/arch[/variant]` (DistributionInspect `Platforms`).
+
+<a id="nestedatt--config"></a>
+### Nested Schema for `config`
+
+Read-Only:
+
+- `args_escaped` (Boolean) Upstream `ArgsEscaped`.
+- `cmd` (List of String) Upstream `Cmd`.
+- `entrypoint` (List of String) Upstream `Entrypoint`.
+- `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
+- `exposed_ports` (List of String) Map keys (`<port>/<proto>`) as a list.
+- `healthcheck` (Attributes) Upstream `Healthcheck`. (see [below for nested schema](#nestedatt--config--healthcheck))
+- `labels` (Map of String) Upstream `Labels`.
+- `on_build` (List of String) Upstream `OnBuild`.
+- `shell` (List of String) Upstream `Shell`.
+- `stop_signal` (String) Upstream `StopSignal`.
+- `user` (String) Upstream `User`.
+- `volumes` (List of String) Map keys as a list.
+- `working_dir` (String) Upstream `WorkingDir`.
+
+<a id="nestedatt--config--healthcheck"></a>
+### Nested Schema for `config.healthcheck`
+
+Read-Only:
+
+- `interval` (Number) Upstream `Interval`.
+- `retries` (Number) Upstream `Retries`.
+- `start_interval` (Number) Upstream `StartInterval`.
+- `start_period` (Number) Upstream `StartPeriod`.
+- `test` (List of String) Upstream `Test`.
+- `timeout` (Number) Upstream `Timeout`.
+
+
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `descriptor` (Attributes) Upstream `Descriptor`. (see [below for nested schema](#nestedatt--inspect--descriptor))
+- `platforms` (Attributes List) Upstream `Platforms`. (see [below for nested schema](#nestedatt--inspect--platforms))
+
+<a id="nestedatt--inspect--descriptor"></a>
+### Nested Schema for `inspect.descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `artifact_type` (String) Upstream `artifactType`.
+- `data` (String) Upstream `data`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--inspect--descriptor--platform))
+- `size` (Number) Upstream `size`.
+- `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--inspect--descriptor--platform"></a>
+### Nested Schema for `inspect.descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
+
+
+<a id="nestedatt--inspect--platforms"></a>
+### Nested Schema for `inspect.platforms`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
+
+
+<a id="nestedatt--manifests"></a>
+### Nested Schema for `manifests`
+
+Read-Only:
+
+- `available` (Boolean) Local only: whether that platform's content is present on the daemon.
+- `digest` (String) Per-platform manifest digest. Local: ImageInspect.Manifests[].Descriptor.digest (containerd store). Registry: DistributionInspect lists platforms only, so null.
+- `media_type` (String) Upstream `Descriptor.mediaType`.
+- `platform` (Attributes) Upstream `Platform (os/architecture/variant)`. (see [below for nested schema](#nestedatt--manifests--platform))
+- `size` (Number) Upstream `Descriptor.size`.
+
+<a id="nestedatt--manifests--platform"></a>
+### Nested Schema for `manifests.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.

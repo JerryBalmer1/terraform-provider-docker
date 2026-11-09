@@ -11,12 +11,18 @@ A Docker network (`NetworkCreate`): a local `bridge`/`macvlan`/`ipvlan` network,
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `attachable` | `bool` | optional, computed | yes |  | Let standalone containers attach to an `overlay` network. Changing this forces a new resource. |
+| `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `driver` | `string` | optional, computed | yes |  | Network driver: `bridge` (default), `overlay` (Swarm manager only), `macvlan`, `ipvlan`, or a plugin. Changing this forces a new resource. |
+| `enable_ipv6` | `bool` | optional, computed | yes |  | Enable IPv6 on the network (`EnableIPv6`). Changing this forces a new resource. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `id` | `string` | computed |  |  | Network ID. |
 | `ingress` | `bool` | optional, computed | yes |  | Create the Swarm routing-mesh (ingress) network. Changing this forces a new resource. |
+| `inspect` | `object` | computed |  |  | The GET /networks/{id} response as a nested object, field by field. |
+| `inspect_json` | `string` | computed |  |  | The exact Engine API GET /networks/{id} response as JSON. |
 | `internal` | `bool` | optional, computed | yes |  | Restrict external access to the network. Changing this forces a new resource. |
 | `ipam_driver` | `string` | optional, computed | yes |  | IPAM driver. Default `default`. Changing this forces a new resource. |
-| `ipv6` | `bool` | optional, computed | yes |  | Enable IPv6. Changing this forces a new resource. |
+| `ipam_options` | `map(string)` | optional | yes |  | IPAM driver options (`IPAM.Options`), e.g. for a third-party IPAM plugin. Changing this forces a new resource. |
 | `labels` | `map(string)` | optional | yes |  | Network labels. Docker has no network update, so changing this forces a new resource. |
 | `name` | `string` | required | yes |  | Network name. Changing this forces a new resource. |
 | `options` | `map(string)` | optional | yes |  | Driver options, e.g. `{ "com.docker.network.bridge.name" = "br-app" }`. Options the driver adds itself are not reported. Changing this forces a new resource. |
@@ -24,9 +30,82 @@ A Docker network (`NetworkCreate`): a local `bridge`/`macvlan`/`ipvlan` network,
 
 Nested blocks: `ipam_config` (list of blocks, forces replacement).
 
+### `inspect`
+
+nested attribute, object. The GET /networks/{id} response as a nested object, field by field.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `attachable` | `bool` | computed |  |  | Upstream `Attachable`. |
+| `config_from` | `object` | computed |  |  | Upstream `ConfigFrom`. |
+| `config_only` | `bool` | computed |  |  | Upstream `ConfigOnly`. |
+| `containers` | `map(object)` | computed |  |  | Upstream `Containers`. |
+| `created` | `string` | computed |  |  | Upstream `Created`. |
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `enable_ipv4` | `bool` | computed |  |  | Upstream `EnableIPv4`. |
+| `enable_ipv6` | `bool` | computed |  |  | Upstream `EnableIPv6`. |
+| `id` | `string` | computed |  |  | Upstream `Id`. |
+| `ingress` | `bool` | computed |  |  | Upstream `Ingress`. |
+| `internal` | `bool` | computed |  |  | Upstream `Internal`. |
+| `ipam` | `object` | computed |  |  | Upstream `IPAM`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+| `peers` | `list(object)` | computed |  |  | Upstream `Peers`. |
+| `scope` | `string` | computed |  |  | Upstream `Scope`. |
+| `services` | `dynamic` | computed |  |  | Upstream `Services`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `status` | `object` | computed |  |  | Upstream `Status`. |
+
+### `inspect.config_from`
+
+nested attribute, object. Upstream `ConfigFrom`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `network` | `string` | computed |  |  | Upstream `Network`. |
+
+### `inspect.containers`
+
+nested attribute, map(object). Upstream `Containers`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `endpoint_id` | `string` | computed |  |  | Upstream `EndpointID`. |
+| `ipv4_address` | `string` | computed |  |  | Upstream `IPv4Address`. |
+| `ipv6_address` | `string` | computed |  |  | Upstream `IPv6Address`. |
+| `mac_address` | `string` | computed |  |  | Upstream `MacAddress`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+
+### `inspect.ipam`
+
+nested attribute, object. Upstream `IPAM`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `list(string)` | computed |  |  | Upstream `Config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `inspect.peers`
+
+nested attribute, list(object). Upstream `Peers`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ip` | `string` | computed |  |  | Upstream `IP`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+
+### `inspect.status`
+
+nested attribute, object. Upstream `Status`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ipam` | `dynamic` | computed |  |  | Upstream `IPAM`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+
 ### `ipam_config`
 
-list of blocks. Static IPAM pools. Without this block the daemon assigns a subnet itself (not reported in state). Changing this forces a new resource.
+list of blocks. Static IPAM pools. Without this block the daemon assigns a subnet itself (not reported in state). Forces replacement when a configured value differs from the network's: a missing block, or an argument left unset in a pool, accepts what the network already has (e.g. the daemon-assigned pool a kreuzwerker/docker state records) and only drops it from state.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|

@@ -4,21 +4,135 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Reads the per-platform manifests of a multi-platform image straight from its registry, with the provider's `registry_auth`. For a manifest list or OCI index every entry is listed (attestation manifests appear with platform `unknown`); a single-platform image gives one entry whose platform comes from its config blob. Nothing is pulled.
+Reads the manifest of an image straight from its registry, with the provider's `registry_auth`, like `docker buildx imagetools inspect` or `docker manifest inspect`. For a manifest list or OCI index every entry is listed (attestation manifests appear with platform `unknown/unknown`) and, unless `attestations = false`, each platform's image config and its SLSA provenance and SPDX SBOM attestations are read too; a single-platform image gives one entry whose platform comes from its config blob. Nothing is pulled.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `attestations` | `bool` | optional |  |  | Read the image config and the attestations of every platform of an index (two to four extra requests per platform). Default `true`; `false` reads only the top-level document, and `image_config_json`, `provenance_json` and `sbom_json` stay null for an index. |
+| `buildx_version` | `string` | computed |  |  | The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx. |
 | `digest` | `string` | computed |  |  | Digest of the top-level manifest (index, list or image manifest). |
+| `image_config` | `object` | computed |  |  | The image config field by field (for an index: one entry per platform, keyed os/arch[/variant]). |
+| `image_config_json` | `string` | computed |  | yes | Image config blob (per platform for an index: a JSON object keyed by os/arch[/variant]). Sensitive: config.Env can hold baked-in secrets. |
+| `image_config_json_sha256` | `string` | computed |  |  | SHA-256 of image_config_json, to detect drift without diffing the document. |
+| `image_digest_ref` | `string` | computed |  |  | Pinned reference `<registry>/<repository>@sha256:...`, safe to hand to a deploy tool. |
+| `image_ref` | `string` | computed |  |  | Normalized reference, e.g. `docker.io/library/alpine:latest`. |
 | `insecure_skip_verify` | `bool` | optional |  |  | Skip TLS certificate verification of the registry. |
-| `manifests` | `list(object)` | computed |  |  | Image manifests, in registry order. |
+| `manifest` | `object` | computed |  |  | The manifest/index field by field; for an index, `manifests[*].platform` gives os/architecture/variant. |
+| `manifest_json` | `string` | computed |  |  | The top-level manifest, OCI index or manifest list exactly as the registry served it. |
+| `manifest_json_sha256` | `string` | computed |  |  | SHA-256 of manifest_json, to detect drift without diffing the document. |
+| `manifests` | `list(object)` | computed |  |  | Entries of the top-level document, in registry order (one entry for a single image manifest). |
 | `media_type` | `string` | computed |  |  | Media type of the top-level manifest. |
 | `name` | `string` | required |  |  | Image reference, e.g. `nginx:1.27` or `ghcr.io/org/app@sha256:...` (no tag means `latest`). |
+| `platforms` | `list(string)` | computed |  |  | Platforms as `os/arch[/variant]`, in registry order, excluding attestation manifests. |
+| `provenance_json` | `string` | computed |  | yes | SLSA provenance attestation content; empty when the image has none. Sensitive: provenance can record build args. |
+| `provenance_json_sha256` | `string` | computed |  |  | SHA-256 of provenance_json, to detect drift without diffing the document. |
+| `sbom_json` | `string` | computed |  |  | SBOM attestation content (SPDX); empty when the image has none. |
+| `sbom_json_sha256` | `string` | computed |  |  | SHA-256 of sbom_json, to detect drift without diffing the document. |
+
+### `image_config`
+
+nested attribute, object. The image config field by field (for an index: one entry per platform, keyed os/arch[/variant]).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `config` | `dynamic` | computed |  | yes | Upstream `config`. Sensitive. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `created` | `string` | computed |  |  | Upstream `created`. |
+| `history` | `list(object)` | computed |  |  | Upstream `history`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `rootfs` | `object` | computed |  |  | Upstream `rootfs`. |
+
+### `image_config.history`
+
+nested attribute, list(object). Upstream `history`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `comment` | `string` | computed |  |  | Upstream `comment`. |
+| `created` | `string` | computed |  |  | Upstream `created`. |
+| `created_by` | `string` | computed |  | yes | Upstream `created_by`. Sensitive. |
+| `empty_layer` | `bool` | computed |  |  | Upstream `empty_layer`. |
+
+### `image_config.rootfs`
+
+nested attribute, object. Upstream `rootfs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `diff_ids` | `list(string)` | computed |  |  | Upstream `diff_ids`. |
+| `type` | `string` | computed |  |  | Upstream `type`. |
+
+### `manifest`
+
+nested attribute, object. The manifest/index field by field; for an index, `manifests[*].platform` gives os/architecture/variant.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `object` | computed |  |  | Upstream `config`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `layers` | `list(object)` | computed |  |  | Upstream `layers`. |
+| `manifests` | `list(object)` | computed |  |  | Upstream `manifests`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `schema_version` | `number` | computed |  |  | Upstream `schemaVersion`. |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+
+### `manifest.config`
+
+nested attribute, object. Upstream `config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `artifact_type` | `string` | computed |  |  | Upstream `artifactType`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+| `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `manifest.layers`
+
+nested attribute, list(object). Upstream `layers`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `artifact_type` | `string` | computed |  |  | Upstream `artifactType`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+| `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `manifest.manifests`
+
+nested attribute, list(object). Upstream `manifests`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `artifact_type` | `string` | computed |  |  | Upstream `artifactType`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `platform` | `object` | computed |  |  | Upstream `platform`. |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+| `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `manifest.manifests.platform`
+
+nested attribute, object. Upstream `platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
 
 ### `manifests`
 
-nested attribute, list(object). Image manifests, in registry order.
+nested attribute, list(object). Entries of the top-level document, in registry order (one entry for a single image manifest).
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
@@ -44,5 +158,15 @@ locals {
 
 output "nginx_arm64" {
   value = "nginx@${local.arm64}"
+}
+
+# SLSA provenance of a BuildKit-built image (null when it has none).
+data "docker_registry_image_manifests" "app" {
+  name = "ghcr.io/org/app:1.0"
+}
+
+output "app_provenance" {
+  value     = try(jsondecode(data.docker_registry_image_manifests.app.provenance_json)["linux/amd64"].SLSA, null)
+  sensitive = true
 }
 ```

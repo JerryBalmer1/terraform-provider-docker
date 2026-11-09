@@ -1,0 +1,64 @@
+# Exercises the converter paths the other fixtures do not: aliases and static
+# addresses, IPv6 networks, dns, tmpfs sizes, logging, capabilities, devices
+# restart retries and the init/ipc/shm/group options.
+name: kitchen
+
+services:
+  api:
+    image: example/api:2.1
+    restart: on-failure:3
+    init: true
+    read_only: true
+    stop_signal: SIGINT
+    group_add: [audio]
+    ipc: shareable
+    shm_size: 128m
+    mem_reservation: 64m
+    cap_add: [NET_ADMIN]
+    cap_drop: [MKNOD]
+    devices:
+      - /dev/fuse:/dev/fuse:rwm
+    dns: [10.0.0.2]
+    dns_search: [corp.example]
+    dns_opt: [ndots:2]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+    volumes:
+      - type: tmpfs
+        target: /cache
+        tmpfs:
+          size: 67108864
+      - type: volume
+        source: blobs
+        target: /blobs
+    networks:
+      core:
+        aliases: [api.internal]
+        ipv4_address: 172.28.0.10
+      edge: {}
+    ports:
+      - target: 8443
+        published: "443"
+        host_ip: 0.0.0.0
+        protocol: tcp
+      - target: 53
+        published: "5353"
+        protocol: udp
+
+networks:
+  core:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+  edge:
+    external: true
+    name: shared_edge
+
+volumes:
+  blobs:
+    driver: local
+    driver_opts:
+      type: none

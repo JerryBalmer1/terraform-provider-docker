@@ -10,10 +10,153 @@ A Swarm stack built from API primitives (not a compose file, no CLI): services, 
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `compose_spec_version` | `string` | computed |  |  | compose-spec commit stack_yaml and `stack` follow (pinned). |
+| `config_ids` | `map(string)` | computed |  |  | Map of short config name to Swarm config ID. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 of stack_yaml. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon (GET /version Version). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon for this read/apply. |
 | `id` | `string` | computed |  |  | The stack name. |
-| `name` | `string` | required | yes |  | Stack namespace. Changing this forces a new resource. |
+| `labels` | `map(string)` | computed |  |  | The namespace label every object of the stack carries (`com.docker.stack.namespace=<name>`), usable as a label selector. |
+| `name` | `string` | required | yes |  | Stack namespace. Forces replacement. |
+| `namespace` | `string` | computed |  |  | The stack namespace, the value of `com.docker.stack.namespace` on every object (equals `name`). |
+| `network_ids` | `map(string)` | computed |  |  | Map of short network name to network ID. |
+| `secret_ids` | `map(string)` | computed |  |  | Map of short secret name to Swarm secret ID. |
+| `service_ids` | `map(string)` | computed |  |  | Map of short service name to Swarm service ID. |
+| `service_status` | `list(object)` | computed |  |  | Runtime view per service (the `stack services` row: id, mode, replicas, image, ports) plus its ServiceSpec. |
+| `stack` | `object` | computed |  |  | The stack as a compose-spec document field by field: `services` is a map of service name -> compose-spec service (all top-level service keys recorded). |
+| `stack_yaml` | `string` | computed |  | yes | The stack rendered as a compose-spec file (what `docker stack config` prints), for tools that deploy compose (e.g. Ansible docker_stack). Sensitive: service environment values. |
 
 Nested blocks: `config` (list of blocks), `network` (list of blocks), `secret` (list of blocks), `service` (list of blocks), `volume` (list of blocks).
+
+### `service_status`
+
+nested attribute, list(object). Runtime view per service (the `stack services` row: id, mode, replicas, image, ports) plus its ServiceSpec.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `desired_replicas` | `number` | computed |  |  | Upstream `Replicas (desired half)`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `image` | `string` | computed |  |  | Upstream `Image`. |
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `ports` | `list(string)` | computed |  |  | Upstream `Ports`. |
+| `replicas` | `string` | computed |  |  | Upstream `Replicas`. |
+| `running_replicas` | `number` | computed |  |  | Upstream `Replicas (running half)`. |
+| `spec` | `string` | computed |  | yes | Upstream `Spec`. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `stack`
+
+nested attribute, object. The stack as a compose-spec document field by field: `services` is a map of service name -> compose-spec service (all top-level service keys recorded).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `configs` | `map(string)` | computed |  |  | Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `name` | `string` | computed |  |  | Upstream `name`. |
+| `networks` | `map(string)` | computed |  |  | Upstream `networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `secrets` | `map(string)` | computed |  |  | Upstream `secrets`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `services` | `map(object)` | computed |  |  | Upstream `services`. |
+| `volumes` | `map(string)` | computed |  |  | Upstream `volumes`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `stack.services`
+
+nested attribute, map(object). Upstream `services`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `attach` | `bool` | computed |  |  | Upstream `attach`. |
+| `blkio_config` | `string` | computed |  |  | Upstream `blkio_config`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `build` | `string` | computed |  |  | Upstream `build`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cap_add` | `list(string)` | computed |  |  | Upstream `cap_add`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cap_drop` | `list(string)` | computed |  |  | Upstream `cap_drop`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cgroup` | `string` | computed |  |  | Upstream `cgroup`. |
+| `cgroup_parent` | `string` | computed |  |  | Upstream `cgroup_parent`. |
+| `command` | `list(string)` | computed |  |  | Upstream `command`. |
+| `configs` | `list(string)` | computed |  |  | Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `container_name` | `string` | computed |  |  | Upstream `container_name`. |
+| `cpu_count` | `string` | computed |  |  | Upstream `cpu_count`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cpu_percent` | `string` | computed |  |  | Upstream `cpu_percent`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cpu_period` | `number` | computed |  |  | Upstream `cpu_period`. |
+| `cpu_quota` | `number` | computed |  |  | Upstream `cpu_quota`. |
+| `cpu_rt_period` | `number` | computed |  |  | Upstream `cpu_rt_period`. |
+| `cpu_rt_runtime` | `number` | computed |  |  | Upstream `cpu_rt_runtime`. |
+| `cpu_shares` | `number` | computed |  |  | Upstream `cpu_shares`. |
+| `cpus` | `number` | computed |  |  | Upstream `cpus`. |
+| `cpuset` | `string` | computed |  |  | Upstream `cpuset`. |
+| `credential_spec` | `string` | computed |  |  | Upstream `credential_spec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `depends_on` | `string` | computed |  |  | Upstream `depends_on`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `deploy` | `string` | computed |  |  | Upstream `deploy`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `develop` | `string` | computed |  |  | Upstream `develop`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `device_cgroup_rules` | `list(string)` | computed |  |  | Upstream `device_cgroup_rules`. |
+| `devices` | `list(string)` | computed |  |  | Upstream `devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `dns` | `list(string)` | computed |  |  | Upstream `dns`. |
+| `dns_opt` | `list(string)` | computed |  |  | Upstream `dns_opt`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `dns_search` | `list(string)` | computed |  |  | Upstream `dns_search`. |
+| `domainname` | `string` | computed |  |  | Upstream `domainname`. |
+| `entrypoint` | `list(string)` | computed |  |  | Upstream `entrypoint`. |
+| `env_file` | `list(string)` | computed |  | yes | Upstream `env_file`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `environment` | `map(string)` | computed |  | yes | Upstream `environment`. Sensitive. |
+| `expose` | `list(string)` | computed |  |  | Upstream `expose`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `extends` | `string` | computed |  |  | Upstream `extends`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `external_links` | `list(string)` | computed |  |  | Upstream `external_links`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `extra_hosts` | `map(list(string))` | computed |  |  | Upstream `extra_hosts`. |
+| `gpus` | `string` | computed |  |  | Upstream `gpus`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `group_add` | `list(string)` | computed |  |  | Upstream `group_add`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `healthcheck` | `string` | computed |  |  | Upstream `healthcheck`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `hostname` | `string` | computed |  |  | Upstream `hostname`. |
+| `image` | `string` | computed |  |  | Upstream `image`. |
+| `init` | `bool` | computed |  |  | Upstream `init`. |
+| `ipc` | `string` | computed |  |  | Upstream `ipc`. |
+| `isolation` | `string` | computed |  |  | Upstream `isolation`. |
+| `label_file` | `list(string)` | computed |  |  | Upstream `label_file`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `links` | `list(string)` | computed |  |  | Upstream `links`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `logging` | `string` | computed |  |  | Upstream `logging`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `mac_address` | `string` | computed |  |  | Upstream `mac_address`. |
+| `mem_limit` | `number` | computed |  |  | Upstream `mem_limit`. |
+| `mem_reservation` | `number` | computed |  |  | Upstream `mem_reservation`. |
+| `mem_swappiness` | `number` | computed |  |  | Upstream `mem_swappiness`. |
+| `memswap_limit` | `number` | computed |  |  | Upstream `memswap_limit`. |
+| `models` | `string` | computed |  |  | Upstream `models`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `network_mode` | `string` | computed |  |  | Upstream `network_mode`. |
+| `networks` | `string` | computed |  |  | Upstream `networks`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `oom_kill_disable` | `bool` | computed |  |  | Upstream `oom_kill_disable`. |
+| `oom_score_adj` | `string` | computed |  |  | Upstream `oom_score_adj`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `pid` | `string` | computed |  |  | Upstream `pid`. |
+| `pids_limit` | `number` | computed |  |  | Upstream `pids_limit`. |
+| `platform` | `string` | computed |  |  | Upstream `platform`. |
+| `ports` | `list(string)` | computed |  |  | Upstream `ports`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `post_start` | `list(string)` | computed |  |  | Upstream `post_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `pre_start` | `list(string)` | computed |  |  | Upstream `pre_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `pre_stop` | `list(string)` | computed |  |  | Upstream `pre_stop`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
+| `profiles` | `list(string)` | computed |  |  | Upstream `profiles`. |
+| `provider` | `string` | computed |  |  | Upstream `provider`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `pull_policy` | `string` | computed |  |  | Upstream `pull_policy`. |
+| `pull_refresh_after` | `string` | computed |  |  | Upstream `pull_refresh_after`. |
+| `read_only` | `bool` | computed |  |  | Upstream `read_only`. |
+| `restart` | `string` | computed |  |  | Upstream `restart`. |
+| `runtime` | `string` | computed |  |  | Upstream `runtime`. |
+| `scale` | `number` | computed |  |  | Upstream `scale`. |
+| `secrets` | `list(string)` | computed |  | yes | Upstream `secrets`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `security_opt` | `list(string)` | computed |  |  | Upstream `security_opt`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `shm_size` | `number` | computed |  |  | Upstream `shm_size`. |
+| `stdin_open` | `bool` | computed |  |  | Upstream `stdin_open`. |
+| `stop_grace_period` | `string` | computed |  |  | Upstream `stop_grace_period`. |
+| `stop_signal` | `string` | computed |  |  | Upstream `stop_signal`. |
+| `storage_opt` | `string` | computed |  |  | Upstream `storage_opt`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `sysctls` | `map(string)` | computed |  |  | Upstream `sysctls`. |
+| `tmpfs` | `list(string)` | computed |  |  | Upstream `tmpfs`. |
+| `tty` | `bool` | computed |  |  | Upstream `tty`. |
+| `ulimits` | `string` | computed |  |  | Upstream `ulimits`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `umask` | `number` | computed |  |  | Upstream `umask`. |
+| `use_api_socket` | `bool` | computed |  |  | Upstream `use_api_socket`. |
+| `user` | `string` | computed |  |  | Upstream `user`. |
+| `userns_mode` | `string` | computed |  |  | Upstream `userns_mode`. |
+| `uts` | `string` | computed |  |  | Upstream `uts`. |
+| `volumes` | `list(string)` | computed |  |  | Upstream `volumes`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `volumes_from` | `list(string)` | computed |  |  | Upstream `volumes_from`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `working_dir` | `string` | computed |  |  | Upstream `working_dir`. |
 
 ### `config`
 
@@ -62,21 +205,36 @@ list of blocks. A service of the stack, created as `<stack>_<name>` with the sam
 | `dir` | `string` | optional |  |  | Working directory of the task process. Unset uses the image's. Updated in place. |
 | `env` | `map(string)` | optional |  |  | Environment variables of the task containers. |
 | `force_update` | `number` | optional |  |  | Counter (`TaskTemplate.ForceUpdate`): change it (e.g. increment) to force a rolling restart of every task even when nothing else changed, like `docker service update --force`. Unset leaves the daemon's counter alone and ignores it on refresh. Updated in place. |
+| `groups` | `list(string)` | optional |  |  | Additional groups the task process runs with (`ContainerSpec.Groups`). Updated in place. |
 | `hostname` | `string` | optional |  |  | Hostname of the task containers (`ContainerSpec.Hostname`; Go templates such as `{{.Task.Name}}` work). Unset: the container ID prefix. Updated in place (rolling update). |
 | `hosts` | `list(string)` | optional |  |  | Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` like `docker service create --host`. The provider sends them in the daemon's `"<ip> <hostname>"` (hosts(5)) format; an entry that already contains a space is sent as is. Updated in place. |
 | `image` | `string` | required |  |  | Image reference the tasks run. The provider asks the registry for the digest and the daemon pins tasks to it (`@sha256:...`); that pin is ignored on refresh when this value has no digest. Credentials come from the provider's `registry_auth`. Updated in place (rolling update). |
+| `init` | `bool` | optional |  |  | Run an init process inside the task containers that forwards signals and reaps processes (`ContainerSpec.Init`). Unset uses the daemon default. Updated in place. |
+| `isolation` | `string` | optional |  |  | Isolation technology of the task containers (`ContainerSpec.Isolation`): `default`, `process` or `hyperv` (Windows only). Updated in place. |
 | `labels` | `map(string)` | optional |  |  | Labels on the service object. |
 | `max_concurrent` | `number` | optional |  |  | `replicated_job` only: tasks run at the same time (daemon default 1). Updated in place (re-runs the job). |
 | `mode` | `string` | optional, computed |  |  | `replicated` (default), `global`, `replicated_job` or `global_job` (see `docker_service`). Changing it recreates this service. |
 | `name` | `string` | required |  |  | Short service name inside the stack; the Swarm service is named `<stack>_<name>`. Renaming removes the old service and creates a new one. |
-| `networks` | `set(string)` | optional |  |  | Networks to attach the tasks to, by ID or name (resolved to IDs; overlay networks). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. Use `networks_advanced` instead for per-network aliases; the two cannot be combined. Updated in place. |
+| `networks` | `map(object)` | optional |  |  | Networks the tasks attach to (`TaskTemplate.Networks`), keyed by network name or ID (resolved to the ID, the attachment's `Target`); use `{}` as the value for a plain attachment. In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. Updated in place. |
+| `read_only` | `bool` | optional |  |  | Mount the task containers' root filesystem read-only (`ContainerSpec.ReadOnly`). Updated in place. |
 | `replicas` | `number` | optional, computed |  |  | Number of tasks for `replicated` mode (default 1); ignored by the other modes. Updated in place. |
+| `runtime` | `string` | optional |  |  | Runtime of the tasks (`TaskTemplate.Runtime`). Only `container` (the default) is useful here: this type always sends a `ContainerSpec`, and the `plugin` and `attachment` runtimes need a plugin or network-attachment spec instead. Updated in place. |
 | `stop_grace_period` | `string` | optional |  |  | Time to wait after the stop signal before killing a task (Go duration, e.g. `30s`; daemon default 10s). Updated in place. |
+| `stop_signal` | `string` | optional |  |  | Signal that stops the task containers, e.g. `SIGTERM` (`ContainerSpec.StopSignal`). Unset uses the image's. Updated in place. |
 | `sysctls` | `map(string)` | optional |  |  | Namespaced kernel parameters for the task containers, e.g. `{ "net.core.somaxconn" = "1024" }`. Updated in place. |
 | `total_completions` | `number` | optional |  |  | `replicated_job` only: tasks that must complete successfully (daemon default: `max_concurrent`). Updated in place (re-runs the job). |
 | `user` | `string` | optional |  |  | User (`uid`, `name`, optionally `:group`) the task process runs as. Unset uses the image's. Updated in place. |
 
-Nested blocks: `configs` (list of blocks), `converge_config` (single block), `dns` (single block), `endpoint_spec` (single block), `healthcheck` (single block), `logging` (single block), `mounts` (list of blocks), `networks_advanced` (list of blocks), `placement` (single block), `resources` (single block), `restart_policy` (single block), `rollback_config` (single block), `secrets` (list of blocks), `ulimits` (list of blocks), `update_config` (single block).
+Nested blocks: `configs` (list of blocks), `converge_config` (single block), `dns_config` (single block), `endpoint_spec` (single block), `healthcheck` (single block), `logging` (single block), `mounts` (list of blocks), `placement` (single block), `privileges` (single block), `resources` (single block), `restart_policy` (single block), `rollback_config` (single block), `secrets` (list of blocks), `ulimits` (list of blocks), `update_config` (single block).
+
+### `service.networks`
+
+nested attribute, map(object). Networks the tasks attach to (`TaskTemplate.Networks`), keyed by network name or ID (resolved to the ID, the attachment's `Target`); use `{}` as the value for a plain attachment. In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. Updated in place.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `set(string)` | optional |  |  | Extra DNS names the service gets on this network (`Aliases`); the service name always resolves. |
+| `driver_opts` | `map(string)` | optional |  |  | Driver options of this attachment (`DriverOpts`). |
 
 ### `service.configs`
 
@@ -100,7 +258,7 @@ single block. When present, create and update wait until the service has converg
 | `delay` | `string` | optional, computed |  |  | Poll interval (Go duration, default `5s`). |
 | `timeout` | `string` | optional, computed |  |  | Maximum wait (Go duration, default `3m`). |
 
-### `service.dns`
+### `service.dns_config`
 
 single block. Resolver configuration of the task containers (`ContainerSpec.DNSConfig`). Updated in place.
 
@@ -126,6 +284,7 @@ list of blocks. Published ports.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `name` | `string` | optional |  |  | Name of the port mapping (`Name`). |
 | `protocol` | `string` | optional, computed |  |  | `tcp` (default), `udp` or `sctp`. |
 | `publish_mode` | `string` | optional, computed |  |  | `ingress` (default, routing mesh on every node) or `host` (only on nodes running a task). |
 | `published_port` | `number` | optional |  |  | Port published on the nodes. Unset lets Swarm choose one (30000+). |
@@ -161,20 +320,46 @@ list of blocks. Mounts in the task containers.
 | `read_only` | `bool` | optional, computed |  |  | Mount read-only. |
 | `source` | `string` | optional |  |  | Host path (`bind`) or volume name (`volume`; created on each node by the volume driver if missing). In a stack, the short name of a stack `volume` block resolves to `<stack>_<name>` with that block's driver, options and labels. |
 | `target` | `string` | required |  |  | Path inside the container. |
-| `tmpfs_size` | `number` | optional |  |  | Size of a `tmpfs` mount in bytes. |
 | `type` | `string` | required |  |  | `bind`, `volume` or `tmpfs`. |
-| `volume_driver` | `string` | optional |  |  | Volume driver used when the volume does not exist yet on the node. |
-| `volume_driver_opts` | `map(string)` | optional |  |  | Driver options for a volume created on first use. |
-| `volume_labels` | `map(string)` | optional |  |  | Labels for a volume created on first use. |
 
-### `service.networks_advanced`
+Nested blocks: `bind_options` (single block), `tmpfs_options` (single block), `volume_options` (single block).
 
-list of blocks. Networks to attach, with per-network DNS aliases (`TaskTemplate.Networks[].Aliases`). An alternative to `networks`: setting both is an error. Updated in place.
+### `service.mounts.bind_options`
+
+single block. Options of a `bind` mount (`Mount.BindOptions`).
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `aliases` | `set(string)` | optional |  |  | Extra DNS names the service gets on this network (the service name always resolves). |
-| `name` | `string` | required |  |  | Network ID or name (resolved to its ID). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. |
+| `propagation` | `string` | optional |  |  | Bind propagation: `private`, `rprivate`, `shared`, `rshared`, `slave` or `rslave` (`Propagation`). |
+
+### `service.mounts.tmpfs_options`
+
+single block. Options of a `tmpfs` mount (`Mount.TmpfsOptions`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `number` | optional |  |  | Permission bits of the tmpfs as a decimal number, e.g. `448` for `0700` (`Mode`). |
+| `size_bytes` | `number` | optional |  |  | Size of the tmpfs in bytes (`SizeBytes`); unset is unlimited. |
+
+### `service.mounts.volume_options`
+
+single block. Options of a `volume` mount, used when the volume does not exist yet on the node (`Mount.VolumeOptions`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `labels` | `map(string)` | optional |  |  | Labels for a volume created on first use (`Labels`). |
+| `no_copy` | `bool` | optional |  |  | Do not populate a new volume with the image's data at the target (`NoCopy`). |
+
+Nested blocks: `driver_config` (single block).
+
+### `service.mounts.volume_options.driver_config`
+
+single block. Volume driver for a volume created on first use (`DriverConfig`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | optional |  |  | Volume driver name, e.g. `local` (`Name`). |
+| `options` | `map(string)` | optional |  |  | Driver options (`Options`). |
 
 ### `service.placement`
 
@@ -185,6 +370,45 @@ single block. Where tasks may run.
 | `constraints` | `list(string)` | optional |  |  | Constraints such as `node.role==manager` or `node.labels.zone==a`. |
 | `max_replicas` | `number` | optional |  |  | Maximum tasks per node; 0 or unset means unlimited. |
 | `preferences` | `list(string)` | optional |  |  | Spread preferences, each `spread=<descriptor>` such as `spread=node.labels.zone`. |
+
+Nested blocks: `platforms` (list of blocks).
+
+### `service.placement.platforms`
+
+list of blocks. Platforms the tasks may run on (`Placement.Platforms`). Unset lets the daemon fill them from the image manifest; that daemon value is then not shown.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | required |  |  | CPU architecture, e.g. `amd64` or `arm64` (`Architecture`). |
+| `os` | `string` | required |  |  | Operating system, e.g. `linux` (`OS`). |
+
+### `service.privileges`
+
+single block. Security options of the task containers (`ContainerSpec.Privileges`). Updated in place.
+
+Nested blocks: `credential_spec` (single block), `selinux_context` (single block).
+
+### `service.privileges.credential_spec`
+
+single block. Managed service account credential spec (`CredentialSpec`, Windows only); set one of `config`, `file` and `registry`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `string` | optional |  |  | ID of a swarm config holding the credential spec (`Config`). |
+| `file` | `string` | optional |  |  | Credential spec file name under the daemon's `CredentialSpecs` directory (`File`). |
+| `registry` | `string` | optional |  |  | Registry value name holding the credential spec (`Registry`). |
+
+### `service.privileges.selinux_context`
+
+single block. SELinux labels of the task containers (`SELinuxContext`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `disable` | `bool` | optional |  |  | Disable SELinux labeling (`Disable`). |
+| `level` | `string` | optional |  |  | SELinux level label (`Level`). |
+| `role` | `string` | optional |  |  | SELinux role label (`Role`). |
+| `type` | `string` | optional |  |  | SELinux type label (`Type`). |
+| `user` | `string` | optional |  |  | SELinux user label (`User`). |
 
 ### `service.resources`
 
@@ -209,6 +433,32 @@ single block. Reservations the scheduler must find on a node.
 |---|---|---|---|---|---|
 | `memory_bytes` | `number` | optional |  |  | Memory in bytes. |
 | `nano_cpus` | `number` | optional |  |  | CPU in units of 1e-9 CPUs (1000000000 = one CPU). |
+
+Nested blocks: `generic_resources` (list of blocks).
+
+### `service.resources.reservations.generic_resources`
+
+list of blocks. User-defined resources the node must advertise (`GenericResources`); each entry sets one of `named_resource_spec` and `discrete_resource_spec`.
+
+Nested blocks: `discrete_resource_spec` (single block), `named_resource_spec` (single block).
+
+### `service.resources.reservations.generic_resources.discrete_resource_spec`
+
+single block. A countable resource (`DiscreteResourceSpec`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | optional |  |  | Resource kind, e.g. `SSD` (`Kind`). |
+| `value` | `number` | optional |  |  | Amount (`Value`). |
+
+### `service.resources.reservations.generic_resources.named_resource_spec`
+
+single block. A resource with a string value, e.g. a GPU UUID (`NamedResourceSpec`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | optional |  |  | Resource kind, e.g. `GPU` (`Kind`). |
+| `value` | `string` | optional |  |  | Resource value (`Value`). |
 
 ### `service.restart_policy`
 
@@ -313,7 +563,7 @@ resource "docker_stack" "shop" {
   service {
     name     = "db"
     image    = "postgres:16-alpine"
-    networks = ["backend"] # stack-local short name
+    networks = { backend = {} } # stack-local short name
 
     env = {
       POSTGRES_PASSWORD_FILE = "/run/secrets/db_password"
@@ -338,7 +588,7 @@ resource "docker_stack" "shop" {
     name     = "web"
     image    = "nginx:1.27-alpine"
     replicas = 2
-    networks = ["backend"]
+    networks = { backend = {} }
 
     configs {
       config_id = "nginx"

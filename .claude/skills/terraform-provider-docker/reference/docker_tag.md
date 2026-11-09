@@ -10,10 +10,128 @@ Adds a tag to an image already on the provider's daemon, like `docker tag SOURCE
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `id` | `string` | computed |  |  | `<source_image_id>.<target_image>`. |
-| `source_image` | `string` | required | yes |  | Existing image to tag: a name, `name:tag`, or image ID (e.g. a `docker_image`'s `image_id`). Changing this forces a new resource. |
+| `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
+| `id` | `string` | computed |  |  | ID (`sha256:...`) of the tagged image, the image `source_image` resolved to. |
+| `image_ref` | `string` | computed |  |  | The new tag in normalized `registry/repository:tag` form (implicit `latest` added). |
+| `inspect` | `object` | computed |  |  | The GET /images/{name}/json for the target tag response as a nested object, field by field. |
+| `inspect_json` | `string` | computed |  |  | The exact Engine API GET /images/{name}/json for the target tag response as JSON. |
+| `repo_digests` | `list(string)` | computed |  |  | Repository digest references (`repo@sha256:...`) the daemon knows for the tagged image (`RepoDigests`). |
+| `source_image` | `string` | required | yes |  | Existing image to tag: a name, `name:tag`, or image ID (e.g. a `docker_image`'s `id`). Forces replacement. |
 | `source_image_id` | `string` | computed |  |  | ID (`sha256:...`) of the image `source_image` resolved to when the tag was set. |
-| `target_image` | `string` | required | yes |  | New reference, `repository[:tag]` (no tag means `latest`), e.g. `registry.example.com/app:1.0`. Changing this forces a new resource. |
+| `target_image` | `string` | required | yes |  | New reference, `repository[:tag]` (no tag means `latest`), e.g. `registry.example.com/app:1.0`. Forces replacement. |
+| `triggers` | `map(string)` | optional | yes |  | Arbitrary string map; any change re-applies the tag (for example after `source_image` was rebuilt under the same name). Forces replacement. |
+
+### `inspect`
+
+nested attribute, object. The GET /images/{name}/json for the target tag response as a nested object, field by field.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `Architecture`. |
+| `author` | `string` | computed |  |  | Upstream `Author`. |
+| `comment` | `string` | computed |  |  | Upstream `Comment`. |
+| `config` | `object` | computed |  |  | Upstream `Config`. |
+| `created` | `string` | computed |  |  | Upstream `Created`. |
+| `descriptor` | `object` | computed |  |  | Upstream `Descriptor`. |
+| `graph_driver` | `object` | computed |  |  | Upstream `GraphDriver`. |
+| `id` | `string` | computed |  |  | Upstream `Id`. |
+| `identity` | `object` | computed |  |  | Upstream `Identity`. |
+| `manifests` | `list(object)` | computed |  |  | Upstream `Manifests`. |
+| `metadata` | `object` | computed |  |  | Upstream `Metadata`. |
+| `os` | `string` | computed |  |  | Upstream `Os`. |
+| `os_version` | `string` | computed |  |  | Upstream `OsVersion`. |
+| `repo_digests` | `list(string)` | computed |  |  | Upstream `RepoDigests`. |
+| `repo_tags` | `list(string)` | computed |  |  | Upstream `RepoTags`. |
+| `root_fs` | `object` | computed |  |  | Upstream `RootFS`. |
+| `size` | `number` | computed |  |  | Upstream `Size`. |
+| `variant` | `string` | computed |  |  | Upstream `Variant`. |
+
+### `inspect.config`
+
+nested attribute, object. Upstream `Config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args_escaped` | `bool` | computed |  |  | Upstream `ArgsEscaped`. |
+| `cmd` | `list(string)` | computed |  |  | Upstream `Cmd`. |
+| `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
+| `env` | `list(string)` | computed |  |  | Upstream `Env`. |
+| `exposed_ports` | `dynamic` | computed |  |  | Upstream `ExposedPorts`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `healthcheck` | `dynamic` | computed |  |  | Upstream `Healthcheck`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `on_build` | `list(string)` | computed |  |  | Upstream `OnBuild`. |
+| `shell` | `list(string)` | computed |  |  | Upstream `Shell`. |
+| `stop_signal` | `string` | computed |  |  | Upstream `StopSignal`. |
+| `user` | `string` | computed |  |  | Upstream `User`. |
+| `volumes` | `dynamic` | computed |  |  | Upstream `Volumes`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `working_dir` | `string` | computed |  |  | Upstream `WorkingDir`. |
+
+### `inspect.descriptor`
+
+nested attribute, object. Upstream `Descriptor`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `artifact_type` | `string` | computed |  |  | Upstream `artifactType`. |
+| `data` | `string` | computed |  |  | Upstream `data`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `platform` | `dynamic` | computed |  |  | Upstream `platform`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+| `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `inspect.graph_driver`
+
+nested attribute, object. Upstream `GraphDriver`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `data` | `map(string)` | computed |  |  | Upstream `Data`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+
+### `inspect.identity`
+
+nested attribute, object. Upstream `Identity`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `build` | `list(string)` | computed |  |  | Upstream `Build`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `pull` | `list(string)` | computed |  |  | Upstream `Pull`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `signature` | `list(string)` | computed |  |  | Upstream `Signature`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `inspect.manifests`
+
+nested attribute, list(object). Upstream `Manifests`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `attestation_data` | `string` | computed |  |  | Upstream `AttestationData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `available` | `bool` | computed |  |  | Upstream `Available`. |
+| `descriptor` | `string` | computed |  |  | Upstream `Descriptor`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `image_data` | `string` | computed |  |  | Upstream `ImageData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `size` | `string` | computed |  |  | Upstream `Size`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `inspect.metadata`
+
+nested attribute, object. Upstream `Metadata`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `last_tag_time` | `string` | computed |  |  | Upstream `LastTagTime`. |
+
+### `inspect.root_fs`
+
+nested attribute, object. Upstream `RootFS`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `layers` | `list(string)` | computed |  |  | Upstream `Layers`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
 
 ## Example
 
@@ -24,8 +142,15 @@ resource "docker_image" "app" {
 
 # Same image under a second name, e.g. before pushing it to a private registry.
 resource "docker_tag" "release" {
-  source_image = docker_image.app.image_id
+  source_image = docker_image.app.id
   target_image = "registry.example.com/web/nginx:stable"
+
+  # Re-tag whenever the source image is rebuilt.
+  triggers = { source = docker_image.app.id }
+}
+
+output "tag_ref" {
+  value = docker_tag.release.image_ref
 }
 
 output "tagged_image_id" {

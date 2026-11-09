@@ -3,12 +3,12 @@
 page_title: "docker_registry_token Ephemeral Resource - docker"
 subcategory: ""
 description: |-
-  Obtains a short-lived registry bearer token, as an ephemeral value that is never written to plan or state. The provider pings GET /v2/ on the registry, follows its WWW-Authenticate: Bearer challenge to the token service and authenticates with the matching registry_auth entry (anonymous when none matches). Registries that use Basic auth issue no token and are an error.
+  Obtains a short-lived registry bearer token, as an ephemeral value that is never written to plan or state. The provider pings GET /v2/ on the registry, follows its WWW-Authenticate: Bearer challenge to the token service and authenticates with the matching registry_auth entry (anonymous when none matches). Registries that use Basic auth issue no token and are an error. The bearer token is token.token; send it as Authorization: Bearer <token>.
 ---
 
 # docker_registry_token (Ephemeral Resource)
 
-Obtains a short-lived registry bearer token, as an ephemeral value that is never written to plan or state. The provider pings `GET /v2/` on the registry, follows its `WWW-Authenticate: Bearer` challenge to the token service and authenticates with the matching `registry_auth` entry (anonymous when none matches). Registries that use Basic auth issue no token and are an error.
+Obtains a short-lived registry bearer token, as an ephemeral value that is never written to plan or state. The provider pings `GET /v2/` on the registry, follows its `WWW-Authenticate: Bearer` challenge to the token service and authenticates with the matching `registry_auth` entry (anonymous when none matches). Registries that use Basic auth issue no token and are an error. The bearer token is `token.token`; send it as `Authorization: Bearer <token>`.
 
 Ephemeral resources require Terraform 1.10 or later. Their values are never
 stored in the plan or state, so they can only be referenced from ephemeral
@@ -41,7 +41,7 @@ ephemeral "docker_registry_token" "app" {
 # write-only secret for a service that pulls from ghcr.io itself.
 resource "docker_secret" "ghcr_token" {
   name            = "ghcr-pull-token"
-  data_wo         = base64encode(ephemeral.docker_registry_token.app.token)
+  data_wo         = base64encode(ephemeral.docker_registry_token.app.token.token)
   data_wo_version = 1
 }
 ```
@@ -60,9 +60,19 @@ resource "docker_secret" "ghcr_token" {
 
 ### Read-Only
 
+- `distribution_api_version` (String) The registry's Docker-Distribution-API-Version header.
 - `expires_at` (String) RFC 3339 time the token expires.
-- `expires_in` (Number) Token lifetime in seconds (60 when the token service does not say).
-- `issued_at` (String) RFC 3339 time the token was issued.
+- `expires_in` (Number) Token lifetime in seconds (60 when the token service does not say); the same value as `token.expires_in`.
+- `issued_at` (String) RFC 3339 time the token was issued; the same value as `token.issued_at`.
 - `realm` (String) Token service URL from the challenge.
 - `service` (String) Service name from the challenge.
-- `token` (String, Sensitive) The bearer token. Send it as `Authorization: Bearer <token>`.
+- `token` (Attributes) The `token` structured output. (see [below for nested schema](#nestedatt--token))
+
+<a id="nestedatt--token"></a>
+### Nested Schema for `token`
+
+Read-Only:
+
+- `expires_in` (Number) Upstream `expires_in`.
+- `issued_at` (String) Upstream `issued_at`.
+- `token` (String, Sensitive) Upstream `token`. Sensitive.

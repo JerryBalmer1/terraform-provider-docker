@@ -3,12 +3,12 @@
 page_title: "docker_node Data Source - docker"
 subcategory: ""
 description: |-
-  Looks up one swarm node through the provider's Docker host (which must be a manager), by id (full ID or unique prefix) or hostname. Set exactly one.
+  Looks up one swarm node (GET /nodes/{id}) through the provider's Docker host (which must be a manager), by id (full ID or unique prefix) or hostname. Set exactly one. inspect holds the whole Engine node object.
 ---
 
 # docker_node (Data Source)
 
-Looks up one swarm node through the provider's Docker host (which must be a manager), by `id` (full ID or unique prefix) or `hostname`. Set exactly one.
+Looks up one swarm node (`GET /nodes/{id}`) through the provider's Docker host (which must be a manager), by `id` (full ID or unique prefix) or `hostname`. Set exactly one. `inspect` holds the whole Engine node object.
 
 ## Example Usage
 
@@ -19,6 +19,11 @@ data "docker_node" "worker1" {
 
 output "worker1_state" {
   value = data.docker_node.worker1.state
+}
+
+# The whole Engine node object is under inspect.
+output "worker1_resources" {
+  value = data.docker_node.worker1.inspect.description.resources
 }
 ```
 
@@ -32,10 +37,156 @@ output "worker1_state" {
 
 ### Read-Only
 
-- `addr` (String) IP address the node is reached at.
+- `addr` (String) IP address the node is reached at (`Status.Addr`).
 - `availability` (String) `active`, `pause` or `drain`.
+- `content_sha256` (String) SHA-256 of inspect_json; changes whenever the object changes.
+- `docker_server_version` (String) Docker Engine version of the daemon the provider talked to (GET /version Version).
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).
 - `engine_version` (String) Docker Engine version on the node.
-- `labels` (Map of String) Node labels (`node.labels.*`).
+- `inspect` (Attributes) The node inspect response as a nested object mirroring Node field by field (snake_case). (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String) The exact Engine API inspect response for the node, as JSON.
+- `labels` (Map of String) Labels on the node (`Spec.Labels`).
 - `leader` (Boolean) True when the node is the current raft leader.
+- `name` (String) Node name (`Spec.Name`), else the hostname.
 - `role` (String) `worker` or `manager`.
 - `state` (String) Node status: `ready`, `down`, `disconnected` or `unknown`.
+- `version_index` (Number) The node object's `Version.Index`; it changes on every update.
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `created_at` (String) Upstream `CreatedAt`.
+- `description` (Attributes) Upstream `Description`. (see [below for nested schema](#nestedatt--inspect--description))
+- `id` (String) Upstream `ID`.
+- `manager_status` (Attributes) Upstream `ManagerStatus`. (see [below for nested schema](#nestedatt--inspect--manager_status))
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--inspect--spec))
+- `status` (Attributes) Upstream `Status`. (see [below for nested schema](#nestedatt--inspect--status))
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--inspect--version))
+
+<a id="nestedatt--inspect--description"></a>
+### Nested Schema for `inspect.description`
+
+Read-Only:
+
+- `engine` (Attributes) Upstream `Engine`. (see [below for nested schema](#nestedatt--inspect--description--engine))
+- `hostname` (String) Upstream `Hostname`.
+- `platform` (Attributes) Upstream `Platform`. (see [below for nested schema](#nestedatt--inspect--description--platform))
+- `resources` (Attributes) Upstream `Resources`. (see [below for nested schema](#nestedatt--inspect--description--resources))
+- `tls_info` (Attributes) Upstream `TLSInfo`. (see [below for nested schema](#nestedatt--inspect--description--tls_info))
+
+<a id="nestedatt--inspect--description--engine"></a>
+### Nested Schema for `inspect.description.engine`
+
+Read-Only:
+
+- `engine_version` (String) Upstream `EngineVersion`.
+- `labels` (Map of String) Upstream `Labels`.
+- `plugins` (Attributes List) Upstream `Plugins`. (see [below for nested schema](#nestedatt--inspect--description--engine--plugins))
+
+<a id="nestedatt--inspect--description--engine--plugins"></a>
+### Nested Schema for `inspect.description.engine.plugins`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `type` (String) Upstream `Type`.
+
+
+
+<a id="nestedatt--inspect--description--platform"></a>
+### Nested Schema for `inspect.description.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `Architecture`.
+- `os` (String) Upstream `OS`.
+
+
+<a id="nestedatt--inspect--description--resources"></a>
+### Nested Schema for `inspect.description.resources`
+
+Read-Only:
+
+- `generic_resources` (Attributes List) Upstream `GenericResources`. (see [below for nested schema](#nestedatt--inspect--description--resources--generic_resources))
+- `memory_bytes` (Number) Upstream `MemoryBytes`.
+- `nano_cpus` (Number) Upstream `NanoCPUs`.
+
+<a id="nestedatt--inspect--description--resources--generic_resources"></a>
+### Nested Schema for `inspect.description.resources.generic_resources`
+
+Read-Only:
+
+- `discrete_resource_spec` (Attributes) Upstream `DiscreteResourceSpec`. (see [below for nested schema](#nestedatt--inspect--description--resources--generic_resources--discrete_resource_spec))
+- `named_resource_spec` (Attributes) Upstream `NamedResourceSpec`. (see [below for nested schema](#nestedatt--inspect--description--resources--generic_resources--named_resource_spec))
+
+<a id="nestedatt--inspect--description--resources--generic_resources--discrete_resource_spec"></a>
+### Nested Schema for `inspect.description.resources.generic_resources.discrete_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `Kind`.
+- `value` (Number) Upstream `Value`.
+
+
+<a id="nestedatt--inspect--description--resources--generic_resources--named_resource_spec"></a>
+### Nested Schema for `inspect.description.resources.generic_resources.named_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `Kind`.
+- `value` (String) Upstream `Value`.
+
+
+
+
+<a id="nestedatt--inspect--description--tls_info"></a>
+### Nested Schema for `inspect.description.tls_info`
+
+Read-Only:
+
+- `cert_issuer_public_key` (String) Upstream `CertIssuerPublicKey`.
+- `cert_issuer_subject` (String) Upstream `CertIssuerSubject`.
+- `trust_root` (String) Upstream `TrustRoot`.
+
+
+
+<a id="nestedatt--inspect--manager_status"></a>
+### Nested Schema for `inspect.manager_status`
+
+Read-Only:
+
+- `addr` (String) Upstream `Addr`.
+- `leader` (Boolean) Upstream `Leader`.
+- `reachability` (String) Upstream `Reachability`.
+
+
+<a id="nestedatt--inspect--spec"></a>
+### Nested Schema for `inspect.spec`
+
+Read-Only:
+
+- `availability` (String) Upstream `Availability`.
+- `labels` (Map of String) Upstream `Labels`.
+- `name` (String) Upstream `Name`.
+- `role` (String) Upstream `Role`.
+
+
+<a id="nestedatt--inspect--status"></a>
+### Nested Schema for `inspect.status`
+
+Read-Only:
+
+- `addr` (String) Upstream `Addr`.
+- `message` (String) Upstream `Message`.
+- `state` (String) Upstream `State`.
+
+
+<a id="nestedatt--inspect--version"></a>
+### Nested Schema for `inspect.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.

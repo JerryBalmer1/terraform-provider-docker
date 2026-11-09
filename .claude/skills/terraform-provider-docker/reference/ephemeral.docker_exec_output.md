@@ -4,7 +4,7 @@
 
 Kind: ephemeral-resource. Back to [SKILL.md](../SKILL.md).
 
-Runs a command in a running container (`docker exec`) and returns its standard output as an ephemeral value that is never written to plan or state. A non-zero exit code is an error that carries the command's stderr. Use it to read a generated credential or setting out of a container during a run; the command runs on every plan and apply, so it must be safe to repeat.
+Runs a command in a running container (`docker exec`) and returns its standard output and error as ephemeral values that are never written to plan or state. A non-zero exit code is an error that carries the command's stderr. Use it to read a generated credential or setting out of a container during a run; the command runs on every plan and apply, so it must be safe to repeat. `result` holds the Engine's exec inspect (`GET /exec/{id}/json`).
 
 Ephemeral resources need Terraform >= 1.10. Their values are never written to
 plan or state; reference them only from ephemeral contexts (write-only
@@ -27,14 +27,51 @@ ephemeral "docker_exec_output" "<name>" {
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `command` | `list(string)` | required |  |  | Command and arguments, exec form, e.g. `["cat", "/run/secrets/token"]`. Use `["sh", "-c", "..."]` for shell syntax. |
-| `container` | `string` | required |  |  | Container name or ID; it must be running. |
+| `container_id` | `string` | required |  |  | The container to run the command in, by ID or name; it must be running. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `env` | `map(string)` | optional |  |  | Extra environment variables for the command. |
+| `exec_id` | `string` | computed |  |  | ID of the exec instance (`POST /containers/{id}/exec`). |
 | `exit_code` | `number` | computed |  |  | Exit code of the command; always 0, because any other code fails the read. |
-| `stderr` | `string` | computed |  | yes | Standard error of the command (up to 4 MiB). |
-| `stdout` | `string` | computed |  | yes | Standard output of the command, exactly as written (up to 4 MiB). |
+| `privileged` | `bool` | optional |  |  | Give the command extended privileges. Default `false`. |
+| `result` | `object` | computed |  |  | GET /exec/{id}/json after the command finished (exit_code, running, pid, process_config...). |
+| `stderr` | `string` | computed |  | yes | The command's standard error (Q33). |
+| `stderr_sha256` | `string` | computed |  |  | sha256 of `stderr` (Q34). |
+| `stdout` | `string` | computed |  | yes | The command's standard output (Q33). |
+| `stdout_sha256` | `string` | computed |  |  | sha256 of output. |
 | `timeout` | `string` | optional |  |  | Maximum run time as a Go duration, e.g. `30s`. Default `60s`. |
 | `user` | `string` | optional |  |  | User to run as (`name`, `uid` or `uid:gid`). Default: the container's user. |
 | `workdir` | `string` | optional |  |  | Working directory inside the container. |
+
+### `result`
+
+nested attribute, object. GET /exec/{id}/json after the command finished (exit_code, running, pid, process_config...).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `can_remove` | `bool` | computed |  |  | Upstream `CanRemove`. |
+| `container_id` | `string` | computed |  |  | Upstream `ContainerID`. |
+| `detach_keys` | `string` | computed |  |  | Upstream `DetachKeys`. |
+| `exit_code` | `number` | computed |  |  | Upstream `ExitCode`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `open_stderr` | `bool` | computed |  |  | Upstream `OpenStderr`. |
+| `open_stdin` | `bool` | computed |  |  | Upstream `OpenStdin`. |
+| `open_stdout` | `bool` | computed |  |  | Upstream `OpenStdout`. |
+| `pid` | `number` | computed |  |  | Upstream `Pid`. |
+| `process_config` | `object` | computed |  |  | Upstream `ProcessConfig`. |
+| `running` | `bool` | computed |  |  | Upstream `Running`. |
+
+### `result.process_config`
+
+nested attribute, object. Upstream `ProcessConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `arguments` | `list(string)` | computed |  |  | Upstream `arguments`. |
+| `entrypoint` | `string` | computed |  |  | Upstream `entrypoint`. |
+| `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
+| `tty` | `bool` | computed |  |  | Upstream `tty`. |
+| `user` | `string` | computed |  |  | Upstream `user`. |
 
 ## Example
 
@@ -48,9 +85,9 @@ resource "docker_container" "app" {
 # Read the token out of the container during the run; it never reaches plan
 # or state. A non-zero exit code (say, the file is not there yet) fails the run.
 ephemeral "docker_exec_output" "admin_token" {
-  container = docker_container.app.id
-  command   = ["cat", "/var/lib/app/admin-token"]
-  timeout   = "30s"
+  container_id = docker_container.app.id
+  command      = ["cat", "/var/lib/app/admin-token"]
+  timeout      = "30s"
 }
 
 # Share it with swarm services as a write-only secret.

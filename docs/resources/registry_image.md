@@ -3,12 +3,12 @@
 page_title: "docker_registry_image Resource - docker"
 subcategory: ""
 description: |-
-  Pushes an image that exists on the provider's daemon (typically a docker_image) to its registry, using the provider's registry_auth credentials. Read refreshes sha256_digest from the registry. A push only happens on create: tie triggers to the source image (e.g. docker_image.app.image_id) so a rebuilt image is pushed again.
+  Pushes an image that exists on the provider's daemon (typically a docker_image) to its registry, using the provider's registry_auth credentials. Read refreshes digest and the distribution outputs from the registry (GET /distribution/<name>/json). A push only happens on create: tie triggers to the source image (e.g. docker_image.app.id) so a rebuilt image is pushed again.
 ---
 
 # docker_registry_image (Resource)
 
-Pushes an image that exists on the provider's daemon (typically a `docker_image`) to its registry, using the provider's `registry_auth` credentials. Read refreshes `sha256_digest` from the registry. A push only happens on create: tie `triggers` to the source image (e.g. `docker_image.app.image_id`) so a rebuilt image is pushed again.
+Pushes an image that exists on the provider's daemon (typically a `docker_image`) to its registry, using the provider's `registry_auth` credentials. Read refreshes `digest` and the distribution outputs from the registry (`GET /distribution/<name>/json`). A push only happens on create: tie `triggers` to the source image (e.g. `docker_image.app.id`) so a rebuilt image is pushed again.
 
 ## Example Usage
 
@@ -26,12 +26,12 @@ resource "docker_registry_image" "app" {
   keep_remotely = true
   push_retries  = 5
   triggers = {
-    image_id = docker_image.app.image_id
+    image_id = docker_image.app.id
   }
 }
 
 output "app_digest" {
-  value = docker_registry_image.app.sha256_digest
+  value = docker_registry_image.app.image_digest_ref
 }
 ```
 
@@ -40,19 +40,61 @@ output "app_digest" {
 
 ### Required
 
-- `name` (String) Local image reference to push, including registry host and tag (e.g. `registry.example.com/team/app:1.2`; no tag means `latest`). The image must already exist on the daemon under this name. Changing this forces a new resource.
+- `name` (String) Local image reference to push, including registry host and tag (e.g. `registry.example.com/team/app:1.2`; no tag means `latest`). The image must already exist on the daemon under this name. Forces replacement.
 
 ### Optional
 
 - `insecure_skip_verify` (Boolean) Skip TLS verification when the provider itself talks to the registry (only for the delete on destroy; pushes go through the daemon and follow its insecure-registries setting). Default `false`.
 - `keep_remotely` (Boolean) When false (default), destroy deletes the manifest from the registry through the Registry HTTP API v2 (`DELETE /v2/<repo>/manifests/<digest>`, the registry must allow deletes). If that fails the resource is removed from state with a warning. When true, the image is left in the registry.
 - `push_retries` (Number) How many times to retry a failed push, with exponential backoff (1s, 2s, 4s, ... capped at 30s). Default `3`.
-- `triggers` (Map of String) Arbitrary string map; any change pushes the image again. Changing this forces a new resource.
+- `triggers` (Map of String) Arbitrary string map; any change pushes the image again. Forces replacement.
 
 ### Read-Only
 
+- `content_sha256` (String) sha256 of distribution_json.
+- `digest` (String) Manifest (or index) digest (`sha256:...`) of the pushed image in the registry (DistributionInspect `Descriptor.digest`).
+- `distribution` (Attributes) The GET /distribution/{name}/json response as a nested object, field by field. (see [below for nested schema](#nestedatt--distribution))
+- `distribution_json` (String) The exact Engine API GET /distribution/{name}/json response as JSON.
+- `docker_server_version` (String) Docker Engine version from GET /version.
+- `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `id` (String) The pushed reference (same as `name`).
-- `sha256_digest` (String) Manifest digest (`sha256:...`) of the pushed image, from the push result or the registry.
+- `image_digest_ref` (String) Pinned reference `<registry>/<repository>@<digest>`, safe to hand to a deploy tool.
+- `image_ref` (String) The pushed reference, normalized to `<registry>/<repository>:<tag>`.
+- `platforms` (List of String) Platforms in the pushed manifest as `os/arch[/variant]`.
+
+<a id="nestedatt--distribution"></a>
+### Nested Schema for `distribution`
+
+Read-Only:
+
+- `descriptor` (Attributes) Upstream `Descriptor`. (see [below for nested schema](#nestedatt--distribution--descriptor))
+- `platforms` (Attributes List) Upstream `Platforms`. (see [below for nested schema](#nestedatt--distribution--platforms))
+
+<a id="nestedatt--distribution--descriptor"></a>
+### Nested Schema for `distribution.descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `artifact_type` (String) Upstream `artifactType`.
+- `data` (String) Upstream `data`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `platform` (Dynamic) Upstream `platform`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `size` (Number) Upstream `size`.
+- `urls` (List of String) Upstream `urls`.
+
+
+<a id="nestedatt--distribution--platforms"></a>
+### Nested Schema for `distribution.platforms`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
 
 ## Import
 

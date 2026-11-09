@@ -10,7 +10,9 @@ resource "docker_stack" "minimal" {
     env = {
       LOG_LEVEL = "info"
     }
-    networks = ["traefik_public"]
+    networks = {
+      traefik_public = {}
+    }
     # TODO: tmpfs is not supported by docker_stack services
     restart_policy {
       condition = "any"

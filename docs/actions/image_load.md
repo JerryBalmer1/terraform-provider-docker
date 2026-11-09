@@ -3,12 +3,12 @@
 page_title: "docker_image_load Action - docker"
 subcategory: ""
 description: |-
-  Loads images from a local tar archive into the daemon, like docker load. The archive is what docker save or the docker_image_save action writes; the loaded image names are reported as progress. The images are not tracked in state.
+  Loads images from a local tar archive into the daemon, like docker load. The archive is what docker save or the docker_image_save action writes; the loaded image names are reported as progress and in the result object (loaded_images, result.archive_size). The images are not tracked in state.
 ---
 
 # docker_image_load (Action)
 
-Loads images from a local tar archive into the daemon, like `docker load`. The archive is what `docker save` or the `docker_image_save` action writes; the loaded image names are reported as progress. The images are not tracked in state.
+Loads images from a local tar archive into the daemon, like `docker load`. The archive is what `docker save` or the `docker_image_save` action writes; the loaded image names are reported as progress and in the result object (`loaded_images`, `result.archive_size`). The images are not tracked in state.
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_image_load.<name>] } }`
@@ -33,7 +33,8 @@ resource "terraform_data" "bundle" {
 #   terraform apply -invoke=action.docker_image_load.bundle
 action "docker_image_load" "bundle" {
   config {
-    path = "${path.module}/images.tar"
+    input       = "${path.module}/images.tar"
+    result_path = "${path.module}/out/load-result.json"
   }
 }
 ```
@@ -43,4 +44,9 @@ action "docker_image_load" "bundle" {
 
 ### Required
 
-- `path` (String) Local path of the image archive (optionally gzip/bzip2/xz compressed). `~` expands to the home directory.
+- `input` (String) Local path of the image archive (optionally gzip/bzip2/xz compressed), like `docker load --input`. `~` expands to the home directory.
+
+### Optional
+
+- `platform` (String) Only this platform of multi-platform images, `os[/arch[/variant]]` (`docker load --platform`; API 1.48+ with the containerd image store). Default: all platforms.
+- `result_path` (String) Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails.

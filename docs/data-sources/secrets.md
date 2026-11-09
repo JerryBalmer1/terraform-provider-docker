@@ -3,12 +3,12 @@
 page_title: "docker_secrets Data Source - docker"
 subcategory: ""
 description: |-
-  Lists the swarm's secrets (GET /secrets), sorted by name; the provider's host must be a swarm manager. Secret data is never returned by the daemon, so only metadata is listed.
+  Lists the swarm's secrets (GET /secrets), sorted by name; the provider's host must be a swarm manager. Secret data is never returned by the daemon, so secrets holds the metadata (ID, version, times, name, labels, driver).
 ---
 
 # docker_secrets (Data Source)
 
-Lists the swarm's secrets (`GET /secrets`), sorted by name; the provider's host must be a swarm manager. Secret data is never returned by the daemon, so only metadata is listed.
+Lists the swarm's secrets (`GET /secrets`), sorted by name; the provider's host must be a swarm manager. Secret data is never returned by the daemon, so `secrets` holds the metadata (ID, version, times, name, labels, driver).
 
 ## Example Usage
 
@@ -18,7 +18,7 @@ data "docker_secrets" "shop" {
 }
 
 output "shop_secret_names" {
-  value = data.docker_secrets.shop.secrets[*].name
+  value = data.docker_secrets.shop.names
 }
 ```
 
@@ -27,20 +27,63 @@ output "shop_secret_names" {
 
 ### Optional
 
-- `labels` (Map of String) Only objects carrying every one of these labels; an empty value matches any value.
+- `labels` (Map of String) Only objects carrying every one of these labels (Engine `label` filter); an empty value matches any value.
 - `name` (String) Only objects whose name matches (Engine `name` filter, a prefix/substring match).
 
 ### Read-Only
 
-- `secrets` (Attributes List) The matching objects, sorted by name then ID. (see [below for nested schema](#nestedatt--secrets))
+- `content_sha256` (String) SHA-256 of secrets_json; changes whenever the object changes.
+- `docker_server_version` (String) Docker Engine version of the daemon the provider talked to (GET /version Version).
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).
+- `ids` (List of String) IDs of the matching objects, in the order of `secrets`.
+- `names` (List of String) Names of the matching objects, in the order of `secrets`.
+- `secrets` (Attributes List) Every secret returned by the list endpoint, each mirroring Secret field by field (snake_case). Not sensitive: Data is never returned by SecretList. (see [below for nested schema](#nestedatt--secrets))
+- `secrets_json` (String) The exact list response (JSON array of Secret) as returned by the Engine API. Not sensitive: Data is never returned by SecretList.
 
 <a id="nestedatt--secrets"></a>
 ### Nested Schema for `secrets`
 
 Read-Only:
 
-- `created_at` (String) RFC 3339 creation time.
-- `id` (String) Secret ID.
-- `labels` (Map of String) Secret labels.
-- `name` (String) Secret name.
-- `updated_at` (String) RFC 3339 time of the last update.
+- `created_at` (String) Upstream `CreatedAt`.
+- `id` (String) Upstream `ID`.
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--secrets--spec))
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--secrets--version))
+
+<a id="nestedatt--secrets--spec"></a>
+### Nested Schema for `secrets.spec`
+
+Read-Only:
+
+- `data` (String) Upstream `Data`.
+- `driver` (Attributes) Upstream `Driver`. (see [below for nested schema](#nestedatt--secrets--spec--driver))
+- `labels` (Map of String) Upstream `Labels`.
+- `name` (String) Upstream `Name`.
+- `templating` (Attributes) Upstream `Templating`. (see [below for nested schema](#nestedatt--secrets--spec--templating))
+
+<a id="nestedatt--secrets--spec--driver"></a>
+### Nested Schema for `secrets.spec.driver`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `options` (Map of String) Upstream `Options`.
+
+
+<a id="nestedatt--secrets--spec--templating"></a>
+### Nested Schema for `secrets.spec.templating`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `options` (Map of String) Upstream `Options`.
+
+
+
+<a id="nestedatt--secrets--version"></a>
+### Nested Schema for `secrets.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.

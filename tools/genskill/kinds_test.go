@@ -231,7 +231,7 @@ func TestNewKindsFromFakeProvider(t *testing.T) {
 		"## 10. Worked example 2: compose file to stack, seeded and scaled with actions",
 		"go run ./tools/compose2stack -in docker-compose.yml -out stack.tf -mode swarm",
 		"terraform apply -invoke=action.docker_service_scale.web_peak",
-		"`action.docker_exec.service` is not in the schema",
+		"`action.docker_exec.service_id` is not in the schema",
 		"action `docker_service_scale` is not registered in this build",
 		"resource `docker_stack` is not registered in this build",
 		"- [`provider::docker::parse_ref`](reference/function.parse_ref.md): Parses an image reference into its parts.",

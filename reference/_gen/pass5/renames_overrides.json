@@ -1,0 +1,1543 @@
+{
+  "about": "Applied to renames.json by generators/pass5/renames_post.py. shape_mappings: user decisions (Pass 5) on one Terraform shape for several upstream shapes; rows: per-row patches (decisions, then the gap rows lanes implemented, added by Lane Z from the lane reports).",
+  "shape_mappings": {
+    "logging": {
+      "decision": "Pass 5 (user): `logging { driver, options }` is the single shape on docker_container, docker_service, docker_stack services and docker_compose services. The raw inspect_json keeps each API's own shape exactly; the structured output keeps the upstream field names (see input_attr in the inventory field maps).",
+      "terraform": {
+        "driver": "string",
+        "options": "map(string)"
+      },
+      "upstream": {
+        "engine_container": {
+          "pointer": "swagger #/definitions/HostConfig LogConfig",
+          "driver": "LogConfig.Type",
+          "options": "LogConfig.Config",
+          "types": [
+            "docker_container",
+            "data.docker_container"
+          ]
+        },
+        "swarm_service": {
+          "pointer": "swagger #/definitions/TaskSpec LogDriver",
+          "driver": "LogDriver.Name",
+          "options": "LogDriver.Options",
+          "types": [
+            "docker_service",
+            "data.docker_service",
+            "docker_stack (service)"
+          ]
+        },
+        "compose": {
+          "pointer": "compose-spec #/$defs/service logging",
+          "driver": "logging.driver",
+          "options": "logging.options",
+          "types": [
+            "docker_compose"
+          ]
+        }
+      }
+    },
+    "service_networks": {
+      "decision": "Pass 5 (user): docker_service (and docker_stack services) `networks` and `networks_advanced` merge into one map keyed by network name, matching Q1 on docker_container. The value mirrors TaskTemplate.Networks[] (NetworkAttachmentConfig): Target is resolved from the key (name -> ID), Aliases -> aliases, DriverOpts -> driver_opts.",
+      "terraform": "map(object({aliases = set(string), driver_opts = map(string)}))",
+      "upstream": {
+        "pointer": "swagger #/definitions/TaskSpec Networks -> #/definitions/NetworkAttachmentConfig",
+        "key": "Target (name resolved to ID)",
+        "aliases": "Aliases",
+        "driver_opts": "DriverOpts"
+      }
+    },
+    "container_networks": {
+      "decision": "Q1: docker_container `networks` is a map keyed by network name of EndpointSettings (NetworkingConfig.EndpointsConfig), connected and disconnected in place.",
+      "terraform": "map(object({aliases, ipv4_address, ipv6_address, mac_address, driver_opts, gw_priority, link_local_ips, ...}))",
+      "upstream": {
+        "pointer": "swagger #/definitions/NetworkingConfig EndpointsConfig -> #/definitions/EndpointSettings"
+      }
+    }
+  },
+  "rows": [
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "log_driver",
+      "set": {
+        "upstream": "swagger #/definitions/HostConfig LogConfig.Type (shape_mappings.logging.engine_container); compose-spec #/$defs/service logging.driver"
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "log_opts",
+      "set": {
+        "upstream": "swagger #/definitions/HostConfig LogConfig.Config (shape_mappings.logging.engine_container); compose-spec #/$defs/service logging.options"
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.log_driver",
+      "set": {
+        "upstream": "swagger #/definitions/TaskSpec LogDriver (shape_mappings.logging.swarm_service); compose-spec #/$defs/service logging"
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.log_driver.name",
+      "set": {
+        "upstream": "swagger #/definitions/TaskSpec LogDriver.Name (shape_mappings.logging.swarm_service); compose-spec logging.driver"
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.log_driver.options",
+      "set": {
+        "upstream": "swagger #/definitions/TaskSpec LogDriver.Options (shape_mappings.logging.swarm_service); compose-spec logging.options"
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.networks_advanced.driver_opts",
+      "set": {
+        "our_attr": "networks.driver_opts",
+        "transform": "rename (map value)",
+        "upstream": "swagger #/definitions/NetworkAttachmentConfig DriverOpts (shape_mappings.service_networks)",
+        "reason": "Pass 5 (user): the service networks map value mirrors TaskTemplate.Networks[] {aliases, driver_opts}."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": null,
+      "previous_attr": "networks",
+      "set": {
+        "upstream": "swagger #/definitions/TaskSpec Networks (shape_mappings.service_networks)"
+      }
+    },
+    {
+      "type": "action.docker_exec",
+      "kreuzwerker_attr": "detach",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "detach",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "action.docker_exec",
+      "kreuzwerker_attr": "env_file",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "env_file",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "action.docker_exec",
+      "kreuzwerker_attr": "tty",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "tty",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "action.docker_image_load",
+      "kreuzwerker_attr": "platform",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "platform",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "action.docker_image_save",
+      "kreuzwerker_attr": "platform",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "platform",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "data.docker_network",
+      "kreuzwerker_attr": "containers",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "containers",
+        "transform": "added (gap, Pass 5): map keyed by container ID",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "data.docker_network",
+      "kreuzwerker_attr": "containers.container_id",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "containers",
+        "transform": "added (gap, Pass 5): map key",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "data.docker_network",
+      "kreuzwerker_attr": "containers.endpoint_id",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "containers.endpoint_id",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "data.docker_network",
+      "kreuzwerker_attr": "containers.ipv4_address",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "containers.ipv4_address",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "data.docker_network",
+      "kreuzwerker_attr": "containers.ipv6_address",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "containers.ipv6_address",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "data.docker_network",
+      "kreuzwerker_attr": "containers.mac_address",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "containers.mac_address",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "data.docker_network",
+      "kreuzwerker_attr": "containers.name",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "containers.name",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "data.docker_registry_image",
+      "kreuzwerker_attr": "insecure_skip_verify",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "insecure_skip_verify",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_buildx_builder",
+      "kreuzwerker_attr": "append",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "append",
+        "transform": "added (gap, Pass 5): bool, default false, RequiresReplace",
+        "reason": "Pass 5 Lane E: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_buildx_builder",
+      "kreuzwerker_attr": "docker_container.cgroup_parent",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "docker_container.cgroup_parent",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane E: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_buildx_builder",
+      "kreuzwerker_attr": "docker_container.cpu_period",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "docker_container.cpu_period",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane E: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_buildx_builder",
+      "kreuzwerker_attr": "docker_container.cpu_quota",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "docker_container.cpu_quota",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane E: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_buildx_builder",
+      "kreuzwerker_attr": "docker_container.cpu_shares",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "docker_container.cpu_shares",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane E: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_buildx_builder",
+      "kreuzwerker_attr": "docker_container.cpuset_cpus",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "docker_container.cpuset_cpus",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane E: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_buildx_builder",
+      "kreuzwerker_attr": "docker_container.cpuset_mems",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "docker_container.cpuset_mems",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane E: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_buildx_builder",
+      "kreuzwerker_attr": "docker_container.default_load",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "docker_container.default_load",
+        "transform": "added (gap, Pass 5): stored as a label; the seam loads by default on that builder",
+        "reason": "Pass 5 Lane E: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_buildx_builder",
+      "kreuzwerker_attr": "docker_container.memory_swap",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "docker_container.memory_swap",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane E: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_buildx_builder",
+      "kreuzwerker_attr": "node",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "node",
+        "transform": "added (gap, Pass 5): Optional+Computed, default `<name>0`; container `buildx_buildkit_<node>`",
+        "reason": "Pass 5 Lane E: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_buildx_builder",
+      "kreuzwerker_attr": "platform",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "platform",
+        "transform": "added (gap, Pass 5): list, RequiresReplace; stored as a node-container label, listed first in `platforms`",
+        "reason": "Pass 5 Lane E: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_compose",
+      "kreuzwerker_attr": "remove_orphans",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "remove_orphans",
+        "transform": "added (gap, Pass 5): .",
+        "reason": "Pass 5 Lane C: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "cgroup_parent",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cgroup_parent",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "cgroupns_mode",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cgroupns_mode",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "cpu_period",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cpu_period",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "cpu_quota",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cpu_quota",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "cpu_set",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cpuset_cpus",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_cgroup_rules",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "device_cgroup_rules",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_read_bps",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_read_bps",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_read_bps.path",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_read_bps.path",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_read_bps.rate",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_read_bps.rate",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_read_iops",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_read_iops",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_read_iops.path",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_read_iops.path",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_read_iops.rate",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_read_iops.rate",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_requests",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "device_requests",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_requests.capabilities",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "device_requests.capabilities",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_requests.count",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "device_requests.count",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_requests.device_ids",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "device_requests.device_ids",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_requests.driver",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "device_requests.driver",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_requests.options",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "device_requests.options",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_write_bps",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_write_bps",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_write_bps.path",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_write_bps.path",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_write_bps.rate",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_write_bps.rate",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_write_iops",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_write_iops",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_write_iops.path",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_write_iops.path",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "device_write_iops.rate",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "blkio_device_write_iops.rate",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "dns_opts",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "dns_options",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "domainname",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "domainname",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "exit_code",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "exit_code",
+        "transform": "added (gap, Pass 5): computed",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "group_add",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "group_add",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "healthcheck.start_interval",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "healthcheck.start_interval",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "init",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "init",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "ipc_mode",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "ipc_mode",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "memory_reservation",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "memory_reservation",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "mounts.bind_options",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.bind_options",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "mounts.bind_options.propagation",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.bind_options.propagation",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "mounts.tmpfs_options.mode",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.tmpfs_options.mode",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "mounts.volume_options",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.volume_options",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "mounts.volume_options.driver_name",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.volume_options.driver_config.name",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "mounts.volume_options.driver_options",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.volume_options.driver_config.options",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "mounts.volume_options.labels",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.volume_options.labels",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "mounts.volume_options.labels.label",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.volume_options.labels",
+        "transform": "added (gap, Pass 5): map key",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "mounts.volume_options.labels.value",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.volume_options.labels",
+        "transform": "added (gap, Pass 5): map value",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "mounts.volume_options.no_copy",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.volume_options.no_copy",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "mounts.volume_options.subpath",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.volume_options.subpath",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "network_mode",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "network_mode",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "pid_mode",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "pid_mode",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "platform",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "platform",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "publish_all_ports",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "publish_all_ports",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "rm",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "auto_remove",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "runtime",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "runtime",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "shm_size",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "shm_size",
+        "transform": "added (gap, Pass 5): bytes",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "storage_opts",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "storage_opt",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "tmpfs",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "tmpfs",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "userns_mode",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "userns_mode",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_container",
+      "kreuzwerker_attr": "volumes.from_container",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "volumes_from",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.additional_contexts",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.additional_contexts",
+        "transform": "added (gap, Pass 5): in the schema; returns \"not supported yet\" until seamBuildRequest gets named contexts, see TODO",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.cache_to",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.cache_to",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.cgroup_parent",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.cgroup_parent",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.cpu_period",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.cpu_period",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.cpu_quota",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.cpu_quota",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.cpu_set_cpus",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.cpuset_cpus",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.cpu_set_mems",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.cpuset_mems",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.cpu_shares",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.cpu_shares",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.extra_hosts",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.extra_hosts",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.force_remove",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.force_rm",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.isolation",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.isolation",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.memory",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.memory",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.memory_swap",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.memswap",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.network_mode",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.network",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.provenance",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.provenance",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.remote_context",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.remote",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.sbom",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.sbom",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.shm_size",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.shm_size",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.squash",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.squash",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.tag",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.tags",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.ulimit",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.ulimits",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.ulimit.hard",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.ulimits.hard",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.ulimit.name",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.ulimits",
+        "transform": "added (gap, Pass 5): map key",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_image",
+      "kreuzwerker_attr": "build.ulimit.soft",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "build.ulimits.soft",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_network",
+      "kreuzwerker_attr": "ipam_options",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "ipam_options",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "endpoint_spec.ports.name",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "endpoint_spec.ports.name",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.groups",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "groups",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.init",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "init",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.isolation",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "isolation",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.mounts.bind_options",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.bind_options",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.mounts.bind_options.propagation",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.bind_options.propagation",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.mounts.tmpfs_options.mode",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.tmpfs_options.mode",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.mounts.volume_options.no_copy",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "mounts.volume_options.no_copy",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.privileges",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "privileges",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.privileges.credential_spec",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "privileges.credential_spec",
+        "transform": "added (gap, Pass 5): ; `config` was added too",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.privileges.credential_spec.file",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "privileges.credential_spec.file",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.privileges.credential_spec.registry",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "privileges.credential_spec.registry",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.privileges.se_linux_context",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "privileges.selinux_context",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.privileges.se_linux_context.disable",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "privileges.selinux_context.disable",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.privileges.se_linux_context.level",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "privileges.selinux_context.level",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.privileges.se_linux_context.role",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "privileges.selinux_context.role",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.privileges.se_linux_context.type",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "privileges.selinux_context.type",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.privileges.se_linux_context.user",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "privileges.selinux_context.user",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.read_only",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "read_only",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.container_spec.stop_signal",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "stop_signal",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.placement.platforms",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "placement.platforms",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.placement.platforms.architecture",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "placement.platforms.architecture",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.placement.platforms.os",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "placement.platforms.os",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.resources.reservation.generic_resources",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "resources.reservations.generic_resources",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.resources.reservation.generic_resources.discrete_resources_spec",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "resources.reservations.generic_resources.discrete_resource_spec",
+        "transform": "added (gap, Pass 5): {kind, value}",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.resources.reservation.generic_resources.named_resources_spec",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "resources.reservations.generic_resources.named_resource_spec",
+        "transform": "added (gap, Pass 5): {kind, value}",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_service",
+      "kreuzwerker_attr": "task_spec.runtime",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "runtime",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane B: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_tag",
+      "kreuzwerker_attr": "tag_triggers",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "triggers",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_volume",
+      "kreuzwerker_attr": "cluster",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cluster_volume_spec",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_volume",
+      "kreuzwerker_attr": "cluster.availability",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cluster_volume_spec.availability",
+        "transform": "added (gap, Pass 5): in place via VolumeUpdate",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_volume",
+      "kreuzwerker_attr": "cluster.group",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cluster_volume_spec.group",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_volume",
+      "kreuzwerker_attr": "cluster.id",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cluster_volume_id",
+        "transform": "added (gap, Pass 5): computed, top level: ClusterVolume.ID is not part of the spec",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_volume",
+      "kreuzwerker_attr": "cluster.limit_bytes",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cluster_volume_spec.capacity_range.limit_bytes",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_volume",
+      "kreuzwerker_attr": "cluster.required_bytes",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cluster_volume_spec.capacity_range.required_bytes",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_volume",
+      "kreuzwerker_attr": "cluster.scope",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cluster_volume_spec.access_mode.scope",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_volume",
+      "kreuzwerker_attr": "cluster.sharing",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cluster_volume_spec.access_mode.sharing",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_volume",
+      "kreuzwerker_attr": "cluster.topology_preferred",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cluster_volume_spec.accessibility_requirements.preferred",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_volume",
+      "kreuzwerker_attr": "cluster.topology_required",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cluster_volume_spec.accessibility_requirements.requisite",
+        "transform": "added (gap, Pass 5)",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    },
+    {
+      "type": "docker_volume",
+      "kreuzwerker_attr": "cluster.type",
+      "gap_flip": true,
+      "set": {
+        "our_attr": "cluster_volume_spec.access_mode.mount_volume",
+        "transform": "added (gap, Pass 5): / cluster_volume_spec.access_mode.block_volume",
+        "reason": "Pass 5 Lane A: implemented under the upstream name."
+      }
+    }
+  ]
+}

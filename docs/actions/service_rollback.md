@@ -3,12 +3,12 @@
 page_title: "docker_service_rollback Action - docker"
 subcategory: ""
 description: |-
-  Rolls a swarm service back to its previous spec, like docker service rollback, and waits for the rollback to complete. The service must have been updated at least once. A docker_service resource managing the service will plan to re-apply its configured spec afterwards.
+  Rolls a swarm service back to its previous spec, like docker service rollback, and waits for the rollback to complete. The service must have been updated at least once. A docker_service resource managing the service will plan to re-apply its configured spec afterwards. The result object has the update warnings and the rollout status, beside the image the service runs now (image_digest_ref).
 ---
 
 # docker_service_rollback (Action)
 
-Rolls a swarm service back to its previous spec, like `docker service rollback`, and waits for the rollback to complete. The service must have been updated at least once. A `docker_service` resource managing the service will plan to re-apply its configured spec afterwards.
+Rolls a swarm service back to its previous spec, like `docker service rollback`, and waits for the rollback to complete. The service must have been updated at least once. A `docker_service` resource managing the service will plan to re-apply its configured spec afterwards. The result object has the update warnings and the rollout status, beside the image the service runs now (`image_digest_ref`).
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_service_rollback.<name>] } }`
@@ -39,8 +39,8 @@ resource "terraform_data" "rollback" {
 #   terraform apply -invoke=action.docker_service_rollback.web
 action "docker_service_rollback" "web" {
   config {
-    service = "web"
-    timeout = "10m"
+    service_id = "web"
+    timeout    = "10m"
   }
 }
 ```
@@ -50,9 +50,10 @@ action "docker_service_rollback" "web" {
 
 ### Required
 
-- `service` (String) Service ID or name.
+- `service_id` (String) Target service: ID, unique ID prefix or name (resolved to the service ID).
 
 ### Optional
 
+- `result_path` (String) Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails.
 - `timeout` (String) How long to wait for convergence, as a Go duration. Default `5m`.
 - `wait` (Boolean) Wait until the service converges (every wanted task running). Default `true`.

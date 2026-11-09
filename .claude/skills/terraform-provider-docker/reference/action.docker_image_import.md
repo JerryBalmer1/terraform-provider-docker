@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Creates an image from a filesystem tarball, like `docker import`. The source is a local tar file (streamed by the provider) or an `http(s)://` URL (fetched by the daemon). The image is not tracked in state; manage its lifetime yourself.
+Creates an image from a filesystem tarball, like `docker import`. The source is a local tar file (streamed by the provider) or an `http(s)://` URL (fetched by the daemon). The image is not tracked in state; manage its lifetime yourself. The result object holds `id`, `image_ref` and `result.image` (size, created, architecture, os and variant of the new image).
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
@@ -32,6 +32,7 @@ action "docker_image_import" "<name>" {
 | `message` | `string` | optional |  |  | Commit message recorded in the image history. |
 | `platform` | `string` | optional |  |  | Platform of the imported image, `os[/arch[/variant]]`, e.g. `linux/amd64`. Default: the daemon's. |
 | `repository` | `string` | optional |  |  | Repository to tag the image with, e.g. `example/rootfs`. Without it the image is untagged. |
+| `result_path` | `string` | optional |  |  | Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails. |
 | `source` | `string` | required |  |  | Local path of a tar archive (optionally gzip/bzip2/xz compressed) or an `http://` / `https://` URL the daemon downloads. |
 | `tag` | `string` | optional |  |  | Tag for `repository`. Default `latest`. Requires `repository`. |
 
@@ -59,6 +60,9 @@ action "docker_image_import" "rootfs" {
     tag        = "v1"
     changes    = ["CMD [\"/bin/sh\"]", "ENV LANG=C.UTF-8"]
     message    = "imported by Terraform"
+
+    # The new image ID and reference, for a later run: jsondecode(file(...)).id
+    result_path = "${path.module}/out/import-result.json"
   }
 }
 ```

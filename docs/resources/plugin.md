@@ -3,16 +3,18 @@
 page_title: "docker_plugin Resource - docker"
 subcategory: ""
 description: |-
-  A managed Docker Engine plugin installed from a registry, like docker plugin install. The privileges the plugin asks for (GET /plugins/privileges) must be granted with grant_all_permissions or grant_permissions blocks, otherwise install fails and lists them. enabled and env change in place (the plugin is disabled for PluginSet and re-enabled); name and alias force a new resource. Import by plugin ID or name.
+  A managed Docker Engine plugin installed from a registry, like docker plugin install. The privileges the plugin asks for (GET /plugins/privileges) must be granted with grant_all_permissions or grant_permissions blocks, otherwise install fails and lists them. enabled and env change in place (the plugin is disabled for PluginSet and re-enabled). With alias set, a changed name upgrades the plugin in place (docker plugin upgrade: disable, PluginUpgrade, re-enable), keeping its local name and settings; without alias, a changed name forces a new resource, since the local name is derived from it. A changed alias always forces a new resource. Import by plugin ID or name.
 ---
 
 # docker_plugin (Resource)
 
-A managed Docker Engine plugin installed from a registry, like `docker plugin install`. The privileges the plugin asks for (`GET /plugins/privileges`) must be granted with `grant_all_permissions` or `grant_permissions` blocks, otherwise install fails and lists them. `enabled` and `env` change in place (the plugin is disabled for `PluginSet` and re-enabled); `name` and `alias` force a new resource. Import by plugin ID or name.
+A managed Docker Engine plugin installed from a registry, like `docker plugin install`. The privileges the plugin asks for (`GET /plugins/privileges`) must be granted with `grant_all_permissions` or `grant_permissions` blocks, otherwise install fails and lists them. `enabled` and `env` change in place (the plugin is disabled for `PluginSet` and re-enabled). With `alias` set, a changed `name` upgrades the plugin in place (`docker plugin upgrade`: disable, `PluginUpgrade`, re-enable), keeping its local name and settings; without `alias`, a changed `name` forces a new resource, since the local name is derived from it. A changed `alias` always forces a new resource. Import by plugin ID or name.
 
 ## Example Usage
 
 ```terraform
+# With alias set, changing name later upgrades the plugin in place
+# (docker plugin upgrade) instead of replacing it.
 resource "docker_plugin" "sshfs" {
   name  = "vieux/sshfs:latest"
   alias = "sshfs"
@@ -54,7 +56,7 @@ resource "docker_volume" "remote" {
 
 ### Required
 
-- `name` (String) Plugin reference to install from a registry, e.g. `vieux/sshfs:latest` or `ghcr.io/org/plugin:1.0` (`registry_auth` credentials apply). Changing this forces a new resource.
+- `name` (String) Plugin reference to install from a registry, e.g. `vieux/sshfs:latest` or `ghcr.io/org/plugin:1.0` (`registry_auth` credentials apply). With `alias` set, a change upgrades the plugin in place (`PluginUpgrade`); without `alias`, changing this forces replacement.
 
 ### Optional
 
@@ -63,13 +65,18 @@ resource "docker_volume" "remote" {
 - `enabled` (Boolean) Whether the plugin is enabled. Default `true`. Updated in place.
 - `env` (Set of String) Plugin settings as `KEY=VALUE` (`docker plugin set`). Unset reports the plugin's current env; when set only the keys you list are reported. Updated in place: the plugin is disabled, set and re-enabled.
 - `force_destroy` (Boolean) Remove the plugin on destroy even while it is enabled or in use (`docker plugin rm -f`). Default `false`.
-- `force_disable` (Boolean) Disable the plugin even while it is in use (`docker plugin disable -f`), for env updates and destroy. Default `false`.
+- `force_disable` (Boolean) Disable the plugin even while it is in use (`docker plugin disable -f`), for env updates, upgrades and destroy. Default `false`.
 - `grant_all_permissions` (Boolean) Grant every privilege the plugin requests (`--grant-all-permissions`). Conflicts with `grant_permissions`.
 - `grant_permissions` (Block Set) Privileges to grant, one block per privilege name, e.g. `name = "network"`, `value = ["host"]`. Install fails when the plugin asks for a privilege or value not listed. Conflicts with `grant_all_permissions`. Changing it does not reinstall the plugin. (see [below for nested schema](#nestedblock--grant_permissions))
 
 ### Read-Only
 
+- `content_sha256` (String) sha256 of inspect_json.
+- `docker_server_version` (String) Docker Engine version from GET /version.
+- `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `id` (String) Plugin ID.
+- `inspect` (Attributes) The GET /plugins/{name}/json response as a nested object, field by field. (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String, Sensitive) The exact Engine API GET /plugins/{name}/json response as JSON.
 - `plugin_reference` (String) Fully qualified reference the daemon installed from, e.g. `docker.io/vieux/sshfs:latest`.
 
 <a id="nestedblock--grant_permissions"></a>
@@ -79,6 +86,51 @@ Required:
 
 - `name` (String) Privilege name, e.g. `network`, `mount`, `device`, `capabilities`.
 - `value` (Set of String) Granted values, e.g. `["host"]` for `network` or `["CAP_SYS_ADMIN"]` for `capabilities`.
+
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `config` (Attributes) Upstream `Config`. (see [below for nested schema](#nestedatt--inspect--config))
+- `enabled` (Boolean) Upstream `Enabled`.
+- `id` (String) Upstream `Id`.
+- `name` (String) Upstream `Name`.
+- `plugin_reference` (String) Upstream `PluginReference`.
+- `settings` (Attributes) Upstream `Settings`. (see [below for nested schema](#nestedatt--inspect--settings))
+
+<a id="nestedatt--inspect--config"></a>
+### Nested Schema for `inspect.config`
+
+Read-Only:
+
+- `args` (Dynamic) Upstream `Args`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `description` (String) Upstream `Description`.
+- `documentation` (String) Upstream `Documentation`.
+- `entrypoint` (List of String) Upstream `Entrypoint`.
+- `env` (List of String, Sensitive) Upstream `Env`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `interface` (Dynamic) Upstream `Interface`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `ipc_host` (Boolean) Upstream `IpcHost`.
+- `linux` (Dynamic) Upstream `Linux`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `mounts` (List of String) Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `network` (Dynamic) Upstream `Network`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `pid_host` (Boolean) Upstream `PidHost`.
+- `propagated_mount` (String) Upstream `PropagatedMount`.
+- `rootfs` (Dynamic) Upstream `rootfs`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `user` (Dynamic) Upstream `User`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `work_dir` (String) Upstream `WorkDir`.
+
+
+<a id="nestedatt--inspect--settings"></a>
+### Nested Schema for `inspect.settings`
+
+Read-Only:
+
+- `args` (List of String) Upstream `Args`.
+- `devices` (List of String) Upstream `Devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
+- `mounts` (List of String) Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 
 ## Import
 

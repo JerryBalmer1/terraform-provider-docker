@@ -4,19 +4,64 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Looks up an existing Docker volume by name.
+Looks up an existing Docker volume by name (`GET /volumes/{name}`). The raw `inspect_json` output is sensitive because driver options can hold credentials.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `driver` | `string` | computed |  |  | Volume driver. |
 | `driver_opts` | `map(string)` | computed |  |  | Driver options. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `id` | `string` | computed |  |  | Volume name (volumes have no separate ID). |
+| `inspect` | `object` | computed |  |  | The GET /volumes/{name} response as a nested object, field by field. |
+| `inspect_json` | `string` | computed |  | yes | The exact Engine API GET /volumes/{name} response as JSON. |
 | `labels` | `map(string)` | computed |  |  | Volume labels. |
 | `mountpoint` | `string` | computed |  |  | Host path of the volume data. |
 | `name` | `string` | required |  |  | Volume name. |
 | `scope` | `string` | computed |  |  | `local` or `global`. |
+
+### `inspect`
+
+nested attribute, object. The GET /volumes/{name} response as a nested object, field by field.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `cluster_volume` | `object` | computed |  |  | Upstream `ClusterVolume`. |
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `mountpoint` | `string` | computed |  |  | Upstream `Mountpoint`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  | yes | Upstream `Options`. Sensitive. |
+| `scope` | `string` | computed |  |  | Upstream `Scope`. |
+| `status` | `dynamic` | computed |  |  | Upstream `Status`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `usage_data` | `object` | computed |  |  | Upstream `UsageData`. |
+
+### `inspect.cluster_volume`
+
+nested attribute, object. Upstream `ClusterVolume`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `info` | `dynamic` | computed |  |  | Upstream `Info`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `publish_status` | `list(string)` | computed |  |  | Upstream `PublishStatus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `spec` | `dynamic` | computed |  |  | Upstream `Spec`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `dynamic` | computed |  |  | Upstream `Version`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+
+### `inspect.usage_data`
+
+nested attribute, object. Upstream `UsageData`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ref_count` | `number` | computed |  |  | Upstream `RefCount`. |
+| `size` | `number` | computed |  |  | Upstream `Size`. |
 
 ## Example
 

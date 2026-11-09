@@ -4,28 +4,61 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Lists the swarm's configs (`GET /configs`), sorted by name, with their content; the provider's host must be a swarm manager. Filter by `name` and `labels`.
+Lists the swarm's configs (`GET /configs`), sorted by name, with their content (`configs[*].spec.data`, base64); the provider's host must be a swarm manager. Filter by `name` and `labels`.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `configs` | `list(object)` | computed |  |  | The matching objects, sorted by name then ID. |
-| `labels` | `map(string)` | optional |  |  | Only objects carrying every one of these labels; an empty value matches any value. |
+| `configs` | `list(object)` | computed |  |  | Every config returned by the list endpoint, each mirroring Config field by field (snake_case). |
+| `configs_json` | `string` | computed |  |  | The exact list response (JSON array of Config) as returned by the Engine API. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 of configs_json; changes whenever the object changes. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
+| `ids` | `list(string)` | computed |  |  | IDs of the matching objects, in the order of `configs`. |
+| `labels` | `map(string)` | optional |  |  | Only objects carrying every one of these labels (Engine `label` filter); an empty value matches any value. |
 | `name` | `string` | optional |  |  | Only objects whose name matches (Engine `name` filter, a prefix/substring match). |
+| `names` | `list(string)` | computed |  |  | Names of the matching objects, in the order of `configs`. |
 
 ### `configs`
 
-nested attribute, list(object). The matching objects, sorted by name then ID.
+nested attribute, list(object). Every config returned by the list endpoint, each mirroring Config field by field (snake_case).
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `created_at` | `string` | computed |  |  | RFC 3339 creation time. |
-| `data` | `string` | computed |  |  | Config content, base64-encoded. |
-| `id` | `string` | computed |  |  | Config ID. |
-| `labels` | `map(string)` | computed |  |  | Config labels. |
-| `name` | `string` | computed |  |  | Config name. |
-| `updated_at` | `string` | computed |  |  | RFC 3339 time of the last update. |
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `configs.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `data` | `string` | computed |  |  | Upstream `Data`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `templating` | `object` | computed |  |  | Upstream `Templating`. |
+
+### `configs.spec.templating`
+
+nested attribute, object. Upstream `Templating`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `configs.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
 
 ## Example
 
@@ -34,7 +67,8 @@ data "docker_configs" "nginx" {
   name = "nginx"
 }
 
+# Each element is the Engine config object; spec.data is base64.
 output "nginx_configs" {
-  value = { for c in data.docker_configs.nginx.configs : c.name => base64decode(c.data) }
+  value = { for c in data.docker_configs.nginx.configs : c.spec.name => base64decode(c.spec.data) }
 }
 ```

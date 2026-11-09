@@ -4,29 +4,79 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A BuildKit builder run by the daemon as a `docker-container` driver node, the same container and state volume `docker buildx create --driver docker-container --bootstrap` makes, created through the Engine API without the buildx CLI. The container `buildx_buildkit_<name>0` runs `moby/buildkit` privileged with the state volume `buildx_buildkit_<name>0_state`; readiness is checked by listing BuildKit workers over `buildctl dial-stdio` in the container. Use `endpoint` with `buildctl --addr`, or `tcp_address` when `tcp_port` is set. The buildx CLI's own instance list (`~/.docker/buildx/instances`) is not written, so `docker buildx ls` does not show the builder until `docker buildx create --name <name> --driver docker-container` is run, which adopts the same container. Only the `docker-container` driver is supported. Every argument except `keep_state` forces a new resource.
+A BuildKit builder run by the daemon as a `docker-container` driver node, the same container and state volume `docker buildx create --driver docker-container --bootstrap` makes, created through the Engine API without the buildx CLI. The container `buildx_buildkit_<node>` runs `moby/buildkit` privileged with the state volume `buildx_buildkit_<node>_state`; readiness is checked by listing BuildKit workers over `buildctl dial-stdio` in the container. Pass `name` to `docker_image.build.builder`, or use `endpoint` with `buildctl --addr` (`tcp_address` when `tcp_port` is set). The buildx CLI's own instance list (`~/.docker/buildx/instances`) is not written, so `docker buildx ls` does not show the builder until `docker buildx create --name <name> --driver docker-container` is run, which adopts the same container. Only the `docker-container` driver is supported. Every argument except `keep_state` forces a new resource.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `bootstrap` | `bool` | optional, computed | yes |  | Start the builder and wait until BuildKit lists its workers (`--bootstrap`). With `false` the container is only created. Default `true`. Changing this forces a new resource. |
-| `buildkit_config` | `string` | optional | yes |  | Path of a local `buildkitd.toml` (`--buildkitd-config`), read at apply and copied to `/etc/buildkit/buildkitd.toml` in the container. Conflicts with `buildkit_config_content`. Changing this forces a new resource. |
-| `buildkit_config_content` | `string` | optional | yes |  | `buildkitd.toml` content, copied like `buildkit_config`. Changing this forces a new resource. |
-| `buildkit_flags` | `string` | optional | yes |  | Flags for buildkitd (`--buildkitd-flags`), whitespace-separated with no shell quoting, e.g. `"--debug --allow-insecure-entitlement=security.insecure"`. Default `--allow-insecure-entitlement=network.host`, like buildx. Changing this forces a new resource. |
-| `buildkit_version` | `string` | computed |  |  | BuildKit version the worker reported at bootstrap. Null when `bootstrap` is false. |
-| `container_name` | `string` | computed |  |  | `buildx_buildkit_<name>0`. |
-| `driver` | `string` | optional, computed | yes |  | Builder driver. Only `docker-container` (default) is supported: `docker` is the daemon's built-in builder (use `docker_image` with `build.builder = "buildkit"`), and `kubernetes`/`remote` are not Engine API objects. Forces replacement. |
-| `endpoint` | `string` | computed |  |  | BuildKit address for `buildctl --addr`: `docker-container://buildx_buildkit_<name>0`. |
-| `id` | `string` | computed |  |  | ID of the BuildKit container. |
-| `keep_state` | `bool` | optional, computed |  |  | Keep the state volume (build cache) on destroy (`docker buildx rm --keep-state`). Default `false`. Updated in place. |
-| `name` | `string` | required | yes |  | Builder name, as for `docker buildx create --name`. Changing this forces a new resource. |
-| `platforms` | `list(string)` | computed |  |  | Platforms the BuildKit worker supports, e.g. `["linux/amd64", "linux/386"]`. Empty when `bootstrap` is false. |
-| `tcp_address` | `string` | computed |  |  | `tcp://<daemon host>:<tcp_port>` when `tcp_port` is set: the host of the provider's `tcp://`/`ssh://` daemon address, else `127.0.0.1`. Null without `tcp_port`. |
-| `tcp_port` | `number` | optional | yes |  | Also serve BuildKit on TCP: buildkitd listens on `tcp://0.0.0.0:1234` in the container and the port is published on this host port. Unauthenticated and unencrypted; bind it only on trusted networks. Changing this forces a new resource. |
-| `volume_name` | `string` | computed |  |  | `buildx_buildkit_<name>0_state`, mounted on `/var/lib/buildkit`. |
+| `append` | `bool` | optional, computed | yes |  | Whether this node joins an existing builder of the same `name` (`--append`). The builder must already have a node on the daemon, and `node` must differ from its nodes. With `false` (default) creating fails when the builder already exists. Destroy removes only this node. Forces replacement. |
+| `bootstrap` | `bool` | optional, computed | yes |  | Whether to start the builder and wait until BuildKit lists its workers (`--bootstrap`). With `false` the container is only created. Default `true`. Forces replacement. |
+| `builder` | `object` | computed |  |  | The builder object field by field (name, driver, last activity, nodes with endpoint, status, BuildKit version, platforms, labels, GC policy). |
+| `buildkit_version` | `string` | computed |  |  | BuildKit daemon version of the first node (identity, not one of the six version names; see naming_questions). |
+| `buildkitd_config` | `string` | optional | yes |  | Path of a local `buildkitd.toml` (`--buildkitd-config`), read at apply and copied to `/etc/buildkit/buildkitd.toml` in the container. Conflicts with `buildkitd_config_content`. Forces replacement. |
+| `buildkitd_config_content` | `string` | optional | yes |  | Content of `buildkitd.toml`, copied like `buildkitd_config`. Forces replacement. |
+| `buildkitd_flags` | `string` | optional | yes |  | Flags for buildkitd (`--buildkitd-flags`), whitespace-separated with no shell quoting, e.g. `"--debug --allow-insecure-entitlement=security.insecure"`. Default `--allow-insecure-entitlement=network.host`, like buildx. Forces replacement. |
+| `buildx_version` | `string` | computed |  |  | The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx. |
+| `container_name` | `string` | computed |  |  | Name of the node container, `buildx_buildkit_<node>`. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json, to detect drift without diffing the document. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon (GET /version Version). |
+| `driver` | `string` | optional, computed | yes |  | Builder driver. Only `docker-container` (default) is supported: `docker` is the daemon's built-in builder (use `docker_image` without `build.builder`), and `kubernetes`/`remote` are not Engine API objects. Forces replacement. |
+| `endpoint` | `string` | computed |  |  | BuildKit address of the node for `buildctl --addr`: `docker-container://buildx_buildkit_<node>`. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon for this read/apply. |
+| `id` | `string` | computed |  |  | ID of the BuildKit node container. |
+| `inspect_json` | `string` | computed |  | yes | The builder and its nodes as one JSON document (the `docker buildx inspect` view, keys as in `buildx ls --format json` Builder object). Sensitive: driver options carry env.* values. |
+| `keep_state` | `bool` | optional, computed |  |  | Whether to keep the state volume (build cache) on destroy (`docker buildx rm --keep-state`). Default `false`. Updated in place. |
+| `labels` | `map(string)` | computed |  |  | BuildKit worker labels of the node (`org.mobyproject.buildkit.worker.*`). Empty when `bootstrap` is false. |
+| `name` | `string` | required | yes |  | Builder name, as for `docker buildx create --name`; pass it to `docker_image.build.builder`. Forces replacement. |
+| `node` | `string` | optional, computed | yes |  | Node name (`--node`); the node container is `buildx_buildkit_<node>`. Default `<name>0`, like buildx. Forces replacement. |
+| `platform` | `list(string)` | optional | yes |  | Platforms this node is pinned to (`--platform`), listed first in `platforms`. buildx keeps pins in its client-side store; the provider stores them as a label on the node container. Forces replacement. |
+| `platforms` | `list(string)` | computed |  |  | Platforms the builder can build for: the `platform` pins, then what the BuildKit workers report, e.g. `["linux/amd64", "linux/386"]`. Only the pins when `bootstrap` is false. |
+| `tcp_address` | `string` | computed |  |  | TCP address of BuildKit, `tcp://<daemon host>:<tcp_port>`, when `tcp_port` is set: the host of the provider's `tcp://`/`ssh://` daemon address, else `127.0.0.1`. Null without `tcp_port`. |
+| `tcp_port` | `number` | optional | yes |  | Host port on which BuildKit is also served over TCP: buildkitd listens on `tcp://0.0.0.0:1234` in the container and the port is published on this host port. Unauthenticated and unencrypted; bind it only on trusted networks. Forces replacement. |
+| `volume_name` | `string` | computed |  |  | Name of the state volume, `buildx_buildkit_<node>_state`, mounted on `/var/lib/buildkit`. |
 
 Nested blocks: `docker_container` (single block, forces replacement).
+
+### `builder`
+
+nested attribute, object. The builder object field by field (name, driver, last activity, nodes with endpoint, status, BuildKit version, platforms, labels, GC policy).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `error` | `string` | computed |  |  | Upstream `Error`. |
+| `last_activity` | `string` | computed |  |  | Upstream `Last Activity`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `nodes` | `list(object)` | computed |  |  | Upstream `Nodes`. |
+
+### `builder.nodes`
+
+nested attribute, list(object). Upstream `Nodes`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `buildkit_version` | `string` | computed |  |  | Upstream `BuildKit`. |
+| `driver_opts` | `map(string)` | computed |  | yes | Upstream `Driver Options`. Sensitive. |
+| `endpoint` | `string` | computed |  |  | Upstream `Endpoint`. |
+| `error` | `string` | computed |  |  | Upstream `Error`. |
+| `flags` | `list(string)` | computed |  |  | Upstream `Flags`. |
+| `gc_policy` | `list(object)` | computed |  |  | Upstream `GC Policy rule#N`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `platforms` | `list(string)` | computed |  |  | Upstream `Platforms`. |
+| `status` | `string` | computed |  |  | Upstream `Status`. |
+
+### `builder.nodes.gc_policy`
+
+nested attribute, list(object). Upstream `GC Policy rule#N`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `all` | `bool` | computed |  |  | Upstream `All`. |
+| `filters` | `list(string)` | computed |  |  | Upstream `Filters`. |
+| `keep_bytes` | `number` | computed |  |  | Upstream `Keep Bytes`. |
+| `keep_duration` | `string` | computed |  |  | Upstream `Keep Duration`. |
 
 ### `docker_container`
 
@@ -34,9 +84,17 @@ single block. Settings for the BuildKit container (`--driver-opt`). Changing any
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `cgroup_parent` | `string` | optional |  |  | Parent cgroup of the container (`cgroup-parent=`). |
+| `cpu_period` | `number` | optional |  |  | CPU CFS period in microseconds (`cpu-period=`). |
+| `cpu_quota` | `number` | optional |  |  | CPU CFS quota in microseconds per `cpu_period` (`cpu-quota=`). |
+| `cpu_shares` | `number` | optional |  |  | Relative CPU weight (`cpu-shares=`). |
+| `cpuset_cpus` | `string` | optional |  |  | CPUs the container may use, e.g. `0-3` (`cpuset-cpus=`). |
+| `cpuset_mems` | `string` | optional |  |  | NUMA memory nodes the container may use, e.g. `0` (`cpuset-mems=`). |
+| `default_load` | `bool` | optional |  |  | Whether builds that ask for no output load their result into the daemon's image store (`default-load=`). Stored as a label on the node container and honoured by the provider's builds on this builder. |
 | `env` | `map(string)` | optional |  |  | Environment variables for buildkitd (`env.<KEY>=`), e.g. proxy settings. |
 | `image` | `string` | optional |  |  | BuildKit image (`image=`). Default `moby/buildkit:buildx-stable-1`. Pulled with `registry_auth` when missing. |
 | `memory` | `number` | optional |  |  | Memory limit in bytes (`memory=`). |
+| `memory_swap` | `number` | optional |  |  | Memory plus swap limit in bytes (`memory-swap=`); `-1` is unlimited swap. |
 | `network` | `string` | optional |  |  | Network mode or network name for the container (`network=`), e.g. `host`. Default: the daemon's bridge. |
 | `restart_policy` | `string` | optional |  |  | Restart policy (`restart-policy=`): `no`, `always`, `unless-stopped` (default, like buildx) or `on-failure`. |
 
@@ -44,17 +102,23 @@ single block. Settings for the BuildKit container (`--driver-opt`). Changing any
 
 ```terraform
 resource "docker_buildx_builder" "ci" {
-  name           = "ci"
-  buildkit_flags = "--allow-insecure-entitlement=network.host --debug"
+  name            = "ci"
+  buildkitd_flags = "--allow-insecure-entitlement=network.host --debug"
 
-  buildkit_config_content = <<-EOT
+  buildkitd_config_content = <<-EOT
     [worker.oci]
       max-parallelism = 4
   EOT
 
+  # Pin the platforms this node advertises first (docker buildx create --platform).
+  platform = ["linux/amd64", "linux/arm64"]
+
   docker_container {
-    image  = "moby/buildkit:buildx-stable-1"
-    memory = 4294967296 # 4 GiB
+    image        = "moby/buildkit:buildx-stable-1"
+    memory       = 4294967296 # 4 GiB
+    cpu_quota    = 200000     # two CPUs per 100 ms period
+    cpu_period   = 100000
+    default_load = true
     env = {
       HTTPS_PROXY = "http://proxy.internal:3128"
     }
@@ -72,11 +136,15 @@ output "buildkit_endpoint" {
 output "buildkit_tcp" {
   value = docker_buildx_builder.ci.tcp_address
 }
+
+output "buildkit_version" {
+  value = docker_buildx_builder.ci.buildkit_version
+}
 ```
 
 ## Import
 
 ```shell
-# Import by builder name (container buildx_buildkit_<name>0) or container ID.
+# Import by builder name (its node container buildx_buildkit_<name>0), node name, or container ID.
 terraform import docker_buildx_builder.ci ci
 ```

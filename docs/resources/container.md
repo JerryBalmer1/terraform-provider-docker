@@ -3,12 +3,12 @@
 page_title: "docker_container Resource - docker"
 subcategory: ""
 description: |-
-  A single-host Docker container, created with ContainerCreate, attached to its networks and started. Refresh diffs against ContainerInspect: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. name, restart, max_retry_count, memory, memory_swap, cpu_shares and nano_cpus update in place (ContainerRename/ContainerUpdate); upload blocks are copied in with CopyToContainer before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
+  A single-host Docker container, created with ContainerCreate, attached to its networks and started. Refresh diffs against ContainerInspect: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. name, restart, maximum_retry_count, memory, memory_swap, memory_reservation, cpu_shares, nano_cpus, cpu_period, cpu_quota and cpuset_cpus update in place (ContainerRename/ContainerUpdate); networks entries are connected and disconnected in place (NetworkConnect/NetworkDisconnect); files blocks are copied in with PutContainerArchive before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
 ---
 
 # docker_container (Resource)
 
-A single-host Docker container, created with `ContainerCreate`, attached to its networks and started. Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `max_retry_count`, `memory`, `memory_swap`, `cpu_shares` and `nano_cpus` update in place (`ContainerRename`/`ContainerUpdate`); `upload` blocks are copied in with `CopyToContainer` before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
+A single-host Docker container, created with `ContainerCreate`, attached to its networks and started. Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `maximum_retry_count`, `memory`, `memory_swap`, `memory_reservation`, `cpu_shares`, `nano_cpus`, `cpu_period`, `cpu_quota` and `cpuset_cpus` update in place (`ContainerRename`/`ContainerUpdate`); `networks` entries are connected and disconnected in place (`NetworkConnect`/`NetworkDisconnect`); `files` blocks are copied in with `PutContainerArchive` before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
 
 ## Example Usage
 
@@ -30,8 +30,8 @@ resource "docker_container" "web" {
   labels = { team = "web" }
 
   ports {
-    internal = 80
-    external = 8080
+    container_port = 80
+    host_port      = 8080
   }
 
   mounts {
@@ -41,9 +41,12 @@ resource "docker_container" "web" {
   }
 
   mounts {
-    type       = "tmpfs"
-    target     = "/var/cache/nginx"
-    tmpfs_size = 67108864
+    type   = "tmpfs"
+    target = "/var/cache/nginx"
+    tmpfs_options {
+      size_bytes = 67108864
+      mode       = "1777"
+    }
   }
 
   # SELinux hosts: relabel the bind source for this container (`-v src:dst:z`).
@@ -56,38 +59,40 @@ resource "docker_container" "web" {
   }
 
   # Files copied in after create and before start.
-  upload {
-    file        = "/etc/nginx/snippets/headers.conf"
-    content     = "add_header X-Served-By terraform;\n"
-    permissions = "0640"
-    owner       = 0
-    group       = 101 # nginx
+  files {
+    path    = "/etc/nginx/snippets/headers.conf"
+    content = "add_header X-Served-By terraform;\n"
+    mode    = "0640"
+    uid     = 0
+    gid     = 101 # nginx
   }
 
   # For a local file use `source = "${path.module}/banner.sh"` together with
   # `source_hash = filesha256("${path.module}/banner.sh")`.
-  upload {
-    file           = "/docker-entrypoint.d/99-banner.sh"
+  files {
+    path           = "/docker-entrypoint.d/99-banner.sh"
     content_base64 = base64encode("#!/bin/sh\necho web starting\n")
-    executable     = true
+    mode           = "0755"
   }
 
-  networks_advanced {
-    name    = docker_network.app.name
-    aliases = ["www"]
+  # Keyed by network name; adding or removing a network connects or
+  # disconnects the container in place.
+  networks = {
+    (docker_network.app.name) = {
+      aliases = ["www"]
+    }
   }
 
   healthcheck {
-    test         = ["CMD", "curl", "-fsS", "http://localhost/"]
-    interval     = "10s"
-    timeout      = "3s"
-    start_period = "5s"
-    retries      = 3
+    test           = ["CMD", "curl", "-fsS", "http://localhost/"]
+    interval       = "10s"
+    timeout        = "3s"
+    start_period   = "5s"
+    start_interval = "1s"
+    retries        = 3
   }
 
-  capabilities {
-    drop = ["NET_RAW"]
-  }
+  cap_drop = ["NET_RAW"]
 
   ulimits {
     name = "nofile"
@@ -103,13 +108,17 @@ resource "docker_container" "web" {
   stop_timeout = 30
   sysctls      = { "net.core.somaxconn" = "1024" }
   security_opt = ["no-new-privileges:true"]
+  init         = true
+  shm_size     = 134217728 # 128 MiB
 
   devices {
-    host_path = "/dev/fuse"
+    path_on_host = "/dev/fuse"
   }
 
-  log_driver = "json-file"
-  log_opts   = { max-size = "10m", max-file = "3" }
+  logging {
+    driver  = "json-file"
+    options = { max-size = "10m", max-file = "3" }
+  }
 
   memory    = 268435456 # 256 MiB, updated in place
   nano_cpus = 500000000 # 0.5 CPU, updated in place
@@ -117,6 +126,12 @@ resource "docker_container" "web" {
   must_run     = true
   wait         = true
   wait_timeout = "2m"
+}
+
+# Read-only endpoint values sit beside the settings in each networks entry;
+# the full ContainerInspect document is in `inspect` (object) and `inspect_json`.
+output "web_ip" {
+  value = docker_container.web.networks["app"].ip_address
 }
 ```
 
@@ -130,58 +145,131 @@ resource "docker_container" "web" {
 
 ### Optional
 
-- `capabilities` (Block, Optional) Linux capabilities to add or drop. Changing it forces a new resource. (see [below for nested schema](#nestedblock--capabilities))
+- `auto_remove` (Boolean) Remove the container when its process exits (`HostConfig.AutoRemove`, `docker run --rm`); Terraform then plans a new one. Default `false`. Forces replacement.
+- `blkio_device_read_bps` (Block List) Per-device limit in bytes per second (`HostConfig.BlkioDeviceReadBps`). Forces replacement. (see [below for nested schema](#nestedblock--blkio_device_read_bps))
+- `blkio_device_read_iops` (Block List) Per-device limit in IO operations per second (`HostConfig.BlkioDeviceReadIOps`). Forces replacement. (see [below for nested schema](#nestedblock--blkio_device_read_iops))
+- `blkio_device_write_bps` (Block List) Per-device limit in bytes per second (`HostConfig.BlkioDeviceWriteBps`). Forces replacement. (see [below for nested schema](#nestedblock--blkio_device_write_bps))
+- `blkio_device_write_iops` (Block List) Per-device limit in IO operations per second (`HostConfig.BlkioDeviceWriteIOps`). Forces replacement. (see [below for nested schema](#nestedblock--blkio_device_write_iops))
+- `cap_add` (Set of String) Linux capabilities to add, e.g. `NET_ADMIN` (`HostConfig.CapAdd`). Forces replacement.
+- `cap_drop` (Set of String) Linux capabilities to drop, e.g. `ALL` (`HostConfig.CapDrop`). Forces replacement.
+- `cgroup_parent` (String) Parent cgroup of the container (`HostConfig.CgroupParent`). Forces replacement.
+- `cgroupns_mode` (String) Cgroup namespace mode (`HostConfig.CgroupnsMode`): `private` or `host`. Unset uses the daemon default, which is not reported. Forces replacement.
 - `command` (List of String) Command (`CMD`) override. Unset uses the image's. Changing this forces a new resource.
+- `cpu_period` (Number) CPU CFS period in microseconds (`HostConfig.CpuPeriod`). Updated in place; removing it forces a new resource.
+- `cpu_quota` (Number) CPU CFS quota in microseconds per `cpu_period` (`HostConfig.CpuQuota`). Updated in place; removing it forces a new resource.
 - `cpu_shares` (Number) Relative CPU weight (default 1024 in the daemon). Updated in place; removing it forces a new resource.
+- `cpuset_cpus` (String) CPUs the container may use, e.g. `0-2` or `0,1` (`HostConfig.CpusetCpus`). Updated in place; removing it forces a new resource.
+- `device_cgroup_rules` (List of String) Rules added to the device cgroup, e.g. `c 1:3 mr` (`HostConfig.DeviceCgroupRules`). Forces replacement.
+- `device_requests` (Block List) Device requests to device drivers (`HostConfig.DeviceRequests`), e.g. GPUs from a driver other than the one `gpus` uses. Forces replacement. (see [below for nested schema](#nestedblock--device_requests))
 - `devices` (Block List) Host devices mapped into the container (`HostConfig.Devices`, like `docker run --device`). Forces replacement. (see [below for nested schema](#nestedblock--devices))
 - `dns` (List of String) DNS server IPs for the container's resolver (`HostConfig.Dns`). Unset uses the daemon/network default. Forces replacement.
+- `dns_options` (List of String) Resolver options, e.g. `ndots:2` (`HostConfig.DnsOptions`). Forces replacement.
 - `dns_search` (List of String) DNS search domains (`HostConfig.DnsSearch`). Forces replacement.
+- `domainname` (String) Domain name of the container (`Config.Domainname`). Forces replacement.
 - `entrypoint` (List of String) Entrypoint override. Unset uses the image's; setting it also drops the image's `CMD` unless `command` is set. Changing this forces a new resource.
 - `env` (Map of String) Environment variables, merged over the image's. Image-provided variables are not reported in state. Changing this forces a new resource.
 - `extra_hosts` (List of String) Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` exactly like `docker run --add-host` (e.g. `"db.local:10.0.0.5"`, or `"host.docker.internal:host-gateway"` for the host's gateway IP). Forces replacement.
+- `files` (Block List) Files written into the container with `PutContainerArchive` after create and before start (like `docker cp`). Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `path` must already exist in the image. Files are not read back from the daemon. Changing a file forces a new container, unless the container is stopped (`must_run = false` and not running), in which case the files are copied in place. To copy files into a running container at any time use the `docker_container_cp` action. (see [below for nested schema](#nestedblock--files))
 - `gpus` (String) GPUs to expose, like `docker run --gpus`: `"all"`, a count such as `"2"`, or `"device=0,1"` (indexes or UUIDs). Sent as a `HostConfig.DeviceRequests` entry with driver `nvidia` and capabilities `[["gpu"]]`; the host needs the NVIDIA container toolkit. Forces replacement.
+- `group_add` (Set of String) Additional groups the container process runs as (`HostConfig.GroupAdd`). Forces replacement.
 - `healthcheck` (Block, Optional) Healthcheck override. Without this block the image's healthcheck (if any) applies. Changing it forces a new resource. (see [below for nested schema](#nestedblock--healthcheck))
 - `hostname` (String) Container hostname (`Config.Hostname`). Unset: the daemon uses the first 12 characters of the container ID, which is not reported in state. Forces replacement.
+- `init` (Boolean) Run an init process inside the container that forwards signals and reaps processes (`HostConfig.Init`, `docker run --init`). Unset uses the daemon setting. Forces replacement.
+- `ipc_mode` (String) IPC namespace (`HostConfig.IpcMode`): `none`, `private`, `shareable`, `host` or `container:<name|id>`. Unset uses the daemon default, which is not reported. Forces replacement.
 - `labels` (Map of String) Container labels. Image labels are not reported in state. Docker cannot change labels of an existing container, so changing this forces a new resource.
-- `log_driver` (String) Logging driver, e.g. `json-file`, `local`, `syslog`. Unset uses the daemon default (reported after create). Changing this forces a new resource.
-- `log_opts` (Map of String) Logging driver options, e.g. `{ max-size = "10m" }`. Unset uses the daemon defaults. Changing this forces a new resource.
-- `max_retry_count` (Number) Maximum restart attempts for `restart = "on-failure"` (0 = unlimited). Ignored by other policies. Updated in place.
+- `logging` (Block, Optional) Logging driver and its options (`HostConfig.LogConfig`). Without this block the daemon defaults apply and are not reported. Adding or changing the block forces a new resource; removing it keeps the container as it is. (see [below for nested schema](#nestedblock--logging))
+- `maximum_retry_count` (Number) Maximum restart attempts for `restart = "on-failure"` (0 = unlimited). Ignored by other policies. Updated in place.
 - `memory` (Number) Memory limit in bytes. Updated in place; removing the limit forces a new resource.
+- `memory_reservation` (Number) Memory soft limit in bytes (`HostConfig.MemoryReservation`). Updated in place; removing it forces a new resource.
 - `memory_swap` (Number) Total memory + swap limit in bytes (`-1` = unlimited swap). Unset: the daemon uses twice `memory` when `memory` is set. Updated in place.
 - `mounts` (Block List) Mounts (`HostConfig.Mounts`). Changing mounts forces a new resource. (see [below for nested schema](#nestedblock--mounts))
 - `must_run` (Boolean) When `true` (default) a container found stopped on refresh is planned for start (`running` goes to `true`) and started by the next apply.
 - `nano_cpus` (Number) CPU quota in units of 1e-9 CPUs (`1500000000` = 1.5 CPUs). Updated in place; removing it forces a new resource.
-- `networks_advanced` (Block List) Networks to attach. The first is used at create (`NetworkMode`), the rest are connected before start. Without this block the container joins the daemon's default `bridge`. Changing networks forces a new resource. (see [below for nested schema](#nestedblock--networks_advanced))
+- `network_mode` (String) Network mode (`HostConfig.NetworkMode`): `bridge`, `host`, `none`, `container:<name|id>` or a network name. Unset: the alphabetically first `networks` key, else the daemon default `bridge`. Forces replacement.
+- `networks` (Attributes Map) Networks the container is attached to, keyed by network name (e.g. a `docker_network`'s `name`); each value mirrors `NetworkingConfig.EndpointsConfig` (`EndpointSettings`). Use `{}` for an endpoint with no settings. All endpoints are configured at create; the container's `NetworkMode` is `network_mode` when set, else the alphabetically first key. Adding or removing a key, or changing an endpoint's settings, connects or disconnects the container in place (`NetworkConnect` / `NetworkDisconnect`) without replacing it. Unset, the container joins the daemon's default `bridge`, which is not reported. (see [below for nested schema](#nestedatt--networks))
+- `pid_mode` (String) PID namespace (`HostConfig.PidMode`): `host` or `container:<name|id>`. Forces replacement.
+- `platform` (String) Platform of the image to run, `os[/arch[/variant]]`, e.g. `linux/arm64` (the create `platform` parameter). Forces replacement.
 - `ports` (Block List) Published ports (`HostConfig.PortBindings`). Changing ports forces a new resource. (see [below for nested schema](#nestedblock--ports))
 - `privileged` (Boolean) Run the container privileged. Changing this forces a new resource.
+- `publish_all_ports` (Boolean) Publish every exposed port on a random host port (`HostConfig.PublishAllPorts`, `docker run -P`). Default `false`. Forces replacement.
 - `read_only` (Boolean) Mount the container's root filesystem read-only (`docker run --read-only`); use `mounts` (e.g. tmpfs) for writable paths. Default `false`. Forces replacement.
 - `restart` (String) Restart policy: `no` (default), `always`, `unless-stopped` or `on-failure`. Updated in place.
+- `runtime` (String) OCI runtime, e.g. `runc` or `nvidia` (`HostConfig.Runtime`). Unset uses the daemon default, which is not reported. Forces replacement.
 - `security_opt` (Set of String) Security options (`HostConfig.SecurityOpt`), e.g. `no-new-privileges:true`, `apparmor=unconfined`, `seccomp=unconfined`, `label=disable`. Forces replacement.
+- `shm_size` (Number) Size of `/dev/shm` in bytes (`HostConfig.ShmSize`). Unset uses the daemon default (64 MiB), which is not reported. Forces replacement.
 - `stdin_open` (Boolean) Keep stdin open (`docker run -i`); with `tty` this keeps shells such as `sh` from exiting immediately. Default `false`. Forces replacement.
 - `stop_signal` (String) Signal sent to stop the container, e.g. `SIGTERM` or `SIGQUIT`. Unset uses the image's `STOPSIGNAL` (else `SIGTERM`); the image value is not reported in state. Forces replacement.
 - `stop_timeout` (Number) Seconds to wait after the stop signal before killing the container. Unset uses the daemon default (10s). Forces replacement.
+- `storage_opt` (Map of String) Storage driver options, e.g. `{ size = "20G" }` (`HostConfig.StorageOpt`). Forces replacement.
 - `sysctls` (Map of String) Namespaced kernel parameters, e.g. `{ "net.core.somaxconn" = "1024" }`. Only keys you set are reported (except on import). Forces replacement.
+- `tmpfs` (Map of String) tmpfs mounts keyed by container path, values are mount options such as `rw,size=64m` (`HostConfig.Tmpfs`, `docker run --tmpfs`). `mounts` with `type = "tmpfs"` is the structured alternative. Forces replacement.
 - `tty` (Boolean) Allocate a pseudo-TTY (`docker run -t`). Default `false`. Forces replacement.
 - `ulimits` (Block List) Resource ulimits. Changing them forces a new resource. (see [below for nested schema](#nestedblock--ulimits))
-- `upload` (Block List) Files written into the container with `CopyToContainer` after create and before start (like `docker cp`). Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `file` must already exist in the image. Uploads are not read back from the daemon. Changing an upload forces a new container, unless the container is stopped (`must_run = false` and not running), in which case the files are copied in place. (see [below for nested schema](#nestedblock--upload))
 - `user` (String) User (and optionally `:group`) to run as. Unset uses the image's. Changing this forces a new resource.
+- `userns_mode` (String) User namespace mode (`HostConfig.UsernsMode`), e.g. `host`. Forces replacement.
+- `volumes_from` (List of String) Mount the volumes of other containers, `<name|id>[:ro|:rw]` (`HostConfig.VolumesFrom`). Forces replacement.
 - `wait` (Boolean) Wait after start until the container's healthcheck reports `healthy` (or, without a healthcheck, until it is running). Fails if the container exits or `wait_timeout` elapses.
 - `wait_timeout` (String) How long `wait` waits, as a Go duration. Default `60s`.
 - `working_dir` (String) Working directory. Unset uses the image's. Changing this forces a new resource.
 
 ### Read-Only
 
+- `content_sha256` (String) sha256 of inspect_json.
+- `docker_server_version` (String) Docker Engine version from GET /version.
+- `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
+- `exit_code` (Number) Exit code of the container's main process at the last refresh (`State.ExitCode`); 0 while it runs.
 - `id` (String) Full container ID.
 - `image_id` (String) ID (`sha256:...`) of the image the container runs.
+- `inspect` (Attributes) The GET /containers/{id}/json response as a nested object, field by field. (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String, Sensitive) The exact Engine API GET /containers/{id}/json response as JSON.
 - `running` (Boolean) Whether the container was running at the last refresh. Planned `true` when `must_run` is set.
 
-<a id="nestedblock--capabilities"></a>
-### Nested Schema for `capabilities`
+<a id="nestedblock--blkio_device_read_bps"></a>
+### Nested Schema for `blkio_device_read_bps`
+
+Required:
+
+- `path` (String) Device path on the host, e.g. `/dev/sda`.
+- `rate` (Number) Limit in bytes per second.
+
+
+<a id="nestedblock--blkio_device_read_iops"></a>
+### Nested Schema for `blkio_device_read_iops`
+
+Required:
+
+- `path` (String) Device path on the host, e.g. `/dev/sda`.
+- `rate` (Number) Limit in IO operations per second.
+
+
+<a id="nestedblock--blkio_device_write_bps"></a>
+### Nested Schema for `blkio_device_write_bps`
+
+Required:
+
+- `path` (String) Device path on the host, e.g. `/dev/sda`.
+- `rate` (Number) Limit in bytes per second.
+
+
+<a id="nestedblock--blkio_device_write_iops"></a>
+### Nested Schema for `blkio_device_write_iops`
+
+Required:
+
+- `path` (String) Device path on the host, e.g. `/dev/sda`.
+- `rate` (Number) Limit in IO operations per second.
+
+
+<a id="nestedblock--device_requests"></a>
+### Nested Schema for `device_requests`
 
 Optional:
 
-- `add` (Set of String) Capabilities to add, e.g. `NET_ADMIN`.
-- `drop` (Set of String) Capabilities to drop, e.g. `ALL`.
+- `capabilities` (List of List of String) Capability sets: the request matches a device having every capability of any one inner list, e.g. `[["gpu"]]`.
+- `count` (Number) Number of devices to request; `-1` requests all. Conflicts with `device_ids` in the daemon.
+- `device_ids` (List of String) Device IDs or indexes to request.
+- `driver` (String) Device driver, e.g. `nvidia`.
+- `options` (Map of String) Driver-specific options.
 
 
 <a id="nestedblock--devices"></a>
@@ -189,12 +277,30 @@ Optional:
 
 Required:
 
-- `host_path` (String) Device path on the host, e.g. `/dev/fuse`.
+- `path_on_host` (String) Device path on the host, e.g. `/dev/fuse` (`PathOnHost`).
 
 Optional:
 
-- `container_path` (String) Path inside the container. Unset uses `host_path`.
-- `permissions` (String) Cgroup permissions, a combination of `r` (read), `w` (write) and `m` (mknod). Default `rwm`.
+- `cgroup_permissions` (String) Cgroup permissions (`CgroupPermissions`), a combination of `r` (read), `w` (write) and `m` (mknod). Default `rwm`.
+- `path_in_container` (String) Path inside the container (`PathInContainer`). Unset uses `path_on_host`.
+
+
+<a id="nestedblock--files"></a>
+### Nested Schema for `files`
+
+Required:
+
+- `path` (String) Absolute path of the file inside the container, e.g. `/etc/app/config.json`.
+
+Optional:
+
+- `content` (String) Literal file content (UTF-8 text).
+- `content_base64` (String) File content, base64-encoded (use `filebase64()` for binary files).
+- `gid` (Number) Numeric group ID that owns the file. Default `0`.
+- `mode` (String) File mode as an octal string, e.g. `"0640"` or `"0755"` for an executable. Unset uploads with `0644`.
+- `source` (String) Path of a local file (on the machine running Terraform) whose content is uploaded. It is read at apply; set `source_hash` (e.g. `filesha256(...)`) so content changes are planned.
+- `source_hash` (String) Any string that changes when the `source` file changes, e.g. `filesha256("app.conf")`. Only used to trigger a re-upload.
+- `uid` (Number) Numeric user ID that owns the file. Default `0`.
 
 
 <a id="nestedblock--healthcheck"></a>
@@ -204,9 +310,19 @@ Optional:
 
 - `interval` (String) Time between checks, Go duration (e.g. `30s`).
 - `retries` (Number) Consecutive failures before `unhealthy`.
+- `start_interval` (String) Time between checks during the start period, Go duration (`StartInterval`).
 - `start_period` (String) Grace period before failures count.
 - `test` (List of String) Test command, e.g. `["CMD", "curl", "-f", "http://localhost/"]`, `["CMD-SHELL", "..."]` or `["NONE"]`. Required when the block is present.
 - `timeout` (String) Time before a check is considered hung.
+
+
+<a id="nestedblock--logging"></a>
+### Nested Schema for `logging`
+
+Optional:
+
+- `driver` (String) Logging driver, e.g. `json-file`, `local` or `syslog` (`LogConfig.Type`). Unset uses the daemon default, which is then reported.
+- `options` (Map of String) Driver options, e.g. `{ max-size = "10m" }` (`LogConfig.Config`). Unset uses the daemon defaults.
 
 
 <a id="nestedblock--mounts"></a>
@@ -219,24 +335,74 @@ Required:
 
 Optional:
 
+- `bind_options` (Block, Optional) Bind mount options (`BindOptions`); `type = "bind"` only. (see [below for nested schema](#nestedblock--mounts--bind_options))
 - `read_only` (Boolean) Mount read-only. Default `false`.
 - `selinux_relabel` (String) SELinux relabel for a `bind` or named `volume` mount: `z` (shared label) or `Z` (private label), like the `docker run -v src:dst:z` suffix. The entry is then sent as a `HostConfig.Binds` string, because the `Mounts` API has no relabel option. Forces replacement like any mounts change.
 - `source` (String) Host path (bind) or volume name (volume; unset = anonymous volume). Not allowed for tmpfs.
-- `tmpfs_size` (Number) tmpfs size in bytes (tmpfs only).
+- `tmpfs_options` (Block, Optional) tmpfs options (`TmpfsOptions`); `type = "tmpfs"` only. (see [below for nested schema](#nestedblock--mounts--tmpfs_options))
+- `volume_options` (Block, Optional) Volume mount options (`VolumeOptions`); `type = "volume"` only. (see [below for nested schema](#nestedblock--mounts--volume_options))
 
-
-<a id="nestedblock--networks_advanced"></a>
-### Nested Schema for `networks_advanced`
-
-Required:
-
-- `name` (String) Network name or ID (e.g. a `docker_network`'s `name`).
+<a id="nestedblock--mounts--bind_options"></a>
+### Nested Schema for `mounts.bind_options`
 
 Optional:
 
-- `aliases` (Set of String) DNS aliases on this network.
-- `ipv4_address` (String) Static IPv4 address (needs a user-defined subnet).
-- `ipv6_address` (String) Static IPv6 address (needs an IPv6-enabled network with a user-defined IPv6 subnet).
+- `propagation` (String) Mount propagation (`Propagation`): `private`, `rprivate`, `shared`, `rshared`, `slave` or `rslave`.
+
+
+<a id="nestedblock--mounts--tmpfs_options"></a>
+### Nested Schema for `mounts.tmpfs_options`
+
+Optional:
+
+- `mode` (String) Permission bits of the tmpfs root as an octal string, e.g. `"1777"` (`Mode`).
+- `size_bytes` (Number) Size of the tmpfs in bytes (`SizeBytes`). Unset is unlimited.
+
+
+<a id="nestedblock--mounts--volume_options"></a>
+### Nested Schema for `mounts.volume_options`
+
+Optional:
+
+- `driver_config` (Block, Optional) Volume driver for a volume the mount creates (`DriverConfig`). (see [below for nested schema](#nestedblock--mounts--volume_options--driver_config))
+- `labels` (Map of String) Labels for a volume the mount creates (`Labels`).
+- `no_copy` (Boolean) Do not copy the image's content at the target into a new volume (`NoCopy`).
+- `subpath` (String) Path inside the volume to mount instead of its root (`Subpath`).
+
+<a id="nestedblock--mounts--volume_options--driver_config"></a>
+### Nested Schema for `mounts.volume_options.driver_config`
+
+Optional:
+
+- `name` (String) Volume driver name (`Name`).
+- `options` (Map of String) Driver options (`Options`).
+
+
+
+
+<a id="nestedatt--networks"></a>
+### Nested Schema for `networks`
+
+Optional:
+
+- `aliases` (Set of String) Extra DNS names of the container on this network (`Aliases`).
+- `driver_opts` (Map of String) Driver-specific endpoint options (`DriverOpts`).
+- `gw_priority` (Number) Gateway priority (`GwPriority`): the endpoint with the highest priority provides the container's default gateway. Needs Engine API >= 1.48.
+- `ipv4_address` (String) Static IPv4 address (`IPAMConfig.IPv4Address`); needs a user-defined subnet.
+- `ipv6_address` (String) Static IPv6 address (`IPAMConfig.IPv6Address`); needs an IPv6-enabled network with a user-defined IPv6 subnet.
+- `link_local_ips` (Set of String) Link-local addresses (`IPAMConfig.LinkLocalIPs`).
+- `mac_address` (String) MAC address of the endpoint (`MacAddress`). Unset, the daemon generates one, which is reported.
+
+Read-Only:
+
+- `endpoint_id` (String) ID of the endpoint (`EndpointID`).
+- `gateway` (String) IPv4 gateway of the network (`Gateway`).
+- `global_ipv6_address` (String) Global IPv6 address of the container on this network (`GlobalIPv6Address`).
+- `global_ipv6_prefix_len` (Number) Global IPv6 prefix length (`GlobalIPv6PrefixLen`).
+- `ip_address` (String) IPv4 address of the container on this network (`IPAddress`).
+- `ip_prefix_len` (Number) IPv4 prefix length (`IPPrefixLen`).
+- `ipv6_gateway` (String) IPv6 gateway of the network (`IPv6Gateway`).
+- `network_id` (String) ID of the network (`NetworkID`).
 
 
 <a id="nestedblock--ports"></a>
@@ -244,12 +410,12 @@ Optional:
 
 Required:
 
-- `internal` (Number) Container port.
+- `container_port` (Number) Container port (the `PortBindings` key's port).
 
 Optional:
 
-- `external` (Number) Host port. Unset lets the daemon pick an ephemeral port.
-- `ip` (String) Host IP to bind. Unset binds all interfaces.
+- `host_ip` (String) Host IP to bind (`PortBinding.HostIp`). Unset binds all interfaces.
+- `host_port` (Number) Host port (`PortBinding.HostPort`). Unset lets the daemon pick an ephemeral port.
 - `protocol` (String) `tcp` (default), `udp` or `sctp`.
 
 
@@ -263,23 +429,222 @@ Required:
 - `soft` (Number) Soft limit.
 
 
-<a id="nestedblock--upload"></a>
-### Nested Schema for `upload`
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
 
-Required:
+Read-Only:
 
-- `file` (String) Absolute path of the file inside the container, e.g. `/etc/app/config.json`.
+- `app_armor_profile` (String) Upstream `AppArmorProfile`.
+- `args` (List of String) Upstream `Args`.
+- `config` (Attributes) Upstream `Config`. (see [below for nested schema](#nestedatt--inspect--config))
+- `created` (String) Upstream `Created`.
+- `driver` (String) Upstream `Driver`.
+- `exec_ids` (List of String) Upstream `ExecIDs`.
+- `graph_driver` (Attributes) Upstream `GraphDriver`. (see [below for nested schema](#nestedatt--inspect--graph_driver))
+- `host_config` (Attributes) Upstream `HostConfig`. (see [below for nested schema](#nestedatt--inspect--host_config))
+- `hostname_path` (String) Upstream `HostnamePath`.
+- `hosts_path` (String) Upstream `HostsPath`.
+- `id` (String) Upstream `Id`.
+- `image` (String) Upstream `Image`.
+- `image_manifest_descriptor` (Attributes) Upstream `ImageManifestDescriptor`. (see [below for nested schema](#nestedatt--inspect--image_manifest_descriptor))
+- `log_path` (String) Upstream `LogPath`.
+- `mount_label` (String) Upstream `MountLabel`.
+- `mounts` (Attributes List) Upstream `Mounts`. (see [below for nested schema](#nestedatt--inspect--mounts))
+- `name` (String) Upstream `Name`.
+- `network_settings` (Attributes) Upstream `NetworkSettings`. (see [below for nested schema](#nestedatt--inspect--network_settings))
+- `path` (String) Upstream `Path`.
+- `platform` (String) Upstream `Platform`.
+- `process_label` (String) Upstream `ProcessLabel`.
+- `resolv_conf_path` (String) Upstream `ResolvConfPath`.
+- `restart_count` (Number) Upstream `RestartCount`.
+- `size_root_fs` (Number) Upstream `SizeRootFs`.
+- `size_rw` (Number) Upstream `SizeRw`.
+- `state` (Attributes) Upstream `State`. (see [below for nested schema](#nestedatt--inspect--state))
+- `storage` (Attributes) Upstream `Storage`. (see [below for nested schema](#nestedatt--inspect--storage))
 
-Optional:
+<a id="nestedatt--inspect--config"></a>
+### Nested Schema for `inspect.config`
 
-- `content` (String) Literal file content (UTF-8 text).
-- `content_base64` (String) File content, base64-encoded (use `filebase64()` for binary files).
-- `executable` (Boolean) Upload with mode `0744` instead of `0644`. Default `false`. Conflicts with `permissions`.
-- `group` (Number) Numeric group ID that owns the file. Default `0`.
-- `owner` (Number) Numeric user ID that owns the file. Default `0`.
-- `permissions` (String) File mode as an octal string, e.g. `"0640"` or `"755"`. Default `0644`. Conflicts with `executable`.
-- `source` (String) Path of a local file (on the machine running Terraform) whose content is uploaded. It is read at apply; set `source_hash` (e.g. `filesha256(...)`) so content changes are planned.
-- `source_hash` (String) Any string that changes when the `source` file changes, e.g. `filesha256("app.conf")`. Only used to trigger a re-upload.
+Read-Only:
+
+- `args_escaped` (Boolean) Upstream `ArgsEscaped`.
+- `attach_stderr` (Boolean) Upstream `AttachStderr`.
+- `attach_stdin` (Boolean) Upstream `AttachStdin`.
+- `attach_stdout` (Boolean) Upstream `AttachStdout`.
+- `cmd` (List of String) Upstream `Cmd`.
+- `domainname` (String) Upstream `Domainname`.
+- `entrypoint` (List of String) Upstream `Entrypoint`.
+- `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
+- `exposed_ports` (Dynamic) Upstream `ExposedPorts`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `healthcheck` (Dynamic) Upstream `Healthcheck`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `hostname` (String) Upstream `Hostname`.
+- `image` (String) Upstream `Image`.
+- `labels` (Map of String) Upstream `Labels`.
+- `network_disabled` (Boolean) Upstream `NetworkDisabled`.
+- `on_build` (List of String) Upstream `OnBuild`.
+- `open_stdin` (Boolean) Upstream `OpenStdin`.
+- `shell` (List of String) Upstream `Shell`.
+- `stdin_once` (Boolean) Upstream `StdinOnce`.
+- `stop_signal` (String) Upstream `StopSignal`.
+- `stop_timeout` (Number) Upstream `StopTimeout`.
+- `tty` (Boolean) Upstream `Tty`.
+- `user` (String) Upstream `User`.
+- `volumes` (Dynamic) Upstream `Volumes`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `working_dir` (String) Upstream `WorkingDir`.
+
+
+<a id="nestedatt--inspect--graph_driver"></a>
+### Nested Schema for `inspect.graph_driver`
+
+Read-Only:
+
+- `data` (Map of String) Upstream `Data`.
+- `name` (String) Upstream `Name`.
+
+
+<a id="nestedatt--inspect--host_config"></a>
+### Nested Schema for `inspect.host_config`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `Annotations`.
+- `auto_remove` (Boolean) Upstream `AutoRemove`.
+- `binds` (List of String) Upstream `Binds`.
+- `blkio_device_read_bps` (List of String) Upstream `BlkioDeviceReadBps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `blkio_device_read_iops` (List of String) Upstream `BlkioDeviceReadIOps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `blkio_device_write_bps` (List of String) Upstream `BlkioDeviceWriteBps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `blkio_device_write_iops` (List of String) Upstream `BlkioDeviceWriteIOps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `blkio_weight` (Number) Upstream `BlkioWeight`.
+- `blkio_weight_device` (List of String) Upstream `BlkioWeightDevice`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `cap_add` (List of String) Upstream `CapAdd`.
+- `cap_drop` (List of String) Upstream `CapDrop`.
+- `cgroup` (String) Upstream `Cgroup`.
+- `cgroup_parent` (String) Upstream `CgroupParent`.
+- `cgroupns_mode` (String) Upstream `CgroupnsMode`.
+- `console_size` (List of Number) Upstream `ConsoleSize`.
+- `container_id_file` (String) Upstream `ContainerIDFile`.
+- `cpu_count` (Number) Upstream `CpuCount`.
+- `cpu_percent` (Number) Upstream `CpuPercent`.
+- `cpu_period` (Number) Upstream `CpuPeriod`.
+- `cpu_quota` (Number) Upstream `CpuQuota`.
+- `cpu_realtime_period` (Number) Upstream `CpuRealtimePeriod`.
+- `cpu_realtime_runtime` (Number) Upstream `CpuRealtimeRuntime`.
+- `cpu_shares` (Number) Upstream `CpuShares`.
+- `cpuset_cpus` (String) Upstream `CpusetCpus`.
+- `cpuset_mems` (String) Upstream `CpusetMems`.
+- `device_cgroup_rules` (List of String) Upstream `DeviceCgroupRules`.
+- `device_requests` (List of String) Upstream `DeviceRequests`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `devices` (List of String) Upstream `Devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `dns` (List of String) Upstream `Dns`.
+- `dns_options` (List of String) Upstream `DnsOptions`.
+- `dns_search` (List of String) Upstream `DnsSearch`.
+- `extra_hosts` (List of String) Upstream `ExtraHosts`.
+- `group_add` (List of String) Upstream `GroupAdd`.
+- `init` (Boolean) Upstream `Init`.
+- `io_maximum_bandwidth` (Number) Upstream `IOMaximumBandwidth`.
+- `io_maximum_iops` (Number) Upstream `IOMaximumIOps`.
+- `ipc_mode` (String) Upstream `IpcMode`.
+- `isolation` (String) Upstream `Isolation`.
+- `links` (List of String) Upstream `Links`.
+- `log_config` (Dynamic) Upstream `LogConfig`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `masked_paths` (List of String) Upstream `MaskedPaths`.
+- `memory` (Number) Upstream `Memory`.
+- `memory_reservation` (Number) Upstream `MemoryReservation`.
+- `memory_swap` (Number) Upstream `MemorySwap`.
+- `memory_swappiness` (Number) Upstream `MemorySwappiness`.
+- `mounts` (List of String) Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `nano_cpus` (Number) Upstream `NanoCpus`.
+- `network_mode` (String) Upstream `NetworkMode`.
+- `oom_kill_disable` (Boolean) Upstream `OomKillDisable`.
+- `oom_score_adj` (Number) Upstream `OomScoreAdj`.
+- `pid_mode` (String) Upstream `PidMode`.
+- `pids_limit` (Number) Upstream `PidsLimit`.
+- `port_bindings` (Map of List of String) Upstream `PortBindings`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `privileged` (Boolean) Upstream `Privileged`.
+- `publish_all_ports` (Boolean) Upstream `PublishAllPorts`.
+- `readonly_paths` (List of String) Upstream `ReadonlyPaths`.
+- `readonly_rootfs` (Boolean) Upstream `ReadonlyRootfs`.
+- `restart_policy` (Dynamic) Upstream `RestartPolicy`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `runtime` (String) Upstream `Runtime`.
+- `security_opt` (List of String) Upstream `SecurityOpt`.
+- `shm_size` (Number) Upstream `ShmSize`.
+- `storage_opt` (Map of String) Upstream `StorageOpt`.
+- `sysctls` (Map of String) Upstream `Sysctls`.
+- `tmpfs` (Map of String) Upstream `Tmpfs`.
+- `ulimits` (List of String) Upstream `Ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `umask` (Number) Upstream `Umask`.
+- `userns_mode` (String) Upstream `UsernsMode`.
+- `uts_mode` (String) Upstream `UTSMode`.
+- `volume_driver` (String) Upstream `VolumeDriver`.
+- `volumes_from` (List of String) Upstream `VolumesFrom`.
+
+
+<a id="nestedatt--inspect--image_manifest_descriptor"></a>
+### Nested Schema for `inspect.image_manifest_descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `artifact_type` (String) Upstream `artifactType`.
+- `data` (String) Upstream `data`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `platform` (Dynamic) Upstream `platform`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `size` (Number) Upstream `size`.
+- `urls` (List of String) Upstream `urls`.
+
+
+<a id="nestedatt--inspect--mounts"></a>
+### Nested Schema for `inspect.mounts`
+
+Read-Only:
+
+- `destination` (String) Upstream `Destination`.
+- `driver` (String) Upstream `Driver`.
+- `mode` (String) Upstream `Mode`.
+- `name` (String) Upstream `Name`.
+- `propagation` (String) Upstream `Propagation`.
+- `rw` (Boolean) Upstream `RW`.
+- `source` (String) Upstream `Source`.
+- `type` (String) Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+
+
+<a id="nestedatt--inspect--network_settings"></a>
+### Nested Schema for `inspect.network_settings`
+
+Read-Only:
+
+- `networks` (Map of String) Upstream `Networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `ports` (Map of List of String) Upstream `Ports`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `sandbox_id` (String) Upstream `SandboxID`.
+- `sandbox_key` (String) Upstream `SandboxKey`.
+
+
+<a id="nestedatt--inspect--state"></a>
+### Nested Schema for `inspect.state`
+
+Read-Only:
+
+- `dead` (Boolean) Upstream `Dead`.
+- `error` (String) Upstream `Error`.
+- `exit_code` (Number) Upstream `ExitCode`.
+- `finished_at` (String) Upstream `FinishedAt`.
+- `health` (Dynamic) Upstream `Health`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `oom_killed` (Boolean) Upstream `OOMKilled`.
+- `paused` (Boolean) Upstream `Paused`.
+- `pid` (Number) Upstream `Pid`.
+- `restarting` (Boolean) Upstream `Restarting`.
+- `running` (Boolean) Upstream `Running`.
+- `started_at` (String) Upstream `StartedAt`.
+- `status` (String) Upstream `Status`.
+
+
+<a id="nestedatt--inspect--storage"></a>
+### Nested Schema for `inspect.storage`
+
+Read-Only:
+
+- `root_fs` (Dynamic) Upstream `RootFS`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
 
 ## Import
 

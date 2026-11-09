@@ -4,15 +4,27 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Reads the join tokens of the swarm the provider's Docker host manages (SwarmInspect). Use it to join nodes to a swarm that was not created by `docker_swarm_init` in this configuration. The host must be a manager.
+Reads the join tokens of the swarm the provider's Docker host manages (SwarmInspect), as `worker` / `manager` and the structured `join_tokens`. Use it to join nodes to a swarm that was not created by `docker_swarm_init` in this configuration. The host must be a manager.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon. |
 | `id` | `string` | computed |  |  | Swarm cluster ID. |
+| `join_tokens` | `object` | computed |  | yes | The `join_tokens` structured output. |
 | `manager` | `string` | computed |  | yes | Token that joins a node as a manager. |
 | `worker` | `string` | computed |  | yes | Token that joins a node as a worker. |
+
+### `join_tokens`
+
+nested attribute, object. The `join_tokens` structured output.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `manager` | `string` | computed |  | yes | Upstream `Manager`. |
+| `worker` | `string` | computed |  | yes | Upstream `Worker`. |
 
 ## Example
 

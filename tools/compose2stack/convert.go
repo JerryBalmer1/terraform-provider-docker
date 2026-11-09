@@ -163,6 +163,15 @@ func setInt(b *hclwrite.Body, k string, v int64) {
 	}
 }
 
+// stringSet is a cty set of strings (v must not be empty).
+func stringSet(v []string) cty.Value {
+	vals := make([]cty.Value, len(v))
+	for i, s := range v {
+		vals[i] = cty.StringVal(s)
+	}
+	return cty.SetVal(vals)
+}
+
 func setList(b *hclwrite.Body, k string, v []string) {
 	if len(v) == 0 {
 		return
@@ -294,17 +303,8 @@ func (c *converter) commonTodos(b *hclwrite.Body, s ctypes.ServiceConfig) {
 	if len(s.PostStart)+len(s.PreStop)+len(s.PreStart) > 0 {
 		todo(b, "lifecycle hooks (pre_start/post_start/pre_stop) are not supported")
 	}
-	if s.Init != nil && *s.Init {
-		todo(b, "init: true is not supported")
-	}
-	if len(s.GroupAdd) > 0 {
-		todo(b, "group_add %v is not supported", s.GroupAdd)
-	}
 	if s.PidsLimit != 0 {
 		todo(b, "pids_limit %d is not supported", s.PidsLimit)
-	}
-	if s.Platform != "" {
-		todo(b, "platform %s is not supported", s.Platform)
 	}
 	if s.PullPolicy != "" && s.PullPolicy != ctypes.PullPolicyMissing {
 		todo(b, "pull_policy %s is not supported", s.PullPolicy)
@@ -476,17 +476,24 @@ func (c *converter) stackService(b *hclwrite.Body, s ctypes.ServiceConfig) {
 	}
 	setMap(b, "labels", d.Labels)
 
-	var nets []string
+	// networks: a map keyed by the stack network's short name (or the
+	// external network's name); the value carries the aliases.
+	nets := map[string]cty.Value{}
 	for _, key := range s.NetworksByPriority() {
 		n := p.Networks[key]
-		nets = append(nets, stackRef(key, n.Name, bool(n.External)))
-		if nc := s.Networks[key]; nc != nil && (len(nc.Aliases) > 0 || nc.Ipv4Address != "" || nc.Ipv6Address != "") {
-			todo(b, "network %s: aliases/static addresses %v %s %s are not converted (networks_advanced takes aliases)", key, nc.Aliases, nc.Ipv4Address, nc.Ipv6Address)
+		att := map[string]cty.Value{}
+		if nc := s.Networks[key]; nc != nil {
+			if len(nc.Aliases) > 0 {
+				att["aliases"] = stringSet(nc.Aliases)
+			}
+			if nc.Ipv4Address != "" || nc.Ipv6Address != "" {
+				todo(b, "network %s: static addresses %s are not supported by swarm services", key, strings.TrimSpace(nc.Ipv4Address+" "+nc.Ipv6Address))
+			}
 		}
+		nets[stackRef(key, n.Name, bool(n.External))] = cty.ObjectVal(att)
 	}
 	if len(nets) > 0 {
-		sort.Strings(nets)
-		setList(b, "networks", nets)
+		b.SetAttributeValue("networks", cty.ObjectVal(nets))
 	}
 
 	// todos
@@ -500,16 +507,22 @@ func (c *converter) stackService(b *hclwrite.Body, s ctypes.ServiceConfig) {
 	for _, u := range []unsupported{
 		{"network_mode", s.NetworkMode != ""}, {"privileged", s.Privileged}, {"devices", len(s.Devices) > 0}, {"ipc", s.Ipc != ""}, {"pid", s.Pid != ""},
 		{"userns_mode", s.UserNSMode != ""}, {"security_opt", len(s.SecurityOpt) > 0}, {"shm_size", s.ShmSize != 0}, {"volumes_from", len(s.VolumesFrom) > 0},
-		{"gpus", len(s.Gpus) > 0}, {"read_only", s.ReadOnly}, {"tty", s.Tty}, {"stdin_open", s.StdinOpen}, {"stop_signal", s.StopSignal != ""},
-		{"expose", len(s.Expose) > 0}, {"tmpfs", len(s.Tmpfs) > 0}, {"cgroup_parent", s.CgroupParent != ""},
+		{"gpus", len(s.Gpus) > 0}, {"tty", s.Tty}, {"stdin_open", s.StdinOpen},
+		{"expose", len(s.Expose) > 0}, {"tmpfs", len(s.Tmpfs) > 0}, {"cgroup_parent", s.CgroupParent != ""}, {"platform", s.Platform != ""},
 	} {
 		if u.set {
 			todo(b, "%s is not supported by docker_stack services", u.attr)
 		}
 	}
+	setBool(b, "read_only", s.ReadOnly)
+	setStr(b, "stop_signal", s.StopSignal)
+	if s.Init != nil && *s.Init {
+		b.SetAttributeValue("init", cty.True)
+	}
+	setList(b, "groups", s.GroupAdd)
 
 	if len(s.DNS)+len(s.DNSSearch)+len(s.DNSOpts) > 0 {
-		db := b.AppendNewBlock("dns", nil).Body()
+		db := b.AppendNewBlock("dns_config", nil).Body()
 		setList(db, "nameservers", []string(s.DNS))
 		setList(db, "search", []string(s.DNSSearch))
 		setList(db, "options", s.DNSOpts)
@@ -529,8 +542,8 @@ func (c *converter) stackService(b *hclwrite.Body, s ctypes.ServiceConfig) {
 			mb.SetAttributeRaw("source", c.modulePath(v.Source, true))
 		case ctypes.VolumeTypeTmpfs:
 			mb.SetAttributeValue("type", cty.StringVal("tmpfs"))
-			if v.Tmpfs != nil {
-				setInt(mb, "tmpfs_size", int64(v.Tmpfs.Size))
+			if v.Tmpfs != nil && v.Tmpfs.Size != 0 {
+				setInt(mb.AppendNewBlock("tmpfs_options", nil).Body(), "size_bytes", int64(v.Tmpfs.Size))
 			}
 		case ctypes.VolumeTypeVolume, "":
 			mb.SetAttributeValue("type", cty.StringVal("volume"))
@@ -686,7 +699,7 @@ func (c *converter) local(body *hclwrite.Body) {
 		setBool(b, "internal", n.Internal)
 		setBool(b, "attachable", n.Attachable)
 		if n.EnableIPv6 != nil && *n.EnableIPv6 {
-			b.SetAttributeValue("ipv6", cty.True)
+			b.SetAttributeValue("enable_ipv6", cty.True)
 		}
 		setStr(b, "ipam_driver", n.Ipam.Driver)
 		setMap(b, "labels", mergeMaps(n.Labels, map[string]string{"com.docker.compose.project": p.Name, "com.docker.compose.network": key}))
@@ -778,7 +791,7 @@ func (c *converter) container(b *hclwrite.Body, s ctypes.ServiceConfig) {
 		name, retries, _ := strings.Cut(restart, ":")
 		setStr(b, "restart", name)
 		if n, err := strconv.ParseInt(retries, 10, 64); err == nil {
-			setInt(b, "max_retry_count", n)
+			setInt(b, "maximum_retry_count", n)
 		}
 	}
 	mem, cpus := int64(s.MemLimit), int64(float64(s.CPUS)*1e9)
@@ -812,8 +825,9 @@ func (c *converter) container(b *hclwrite.Body, s ctypes.ServiceConfig) {
 		b.SetAttributeValue("security_opt", cty.SetVal(vals))
 	}
 	if s.Logging != nil && s.Logging.Driver != "" {
-		setStr(b, "log_driver", s.Logging.Driver)
-		setMap(b, "log_opts", s.Logging.Options)
+		lb := b.AppendNewBlock("logging", nil).Body()
+		setStr(lb, "driver", s.Logging.Driver)
+		setMap(lb, "options", s.Logging.Options)
 	}
 	if len(s.Gpus) > 0 {
 		b.SetAttributeValue("gpus", cty.StringVal("all"))
@@ -838,14 +852,34 @@ func (c *converter) container(b *hclwrite.Body, s ctypes.ServiceConfig) {
 		todo(b, "network_mode %s is not supported by docker_container", s.NetworkMode)
 	}
 	for _, u := range []unsupported{
-		{"ipc", s.Ipc != ""}, {"pid", s.Pid != ""}, {"userns_mode", s.UserNSMode != ""}, {"volumes_from", len(s.VolumesFrom) > 0},
-		{"expose", len(s.Expose) > 0}, {"shm_size", s.ShmSize != 0}, {"cgroup_parent", s.CgroupParent != ""}, {"dns_opt", len(s.DNSOpts) > 0}, {"domainname", s.DomainName != ""},
-		{"mem_reservation", s.MemReservation != 0}, {"oom_score_adj", s.OomScoreAdj != 0}, {"runtime", s.Runtime != ""}, {"device_cgroup_rules", len(s.DeviceCgroupRules) > 0},
+		{"volumes_from", len(s.VolumesFrom) > 0}, {"expose", len(s.Expose) > 0}, {"oom_score_adj", s.OomScoreAdj != 0},
 	} {
 		if u.set {
 			todo(b, "%s is not supported by docker_container", u.attr)
 		}
 	}
+	for _, m := range []struct{ attr, compose, v string }{{"ipc_mode", "ipc", s.Ipc}, {"pid_mode", "pid", s.Pid}} {
+		if strings.HasPrefix(m.v, "service:") {
+			todo(b, "%s %s: use container:<name> of the docker_container instead", m.compose, m.v)
+		} else {
+			setStr(b, m.attr, m.v)
+		}
+	}
+	setStr(b, "userns_mode", s.UserNSMode)
+	setInt(b, "shm_size", int64(s.ShmSize))
+	setStr(b, "cgroup_parent", s.CgroupParent)
+	setList(b, "dns_options", s.DNSOpts)
+	setStr(b, "domainname", s.DomainName)
+	setInt(b, "memory_reservation", int64(s.MemReservation))
+	setStr(b, "runtime", s.Runtime)
+	setList(b, "device_cgroup_rules", s.DeviceCgroupRules)
+	if s.Init != nil && *s.Init {
+		b.SetAttributeValue("init", cty.True)
+	}
+	if len(s.GroupAdd) > 0 {
+		b.SetAttributeValue("group_add", stringSet(s.GroupAdd))
+	}
+	setStr(b, "platform", s.Platform)
 	if s.Deploy != nil {
 		if pl := s.Deploy.Placement; len(pl.Constraints)+len(pl.Preferences) > 0 {
 			todo(b, "deploy.placement only applies to swarm (use -mode swarm)")
@@ -855,29 +889,19 @@ func (c *converter) container(b *hclwrite.Body, s ctypes.ServiceConfig) {
 		}
 	}
 
-	if len(s.CapAdd)+len(s.CapDrop) > 0 {
-		cb := b.AppendNewBlock("capabilities", nil).Body()
-		for _, kv := range []struct {
-			k string
-			v []string
-		}{{"add", s.CapAdd}, {"drop", s.CapDrop}} {
-			k, v := kv.k, kv.v
-			if len(v) > 0 {
-				vals := make([]cty.Value, len(v))
-				for i, x := range v {
-					vals[i] = cty.StringVal(x)
-				}
-				cb.SetAttributeValue(k, cty.SetVal(vals))
-			}
-		}
+	if len(s.CapAdd) > 0 {
+		b.SetAttributeValue("cap_add", stringSet(s.CapAdd))
+	}
+	if len(s.CapDrop) > 0 {
+		b.SetAttributeValue("cap_drop", stringSet(s.CapDrop))
 	}
 	for _, d := range s.Devices {
 		db := b.AppendNewBlock("devices", nil).Body()
-		db.SetAttributeValue("host_path", cty.StringVal(d.Source))
+		db.SetAttributeValue("path_on_host", cty.StringVal(d.Source))
 		if d.Target != "" && d.Target != d.Source {
-			setStr(db, "container_path", d.Target)
+			setStr(db, "path_in_container", d.Target)
 		}
-		setStr(db, "permissions", d.Permissions)
+		setStr(db, "cgroup_permissions", d.Permissions)
 	}
 	healthcheck(b, s.HealthCheck)
 
@@ -889,8 +913,8 @@ func (c *converter) container(b *hclwrite.Body, s ctypes.ServiceConfig) {
 			mb.SetAttributeRaw("source", c.modulePath(v.Source, true))
 		case ctypes.VolumeTypeTmpfs:
 			mb.SetAttributeValue("type", cty.StringVal("tmpfs"))
-			if v.Tmpfs != nil {
-				setInt(mb, "tmpfs_size", int64(v.Tmpfs.Size))
+			if v.Tmpfs != nil && v.Tmpfs.Size != 0 {
+				setInt(mb.AppendNewBlock("tmpfs_options", nil).Body(), "size_bytes", int64(v.Tmpfs.Size))
 			}
 		case ctypes.VolumeTypeVolume, "":
 			mb.SetAttributeValue("type", cty.StringVal("volume"))
@@ -941,31 +965,38 @@ func (c *converter) container(b *hclwrite.Body, s ctypes.ServiceConfig) {
 		fileMount("config", ref.Source, ctypes.FileObjectConfig(p.Configs[ref.Source]), target)
 	}
 
-	for _, key := range s.NetworksByPriority() {
-		n := p.Networks[key]
-		nb := b.AppendNewBlock("networks_advanced", nil).Body()
-		if n.External {
-			nb.SetAttributeValue("name", cty.StringVal(n.Name))
-		} else {
-			nb.SetAttributeRaw("name", raw("docker_network."+ident(key)+".name"))
+	// networks: a map keyed by network name; the value is the endpoint
+	// (the service name is an alias, as compose sets it).
+	if keys := s.NetworksByPriority(); len(keys) > 0 {
+		var sb strings.Builder
+		sb.WriteString("{\n")
+		for _, key := range keys {
+			n := p.Networks[key]
+			if n.External {
+				sb.Write(hclwrite.TokensForValue(cty.StringVal(n.Name)).Bytes())
+			} else {
+				sb.WriteString("(docker_network." + ident(key) + ".name)")
+			}
+			ep := hclwrite.NewEmptyFile().Body()
+			aliases := []string{s.Name}
+			if nc := s.Networks[key]; nc != nil {
+				aliases = append(aliases, nc.Aliases...)
+				setStr(ep, "ipv4_address", nc.Ipv4Address)
+				setStr(ep, "ipv6_address", nc.Ipv6Address)
+			}
+			ep.SetAttributeValue("aliases", stringSet(aliases))
+			sb.WriteString(" = {\n")
+			sb.Write(ep.BuildTokens(nil).Bytes())
+			sb.WriteString("}\n")
 		}
-		aliases := []string{s.Name}
-		if nc := s.Networks[key]; nc != nil {
-			aliases = append(aliases, nc.Aliases...)
-			setStr(nb, "ipv4_address", nc.Ipv4Address)
-			setStr(nb, "ipv6_address", nc.Ipv6Address)
-		}
-		vals := make([]cty.Value, len(aliases))
-		for i, a := range aliases {
-			vals[i] = cty.StringVal(a)
-		}
-		nb.SetAttributeValue("aliases", cty.SetVal(vals))
+		sb.WriteString("}")
+		b.SetAttributeRaw("networks", raw(sb.String()))
 	}
 	c.ports(s, b, func(pc ctypes.ServicePortConfig, pub int64) {
 		pb := b.AppendNewBlock("ports", nil).Body()
-		pb.SetAttributeValue("internal", cty.NumberIntVal(int64(pc.Target)))
-		setInt(pb, "external", pub)
-		setStr(pb, "ip", pc.HostIP)
+		pb.SetAttributeValue("container_port", cty.NumberIntVal(int64(pc.Target)))
+		setInt(pb, "host_port", pub)
+		setStr(pb, "host_ip", pc.HostIP)
 		if pc.Protocol != "" && pc.Protocol != "tcp" {
 			setStr(pb, "protocol", pc.Protocol)
 		}

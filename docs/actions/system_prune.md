@@ -3,12 +3,12 @@
 page_title: "docker_system_prune Action - docker"
 subcategory: ""
 description: |-
-  Removes unused Docker objects, like docker system prune, and reports the space reclaimed. By default it removes stopped containers, unused networks, dangling images and build cache; volumes only when volumes = true. It acts on every object on the daemon that matches, not only on objects Terraform manages, so narrow it with filters.
+  Removes unused Docker objects, like docker system prune, and reports what it removed and the space reclaimed. By default it removes stopped containers, unused networks, dangling images and build cache; volumes only when volumes = true. It acts on every object on the daemon that matches, not only on objects Terraform manages, so narrow it with filters. The result object merges every prune response: containers_deleted, networks_deleted, images_deleted, caches_deleted, volumes_deleted and the total space_reclaimed.
 ---
 
 # docker_system_prune (Action)
 
-Removes unused Docker objects, like `docker system prune`, and reports the space reclaimed. By default it removes stopped containers, unused networks, dangling images and build cache; volumes only when `volumes = true`. It acts on every object on the daemon that matches, not only on objects Terraform manages, so narrow it with `filters`.
+Removes unused Docker objects, like `docker system prune`, and reports what it removed and the space reclaimed. By default it removes stopped containers, unused networks, dangling images and build cache; volumes only when `volumes = true`. It acts on every object on the daemon that matches, not only on objects Terraform manages, so narrow it with `filters`. The `result` object merges every prune response: `containers_deleted`, `networks_deleted`, `images_deleted`, `caches_deleted`, `volumes_deleted` and the total `space_reclaimed`.
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_system_prune.<name>] } }`
@@ -48,10 +48,11 @@ action "docker_system_prune" "old" {
 
 ### Optional
 
-- `all_images` (Boolean) With `images`, remove every image no container uses, not only dangling ones, and all build cache (`docker system prune -a`). Default `false`.
+- `all` (Boolean) With `images`, remove every image no container uses, not only dangling ones, and all build cache (`docker system prune --all`). Default `false`.
 - `build_cache` (Boolean) Remove build cache. Default `true`. The daemon ignores label filters for build cache, so `label`/`label!` filters require `build_cache = false`.
 - `containers` (Boolean) Remove stopped containers. Default `true`.
 - `filters` (Map of String) Prune filters, one value per key: `until` (e.g. `24h` or a timestamp; not applied to volumes), `label` (`key` or `key=value`) and `label!` (the negation).
 - `images` (Boolean) Remove dangling images. Default `true`.
 - `networks` (Boolean) Remove networks no container uses. Default `true`.
+- `result_path` (String) Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails.
 - `volumes` (Boolean) Remove anonymous volumes no container uses. Default `false`.

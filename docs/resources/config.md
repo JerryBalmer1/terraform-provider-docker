@@ -3,12 +3,12 @@
 page_title: "docker_config Resource - docker"
 subcategory: ""
 description: |-
-  A Swarm config: an immutable, non-secret blob mounted into service tasks as a file. Requires the provider to point at a Swarm manager. Swarm configs cannot be changed after creation, so every change replaces the config; a config still referenced by a service cannot be removed, so change the referencing service in the same apply (or use create_before_destroy with a new name).
+  A Swarm config: a non-secret blob mounted into service tasks as a file. Requires the provider to point at a Swarm manager. The content of a swarm config cannot be changed after creation, so a content or name change replaces the config, while labels are updated in place (ConfigUpdate); a config still referenced by a service cannot be removed, so change the referencing service in the same apply (or use create_before_destroy with a new name).
 ---
 
 # docker_config (Resource)
 
-A Swarm config: an immutable, non-secret blob mounted into service tasks as a file. Requires the provider to point at a Swarm manager. Swarm configs cannot be changed after creation, so every change replaces the config; a config still referenced by a service cannot be removed, so change the referencing service in the same apply (or use `create_before_destroy` with a new name).
+A Swarm config: a non-secret blob mounted into service tasks as a file. Requires the provider to point at a Swarm manager. The content of a swarm config cannot be changed after creation, so a content or name change replaces the config, while labels are updated in place (`ConfigUpdate`); a config still referenced by a service cannot be removed, so change the referencing service in the same apply (or use `create_before_destroy` with a new name).
 
 ## Example Usage
 
@@ -22,6 +22,11 @@ resource "docker_config" "nginx" {
     }
   CONF
   )
+
+  # Labels update in place (ConfigUpdate); new content replaces the config.
+  labels = {
+    app = "shop"
+  }
 }
 
 # Terraform 1.11+: write-only content, kept out of plan and state. Bump
@@ -47,11 +52,55 @@ resource "docker_config" "app" {
 - `data` (String) Config content, base64-encoded (use `base64encode()`); it must decode. Kept from state on refresh and filled from the daemon on import. Changing this forces a new resource. Exactly one of `data` and `data_wo` is required.
 - `data_wo` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) Config content as a write-only argument (Terraform 1.11+), base64-encoded (use `base64encode()`); it is never stored in plan or state, so it can come from an ephemeral value. Requires `data_wo_version`; bump the version to replace the config with new content. Conflicts with `data`.
 - `data_wo_version` (Number) Version of `data_wo`. Terraform cannot see changes to a write-only value, so change this number whenever `data_wo` changes; changing it forces a new resource (swarm secrets and configs are immutable).
-- `labels` (Map of String) User labels on the config. Changing this forces a new resource.
+- `labels` (Map of String) User labels on the config. Updated in place (`ConfigUpdate`); the content cannot change, so only labels can.
 
 ### Read-Only
 
+- `content_sha256` (String) SHA-256 of inspect_json; changes whenever the object changes.
+- `docker_server_version` (String) Docker Engine version of the daemon the provider talked to (GET /version Version).
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).
 - `id` (String) The Swarm config ID.
+- `inspect` (Attributes) The config inspect response as a nested object mirroring Config field by field (snake_case). (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String) The exact Engine API inspect response for the config, as JSON.
+- `version_index` (Number) The config object's `Version.Index`; it changes when the labels are updated.
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `created_at` (String) Upstream `CreatedAt`.
+- `id` (String) Upstream `ID`.
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--inspect--spec))
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--inspect--version))
+
+<a id="nestedatt--inspect--spec"></a>
+### Nested Schema for `inspect.spec`
+
+Read-Only:
+
+- `data` (String) Upstream `Data`.
+- `labels` (Map of String) Upstream `Labels`.
+- `name` (String) Upstream `Name`.
+- `templating` (Attributes) Upstream `Templating`. (see [below for nested schema](#nestedatt--inspect--spec--templating))
+
+<a id="nestedatt--inspect--spec--templating"></a>
+### Nested Schema for `inspect.spec.templating`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `options` (Map of String) Upstream `Options`.
+
+
+
+<a id="nestedatt--inspect--version"></a>
+### Nested Schema for `inspect.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.
 
 ## Import
 

@@ -3,12 +3,12 @@
 page_title: "docker_exec_output Ephemeral Resource - docker"
 subcategory: ""
 description: |-
-  Runs a command in a running container (docker exec) and returns its standard output as an ephemeral value that is never written to plan or state. A non-zero exit code is an error that carries the command's stderr. Use it to read a generated credential or setting out of a container during a run; the command runs on every plan and apply, so it must be safe to repeat.
+  Runs a command in a running container (docker exec) and returns its standard output and error as ephemeral values that are never written to plan or state. A non-zero exit code is an error that carries the command's stderr. Use it to read a generated credential or setting out of a container during a run; the command runs on every plan and apply, so it must be safe to repeat. result holds the Engine's exec inspect (GET /exec/{id}/json).
 ---
 
 # docker_exec_output (Ephemeral Resource)
 
-Runs a command in a running container (`docker exec`) and returns its standard output as an ephemeral value that is never written to plan or state. A non-zero exit code is an error that carries the command's stderr. Use it to read a generated credential or setting out of a container during a run; the command runs on every plan and apply, so it must be safe to repeat.
+Runs a command in a running container (`docker exec`) and returns its standard output and error as ephemeral values that are never written to plan or state. A non-zero exit code is an error that carries the command's stderr. Use it to read a generated credential or setting out of a container during a run; the command runs on every plan and apply, so it must be safe to repeat. `result` holds the Engine's exec inspect (`GET /exec/{id}/json`).
 
 Ephemeral resources require Terraform 1.10 or later. Their values are never
 stored in the plan or state, so they can only be referenced from ephemeral
@@ -27,9 +27,9 @@ resource "docker_container" "app" {
 # Read the token out of the container during the run; it never reaches plan
 # or state. A non-zero exit code (say, the file is not there yet) fails the run.
 ephemeral "docker_exec_output" "admin_token" {
-  container = docker_container.app.id
-  command   = ["cat", "/var/lib/app/admin-token"]
-  timeout   = "30s"
+  container_id = docker_container.app.id
+  command      = ["cat", "/var/lib/app/admin-token"]
+  timeout      = "30s"
 }
 
 # Share it with swarm services as a write-only secret.
@@ -46,17 +46,52 @@ resource "docker_secret" "admin_token" {
 ### Required
 
 - `command` (List of String) Command and arguments, exec form, e.g. `["cat", "/run/secrets/token"]`. Use `["sh", "-c", "..."]` for shell syntax.
-- `container` (String) Container name or ID; it must be running.
+- `container_id` (String) The container to run the command in, by ID or name; it must be running.
 
 ### Optional
 
 - `env` (Map of String) Extra environment variables for the command.
+- `privileged` (Boolean) Give the command extended privileges. Default `false`.
 - `timeout` (String) Maximum run time as a Go duration, e.g. `30s`. Default `60s`.
 - `user` (String) User to run as (`name`, `uid` or `uid:gid`). Default: the container's user.
 - `workdir` (String) Working directory inside the container.
 
 ### Read-Only
 
+- `docker_server_version` (String) Docker Engine version from GET /version.
+- `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
+- `exec_id` (String) ID of the exec instance (`POST /containers/{id}/exec`).
 - `exit_code` (Number) Exit code of the command; always 0, because any other code fails the read.
-- `stderr` (String, Sensitive) Standard error of the command (up to 4 MiB).
-- `stdout` (String, Sensitive) Standard output of the command, exactly as written (up to 4 MiB).
+- `result` (Attributes) GET /exec/{id}/json after the command finished (exit_code, running, pid, process_config...). (see [below for nested schema](#nestedatt--result))
+- `stderr` (String, Sensitive) The command's standard error (Q33).
+- `stderr_sha256` (String) sha256 of `stderr` (Q34).
+- `stdout` (String, Sensitive) The command's standard output (Q33).
+- `stdout_sha256` (String) sha256 of output.
+
+<a id="nestedatt--result"></a>
+### Nested Schema for `result`
+
+Read-Only:
+
+- `can_remove` (Boolean) Upstream `CanRemove`.
+- `container_id` (String) Upstream `ContainerID`.
+- `detach_keys` (String) Upstream `DetachKeys`.
+- `exit_code` (Number) Upstream `ExitCode`.
+- `id` (String) Upstream `ID`.
+- `open_stderr` (Boolean) Upstream `OpenStderr`.
+- `open_stdin` (Boolean) Upstream `OpenStdin`.
+- `open_stdout` (Boolean) Upstream `OpenStdout`.
+- `pid` (Number) Upstream `Pid`.
+- `process_config` (Attributes) Upstream `ProcessConfig`. (see [below for nested schema](#nestedatt--result--process_config))
+- `running` (Boolean) Upstream `Running`.
+
+<a id="nestedatt--result--process_config"></a>
+### Nested Schema for `result.process_config`
+
+Read-Only:
+
+- `arguments` (List of String) Upstream `arguments`.
+- `entrypoint` (String) Upstream `entrypoint`.
+- `privileged` (Boolean) Upstream `privileged`.
+- `tty` (Boolean) Upstream `tty`.
+- `user` (String) Upstream `user`.

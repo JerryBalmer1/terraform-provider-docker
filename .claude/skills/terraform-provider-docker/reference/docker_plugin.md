@@ -4,24 +4,75 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A managed Docker Engine plugin installed from a registry, like `docker plugin install`. The privileges the plugin asks for (`GET /plugins/privileges`) must be granted with `grant_all_permissions` or `grant_permissions` blocks, otherwise install fails and lists them. `enabled` and `env` change in place (the plugin is disabled for `PluginSet` and re-enabled); `name` and `alias` force a new resource. Import by plugin ID or name.
+A managed Docker Engine plugin installed from a registry, like `docker plugin install`. The privileges the plugin asks for (`GET /plugins/privileges`) must be granted with `grant_all_permissions` or `grant_permissions` blocks, otherwise install fails and lists them. `enabled` and `env` change in place (the plugin is disabled for `PluginSet` and re-enabled). With `alias` set, a changed `name` upgrades the plugin in place (`docker plugin upgrade`: disable, `PluginUpgrade`, re-enable), keeping its local name and settings; without `alias`, a changed `name` forces a new resource, since the local name is derived from it. A changed `alias` always forces a new resource. Import by plugin ID or name.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `alias` | `string` | optional, computed | yes |  | Local name of the plugin (`docker plugin install --alias`), used by volume and network drivers. Default: the daemon's name for `name`. Changing this forces a new resource. |
+| `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `enable_timeout` | `number` | optional, computed |  |  | Seconds the daemon waits for the plugin to start when enabling it. Default `60`. |
 | `enabled` | `bool` | optional, computed |  |  | Whether the plugin is enabled. Default `true`. Updated in place. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `env` | `set(string)` | optional, computed |  |  | Plugin settings as `KEY=VALUE` (`docker plugin set`). Unset reports the plugin's current env; when set only the keys you list are reported. Updated in place: the plugin is disabled, set and re-enabled. |
 | `force_destroy` | `bool` | optional, computed |  |  | Remove the plugin on destroy even while it is enabled or in use (`docker plugin rm -f`). Default `false`. |
-| `force_disable` | `bool` | optional, computed |  |  | Disable the plugin even while it is in use (`docker plugin disable -f`), for env updates and destroy. Default `false`. |
+| `force_disable` | `bool` | optional, computed |  |  | Disable the plugin even while it is in use (`docker plugin disable -f`), for env updates, upgrades and destroy. Default `false`. |
 | `grant_all_permissions` | `bool` | optional |  |  | Grant every privilege the plugin requests (`--grant-all-permissions`). Conflicts with `grant_permissions`. |
 | `id` | `string` | computed |  |  | Plugin ID. |
-| `name` | `string` | required | yes |  | Plugin reference to install from a registry, e.g. `vieux/sshfs:latest` or `ghcr.io/org/plugin:1.0` (`registry_auth` credentials apply). Changing this forces a new resource. |
+| `inspect` | `object` | computed |  |  | The GET /plugins/{name}/json response as a nested object, field by field. |
+| `inspect_json` | `string` | computed |  | yes | The exact Engine API GET /plugins/{name}/json response as JSON. |
+| `name` | `string` | required | yes |  | Plugin reference to install from a registry, e.g. `vieux/sshfs:latest` or `ghcr.io/org/plugin:1.0` (`registry_auth` credentials apply). With `alias` set, a change upgrades the plugin in place (`PluginUpgrade`); without `alias`, changing this forces replacement. |
 | `plugin_reference` | `string` | computed |  |  | Fully qualified reference the daemon installed from, e.g. `docker.io/vieux/sshfs:latest`. |
 
 Nested blocks: `grant_permissions` (set of blocks).
+
+### `inspect`
+
+nested attribute, object. The GET /plugins/{name}/json response as a nested object, field by field.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `object` | computed |  |  | Upstream `Config`. |
+| `enabled` | `bool` | computed |  |  | Upstream `Enabled`. |
+| `id` | `string` | computed |  |  | Upstream `Id`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `plugin_reference` | `string` | computed |  |  | Upstream `PluginReference`. |
+| `settings` | `object` | computed |  |  | Upstream `Settings`. |
+
+### `inspect.config`
+
+nested attribute, object. Upstream `Config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args` | `dynamic` | computed |  |  | Upstream `Args`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `description` | `string` | computed |  |  | Upstream `Description`. |
+| `documentation` | `string` | computed |  |  | Upstream `Documentation`. |
+| `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
+| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `interface` | `dynamic` | computed |  |  | Upstream `Interface`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `ipc_host` | `bool` | computed |  |  | Upstream `IpcHost`. |
+| `linux` | `dynamic` | computed |  |  | Upstream `Linux`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `mounts` | `list(string)` | computed |  |  | Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `network` | `dynamic` | computed |  |  | Upstream `Network`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `pid_host` | `bool` | computed |  |  | Upstream `PidHost`. |
+| `propagated_mount` | `string` | computed |  |  | Upstream `PropagatedMount`. |
+| `rootfs` | `dynamic` | computed |  |  | Upstream `rootfs`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `user` | `dynamic` | computed |  |  | Upstream `User`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `work_dir` | `string` | computed |  |  | Upstream `WorkDir`. |
+
+### `inspect.settings`
+
+nested attribute, object. Upstream `Settings`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args` | `list(string)` | computed |  |  | Upstream `Args`. |
+| `devices` | `list(string)` | computed |  |  | Upstream `Devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
+| `mounts` | `list(string)` | computed |  |  | Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 
 ### `grant_permissions`
 
@@ -35,6 +86,8 @@ set of blocks. Privileges to grant, one block per privilege name, e.g. `name = "
 ## Example
 
 ```terraform
+# With alias set, changing name later upgrades the plugin in place
+# (docker plugin upgrade) instead of replacing it.
 resource "docker_plugin" "sshfs" {
   name  = "vieux/sshfs:latest"
   alias = "sshfs"

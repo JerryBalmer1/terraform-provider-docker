@@ -4,31 +4,634 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Lists the swarm's services (`GET /services`), sorted by name; the provider's host must be a swarm manager. Filter by `name`, `labels` and `mode`.
+Lists the swarm's services (`GET /services`), sorted by name; the provider's host must be a swarm manager. `services` holds each Engine service object field by field (`services[0].spec.task_template.container_spec.image`), `services_json` the raw list. Filter by `name`, `labels` and `mode`.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `labels` | `map(string)` | optional |  |  | Only objects carrying every one of these labels; an empty value matches any value. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 of services_json; changes whenever the object changes. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
+| `ids` | `list(string)` | computed |  |  | IDs of the matching objects, in the order of `services`. |
+| `labels` | `map(string)` | optional |  |  | Only objects carrying every one of these labels (Engine `label` filter); an empty value matches any value. |
 | `mode` | `string` | optional |  |  | Only services in this mode: `replicated` or `global`. |
 | `name` | `string` | optional |  |  | Only objects whose name matches (Engine `name` filter, a prefix/substring match). |
-| `services` | `list(object)` | computed |  |  | The matching objects, sorted by name then ID. |
+| `names` | `list(string)` | computed |  |  | Names of the matching objects, in the order of `services`. |
+| `services` | `list(object)` | computed |  |  | Every service returned by the list endpoint, each mirroring Service field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans. |
+| `services_json` | `string` | computed |  | yes | The exact list response (JSON array of Service) as returned by the Engine API. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans. |
 
 ### `services`
 
-nested attribute, list(object). The matching objects, sorted by name then ID.
+nested attribute, list(object). Every service returned by the list endpoint, each mirroring Service field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `created_at` | `string` | computed |  |  | RFC 3339 creation time. |
-| `id` | `string` | computed |  |  | Service ID. |
-| `image` | `string` | computed |  |  | Image of the service's tasks, as stored (usually pinned to a digest). |
-| `labels` | `map(string)` | computed |  |  | Service labels. |
-| `mode` | `string` | computed |  |  | `replicated`, `global`, `replicated-job` or `global-job`. |
-| `name` | `string` | computed |  |  | Service name. |
-| `replicas` | `number` | computed |  |  | Desired replicas for `replicated` services; null otherwise. |
-| `updated_at` | `string` | computed |  |  | RFC 3339 time of the last update. |
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `endpoint` | `object` | computed |  |  | Upstream `Endpoint`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `job_status` | `object` | computed |  |  | Upstream `JobStatus`. |
+| `service_status` | `object` | computed |  |  | Upstream `ServiceStatus`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `update_status` | `object` | computed |  |  | Upstream `UpdateStatus`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `services.endpoint`
+
+nested attribute, object. Upstream `Endpoint`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ports` | `list(object)` | computed |  |  | Upstream `Ports`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `virtual_ips` | `list(object)` | computed |  |  | Upstream `VirtualIPs`. |
+
+### `services.endpoint.ports`
+
+nested attribute, list(object). Upstream `Ports`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `protocol` | `string` | computed |  |  | Upstream `Protocol`. |
+| `publish_mode` | `string` | computed |  |  | Upstream `PublishMode`. |
+| `published_port` | `number` | computed |  |  | Upstream `PublishedPort`. |
+| `target_port` | `number` | computed |  |  | Upstream `TargetPort`. |
+
+### `services.endpoint.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+| `ports` | `list(object)` | computed |  |  | Upstream `Ports`. |
+
+### `services.endpoint.spec.ports`
+
+nested attribute, list(object). Upstream `Ports`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `protocol` | `string` | computed |  |  | Upstream `Protocol`. |
+| `publish_mode` | `string` | computed |  |  | Upstream `PublishMode`. |
+| `published_port` | `number` | computed |  |  | Upstream `PublishedPort`. |
+| `target_port` | `number` | computed |  |  | Upstream `TargetPort`. |
+
+### `services.endpoint.virtual_ips`
+
+nested attribute, list(object). Upstream `VirtualIPs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `addr` | `string` | computed |  |  | Upstream `Addr`. |
+| `network_id` | `string` | computed |  |  | Upstream `NetworkID`. |
+
+### `services.job_status`
+
+nested attribute, object. Upstream `JobStatus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `job_iteration` | `object` | computed |  |  | Upstream `JobIteration`. |
+| `last_execution` | `string` | computed |  |  | Upstream `LastExecution`. |
+
+### `services.job_status.job_iteration`
+
+nested attribute, object. Upstream `JobIteration`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
+
+### `services.service_status`
+
+nested attribute, object. Upstream `ServiceStatus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `completed_tasks` | `number` | computed |  |  | Upstream `CompletedTasks`. |
+| `desired_tasks` | `number` | computed |  |  | Upstream `DesiredTasks`. |
+| `running_tasks` | `number` | computed |  |  | Upstream `RunningTasks`. |
+
+### `services.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `endpoint_spec` | `object` | computed |  |  | Upstream `EndpointSpec`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `mode` | `object` | computed |  |  | Upstream `Mode`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `networks` | `list(object)` | computed |  |  | Upstream `Networks`. |
+| `rollback_config` | `object` | computed |  |  | Upstream `RollbackConfig`. |
+| `task_template` | `object` | computed |  |  | Upstream `TaskTemplate`. |
+| `update_config` | `object` | computed |  |  | Upstream `UpdateConfig`. |
+
+### `services.spec.endpoint_spec`
+
+nested attribute, object. Upstream `EndpointSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+| `ports` | `list(object)` | computed |  |  | Upstream `Ports`. |
+
+### `services.spec.endpoint_spec.ports`
+
+nested attribute, list(object). Upstream `Ports`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `protocol` | `string` | computed |  |  | Upstream `Protocol`. |
+| `publish_mode` | `string` | computed |  |  | Upstream `PublishMode`. |
+| `published_port` | `number` | computed |  |  | Upstream `PublishedPort`. |
+| `target_port` | `number` | computed |  |  | Upstream `TargetPort`. |
+
+### `services.spec.mode`
+
+nested attribute, object. Upstream `Mode`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `global` | `string` | computed |  |  | Upstream `Global`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `global_job` | `string` | computed |  |  | Upstream `GlobalJob`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `replicated` | `object` | computed |  |  | Upstream `Replicated`. |
+| `replicated_job` | `object` | computed |  |  | Upstream `ReplicatedJob`. |
+
+### `services.spec.mode.replicated`
+
+nested attribute, object. Upstream `Replicated`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `replicas` | `number` | computed |  |  | Upstream `Replicas`. |
+
+### `services.spec.mode.replicated_job`
+
+nested attribute, object. Upstream `ReplicatedJob`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `max_concurrent` | `number` | computed |  |  | Upstream `MaxConcurrent`. |
+| `total_completions` | `number` | computed |  |  | Upstream `TotalCompletions`. |
+
+### `services.spec.networks`
+
+nested attribute, list(object). Upstream `Networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  |  | Upstream `Aliases`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `DriverOpts`. |
+| `target` | `string` | computed |  |  | Upstream `Target`. |
+
+### `services.spec.rollback_config`
+
+nested attribute, object. Upstream `RollbackConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `delay` | `number` | computed |  |  | Upstream `Delay`. |
+| `failure_action` | `string` | computed |  |  | Upstream `FailureAction`. |
+| `max_failure_ratio` | `number` | computed |  |  | Upstream `MaxFailureRatio`. |
+| `monitor` | `number` | computed |  |  | Upstream `Monitor`. |
+| `order` | `string` | computed |  |  | Upstream `Order`. |
+| `parallelism` | `number` | computed |  |  | Upstream `Parallelism`. |
+
+### `services.spec.task_template`
+
+nested attribute, object. Upstream `TaskTemplate`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `container_spec` | `object` | computed |  |  | Upstream `ContainerSpec`. |
+| `force_update` | `number` | computed |  |  | Upstream `ForceUpdate`. |
+| `log_driver` | `object` | computed |  |  | Upstream `LogDriver`. |
+| `network_attachment_spec` | `object` | computed |  |  | Upstream `NetworkAttachmentSpec`. |
+| `networks` | `list(object)` | computed |  |  | Upstream `Networks`. |
+| `placement` | `object` | computed |  |  | Upstream `Placement`. |
+| `plugin_spec` | `object` | computed |  |  | Upstream `PluginSpec`. |
+| `resources` | `object` | computed |  |  | Upstream `Resources`. |
+| `restart_policy` | `object` | computed |  |  | Upstream `RestartPolicy`. |
+| `runtime` | `string` | computed |  |  | Upstream `Runtime`. |
+
+### `services.spec.task_template.container_spec`
+
+nested attribute, object. Upstream `ContainerSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args` | `list(string)` | computed |  |  | Upstream `Args`. |
+| `capability_add` | `list(string)` | computed |  |  | Upstream `CapabilityAdd`. |
+| `capability_drop` | `list(string)` | computed |  |  | Upstream `CapabilityDrop`. |
+| `command` | `list(string)` | computed |  |  | Upstream `Command`. |
+| `configs` | `list(object)` | computed |  |  | Upstream `Configs`. |
+| `dir` | `string` | computed |  |  | Upstream `Dir`. |
+| `dns_config` | `object` | computed |  |  | Upstream `DNSConfig`. |
+| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
+| `groups` | `list(string)` | computed |  |  | Upstream `Groups`. |
+| `healthcheck` | `object` | computed |  |  | Upstream `Healthcheck`. |
+| `hostname` | `string` | computed |  |  | Upstream `Hostname`. |
+| `hosts` | `list(string)` | computed |  |  | Upstream `Hosts`. |
+| `image` | `string` | computed |  |  | Upstream `Image`. |
+| `init` | `bool` | computed |  |  | Upstream `Init`. |
+| `isolation` | `string` | computed |  |  | Upstream `Isolation`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `mounts` | `list(object)` | computed |  |  | Upstream `Mounts`. |
+| `oom_score_adj` | `number` | computed |  |  | Upstream `OomScoreAdj`. |
+| `open_stdin` | `bool` | computed |  |  | Upstream `OpenStdin`. |
+| `privileges` | `object` | computed |  |  | Upstream `Privileges`. |
+| `read_only` | `bool` | computed |  |  | Upstream `ReadOnly`. |
+| `secrets` | `list(object)` | computed |  |  | Upstream `Secrets`. |
+| `stop_grace_period` | `number` | computed |  |  | Upstream `StopGracePeriod`. |
+| `stop_signal` | `string` | computed |  |  | Upstream `StopSignal`. |
+| `sysctls` | `map(string)` | computed |  |  | Upstream `Sysctls`. |
+| `tty` | `bool` | computed |  |  | Upstream `TTY`. |
+| `ulimits` | `list(object)` | computed |  |  | Upstream `Ulimits`. |
+| `user` | `string` | computed |  |  | Upstream `User`. |
+
+### `services.spec.task_template.container_spec.configs`
+
+nested attribute, list(object). Upstream `Configs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config_id` | `string` | computed |  |  | Upstream `ConfigID`. |
+| `config_name` | `string` | computed |  |  | Upstream `ConfigName`. |
+| `file` | `object` | computed |  |  | Upstream `File`. |
+| `runtime` | `string` | computed |  |  | Upstream `Runtime`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `services.spec.task_template.container_spec.configs.file`
+
+nested attribute, object. Upstream `File`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  |  | Upstream `GID`. |
+| `mode` | `number` | computed |  |  | Upstream `Mode`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `uid` | `string` | computed |  |  | Upstream `UID`. |
+
+### `services.spec.task_template.container_spec.dns_config`
+
+nested attribute, object. Upstream `DNSConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `nameservers` | `list(string)` | computed |  |  | Upstream `Nameservers`. |
+| `options` | `list(string)` | computed |  |  | Upstream `Options`. |
+| `search` | `list(string)` | computed |  |  | Upstream `Search`. |
+
+### `services.spec.task_template.container_spec.healthcheck`
+
+nested attribute, object. Upstream `Healthcheck`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `interval` | `number` | computed |  |  | Upstream `Interval`. |
+| `retries` | `number` | computed |  |  | Upstream `Retries`. |
+| `start_interval` | `number` | computed |  |  | Upstream `StartInterval`. |
+| `start_period` | `number` | computed |  |  | Upstream `StartPeriod`. |
+| `test` | `list(string)` | computed |  |  | Upstream `Test`. |
+| `timeout` | `number` | computed |  |  | Upstream `Timeout`. |
+
+### `services.spec.task_template.container_spec.mounts`
+
+nested attribute, list(object). Upstream `Mounts`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `bind_options` | `object` | computed |  |  | Upstream `BindOptions`. |
+| `consistency` | `string` | computed |  |  | Upstream `Consistency`. |
+| `image_options` | `object` | computed |  |  | Upstream `ImageOptions`. |
+| `read_only` | `bool` | computed |  |  | Upstream `ReadOnly`. |
+| `source` | `string` | computed |  |  | Upstream `Source`. |
+| `target` | `string` | computed |  |  | Upstream `Target`. |
+| `tmpfs_options` | `object` | computed |  |  | Upstream `TmpfsOptions`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `volume_options` | `object` | computed |  |  | Upstream `VolumeOptions`. |
+
+### `services.spec.task_template.container_spec.mounts.bind_options`
+
+nested attribute, object. Upstream `BindOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `create_mountpoint` | `bool` | computed |  |  | Upstream `CreateMountpoint`. |
+| `non_recursive` | `bool` | computed |  |  | Upstream `NonRecursive`. |
+| `propagation` | `string` | computed |  |  | Upstream `Propagation`. |
+| `read_only_force_recursive` | `bool` | computed |  |  | Upstream `ReadOnlyForceRecursive`. |
+| `read_only_non_recursive` | `bool` | computed |  |  | Upstream `ReadOnlyNonRecursive`. |
+
+### `services.spec.task_template.container_spec.mounts.image_options`
+
+nested attribute, object. Upstream `ImageOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `subpath` | `string` | computed |  |  | Upstream `Subpath`. |
+
+### `services.spec.task_template.container_spec.mounts.tmpfs_options`
+
+nested attribute, object. Upstream `TmpfsOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `number` | computed |  |  | Upstream `Mode`. |
+| `options` | `list(list(string))` | computed |  |  | Upstream `Options`. |
+| `size_bytes` | `number` | computed |  |  | Upstream `SizeBytes`. |
+
+### `services.spec.task_template.container_spec.mounts.volume_options`
+
+nested attribute, object. Upstream `VolumeOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `driver_config` | `object` | computed |  |  | Upstream `DriverConfig`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `no_copy` | `bool` | computed |  |  | Upstream `NoCopy`. |
+| `subpath` | `string` | computed |  |  | Upstream `Subpath`. |
+
+### `services.spec.task_template.container_spec.mounts.volume_options.driver_config`
+
+nested attribute, object. Upstream `DriverConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  | yes | Upstream `Options`. Sensitive. |
+
+### `services.spec.task_template.container_spec.privileges`
+
+nested attribute, object. Upstream `Privileges`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `app_armor` | `object` | computed |  |  | Upstream `AppArmor`. |
+| `credential_spec` | `object` | computed |  |  | Upstream `CredentialSpec`. |
+| `no_new_privileges` | `bool` | computed |  |  | Upstream `NoNewPrivileges`. |
+| `seccomp` | `object` | computed |  |  | Upstream `Seccomp`. |
+| `selinux_context` | `object` | computed |  |  | Upstream `SELinuxContext`. |
+
+### `services.spec.task_template.container_spec.privileges.app_armor`
+
+nested attribute, object. Upstream `AppArmor`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+
+### `services.spec.task_template.container_spec.privileges.credential_spec`
+
+nested attribute, object. Upstream `CredentialSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `string` | computed |  |  | Upstream `Config`. |
+| `file` | `string` | computed |  |  | Upstream `File`. |
+| `registry` | `string` | computed |  |  | Upstream `Registry`. |
+
+### `services.spec.task_template.container_spec.privileges.seccomp`
+
+nested attribute, object. Upstream `Seccomp`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+| `profile` | `string` | computed |  |  | Upstream `Profile`. |
+
+### `services.spec.task_template.container_spec.privileges.selinux_context`
+
+nested attribute, object. Upstream `SELinuxContext`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `disable` | `bool` | computed |  |  | Upstream `Disable`. |
+| `level` | `string` | computed |  |  | Upstream `Level`. |
+| `role` | `string` | computed |  |  | Upstream `Role`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+| `user` | `string` | computed |  |  | Upstream `User`. |
+
+### `services.spec.task_template.container_spec.secrets`
+
+nested attribute, list(object). Upstream `Secrets`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `file` | `object` | computed |  |  | Upstream `File`. |
+| `secret_id` | `string` | computed |  |  | Upstream `SecretID`. |
+| `secret_name` | `string` | computed |  |  | Upstream `SecretName`. |
+
+### `services.spec.task_template.container_spec.secrets.file`
+
+nested attribute, object. Upstream `File`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  |  | Upstream `GID`. |
+| `mode` | `number` | computed |  |  | Upstream `Mode`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `uid` | `string` | computed |  |  | Upstream `UID`. |
+
+### `services.spec.task_template.container_spec.ulimits`
+
+nested attribute, list(object). Upstream `Ulimits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `hard` | `number` | computed |  |  | Upstream `Hard`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `soft` | `number` | computed |  |  | Upstream `Soft`. |
+
+### `services.spec.task_template.log_driver`
+
+nested attribute, object. Upstream `LogDriver`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `services.spec.task_template.network_attachment_spec`
+
+nested attribute, object. Upstream `NetworkAttachmentSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `container_id` | `string` | computed |  |  | Upstream `ContainerID`. |
+
+### `services.spec.task_template.networks`
+
+nested attribute, list(object). Upstream `Networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  |  | Upstream `Aliases`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `DriverOpts`. |
+| `target` | `string` | computed |  |  | Upstream `Target`. |
+
+### `services.spec.task_template.placement`
+
+nested attribute, object. Upstream `Placement`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `constraints` | `list(string)` | computed |  |  | Upstream `Constraints`. |
+| `max_replicas` | `number` | computed |  |  | Upstream `MaxReplicas`. |
+| `platforms` | `list(object)` | computed |  |  | Upstream `Platforms`. |
+| `preferences` | `list(object)` | computed |  |  | Upstream `Preferences`. |
+
+### `services.spec.task_template.placement.platforms`
+
+nested attribute, list(object). Upstream `Platforms`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `Architecture`. |
+| `os` | `string` | computed |  |  | Upstream `OS`. |
+
+### `services.spec.task_template.placement.preferences`
+
+nested attribute, list(object). Upstream `Preferences`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `spread` | `object` | computed |  |  | Upstream `Spread`. |
+
+### `services.spec.task_template.placement.preferences.spread`
+
+nested attribute, object. Upstream `Spread`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `spread_descriptor` | `string` | computed |  |  | Upstream `SpreadDescriptor`. |
+
+### `services.spec.task_template.plugin_spec`
+
+nested attribute, object. Upstream `PluginSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `disabled` | `bool` | computed |  |  | Upstream `Disabled`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `plugin_privilege` | `list(object)` | computed |  |  | Upstream `PluginPrivilege`. |
+| `remote` | `string` | computed |  |  | Upstream `Remote`. |
+
+### `services.spec.task_template.plugin_spec.plugin_privilege`
+
+nested attribute, list(object). Upstream `PluginPrivilege`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `description` | `string` | computed |  |  | Upstream `Description`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `value` | `list(string)` | computed |  |  | Upstream `Value`. |
+
+### `services.spec.task_template.resources`
+
+nested attribute, object. Upstream `Resources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `limits` | `object` | computed |  |  | Upstream `Limits`. |
+| `memory_swappiness` | `number` | computed |  |  | Upstream `MemorySwappiness`. |
+| `reservations` | `object` | computed |  |  | Upstream `Reservations`. |
+| `swap_bytes` | `number` | computed |  |  | Upstream `SwapBytes`. |
+
+### `services.spec.task_template.resources.limits`
+
+nested attribute, object. Upstream `Limits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `memory_bytes` | `number` | computed |  |  | Upstream `MemoryBytes`. |
+| `nano_cpus` | `number` | computed |  |  | Upstream `NanoCPUs`. |
+| `pids` | `number` | computed |  |  | Upstream `Pids`. |
+
+### `services.spec.task_template.resources.reservations`
+
+nested attribute, object. Upstream `Reservations`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `generic_resources` | `list(object)` | computed |  |  | Upstream `GenericResources`. |
+| `memory_bytes` | `number` | computed |  |  | Upstream `MemoryBytes`. |
+| `nano_cpus` | `number` | computed |  |  | Upstream `NanoCPUs`. |
+
+### `services.spec.task_template.resources.reservations.generic_resources`
+
+nested attribute, list(object). Upstream `GenericResources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `discrete_resource_spec` | `object` | computed |  |  | Upstream `DiscreteResourceSpec`. |
+| `named_resource_spec` | `object` | computed |  |  | Upstream `NamedResourceSpec`. |
+
+### `services.spec.task_template.resources.reservations.generic_resources.discrete_resource_spec`
+
+nested attribute, object. Upstream `DiscreteResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `number` | computed |  |  | Upstream `Value`. |
+
+### `services.spec.task_template.resources.reservations.generic_resources.named_resource_spec`
+
+nested attribute, object. Upstream `NamedResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `string` | computed |  |  | Upstream `Value`. |
+
+### `services.spec.task_template.restart_policy`
+
+nested attribute, object. Upstream `RestartPolicy`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `condition` | `string` | computed |  |  | Upstream `Condition`. |
+| `delay` | `number` | computed |  |  | Upstream `Delay`. |
+| `max_attempts` | `number` | computed |  |  | Upstream `MaxAttempts`. |
+| `window` | `number` | computed |  |  | Upstream `Window`. |
+
+### `services.spec.update_config`
+
+nested attribute, object. Upstream `UpdateConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `delay` | `number` | computed |  |  | Upstream `Delay`. |
+| `failure_action` | `string` | computed |  |  | Upstream `FailureAction`. |
+| `max_failure_ratio` | `number` | computed |  |  | Upstream `MaxFailureRatio`. |
+| `monitor` | `number` | computed |  |  | Upstream `Monitor`. |
+| `order` | `string` | computed |  |  | Upstream `Order`. |
+| `parallelism` | `number` | computed |  |  | Upstream `Parallelism`. |
+
+### `services.update_status`
+
+nested attribute, object. Upstream `UpdateStatus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `completed_at` | `string` | computed |  |  | Upstream `CompletedAt`. |
+| `message` | `string` | computed |  |  | Upstream `Message`. |
+| `started_at` | `string` | computed |  |  | Upstream `StartedAt`. |
+| `state` | `string` | computed |  |  | Upstream `State`. |
+
+### `services.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
 
 ## Example
 
@@ -39,6 +642,6 @@ data "docker_services" "replicated" {
 }
 
 output "replicas" {
-  value = { for s in data.docker_services.replicated.services : s.name => s.replicas }
+  value = { for s in data.docker_services.replicated.services : s.spec.name => s.spec.mode.replicated.replicas }
 }
 ```

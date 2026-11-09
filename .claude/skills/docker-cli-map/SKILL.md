@@ -22,41 +22,77 @@ Source: `tools/climap/commands.json` (hand-maintained) + `tools/parity/paritydat
 |---|---|---|---|
 | `docker run` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | `image`, `name`, `command`, `env`, `ports`, `mounts`, `restart`, `must_run` | One-off `docker run --rm` jobs: a docker_container with `must_run = false`, or a docker_exec action in an existing container. |
 | `docker create` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | `must_run` | `must_run = false` creates without keeping it running. |
-| `docker start / docker stop` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | `must_run` | - |
-| `docker restart` | no equivalent | - | No in-place restart. Replace the container (`terraform apply -replace=docker_container.x`); for Swarm services use the docker_service_force_update action. |
+| `docker start / docker stop` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md)<br>[`action.docker_container_start`](../terraform-provider-docker/reference/action.docker_container_start.md)<br>[`action.docker_container_stop`](../terraform-provider-docker/reference/action.docker_container_stop.md) | `must_run`, `container_id`, `container_id`, `signal`, `timeout` | `must_run` is the desired state; the actions start or stop a container once without changing configuration. |
+| `docker restart` | [`action.docker_container_restart`](../terraform-provider-docker/reference/action.docker_container_restart.md) | `container_id`, `timeout` | For Swarm services use the docker_service_force_update action. |
 | `docker rm` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | - | Remove the resource from configuration, or `terraform destroy -target=docker_container.x`. |
-| `docker exec` | [`action.docker_exec`](../terraform-provider-docker/reference/action.docker_exec.md)<br>[`ephemeral.docker_exec_output`](../terraform-provider-docker/reference/ephemeral.docker_exec_output.md) | `container`, `service`, `command`, `env`, `user`, `workdir`, `container`, `command` | Use the ephemeral resource when the command's stdout feeds other configuration. |
-| `docker cp (host to container)` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | `upload`, `upload.file`, `upload.content`, `upload.source` | - |
-| `docker cp (container to host)` | [`action.docker_container_export`](../terraform-provider-docker/reference/action.docker_container_export.md) | `container`, `path` | Exports the whole filesystem as a tar; there is no single-file copy out. |
-| `docker logs` | [`data.docker_logs`](../terraform-provider-docker/reference/data.docker_logs.md) | `container`, `tail`, `since`, `timestamps` | - |
-| `docker ps` | [`data.docker_containers`](../terraform-provider-docker/reference/data.docker_containers.md)<br>[`list.docker_container`](../terraform-provider-docker/reference/list.docker_container.md) | - | - |
-| `docker export` | [`action.docker_container_export`](../terraform-provider-docker/reference/action.docker_container_export.md) | `container`, `path` | - |
-| `docker commit` | no equivalent | - | No equivalent by design: snapshotting a container is not declarative. Build the image with docker_image from a Dockerfile. |
+| `docker exec` | [`action.docker_exec`](../terraform-provider-docker/reference/action.docker_exec.md)<br>[`ephemeral.docker_exec_output`](../terraform-provider-docker/reference/ephemeral.docker_exec_output.md) | `container_id`, `service_id`, `command`, `env`, `user`, `workdir`, `detach`, `tty`, `container_id`, `command` | Use the ephemeral resource when the command's stdout feeds other configuration. |
+| `docker cp (host to container)` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md)<br>[`action.docker_container_cp`](../terraform-provider-docker/reference/action.docker_container_cp.md) | `files`, `files.path`, `files.content`, `files.content_base64`, `files.source`, `container_id`, `path`, `content`, `source` | The `files` block writes files before the container's first start; the action copies into an existing container at any time. |
+| `docker cp (container to host)` | [`data.docker_container_file`](../terraform-provider-docker/reference/data.docker_container_file.md)<br>[`action.docker_container_export`](../terraform-provider-docker/reference/action.docker_container_export.md) | `container`, `path`, `container_id`, `output` | The data source reads one file or directory as a tar; the export action writes the whole filesystem as a tar. |
+| `docker logs` | [`data.docker_container_logs`](../terraform-provider-docker/reference/data.docker_container_logs.md) | `container`, `tail`, `since` | - |
+| `docker ps / docker container ls` | [`data.docker_containers`](../terraform-provider-docker/reference/data.docker_containers.md)<br>[`list.docker_container`](../terraform-provider-docker/reference/list.docker_container.md) | `all`, `name`, `status` | - |
+| `docker inspect / docker container inspect` | [`data.docker_container`](../terraform-provider-docker/reference/data.docker_container.md) | `name` | - |
+| `docker diff` | [`data.docker_container_changes`](../terraform-provider-docker/reference/data.docker_container_changes.md) | `container` | - |
+| `docker stats --no-stream` | [`data.docker_container_stats`](../terraform-provider-docker/reference/data.docker_container_stats.md) | `container` | One sample per read; there is no live stream. |
+| `docker top` | [`data.docker_container_top`](../terraform-provider-docker/reference/data.docker_container_top.md) | `container`, `ps_args` | - |
+| `docker system df` | [`data.docker_system_df`](../terraform-provider-docker/reference/data.docker_system_df.md) | `verbose` | - |
+| `docker events` | no equivalent | - | No equivalent: a live event stream is not Terraform state. |
+| `docker export` | [`action.docker_container_export`](../terraform-provider-docker/reference/action.docker_container_export.md) | `container_id`, `output` | - |
+| `docker commit` | [`action.docker_image_commit`](../terraform-provider-docker/reference/action.docker_image_commit.md) | `container_id`, `reference`, `changes` | Snapshots are not declarative; prefer building the image with docker_image from a Dockerfile. |
 | `docker update` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | `memory`, `cpu_shares`, `restart` | Changes to resource limits are applied by the resource; some force replacement (see the reference). |
 | `docker rename` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | `name` | - |
-| `docker pause / unpause / kill / wait / attach` | no equivalent | - | No equivalent: transient process control is not managed state. Use docker_exec for one-off commands. |
-| `docker stats / top / events / system df` | no equivalent | - | No equivalent: live streams and usage reports are not Terraform state. |
+| `docker pause / docker unpause` | [`action.docker_container_pause`](../terraform-provider-docker/reference/action.docker_container_pause.md)<br>[`action.docker_container_unpause`](../terraform-provider-docker/reference/action.docker_container_unpause.md) | `container_id`, `container_id` | - |
+| `docker kill` | [`action.docker_container_kill`](../terraform-provider-docker/reference/action.docker_container_kill.md) | `container_id`, `signal` | - |
+| `docker wait` | [`action.docker_container_wait`](../terraform-provider-docker/reference/action.docker_container_wait.md) | `container_id`, `condition` | - |
+| `docker attach` | no equivalent | - | No equivalent: an interactive stream is not managed state. Use docker_exec for one-off commands. |
+| `docker container prune` | [`action.docker_container_prune`](../terraform-provider-docker/reference/action.docker_container_prune.md) | `filters` | - |
 | `docker pull` | [`docker_image`](../terraform-provider-docker/reference/docker_image.md) | `name`, `keep_locally` | - |
 | `docker build` | [`docker_image`](../terraform-provider-docker/reference/docker_image.md) | `name`, `build`, `build.context`, `build.dockerfile`, `build.builder` | `build.builder = "buildkit"` for BuildKit features (secrets, cache_from, platforms). |
-| `docker buildx build` | [`docker_image`](../terraform-provider-docker/reference/docker_image.md) | `build.builder`, `build.platforms`, `build.secrets` | Builds on the daemon's own BuildKit; building on a docker_buildx_builder is an open TODO. |
-| `docker buildx create` | [`docker_buildx_builder`](../terraform-provider-docker/reference/docker_buildx_builder.md) | `name`, `driver` | docker-container driver only; the buildx instance list is BLOCKED (buildx-private local state). |
+| `docker buildx build` | [`docker_image`](../terraform-provider-docker/reference/docker_image.md) | `build.builder`, `build.platforms`, `build.secrets`, `build.outputs`, `build.cache_to`, `build.attestations` | `build.builder` names a docker_buildx_builder, or `buildkit` for the daemon's own BuildKit. |
+| `docker buildx create` | [`docker_buildx_builder`](../terraform-provider-docker/reference/docker_buildx_builder.md) | `name`, `node`, `append`, `driver`, `platform`, `buildkitd_flags`, `buildkitd_config`, `docker_container` | docker-container driver only; the buildx instance list is BLOCKED (buildx-private local state). |
+| `docker buildx bake` | [`action.docker_buildx_bake`](../terraform-provider-docker/reference/action.docker_buildx_bake.md) | `files`, `targets`, `builder` | - |
+| `docker buildx inspect` | [`data.docker_buildx_builder`](../terraform-provider-docker/reference/data.docker_buildx_builder.md) | `name` | - |
+| `docker buildx ls` | [`data.docker_buildx_builders`](../terraform-provider-docker/reference/data.docker_buildx_builders.md) | - | - |
+| `docker buildx history ls` | [`data.docker_buildx_history_records`](../terraform-provider-docker/reference/data.docker_buildx_history_records.md) | `builder`, `limit` | - |
+| `docker buildx history inspect` | [`data.docker_buildx_history`](../terraform-provider-docker/reference/data.docker_buildx_history.md) | `builder`, `ref` | - |
+| `docker buildx du` | [`data.docker_buildx_disk_usage`](../terraform-provider-docker/reference/data.docker_buildx_disk_usage.md) | `builder` | - |
+| `docker builder prune` | [`action.docker_builder_prune`](../terraform-provider-docker/reference/action.docker_builder_prune.md) | `all`, `filters`, `keep_storage` | - |
+| `docker buildx prune` | [`action.docker_builder_prune`](../terraform-provider-docker/reference/action.docker_builder_prune.md) | `builder`, `all`, `filters` | Set `builder` to prune a docker_buildx_builder's cache. |
+| `docker buildx imagetools create` | [`docker_registry_manifest_list`](../terraform-provider-docker/reference/docker_registry_manifest_list.md) | `name`, `manifests` | - |
+| `docker buildx imagetools inspect` | [`data.docker_registry_image_manifests`](../terraform-provider-docker/reference/data.docker_registry_image_manifests.md) | `name` | - |
 | `docker tag` | [`docker_tag`](../terraform-provider-docker/reference/docker_tag.md) | `source_image`, `target_image` | - |
 | `docker push` | [`docker_registry_image`](../terraform-provider-docker/reference/docker_registry_image.md) | `name`, `keep_remotely` | - |
 | `docker rmi` | [`docker_image`](../terraform-provider-docker/reference/docker_image.md) | `keep_locally` | Destroying a docker_image removes it unless `keep_locally = true`. |
-| `docker images / docker image inspect` | [`data.docker_image`](../terraform-provider-docker/reference/data.docker_image.md)<br>[`list.docker_image`](../terraform-provider-docker/reference/list.docker_image.md) | `name` | - |
-| `docker save` | [`action.docker_image_save`](../terraform-provider-docker/reference/action.docker_image_save.md) | `images`, `path` | - |
-| `docker load` | [`action.docker_image_load`](../terraform-provider-docker/reference/action.docker_image_load.md) | `path` | - |
+| `docker images / docker image ls` | [`data.docker_images`](../terraform-provider-docker/reference/data.docker_images.md)<br>[`list.docker_image`](../terraform-provider-docker/reference/list.docker_image.md) | `reference`, `dangling`, `labels` | - |
+| `docker image inspect` | [`data.docker_image`](../terraform-provider-docker/reference/data.docker_image.md) | `name` | - |
+| `docker image history` | [`data.docker_image_history`](../terraform-provider-docker/reference/data.docker_image_history.md) | `name` | - |
+| `docker search` | [`data.docker_image_search`](../terraform-provider-docker/reference/data.docker_image_search.md) | `term`, `limit` | - |
+| `docker save` | [`action.docker_image_save`](../terraform-provider-docker/reference/action.docker_image_save.md) | `images`, `output` | - |
+| `docker load` | [`action.docker_image_load`](../terraform-provider-docker/reference/action.docker_image_load.md) | `input` | - |
 | `docker import` | [`action.docker_image_import`](../terraform-provider-docker/reference/action.docker_image_import.md) | `source`, `repository`, `tag` | - |
 | `docker image prune` | [`action.docker_image_prune`](../terraform-provider-docker/reference/action.docker_image_prune.md) | `dangling`, `filters` | - |
 | `docker system prune` | [`action.docker_system_prune`](../terraform-provider-docker/reference/action.docker_system_prune.md) | `containers`, `images`, `volumes`, `networks`, `build_cache` | - |
 | `docker network create` | [`docker_network`](../terraform-provider-docker/reference/docker_network.md) | `name`, `driver` | - |
-| `docker network ls / inspect` | [`data.docker_network`](../terraform-provider-docker/reference/data.docker_network.md)<br>[`list.docker_network`](../terraform-provider-docker/reference/list.docker_network.md) | `name` | - |
+| `docker network ls` | [`data.docker_networks`](../terraform-provider-docker/reference/data.docker_networks.md)<br>[`list.docker_network`](../terraform-provider-docker/reference/list.docker_network.md) | `name`, `driver` | - |
+| `docker network inspect` | [`data.docker_network`](../terraform-provider-docker/reference/data.docker_network.md) | `name` | - |
+| `docker network prune` | [`action.docker_network_prune`](../terraform-provider-docker/reference/action.docker_network_prune.md) | `filters` | - |
 | `docker volume create` | [`docker_volume`](../terraform-provider-docker/reference/docker_volume.md) | `name`, `driver` | - |
-| `docker volume ls / inspect` | [`data.docker_volume`](../terraform-provider-docker/reference/data.docker_volume.md)<br>[`list.docker_volume`](../terraform-provider-docker/reference/list.docker_volume.md) | `name` | - |
-| `docker login` | [`provider "docker"`](../terraform-provider-docker/reference/provider.md)<br>[`ephemeral.docker_registry_token`](../terraform-provider-docker/reference/ephemeral.docker_registry_token.md) | `registry_auth`, `registry_auth.address`, `registry_auth.username`, `registry_auth.password`, `allow_credential_helpers` | - |
+| `docker volume create --type mount\|block (cluster volume)` | [`docker_volume`](../terraform-provider-docker/reference/docker_volume.md) | `name`, `driver`, `cluster_volume_spec`, `cluster_volume_spec.access_mode` | Swarm CSI volumes; the provider must point at a manager. |
+| `docker volume update --availability` | [`docker_volume`](../terraform-provider-docker/reference/docker_volume.md) | `cluster_volume_spec.availability` | Updated in place. |
+| `docker volume ls` | [`data.docker_volumes`](../terraform-provider-docker/reference/data.docker_volumes.md)<br>[`list.docker_volume`](../terraform-provider-docker/reference/list.docker_volume.md) | `name`, `driver` | - |
+| `docker volume inspect` | [`data.docker_volume`](../terraform-provider-docker/reference/data.docker_volume.md) | `name` | - |
+| `docker volume prune` | [`action.docker_volume_prune`](../terraform-provider-docker/reference/action.docker_volume_prune.md) | `all`, `filters` | - |
+| `docker login` | [`provider "docker"`](../terraform-provider-docker/reference/provider.md)<br>[`ephemeral.docker_registry_login`](../terraform-provider-docker/reference/ephemeral.docker_registry_login.md)<br>[`ephemeral.docker_registry_token`](../terraform-provider-docker/reference/ephemeral.docker_registry_token.md) | `registry_auth`, `registry_auth.address`, `registry_auth.username`, `registry_auth.password`, `allow_credential_helpers`, `server_address`, `username`, `password` | - |
 | `docker context use / docker -H` | [`provider "docker"`](../terraform-provider-docker/reference/provider.md) | `context`, `host`, `ssh`, `cert_path` | - |
+| `docker info / docker system info` | [`data.docker_info`](../terraform-provider-docker/reference/data.docker_info.md) | - | - |
+| `docker version` | [`data.docker_version`](../terraform-provider-docker/reference/data.docker_version.md) | - | - |
 | `docker plugin install` | [`docker_plugin`](../terraform-provider-docker/reference/docker_plugin.md)<br>[`data.docker_plugin`](../terraform-provider-docker/reference/data.docker_plugin.md) | `name`, `enabled`, `grant_all_permissions` | - |
+| `docker plugin ls` | [`data.docker_plugins`](../terraform-provider-docker/reference/data.docker_plugins.md) | `enabled`, `capability` | - |
+| `docker plugin create` | [`action.docker_plugin_create`](../terraform-provider-docker/reference/action.docker_plugin_create.md) | `name`, `context_dir` | - |
+| `docker plugin push` | [`action.docker_plugin_push`](../terraform-provider-docker/reference/action.docker_plugin_push.md) | `name` | - |
+| `docker plugin upgrade` | [`docker_plugin`](../terraform-provider-docker/reference/docker_plugin.md) | `name`, `alias` | Changing `name` with `alias` set upgrades the plugin in place. |
 | `docker manifest inspect` | [`data.docker_registry_image_manifests`](../terraform-provider-docker/reference/data.docker_registry_image_manifests.md)<br>[`data.docker_registry_image`](../terraform-provider-docker/reference/data.docker_registry_image.md) | `name`, `name` | - |
+| `docker manifest create / annotate / push` | [`docker_registry_manifest_list`](../terraform-provider-docker/reference/docker_registry_manifest_list.md) | `name`, `manifests`, `annotations` | - |
+| `docker manifest rm` | no equivalent | - | No equivalent: the CLI's manifest list draft is local state. Destroying docker_registry_manifest_list deletes the registry tag unless `keep_remotely = true`. |
 | `registry tag listing (crane ls / skopeo list-tags)` | [`data.docker_registry_image_tags`](../terraform-provider-docker/reference/data.docker_registry_image_tags.md) | `name` | - |
 | `image reference parsing` | [`provider::docker::parse_image_ref`](../terraform-provider-docker/reference/function.parse_image_ref.md)<br>[`provider::docker::image_ref`](../terraform-provider-docker/reference/function.image_ref.md) | `ref` | - |
 | `docker port / -p parsing` | [`provider::docker::port_spec`](../terraform-provider-docker/reference/function.port_spec.md) | - | - |
@@ -65,16 +101,36 @@ Source: `tools/climap/commands.json` (hand-maintained) + `tools/parity/paritydat
 
 | CLI | Use instead | Arguments | Notes |
 |---|---|---|---|
-| `docker compose up` | [`docker_compose`](../terraform-provider-docker/reference/docker_compose.md) | `content`, `files`, `project_name`, `profiles`, `env`, `mode` | Or convert once to plain resources with tools/compose2stack. |
+| `docker compose up` | [`docker_compose`](../terraform-provider-docker/reference/docker_compose.md) | `content`, `files`, `name`, `profiles`, `env`, `mode`, `remove_orphans` | Or convert once to plain resources with tools/compose2stack. |
 | `docker compose down` | [`docker_compose`](../terraform-provider-docker/reference/docker_compose.md) | `keep_volumes` | Destroy the docker_compose resource. |
-| `docker compose config / convert` | `tools/compose2stack` | - | `go run ./tools/compose2stack -in docker-compose.yml -out stack.tf -mode swarm\|local`. |
-| `docker compose ps` | [`docker_compose`](../terraform-provider-docker/reference/docker_compose.md) | `services` | - |
-| `docker compose exec` | [`action.docker_exec`](../terraform-provider-docker/reference/action.docker_exec.md) | `container` | Local-mode container names are `<project>-<service>-<n>`. |
-| `docker compose logs` | [`data.docker_logs`](../terraform-provider-docker/reference/data.docker_logs.md) | `container` | - |
-| `docker compose pull` | [`docker_image`](../terraform-provider-docker/reference/docker_image.md) | `name` | - |
+| `docker compose config` | [`data.docker_compose_config`](../terraform-provider-docker/reference/data.docker_compose_config.md) | `content`, `files` | - |
+| `docker compose convert` | `tools/compose2stack` | - | `go run ./tools/compose2stack -in docker-compose.yml -out stack.tf -mode swarm\|local`. |
+| `docker compose ps` | [`data.docker_compose_containers`](../terraform-provider-docker/reference/data.docker_compose_containers.md) | `name`, `all` | - |
+| `docker compose ls` | [`data.docker_compose_projects`](../terraform-provider-docker/reference/data.docker_compose_projects.md) | `all` | - |
+| `docker compose volumes` | [`data.docker_compose_volumes`](../terraform-provider-docker/reference/data.docker_compose_volumes.md) | `name` | - |
+| `docker compose images` | [`data.docker_compose_images`](../terraform-provider-docker/reference/data.docker_compose_images.md) | `name` | - |
+| `docker compose exec` | [`action.docker_compose_exec`](../terraform-provider-docker/reference/action.docker_compose_exec.md)<br>[`action.docker_exec`](../terraform-provider-docker/reference/action.docker_exec.md) | `name`, `service`, `command`, `container_id` | Local-mode container names are `<project>-<service>-<n>`. |
+| `docker compose logs` | [`data.docker_compose_logs`](../terraform-provider-docker/reference/data.docker_compose_logs.md) | `name`, `services`, `tail`, `since` | - |
+| `docker compose port` | [`data.docker_compose_port`](../terraform-provider-docker/reference/data.docker_compose_port.md) | `name`, `service`, `private_port` | - |
+| `docker compose top` | [`data.docker_compose_top`](../terraform-provider-docker/reference/data.docker_compose_top.md) | `name` | - |
+| `docker compose pull` | [`action.docker_compose_pull`](../terraform-provider-docker/reference/action.docker_compose_pull.md) | `content`, `files` | - |
+| `docker compose push` | [`action.docker_compose_push`](../terraform-provider-docker/reference/action.docker_compose_push.md) | `content`, `files` | - |
 | `docker compose up --scale` | [`docker_compose`](../terraform-provider-docker/reference/docker_compose.md) | `content` | Set `deploy.replicas` in the compose content. |
-| `docker compose build` | no equivalent | - | No equivalent inside docker_compose (compose `build:` is not implemented). Build with docker_image and reference its name. |
-| `docker compose run / watch / alpha` | no equivalent | - | No equivalent: one-off containers and file watching are not declarative. Use docker_exec for one-off commands. |
+| `docker compose scale` | [`action.docker_compose_scale`](../terraform-provider-docker/reference/action.docker_compose_scale.md) | `replicas` | The action does not change configuration; set `deploy.replicas` in the compose content to keep a size. |
+| `docker compose build` | [`action.docker_compose_build`](../terraform-provider-docker/reference/action.docker_compose_build.md) | `content`, `files`, `services` | - |
+| `docker compose run` | [`action.docker_compose_run`](../terraform-provider-docker/reference/action.docker_compose_run.md) | `service`, `command` | - |
+| `docker compose watch / alpha` | no equivalent | - | No equivalent: file watching and experimental commands are not declarative. |
+| `docker compose start` | [`action.docker_compose_start`](../terraform-provider-docker/reference/action.docker_compose_start.md) | `name`, `services` | - |
+| `docker compose stop` | [`action.docker_compose_stop`](../terraform-provider-docker/reference/action.docker_compose_stop.md) | `name`, `services` | - |
+| `docker compose restart` | [`action.docker_compose_restart`](../terraform-provider-docker/reference/action.docker_compose_restart.md) | `name`, `services` | - |
+| `docker compose kill` | [`action.docker_compose_kill`](../terraform-provider-docker/reference/action.docker_compose_kill.md) | `name`, `services` | - |
+| `docker compose pause` | [`action.docker_compose_pause`](../terraform-provider-docker/reference/action.docker_compose_pause.md) | `name`, `services` | - |
+| `docker compose unpause` | [`action.docker_compose_unpause`](../terraform-provider-docker/reference/action.docker_compose_unpause.md) | `name`, `services` | - |
+| `docker compose wait` | [`action.docker_compose_wait`](../terraform-provider-docker/reference/action.docker_compose_wait.md) | `name`, `services` | - |
+| `docker compose commit` | [`action.docker_compose_commit`](../terraform-provider-docker/reference/action.docker_compose_commit.md) | `service`, `repository` | - |
+| `docker compose cp` | [`action.docker_compose_cp`](../terraform-provider-docker/reference/action.docker_compose_cp.md) | `service`, `direction`, `container_path`, `local_path` | - |
+| `docker compose export` | [`action.docker_compose_export`](../terraform-provider-docker/reference/action.docker_compose_export.md) | `service`, `output` | - |
+| `docker compose publish` | [`action.docker_compose_publish`](../terraform-provider-docker/reference/action.docker_compose_publish.md) | `repository` | - |
 
 ## docker swarm, node, service, stack, secret, config
 
@@ -85,27 +141,38 @@ Source: `tools/climap/commands.json` (hand-maintained) + `tools/parity/paritydat
 | `docker swarm join-token` | [`data.docker_swarm_tokens`](../terraform-provider-docker/reference/data.docker_swarm_tokens.md)<br>[`ephemeral.docker_swarm_tokens`](../terraform-provider-docker/reference/ephemeral.docker_swarm_tokens.md) | - | - |
 | `docker swarm join-token --rotate` | [`action.docker_swarm_rotate_tokens`](../terraform-provider-docker/reference/action.docker_swarm_rotate_tokens.md) | `worker`, `manager` | - |
 | `docker swarm unlock-key / update --autolock` | [`docker_swarm_init`](../terraform-provider-docker/reference/docker_swarm_init.md) | `autolock`, `unlock_key` | - |
+| `docker swarm unlock-key --rotate` | [`action.docker_swarm_rotate_unlock_key`](../terraform-provider-docker/reference/action.docker_swarm_rotate_unlock_key.md) | - | - |
+| `docker swarm update` | [`docker_swarm_init`](../terraform-provider-docker/reference/docker_swarm_init.md) | `labels`, `autolock`, `orchestration`, `raft`, `dispatcher`, `ca_config` | Updated in place. |
+| `docker swarm ca --rotate` | [`action.docker_swarm_rotate_ca`](../terraform-provider-docker/reference/action.docker_swarm_rotate_ca.md) | `signing_ca_cert`, `signing_ca_key` | - |
 | `docker swarm leave` | [`docker_swarm_node`](../terraform-provider-docker/reference/docker_swarm_node.md) | - | Destroying docker_swarm_node leaves and removes the node. |
-| `docker swarm unlock` | no equivalent | - | No equivalent: unlocking a restarted manager is an operator step; the key is docker_swarm_init.unlock_key. |
+| `docker swarm unlock` | [`action.docker_swarm_unlock`](../terraform-provider-docker/reference/action.docker_swarm_unlock.md) | `unlock_key` | - |
+| `docker info (Swarm section)` | [`data.docker_swarm`](../terraform-provider-docker/reference/data.docker_swarm.md) | - | - |
 | `docker node ls / inspect` | [`data.docker_nodes`](../terraform-provider-docker/reference/data.docker_nodes.md)<br>[`data.docker_node`](../terraform-provider-docker/reference/data.docker_node.md)<br>[`list.docker_swarm_node`](../terraform-provider-docker/reference/list.docker_swarm_node.md) | - | - |
-| `docker node update --availability drain` | [`action.docker_node_drain`](../terraform-provider-docker/reference/action.docker_node_drain.md)<br>[`docker_swarm_node`](../terraform-provider-docker/reference/docker_swarm_node.md) | `node`, `availability` | The action is for a one-off drain (it waits for tasks to leave); the attribute for the desired state. |
-| `docker node update --availability active` | [`action.docker_node_activate`](../terraform-provider-docker/reference/action.docker_node_activate.md)<br>[`docker_swarm_node`](../terraform-provider-docker/reference/docker_swarm_node.md) | `node`, `availability` | - |
-| `docker node promote / demote / update --label-add` | [`docker_swarm_node`](../terraform-provider-docker/reference/docker_swarm_node.md) | `role`, `labels` | - |
+| `docker node update --availability drain` | [`action.docker_node_drain`](../terraform-provider-docker/reference/action.docker_node_drain.md)<br>[`docker_node`](../terraform-provider-docker/reference/docker_node.md) | `node_id`, `availability` | The action is for a one-off drain (it waits for tasks to leave); the attribute for the desired state. |
+| `docker node update --availability active` | [`action.docker_node_activate`](../terraform-provider-docker/reference/action.docker_node_activate.md)<br>[`docker_node`](../terraform-provider-docker/reference/docker_node.md) | `node_id`, `availability` | - |
+| `docker node update --label-add / --availability / --role` | [`docker_node`](../terraform-provider-docker/reference/docker_node.md) | `node_id`, `labels`, `availability`, `role` | - |
+| `docker node promote` | [`action.docker_node_promote`](../terraform-provider-docker/reference/action.docker_node_promote.md)<br>[`docker_node`](../terraform-provider-docker/reference/docker_node.md) | `node_id`, `role` | - |
+| `docker node demote` | [`action.docker_node_demote`](../terraform-provider-docker/reference/action.docker_node_demote.md)<br>[`docker_node`](../terraform-provider-docker/reference/docker_node.md) | `node_id`, `role` | - |
 | `docker node rm` | [`docker_swarm_node`](../terraform-provider-docker/reference/docker_swarm_node.md) | - | - |
 | `docker service create / update` | [`docker_service`](../terraform-provider-docker/reference/docker_service.md) | `name`, `image`, `replicas`, `env`, `networks` | - |
-| `docker service scale` | [`action.docker_service_scale`](../terraform-provider-docker/reference/action.docker_service_scale.md)<br>[`docker_service`](../terraform-provider-docker/reference/docker_service.md) | `service`, `replicas`, `replicas` | The action does not change configuration; the next apply restores `replicas`. |
-| `docker service update --force` | [`action.docker_service_force_update`](../terraform-provider-docker/reference/action.docker_service_force_update.md) | `service` | - |
-| `docker service rollback` | [`action.docker_service_rollback`](../terraform-provider-docker/reference/action.docker_service_rollback.md) | `service` | - |
-| `docker service ls / inspect` | [`data.docker_services`](../terraform-provider-docker/reference/data.docker_services.md)<br>[`list.docker_service`](../terraform-provider-docker/reference/list.docker_service.md) | - | - |
-| `docker service ps / logs` | no equivalent | - | No equivalent for tasks or aggregated service logs. Use docker_logs on a task container, or docker_exec with `service`. |
+| `docker service scale` | [`action.docker_service_scale`](../terraform-provider-docker/reference/action.docker_service_scale.md)<br>[`docker_service`](../terraform-provider-docker/reference/docker_service.md) | `service_id`, `replicas`, `replicas` | The action does not change configuration; the next apply restores `replicas`. |
+| `docker service update --force` | [`action.docker_service_force_update`](../terraform-provider-docker/reference/action.docker_service_force_update.md) | `service_id` | - |
+| `docker service rollback` | [`action.docker_service_rollback`](../terraform-provider-docker/reference/action.docker_service_rollback.md) | `service_id` | - |
+| `docker service ls / inspect` | [`data.docker_services`](../terraform-provider-docker/reference/data.docker_services.md)<br>[`data.docker_service`](../terraform-provider-docker/reference/data.docker_service.md)<br>[`list.docker_service`](../terraform-provider-docker/reference/list.docker_service.md) | `name` | - |
+| `docker service ps / docker node ps` | [`data.docker_tasks`](../terraform-provider-docker/reference/data.docker_tasks.md)<br>[`data.docker_task`](../terraform-provider-docker/reference/data.docker_task.md) | `service_id`, `node_id`, `desired_state`, `id` | - |
+| `docker service logs` | [`data.docker_service_logs`](../terraform-provider-docker/reference/data.docker_service_logs.md)<br>[`data.docker_task_logs`](../terraform-provider-docker/reference/data.docker_task_logs.md) | `service_id`, `tail`, `since`, `task_id`, `tail`, `since` | - |
 | `docker service rm` | [`docker_service`](../terraform-provider-docker/reference/docker_service.md) | - | - |
 | `docker stack deploy` | [`docker_stack`](../terraform-provider-docker/reference/docker_stack.md)<br>[`docker_compose`](../terraform-provider-docker/reference/docker_compose.md) | `name`, `service`, `mode` | docker_compose with `mode = "swarm"` takes the compose file directly. |
 | `docker stack rm` | [`docker_stack`](../terraform-provider-docker/reference/docker_stack.md) | - | - |
-| `docker stack ls / ps / services` | no equivalent | - | No stack listing; use data docker_services filtered by the com.docker.stack.namespace label. |
+| `docker stack ls` | [`data.docker_stacks`](../terraform-provider-docker/reference/data.docker_stacks.md) | - | - |
+| `docker stack services` | [`data.docker_stack`](../terraform-provider-docker/reference/data.docker_stack.md) | `name` | - |
+| `docker stack ps` | [`data.docker_tasks`](../terraform-provider-docker/reference/data.docker_tasks.md) | `labels` | Filter on the stack label: `labels = { "com.docker.stack.namespace" = "<stack>" }`. |
 | `docker secret create` | [`docker_secret`](../terraform-provider-docker/reference/docker_secret.md) | `name`, `data`, `data_wo`, `data_wo_version` | - |
 | `docker secret ls` | [`data.docker_secrets`](../terraform-provider-docker/reference/data.docker_secrets.md)<br>[`list.docker_secret`](../terraform-provider-docker/reference/list.docker_secret.md) | - | - |
+| `docker secret inspect` | [`data.docker_secret`](../terraform-provider-docker/reference/data.docker_secret.md) | `name` | - |
 | `docker config create` | [`docker_config`](../terraform-provider-docker/reference/docker_config.md) | `name`, `data`, `data_wo` | - |
 | `docker config ls` | [`data.docker_configs`](../terraform-provider-docker/reference/data.docker_configs.md)<br>[`list.docker_config`](../terraform-provider-docker/reference/list.docker_config.md) | - | - |
+| `docker config inspect` | [`data.docker_config`](../terraform-provider-docker/reference/data.docker_config.md) | `name` | - |
 
 ## Coverage by provider type
 
@@ -114,59 +181,140 @@ Every type in `tools/parity/paritydata`: its status against kreuzwerker/docker v
 | Kind | Type | Parity | Replaces |
 |---|---|---|---|
 | resource | `docker_buildx_builder` | partial | `docker buildx create` |
-| resource | `docker_compose` | partial | `docker compose up`, `docker compose down`, `docker compose ps`, `docker compose up --scale`, `docker stack deploy` |
+| resource | `docker_compose` | partial | `docker compose up`, `docker compose down`, `docker compose up --scale`, `docker stack deploy` |
 | resource | `docker_config` | have | `docker config create` |
 | resource | `docker_container` | have | `docker run`, `docker create`, `docker start / docker stop`, `docker rm`, `docker cp (host to container)`, `docker update`, `docker rename` |
-| resource | `docker_image` | have | `docker pull`, `docker build`, `docker buildx build`, `docker rmi`, `docker compose pull` |
+| resource | `docker_image` | have | `docker pull`, `docker build`, `docker buildx build`, `docker rmi` |
 | resource | `docker_network` | have | `docker network create` |
-| resource | `docker_plugin` | have | `docker plugin install` |
+| resource | `docker_node` | provider-only | `docker node update --availability drain`, `docker node update --availability active`, `docker node update --label-add / --availability / --role`, `docker node promote`, `docker node demote` |
+| resource | `docker_plugin` | have | `docker plugin install`, `docker plugin upgrade` |
 | resource | `docker_registry_image` | have | `docker push` |
+| resource | `docker_registry_manifest_list` | provider-only | `docker buildx imagetools create`, `docker manifest create / annotate / push` |
 | resource | `docker_secret` | have | `docker secret create` |
 | resource | `docker_service` | have | `docker service create / update`, `docker service scale`, `docker service rm` |
 | resource | `docker_stack` | provider-only | `docker stack deploy`, `docker stack rm` |
-| resource | `docker_swarm_init` | provider-only | `docker swarm init`, `docker swarm unlock-key / update --autolock` |
-| resource | `docker_swarm_node` | provider-only | `docker swarm join`, `docker swarm leave`, `docker node update --availability drain`, `docker node update --availability active`, `docker node promote / demote / update --label-add`, `docker node rm` |
+| resource | `docker_swarm_init` | provider-only | `docker swarm init`, `docker swarm unlock-key / update --autolock`, `docker swarm update` |
+| resource | `docker_swarm_node` | provider-only | `docker swarm join`, `docker swarm leave`, `docker node rm` |
 | resource | `docker_tag` | have | `docker tag` |
-| resource | `docker_volume` | have | `docker volume create` |
+| resource | `docker_volume` | have | `docker volume create`, `docker volume create --type mount\|block (cluster volume)`, `docker volume update --availability` |
+| data source | `docker_buildx_builder` | provider-only | `docker buildx inspect` |
+| data source | `docker_buildx_builders` | provider-only | `docker buildx ls` |
+| data source | `docker_buildx_disk_usage` | provider-only | `docker buildx du` |
+| data source | `docker_buildx_history` | provider-only | `docker buildx history inspect` |
+| data source | `docker_buildx_history_records` | provider-only | `docker buildx history ls` |
+| data source | `docker_compose_config` | provider-only | `docker compose config` |
+| data source | `docker_compose_containers` | provider-only | `docker compose ps` |
+| data source | `docker_compose_images` | provider-only | `docker compose images` |
+| data source | `docker_compose_logs` | provider-only | `docker compose logs` |
+| data source | `docker_compose_port` | provider-only | `docker compose port` |
+| data source | `docker_compose_projects` | provider-only | `docker compose ls` |
+| data source | `docker_compose_top` | provider-only | `docker compose top` |
+| data source | `docker_compose_volumes` | provider-only | `docker compose volumes` |
+| data source | `docker_config` | provider-only | `docker config inspect` |
 | data source | `docker_configs` | provider-only | `docker config ls` |
-| data source | `docker_containers` | have | `docker ps` |
-| data source | `docker_image` | have | `docker images / docker image inspect` |
-| data source | `docker_logs` | have | `docker logs`, `docker compose logs` |
-| data source | `docker_network` | have | `docker network ls / inspect` |
+| data source | `docker_container` | provider-only | `docker inspect / docker container inspect` |
+| data source | `docker_container_changes` | provider-only | `docker diff` |
+| data source | `docker_container_file` | provider-only | `docker cp (container to host)` |
+| data source | `docker_container_logs` | provider-only | `docker logs` |
+| data source | `docker_container_stats` | provider-only | `docker stats --no-stream` |
+| data source | `docker_container_top` | provider-only | `docker top` |
+| data source | `docker_containers` | have | `docker ps / docker container ls` |
+| data source | `docker_dockerfile` | provider-only | - |
+| data source | `docker_image` | have | `docker image inspect` |
+| data source | `docker_image_attestations` | provider-only | - |
+| data source | `docker_image_history` | provider-only | `docker image history` |
+| data source | `docker_image_search` | provider-only | `docker search` |
+| data source | `docker_images` | provider-only | `docker images / docker image ls` |
+| data source | `docker_info` | provider-only | `docker info / docker system info` |
+| data source | `docker_logs` | have | - |
+| data source | `docker_network` | have | `docker network inspect` |
+| data source | `docker_networks` | provider-only | `docker network ls` |
 | data source | `docker_node` | provider-only | `docker node ls / inspect` |
 | data source | `docker_nodes` | provider-only | `docker node ls / inspect` |
 | data source | `docker_plugin` | have | `docker plugin install` |
+| data source | `docker_plugins` | provider-only | `docker plugin ls` |
 | data source | `docker_registry_image` | have | `docker manifest inspect` |
-| data source | `docker_registry_image_manifests` | have | `docker manifest inspect` |
+| data source | `docker_registry_image_manifests` | have | `docker buildx imagetools inspect`, `docker manifest inspect` |
 | data source | `docker_registry_image_tags` | have | `registry tag listing (crane ls / skopeo list-tags)` |
+| data source | `docker_secret` | provider-only | `docker secret inspect` |
 | data source | `docker_secrets` | provider-only | `docker secret ls` |
+| data source | `docker_service` | provider-only | `docker service ls / inspect` |
+| data source | `docker_service_logs` | provider-only | `docker service logs` |
 | data source | `docker_services` | provider-only | `docker service ls / inspect` |
+| data source | `docker_stack` | provider-only | `docker stack services` |
+| data source | `docker_stacks` | provider-only | `docker stack ls` |
+| data source | `docker_swarm` | provider-only | `docker info (Swarm section)` |
 | data source | `docker_swarm_tokens` | provider-only | `docker swarm join-token` |
-| data source | `docker_volume` | provider-only | `docker volume ls / inspect` |
+| data source | `docker_system_df` | provider-only | `docker system df` |
+| data source | `docker_task` | provider-only | `docker service ps / docker node ps` |
+| data source | `docker_task_logs` | provider-only | `docker service logs` |
+| data source | `docker_tasks` | provider-only | `docker service ps / docker node ps`, `docker stack ps` |
+| data source | `docker_version` | provider-only | `docker version` |
+| data source | `docker_volume` | provider-only | `docker volume inspect` |
+| data source | `docker_volumes` | provider-only | `docker volume ls` |
+| action | `docker_builder_prune` | provider-only | `docker builder prune`, `docker buildx prune` |
+| action | `docker_buildx_bake` | provider-only | `docker buildx bake` |
+| action | `docker_compose_build` | provider-only | `docker compose build` |
+| action | `docker_compose_commit` | provider-only | `docker compose commit` |
+| action | `docker_compose_cp` | provider-only | `docker compose cp` |
+| action | `docker_compose_exec` | provider-only | `docker compose exec` |
+| action | `docker_compose_export` | provider-only | `docker compose export` |
+| action | `docker_compose_kill` | provider-only | `docker compose kill` |
+| action | `docker_compose_pause` | provider-only | `docker compose pause` |
+| action | `docker_compose_publish` | provider-only | `docker compose publish` |
+| action | `docker_compose_pull` | provider-only | `docker compose pull` |
+| action | `docker_compose_push` | provider-only | `docker compose push` |
+| action | `docker_compose_restart` | provider-only | `docker compose restart` |
+| action | `docker_compose_run` | provider-only | `docker compose run` |
+| action | `docker_compose_scale` | provider-only | `docker compose scale` |
+| action | `docker_compose_start` | provider-only | `docker compose start` |
+| action | `docker_compose_stop` | provider-only | `docker compose stop` |
+| action | `docker_compose_unpause` | provider-only | `docker compose unpause` |
+| action | `docker_compose_wait` | provider-only | `docker compose wait` |
+| action | `docker_container_cp` | provider-only | `docker cp (host to container)` |
 | action | `docker_container_export` | have | `docker cp (container to host)`, `docker export` |
+| action | `docker_container_kill` | provider-only | `docker kill` |
+| action | `docker_container_pause` | provider-only | `docker pause / docker unpause` |
+| action | `docker_container_prune` | provider-only | `docker container prune` |
+| action | `docker_container_restart` | provider-only | `docker restart` |
+| action | `docker_container_start` | provider-only | `docker start / docker stop` |
+| action | `docker_container_stop` | provider-only | `docker start / docker stop` |
+| action | `docker_container_unpause` | provider-only | `docker pause / docker unpause` |
+| action | `docker_container_wait` | provider-only | `docker wait` |
 | action | `docker_exec` | have | `docker exec`, `docker compose exec` |
+| action | `docker_image_commit` | provider-only | `docker commit` |
 | action | `docker_image_import` | have | `docker import` |
 | action | `docker_image_load` | have | `docker load` |
 | action | `docker_image_prune` | provider-only | `docker image prune` |
 | action | `docker_image_save` | have | `docker save` |
+| action | `docker_network_prune` | provider-only | `docker network prune` |
 | action | `docker_node_activate` | provider-only | `docker node update --availability active` |
+| action | `docker_node_demote` | provider-only | `docker node demote` |
 | action | `docker_node_drain` | provider-only | `docker node update --availability drain` |
+| action | `docker_node_promote` | provider-only | `docker node promote` |
+| action | `docker_plugin_create` | provider-only | `docker plugin create` |
+| action | `docker_plugin_push` | provider-only | `docker plugin push` |
 | action | `docker_service_force_update` | provider-only | `docker service update --force` |
 | action | `docker_service_rollback` | provider-only | `docker service rollback` |
 | action | `docker_service_scale` | provider-only | `docker service scale` |
+| action | `docker_swarm_rotate_ca` | provider-only | `docker swarm ca --rotate` |
 | action | `docker_swarm_rotate_tokens` | provider-only | `docker swarm join-token --rotate` |
+| action | `docker_swarm_rotate_unlock_key` | provider-only | `docker swarm unlock-key --rotate` |
+| action | `docker_swarm_unlock` | provider-only | `docker swarm unlock` |
 | action | `docker_system_prune` | have | `docker system prune` |
+| action | `docker_volume_prune` | provider-only | `docker volume prune` |
 | ephemeral | `docker_exec_output` | provider-only | `docker exec` |
+| ephemeral | `docker_registry_login` | provider-only | `docker login` |
 | ephemeral | `docker_registry_token` | provider-only | `docker login` |
 | ephemeral | `docker_swarm_tokens` | provider-only | `docker swarm join-token` |
 | list | `docker_config` | provider-only | `docker config ls` |
-| list | `docker_container` | provider-only | `docker ps` |
-| list | `docker_image` | provider-only | `docker images / docker image inspect` |
-| list | `docker_network` | provider-only | `docker network ls / inspect` |
+| list | `docker_container` | provider-only | `docker ps / docker container ls` |
+| list | `docker_image` | provider-only | `docker images / docker image ls` |
+| list | `docker_network` | provider-only | `docker network ls` |
 | list | `docker_secret` | provider-only | `docker secret ls` |
 | list | `docker_service` | provider-only | `docker service ls / inspect` |
 | list | `docker_swarm_node` | provider-only | `docker node ls / inspect` |
-| list | `docker_volume` | provider-only | `docker volume ls / inspect` |
+| list | `docker_volume` | provider-only | `docker volume ls` |
 | function | `compose_env` | provider-only | - |
 | function | `image_ref` | provider-only | `image reference parsing` |
 | function | `parse_image_ref` | provider-only | `image reference parsing` |

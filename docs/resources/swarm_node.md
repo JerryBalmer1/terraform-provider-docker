@@ -3,13 +3,13 @@
 page_title: "docker_swarm_node Resource - docker"
 subcategory: ""
 description: |-
-  Joins a Docker host to an existing swarm. The join is sent to the joining node's OWN daemon (host, optionally with a tls block, or over SSH with an ssh:// host and an ssh block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
+  Joins a Docker host to an existing swarm (docker swarm join); to manage a node that already joined without joining or leaving, use docker_node. The join is sent to the joining node's OWN daemon (host, optionally with a tls block, or over SSH with an ssh:// host and an ssh block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
   Import with the node ID; host, join_token and manager_address must then be set in configuration (the next apply records them without replacing the node).
 ---
 
 # docker_swarm_node (Resource)
 
-Joins a Docker host to an existing swarm. The join is sent to the joining node's OWN daemon (`host`, optionally with a `tls` block, or over SSH with an `ssh://` host and an `ssh` block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
+Joins a Docker host to an existing swarm (`docker swarm join`); to manage a node that already joined without joining or leaving, use `docker_node`. The join is sent to the joining node's OWN daemon (`host`, optionally with a `tls` block, or over SSH with an `ssh://` host and an `ssh` block); availability, role and labels are then set through the provider's Docker host, which must be a swarm manager. Destroying the resource makes the node leave the swarm (force), waits until the manager reports it down, and removes it from the node list (managers are demoted first).
 
 Import with the node ID; `host`, `join_token` and `manager_address` must then be set in configuration (the next apply records them without replacing the node).
 
@@ -65,9 +65,17 @@ resource "docker_swarm_node" "worker1" {
 
 ### Read-Only
 
+- `addr` (String) IP address the manager reaches the node at (`Status.Addr`).
+- `content_sha256` (String) SHA-256 of inspect_json; changes whenever the object changes.
+- `docker_server_version` (String) Docker Engine version of the daemon the provider talked to (GET /version Version).
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).
 - `hostname` (String) Hostname the node reports to the swarm.
 - `id` (String) Swarm node ID (same as `node_id`).
+- `inspect` (Attributes) The node inspect response as a nested object mirroring Node field by field (snake_case). (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String) The exact Engine API inspect response for the node, as JSON.
+- `name` (String) Node name (`Spec.Name`), else the hostname.
 - `node_id` (String) Swarm node ID, read from the joining daemon after the join.
+- `version_index` (Number) The node object's `Version.Index`; it changes on every update of the node.
 
 <a id="nestedblock--ssh"></a>
 ### Nested Schema for `ssh`
@@ -98,6 +106,146 @@ Optional:
 - `ca` (String) CA certificate (PEM or path).
 - `cert` (String) Client certificate (PEM or path).
 - `key` (String, Sensitive) Client private key (PEM or path).
+
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `created_at` (String) Upstream `CreatedAt`.
+- `description` (Attributes) Upstream `Description`. (see [below for nested schema](#nestedatt--inspect--description))
+- `id` (String) Upstream `ID`.
+- `manager_status` (Attributes) Upstream `ManagerStatus`. (see [below for nested schema](#nestedatt--inspect--manager_status))
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--inspect--spec))
+- `status` (Attributes) Upstream `Status`. (see [below for nested schema](#nestedatt--inspect--status))
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--inspect--version))
+
+<a id="nestedatt--inspect--description"></a>
+### Nested Schema for `inspect.description`
+
+Read-Only:
+
+- `engine` (Attributes) Upstream `Engine`. (see [below for nested schema](#nestedatt--inspect--description--engine))
+- `hostname` (String) Upstream `Hostname`.
+- `platform` (Attributes) Upstream `Platform`. (see [below for nested schema](#nestedatt--inspect--description--platform))
+- `resources` (Attributes) Upstream `Resources`. (see [below for nested schema](#nestedatt--inspect--description--resources))
+- `tls_info` (Attributes) Upstream `TLSInfo`. (see [below for nested schema](#nestedatt--inspect--description--tls_info))
+
+<a id="nestedatt--inspect--description--engine"></a>
+### Nested Schema for `inspect.description.engine`
+
+Read-Only:
+
+- `engine_version` (String) Upstream `EngineVersion`.
+- `labels` (Map of String) Upstream `Labels`.
+- `plugins` (Attributes List) Upstream `Plugins`. (see [below for nested schema](#nestedatt--inspect--description--engine--plugins))
+
+<a id="nestedatt--inspect--description--engine--plugins"></a>
+### Nested Schema for `inspect.description.engine.plugins`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `type` (String) Upstream `Type`.
+
+
+
+<a id="nestedatt--inspect--description--platform"></a>
+### Nested Schema for `inspect.description.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `Architecture`.
+- `os` (String) Upstream `OS`.
+
+
+<a id="nestedatt--inspect--description--resources"></a>
+### Nested Schema for `inspect.description.resources`
+
+Read-Only:
+
+- `generic_resources` (Attributes List) Upstream `GenericResources`. (see [below for nested schema](#nestedatt--inspect--description--resources--generic_resources))
+- `memory_bytes` (Number) Upstream `MemoryBytes`.
+- `nano_cpus` (Number) Upstream `NanoCPUs`.
+
+<a id="nestedatt--inspect--description--resources--generic_resources"></a>
+### Nested Schema for `inspect.description.resources.generic_resources`
+
+Read-Only:
+
+- `discrete_resource_spec` (Attributes) Upstream `DiscreteResourceSpec`. (see [below for nested schema](#nestedatt--inspect--description--resources--generic_resources--discrete_resource_spec))
+- `named_resource_spec` (Attributes) Upstream `NamedResourceSpec`. (see [below for nested schema](#nestedatt--inspect--description--resources--generic_resources--named_resource_spec))
+
+<a id="nestedatt--inspect--description--resources--generic_resources--discrete_resource_spec"></a>
+### Nested Schema for `inspect.description.resources.generic_resources.discrete_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `Kind`.
+- `value` (Number) Upstream `Value`.
+
+
+<a id="nestedatt--inspect--description--resources--generic_resources--named_resource_spec"></a>
+### Nested Schema for `inspect.description.resources.generic_resources.named_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `Kind`.
+- `value` (String) Upstream `Value`.
+
+
+
+
+<a id="nestedatt--inspect--description--tls_info"></a>
+### Nested Schema for `inspect.description.tls_info`
+
+Read-Only:
+
+- `cert_issuer_public_key` (String) Upstream `CertIssuerPublicKey`.
+- `cert_issuer_subject` (String) Upstream `CertIssuerSubject`.
+- `trust_root` (String) Upstream `TrustRoot`.
+
+
+
+<a id="nestedatt--inspect--manager_status"></a>
+### Nested Schema for `inspect.manager_status`
+
+Read-Only:
+
+- `addr` (String) Upstream `Addr`.
+- `leader` (Boolean) Upstream `Leader`.
+- `reachability` (String) Upstream `Reachability`.
+
+
+<a id="nestedatt--inspect--spec"></a>
+### Nested Schema for `inspect.spec`
+
+Read-Only:
+
+- `availability` (String) Upstream `Availability`.
+- `labels` (Map of String) Upstream `Labels`.
+- `name` (String) Upstream `Name`.
+- `role` (String) Upstream `Role`.
+
+
+<a id="nestedatt--inspect--status"></a>
+### Nested Schema for `inspect.status`
+
+Read-Only:
+
+- `addr` (String) Upstream `Addr`.
+- `message` (String) Upstream `Message`.
+- `state` (String) Upstream `State`.
+
+
+<a id="nestedatt--inspect--version"></a>
+### Nested Schema for `inspect.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.
 
 ## Import
 

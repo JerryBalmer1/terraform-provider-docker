@@ -3,12 +3,12 @@
 page_title: "docker_registry_image_tags Data Source - docker"
 subcategory: ""
 description: |-
-  Lists every tag of a repository straight from its registry (GET /v2/<name>/tags/list), following pagination, with the provider's registry_auth. Tags come back in the registry's order, which for distribution-based registries is lexical.
+  Lists every tag of a repository straight from its registry (GET /v2/<name>/tags/list), following pagination, with the provider's registry_auth. Tags come back in the registry's order, which for distribution-based registries is lexical. tags_json holds the pages merged into one {name, tags} document.
 ---
 
 # docker_registry_image_tags (Data Source)
 
-Lists every tag of a repository straight from its registry (`GET /v2/<name>/tags/list`), following pagination, with the provider's `registry_auth`. Tags come back in the registry's order, which for distribution-based registries is lexical.
+Lists every tag of a repository straight from its registry (`GET /v2/<name>/tags/list`), following pagination, with the provider's `registry_auth`. Tags come back in the registry's order, which for distribution-based registries is lexical. `tags_json` holds the pages merged into one `{name, tags}` document.
 
 ## Example Usage
 
@@ -38,5 +38,17 @@ output "latest_release" {
 
 ### Read-Only
 
+- `content_sha256` (String) The `content_sha256` hash output.
+- `distribution_api_version` (String) The registry's Docker-Distribution-API-Version header.
 - `repository` (String) Normalized `registry/repository`, e.g. `docker.io/library/nginx`.
+- `tag_list` (Attributes) The `tag_list` structured output. (see [below for nested schema](#nestedatt--tag_list))
 - `tags` (List of String) The tags.
+- `tags_json` (String) The merged tags/list response.
+
+<a id="nestedatt--tag_list"></a>
+### Nested Schema for `tag_list`
+
+Read-Only:
+
+- `name` (String) Upstream `name`.
+- `tags` (List of String) Upstream `tags`.

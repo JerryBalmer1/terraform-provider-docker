@@ -4,18 +4,74 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A Swarm secret: an immutable blob the Swarm managers store encrypted and mount into service tasks under `/run/secrets/<file_name>`. Requires the provider to point at a Swarm manager. Swarm secrets cannot be changed after creation, so every change replaces the secret; a secret still referenced by a service cannot be removed, so change the referencing service in the same apply (or use `create_before_destroy` with a new name).
+A Swarm secret: a blob the Swarm managers store encrypted and mount into service tasks under `/run/secrets/<file_name>`. Requires the provider to point at a Swarm manager. The content of a swarm secret cannot be changed after creation, so a content or name change replaces the secret, while labels are updated in place (`SecretUpdate`); a secret still referenced by a service cannot be removed, so change the referencing service in the same apply (or use `create_before_destroy` with a new name).
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json; changes whenever the object changes. |
 | `data` | `string` | optional | yes | yes | Secret content, base64-encoded (use `base64encode()`); it must decode. The daemon never returns secret data, so it is kept from state on refresh and ignored on import. Changing this forces a new resource. Exactly one of `data` and `data_wo` is required. |
 | `data_wo` | `string` | optional, write-only |  | yes | Secret content as a write-only argument (Terraform 1.11+), base64-encoded (use `base64encode()`); it is never stored in plan or state, so it can come from an ephemeral value. Requires `data_wo_version`; bump the version to replace the secret with new content. Conflicts with `data`. |
 | `data_wo_version` | `number` | optional | yes |  | Version of `data_wo`. Terraform cannot see changes to a write-only value, so change this number whenever `data_wo` changes; changing it forces a new resource (swarm secrets and configs are immutable). |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
 | `id` | `string` | computed |  |  | The Swarm secret ID. |
-| `labels` | `map(string)` | optional | yes |  | User labels on the secret. Changing this forces a new resource. |
+| `inspect` | `object` | computed |  |  | The secret inspect response as a nested object mirroring Secret field by field (snake_case). Not sensitive: SecretSpec.Data is write-only and never returned by SecretInspect. |
+| `inspect_json` | `string` | computed |  |  | The exact Engine API inspect response for the secret, as JSON. Not sensitive: SecretSpec.Data is write-only and never returned by SecretInspect. |
+| `labels` | `map(string)` | optional |  |  | User labels on the secret. Updated in place (`SecretUpdate`); the content cannot change, so only labels can. |
 | `name` | `string` | required | yes |  | Secret name, unique in the Swarm. Changing this forces a new resource. |
+| `version_index` | `number` | computed |  |  | The secret object's `Version.Index`; it changes when the labels are updated. |
+
+### `inspect`
+
+nested attribute, object. The secret inspect response as a nested object mirroring Secret field by field (snake_case). Not sensitive: SecretSpec.Data is write-only and never returned by SecretInspect.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `inspect.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `data` | `string` | computed |  |  | Upstream `Data`. |
+| `driver` | `object` | computed |  |  | Upstream `Driver`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `templating` | `object` | computed |  |  | Upstream `Templating`. |
+
+### `inspect.spec.driver`
+
+nested attribute, object. Upstream `Driver`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `inspect.spec.templating`
+
+nested attribute, object. Upstream `Templating`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `inspect.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
 
 ## Example
 
@@ -24,15 +80,21 @@ resource "docker_secret" "db_password" {
   name = "db_password"
   data = base64encode("change-me")
 
+  # Labels update in place (SecretUpdate); a new data value replaces the secret.
   labels = {
     app = "shop"
   }
 }
 
+# The Engine's inspect body, e.g. for a downstream tool.
+output "db_password_secret" {
+  value = docker_secret.db_password.inspect.spec.name
+}
+
 # Terraform 1.11+: a write-only secret. The content never reaches plan or
 # state, so it can come from an ephemeral value (an `ephemeral = true`
 # variable, ephemeral.docker_exec_output, ...); bump data_wo_version to rotate
-# it (the secret is replaced, swarm secrets are immutable).
+# it (the secret is replaced: swarm secret content is immutable).
 resource "docker_secret" "api_key" {
   name            = "api_key_v1"
   data_wo         = base64encode("replace-with-an-ephemeral-value")

@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Sets a swarm node's availability to `drain` and waits until its tasks have left, like `docker node update --availability drain`. The provider's host must be a swarm manager. If a `docker_swarm_node` resource manages the node with `availability = "active"`, its next plan shows the change; use `docker_node_activate` to undo.
+Sets a swarm node's availability to `drain` and waits until its tasks have left, like `docker node update --availability drain`. The provider's host must be a swarm manager. If a `docker_node` or `docker_swarm_node` resource manages the node with `availability = "active"`, its next plan shows the change; use `docker_node_activate` to undo. The result object has the node's spec afterwards.
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
@@ -28,7 +28,8 @@ action "docker_node_drain" "<name>" {
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `node` | `string` | required |  |  | Node ID, hostname or node name. |
+| `node_id` | `string` | required |  |  | Target node: ID, unique ID prefix, hostname or node name (resolved to the node ID). |
+| `result_path` | `string` | optional |  |  | Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails. |
 | `timeout` | `string` | optional |  |  | How long to wait for the tasks to leave, as a Go duration. Default `5m`. |
 | `wait` | `bool` | optional |  |  | Wait until no task on the node is still running. Default `true`. |
 
@@ -55,7 +56,7 @@ resource "terraform_data" "maintenance" {
 #   terraform apply -invoke=action.docker_node_drain.maintenance
 action "docker_node_drain" "maintenance" {
   config {
-    node    = var.maintenance_node
+    node_id = var.maintenance_node
     timeout = "10m"
   }
 }

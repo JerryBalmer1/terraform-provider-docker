@@ -4,18 +4,256 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Looks up an image already present on the provider's daemon (no pull). Fails if the image does not exist locally.
+Looks up an image already present on the provider's daemon, without pulling it (`GET /images/{name}/json`). Fails if the image does not exist locally. Per-platform `manifests` are filled on daemons with the containerd image store (API 1.48+).
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `id` | `string` | computed |  |  | Image ID (`sha256:...`). |
-| `image_id` | `string` | computed |  |  | Image ID (`sha256:...`), same as `id`. |
-| `labels` | `map(string)` | computed |  |  | Labels from the image config. |
+| `config` | `object` | computed |  |  | Image config (ImageInspect.Config). |
+| `content_sha256` | `string` | computed |  |  | The `content_sha256` hash output. |
+| `created` | `string` | computed |  |  | ImageInspect.Created (RFC 3339). |
+| `digest` | `string` | computed |  |  | Manifest or index digest: `ImageInspect.Descriptor.digest` on the containerd store, else the digest part of `image_digest_ref`. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version reported by GET /version. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon for this read/build. |
+| `id` | `string` | computed |  |  | Image ID (`sha256:...`, `ImageInspect.Id`). |
+| `image_digest_ref` | `string` | computed |  |  | Repository digest reference (`repo@sha256:...`) from `RepoDigests` for the repository of `name`, if known to the daemon; null for a local-only image. Every entry is in `inspect.repo_digests`. |
+| `image_ref` | `string` | computed |  |  | Normalized `registry/repository:tag` form of `name` (implicit `latest` added); null when `name` is an ID or a digest reference. |
+| `inspect` | `object` | computed |  |  | Full ImageInspect, field by field. |
+| `inspect_json` | `string` | computed |  | yes | The Engine API response body as JSON. Holds Config.Env, hence sensitive. |
+| `labels` | `map(string)` | computed |  |  | Labels from the image config (`Config.Labels`). |
+| `manifests` | `list(object)` | computed |  |  | Per-platform manifests in one shape for both data sources; `filled_by` on each field says which side fills it. |
 | `name` | `string` | required |  |  | Image name, tag or ID to inspect, e.g. `nginx:1.27` or `sha256:...`. |
-| `repo_digest` | `string` | computed |  |  | Repository digest (`repo@sha256:...`) for the repository of `name`, if known to the daemon. |
+| `platforms` | `list(string)` | computed |  |  | Available platforms as `os/arch[/variant]` (`Manifests[].ImageData.Platform` on the containerd store), else the image's single platform. |
 | `repo_tags` | `list(string)` | computed |  |  | Every tag referencing this image on the daemon. |
+
+### `config`
+
+nested attribute, object. Image config (ImageInspect.Config).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args_escaped` | `bool` | computed |  |  | Upstream `ArgsEscaped`. |
+| `cmd` | `list(string)` | computed |  |  | Upstream `Cmd`. |
+| `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
+| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
+| `exposed_ports` | `list(string)` | computed |  |  | Map keys (`<port>/<proto>`) as a list. |
+| `healthcheck` | `object` | computed |  |  | Upstream `Healthcheck`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `on_build` | `list(string)` | computed |  |  | Upstream `OnBuild`. |
+| `shell` | `list(string)` | computed |  |  | Upstream `Shell`. |
+| `stop_signal` | `string` | computed |  |  | Upstream `StopSignal`. |
+| `user` | `string` | computed |  |  | Upstream `User`. |
+| `volumes` | `list(string)` | computed |  |  | Map keys as a list. |
+| `working_dir` | `string` | computed |  |  | Upstream `WorkingDir`. |
+
+### `config.healthcheck`
+
+nested attribute, object. Upstream `Healthcheck`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `interval` | `number` | computed |  |  | Upstream `Interval`. |
+| `retries` | `number` | computed |  |  | Upstream `Retries`. |
+| `start_interval` | `number` | computed |  |  | Upstream `StartInterval`. |
+| `start_period` | `number` | computed |  |  | Upstream `StartPeriod`. |
+| `test` | `list(string)` | computed |  |  | Upstream `Test`. |
+| `timeout` | `number` | computed |  |  | Upstream `Timeout`. |
+
+### `inspect`
+
+nested attribute, object. Full ImageInspect, field by field.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `Architecture`. |
+| `author` | `string` | computed |  |  | Upstream `Author`. |
+| `comment` | `string` | computed |  |  | Upstream `Comment`. |
+| `config` | `object` | computed |  |  | Upstream `Config`. |
+| `created` | `string` | computed |  |  | Upstream `Created`. |
+| `descriptor` | `object` | computed |  |  | Upstream `Descriptor`. |
+| `graph_driver` | `object` | computed |  |  | Upstream `GraphDriver`. |
+| `id` | `string` | computed |  |  | Upstream `Id`. |
+| `identity` | `object` | computed |  |  | Upstream `Identity`. |
+| `manifests` | `list(object)` | computed |  |  | Only with a multi-platform (containerd) image store and `manifests=true`; experimental upstream. |
+| `metadata` | `object` | computed |  |  | Upstream `Metadata`. |
+| `os` | `string` | computed |  |  | Upstream `Os`. |
+| `os_version` | `string` | computed |  |  | Upstream `OsVersion`. |
+| `repo_digests` | `list(string)` | computed |  |  | Upstream `RepoDigests`. |
+| `repo_tags` | `list(string)` | computed |  |  | Upstream `RepoTags`. |
+| `root_fs` | `object` | computed |  |  | Upstream `RootFS`. |
+| `size` | `number` | computed |  |  | Upstream `Size`. |
+| `variant` | `string` | computed |  |  | Upstream `Variant`. |
+
+### `inspect.config`
+
+nested attribute, object. Upstream `Config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args_escaped` | `bool` | computed |  |  | Upstream `ArgsEscaped`. |
+| `cmd` | `list(string)` | computed |  |  | Upstream `Cmd`. |
+| `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
+| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
+| `exposed_ports` | `list(string)` | computed |  |  | Map keys (`<port>/<proto>`) as a list. |
+| `healthcheck` | `object` | computed |  |  | Upstream `Healthcheck`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `on_build` | `list(string)` | computed |  |  | Upstream `OnBuild`. |
+| `shell` | `list(string)` | computed |  |  | Upstream `Shell`. |
+| `stop_signal` | `string` | computed |  |  | Upstream `StopSignal`. |
+| `user` | `string` | computed |  |  | Upstream `User`. |
+| `volumes` | `list(string)` | computed |  |  | Map keys as a list. |
+| `working_dir` | `string` | computed |  |  | Upstream `WorkingDir`. |
+
+### `inspect.config.healthcheck`
+
+nested attribute, object. Upstream `Healthcheck`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `interval` | `number` | computed |  |  | Upstream `Interval`. |
+| `retries` | `number` | computed |  |  | Upstream `Retries`. |
+| `start_interval` | `number` | computed |  |  | Upstream `StartInterval`. |
+| `start_period` | `number` | computed |  |  | Upstream `StartPeriod`. |
+| `test` | `list(string)` | computed |  |  | Upstream `Test`. |
+| `timeout` | `number` | computed |  |  | Upstream `Timeout`. |
+
+### `inspect.descriptor`
+
+nested attribute, object. Upstream `Descriptor`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `artifact_type` | `string` | computed |  |  | Upstream `artifactType`. |
+| `data` | `string` | computed |  |  | Upstream `data`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `platform` | `object` | computed |  |  | Upstream `platform`. |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+| `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `inspect.descriptor.platform`
+
+nested attribute, object. Upstream `platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
+
+### `inspect.graph_driver`
+
+nested attribute, object. Upstream `GraphDriver`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `data` | `map(string)` | computed |  |  | Upstream `Data`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+
+### `inspect.identity`
+
+nested attribute, object. Upstream `Identity`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `build` | `list(string)` | computed |  |  | Upstream `Build`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `pull` | `list(string)` | computed |  |  | Upstream `Pull`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `signature` | `list(string)` | computed |  |  | Upstream `Signature`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `inspect.manifests`
+
+nested attribute, list(object). Only with a multi-platform (containerd) image store and `manifests=true`; experimental upstream.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `attestation_data` | `string` | computed |  |  | Upstream `AttestationData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `available` | `bool` | computed |  |  | Upstream `Available`. |
+| `descriptor` | `object` | computed |  |  | Upstream `Descriptor`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `image_data` | `string` | computed |  |  | Upstream `ImageData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `size` | `object` | computed |  |  | Upstream `Size`. |
+
+### `inspect.manifests.descriptor`
+
+nested attribute, object. Upstream `Descriptor`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `artifact_type` | `string` | computed |  |  | Upstream `artifactType`. |
+| `data` | `string` | computed |  |  | Upstream `data`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `platform` | `object` | computed |  |  | Upstream `platform`. |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+| `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `inspect.manifests.descriptor.platform`
+
+nested attribute, object. Upstream `platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
+
+### `inspect.manifests.size`
+
+nested attribute, object. Upstream `Size`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `content` | `number` | computed |  |  | Upstream `Content`. |
+| `total` | `number` | computed |  |  | Upstream `Total`. |
+
+### `inspect.metadata`
+
+nested attribute, object. Upstream `Metadata`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `last_tag_time` | `string` | computed |  |  | Upstream `LastTagTime`. |
+
+### `inspect.root_fs`
+
+nested attribute, object. Upstream `RootFS`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `layers` | `list(string)` | computed |  |  | Upstream `Layers`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+
+### `manifests`
+
+nested attribute, list(object). Per-platform manifests in one shape for both data sources; `filled_by` on each field says which side fills it.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `available` | `bool` | computed |  |  | Local only: whether that platform's content is present on the daemon. |
+| `digest` | `string` | computed |  |  | Per-platform manifest digest. Local: ImageInspect.Manifests[].Descriptor.digest (containerd store). Registry: DistributionInspect lists platforms only, so null. |
+| `media_type` | `string` | computed |  |  | Upstream `Descriptor.mediaType`. |
+| `platform` | `object` | computed |  |  | Upstream `Platform (os/architecture/variant)`. |
+| `size` | `number` | computed |  |  | Upstream `Descriptor.size`. |
+
+### `manifests.platform`
+
+nested attribute, object. Upstream `Platform (os/architecture/variant)`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
 
 ## Example
 
@@ -26,7 +264,7 @@ data "docker_image" "nginx" {
 }
 
 output "nginx_image_id" {
-  value = data.docker_image.nginx.image_id
+  value = data.docker_image.nginx.id
 }
 
 output "nginx_labels" {

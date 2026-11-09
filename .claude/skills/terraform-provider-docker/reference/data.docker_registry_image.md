@@ -4,15 +4,133 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Reads the current manifest digest of an image tag from its registry, through the daemon's distribution endpoint (`GET /distribution/<name>/json`) with the provider's `registry_auth`. Nothing is pulled. Feed `sha256_digest` into `docker_image.triggers` to re-pull when a moving tag changes.
+Reads the current manifest digest and platforms of an image tag from its registry, through the daemon's distribution endpoint (`GET /distribution/<name>/json`) with the provider's `registry_auth`. Nothing is pulled. Feed `digest` into `docker_image.triggers` to re-pull when a moving tag changes. The registry side returns no image config, so `labels`, `created` and `config` are always null here; use `docker_registry_image_manifests` for the config.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `id` | `string` | computed |  |  | `<name>@<sha256_digest>`. |
+| `config` | `object` | computed |  |  | Same shape as data.docker_image.config; the registry side cannot fill it (DistributionInspect has no config), always null. |
+| `content_sha256` | `string` | computed |  |  | The `content_sha256` hash output. |
+| `created` | `string` | computed |  |  | Registry side cannot fill (no image config via the Engine API); always null. |
+| `digest` | `string` | computed |  |  | Manifest (or manifest list / index) digest, `sha256:...` (DistributionInspect `Descriptor.digest`). |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version reported by GET /version. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon for this read/build. |
+| `id` | `string` | computed |  |  | `<name>@<digest>`, the reference as given pinned to the digest. |
+| `image_digest_ref` | `string` | computed |  |  | Pinned reference `<registry>/<repository>@<digest>`. |
+| `image_ref` | `string` | computed |  |  | Normalized `<registry>/<repository>:<tag>` of `name`. |
+| `insecure_skip_verify` | `bool` | optional |  |  | Accepted for configurations migrated from other providers; it has no effect. The read goes through the daemon, which follows its own `insecure-registries` setting. |
+| `inspect` | `object` | computed |  |  | Full DistributionInspect, field by field. |
+| `inspect_json` | `string` | computed |  |  | The Engine API response body as JSON. |
+| `labels` | `map(string)` | computed |  |  | Always null: the distribution endpoint returns no image config. Present so both image data sources share one shape. |
+| `manifests` | `list(object)` | computed |  |  | Per-platform manifests in one shape for both data sources; `filled_by` on each field says which side fills it. |
 | `name` | `string` | required |  |  | Image reference in the registry, e.g. `nginx:1.27` or `ghcr.io/org/app:main` (no tag means `latest`). |
-| `sha256_digest` | `string` | computed |  |  | Manifest (or manifest list / index) digest, `sha256:...`. |
+| `platforms` | `list(string)` | computed |  |  | Platforms of the image as `os/arch[/variant]` (DistributionInspect `Platforms`). |
+
+### `config`
+
+nested attribute, object. Same shape as data.docker_image.config; the registry side cannot fill it (DistributionInspect has no config), always null.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args_escaped` | `bool` | computed |  |  | Upstream `ArgsEscaped`. |
+| `cmd` | `list(string)` | computed |  |  | Upstream `Cmd`. |
+| `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
+| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
+| `exposed_ports` | `list(string)` | computed |  |  | Map keys (`<port>/<proto>`) as a list. |
+| `healthcheck` | `object` | computed |  |  | Upstream `Healthcheck`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `on_build` | `list(string)` | computed |  |  | Upstream `OnBuild`. |
+| `shell` | `list(string)` | computed |  |  | Upstream `Shell`. |
+| `stop_signal` | `string` | computed |  |  | Upstream `StopSignal`. |
+| `user` | `string` | computed |  |  | Upstream `User`. |
+| `volumes` | `list(string)` | computed |  |  | Map keys as a list. |
+| `working_dir` | `string` | computed |  |  | Upstream `WorkingDir`. |
+
+### `config.healthcheck`
+
+nested attribute, object. Upstream `Healthcheck`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `interval` | `number` | computed |  |  | Upstream `Interval`. |
+| `retries` | `number` | computed |  |  | Upstream `Retries`. |
+| `start_interval` | `number` | computed |  |  | Upstream `StartInterval`. |
+| `start_period` | `number` | computed |  |  | Upstream `StartPeriod`. |
+| `test` | `list(string)` | computed |  |  | Upstream `Test`. |
+| `timeout` | `number` | computed |  |  | Upstream `Timeout`. |
+
+### `inspect`
+
+nested attribute, object. Full DistributionInspect, field by field.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `descriptor` | `object` | computed |  |  | Upstream `Descriptor`. |
+| `platforms` | `list(object)` | computed |  |  | Upstream `Platforms`. |
+
+### `inspect.descriptor`
+
+nested attribute, object. Upstream `Descriptor`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `artifact_type` | `string` | computed |  |  | Upstream `artifactType`. |
+| `data` | `string` | computed |  |  | Upstream `data`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `platform` | `object` | computed |  |  | Upstream `platform`. |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+| `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `inspect.descriptor.platform`
+
+nested attribute, object. Upstream `platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
+
+### `inspect.platforms`
+
+nested attribute, list(object). Upstream `Platforms`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
+
+### `manifests`
+
+nested attribute, list(object). Per-platform manifests in one shape for both data sources; `filled_by` on each field says which side fills it.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `available` | `bool` | computed |  |  | Local only: whether that platform's content is present on the daemon. |
+| `digest` | `string` | computed |  |  | Per-platform manifest digest. Local: ImageInspect.Manifests[].Descriptor.digest (containerd store). Registry: DistributionInspect lists platforms only, so null. |
+| `media_type` | `string` | computed |  |  | Upstream `Descriptor.mediaType`. |
+| `platform` | `object` | computed |  |  | Upstream `Platform (os/architecture/variant)`. |
+| `size` | `number` | computed |  |  | Upstream `Descriptor.size`. |
+
+### `manifests.platform`
+
+nested attribute, object. Upstream `Platform (os/architecture/variant)`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
 
 ## Example
 
@@ -23,6 +141,6 @@ data "docker_registry_image" "alpine" {
 }
 
 output "alpine_digest" {
-  value = data.docker_registry_image.alpine.sha256_digest
+  value = data.docker_registry_image.alpine.digest
 }
 ```

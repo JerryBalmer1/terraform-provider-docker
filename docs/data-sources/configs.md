@@ -3,12 +3,12 @@
 page_title: "docker_configs Data Source - docker"
 subcategory: ""
 description: |-
-  Lists the swarm's configs (GET /configs), sorted by name, with their content; the provider's host must be a swarm manager. Filter by name and labels.
+  Lists the swarm's configs (GET /configs), sorted by name, with their content (configs[*].spec.data, base64); the provider's host must be a swarm manager. Filter by name and labels.
 ---
 
 # docker_configs (Data Source)
 
-Lists the swarm's configs (`GET /configs`), sorted by name, with their content; the provider's host must be a swarm manager. Filter by `name` and `labels`.
+Lists the swarm's configs (`GET /configs`), sorted by name, with their content (`configs[*].spec.data`, base64); the provider's host must be a swarm manager. Filter by `name` and `labels`.
 
 ## Example Usage
 
@@ -17,8 +17,9 @@ data "docker_configs" "nginx" {
   name = "nginx"
 }
 
+# Each element is the Engine config object; spec.data is base64.
 output "nginx_configs" {
-  value = { for c in data.docker_configs.nginx.configs : c.name => base64decode(c.data) }
+  value = { for c in data.docker_configs.nginx.configs : c.spec.name => base64decode(c.spec.data) }
 }
 ```
 
@@ -27,21 +28,53 @@ output "nginx_configs" {
 
 ### Optional
 
-- `labels` (Map of String) Only objects carrying every one of these labels; an empty value matches any value.
+- `labels` (Map of String) Only objects carrying every one of these labels (Engine `label` filter); an empty value matches any value.
 - `name` (String) Only objects whose name matches (Engine `name` filter, a prefix/substring match).
 
 ### Read-Only
 
-- `configs` (Attributes List) The matching objects, sorted by name then ID. (see [below for nested schema](#nestedatt--configs))
+- `configs` (Attributes List) Every config returned by the list endpoint, each mirroring Config field by field (snake_case). (see [below for nested schema](#nestedatt--configs))
+- `configs_json` (String) The exact list response (JSON array of Config) as returned by the Engine API.
+- `content_sha256` (String) SHA-256 of configs_json; changes whenever the object changes.
+- `docker_server_version` (String) Docker Engine version of the daemon the provider talked to (GET /version Version).
+- `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).
+- `ids` (List of String) IDs of the matching objects, in the order of `configs`.
+- `names` (List of String) Names of the matching objects, in the order of `configs`.
 
 <a id="nestedatt--configs"></a>
 ### Nested Schema for `configs`
 
 Read-Only:
 
-- `created_at` (String) RFC 3339 creation time.
-- `data` (String) Config content, base64-encoded.
-- `id` (String) Config ID.
-- `labels` (Map of String) Config labels.
-- `name` (String) Config name.
-- `updated_at` (String) RFC 3339 time of the last update.
+- `created_at` (String) Upstream `CreatedAt`.
+- `id` (String) Upstream `ID`.
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--configs--spec))
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--configs--version))
+
+<a id="nestedatt--configs--spec"></a>
+### Nested Schema for `configs.spec`
+
+Read-Only:
+
+- `data` (String) Upstream `Data`.
+- `labels` (Map of String) Upstream `Labels`.
+- `name` (String) Upstream `Name`.
+- `templating` (Attributes) Upstream `Templating`. (see [below for nested schema](#nestedatt--configs--spec--templating))
+
+<a id="nestedatt--configs--spec--templating"></a>
+### Nested Schema for `configs.spec.templating`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `options` (Map of String) Upstream `Options`.
+
+
+
+<a id="nestedatt--configs--version"></a>
+### Nested Schema for `configs.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.

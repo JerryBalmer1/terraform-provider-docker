@@ -1,0 +1,17 @@
+examples/data-sources/docker_dockerfile/data-source.tf
+internal/provider/datasource_dockerfile.go
+internal/provider/datasource_dockerfile_test.go
+internal/provider/dockerfile_acc_test.go
+internal/provider/dockerfile_builder.go
+internal/provider/dockerfile_image.go
+internal/provider/dockerfile_seam.go
+internal/provider/dockerfile_seam_test.go
+internal/provider/dockerfile_source.go
+internal/provider/dockerfile_structured.go
+internal/provider/dockerfile_structured_test.go
+internal/provider/testdata/dockerfile/escape.Dockerfile
+internal/provider/testdata/dockerfile/escape.golden
+internal/provider/testdata/dockerfile/heredoc.Dockerfile
+internal/provider/testdata/dockerfile/heredoc.golden
+internal/provider/testdata/dockerfile/multistage.Dockerfile
+internal/provider/testdata/dockerfile/multistage.golden

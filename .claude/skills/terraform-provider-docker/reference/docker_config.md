@@ -4,18 +4,64 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A Swarm config: an immutable, non-secret blob mounted into service tasks as a file. Requires the provider to point at a Swarm manager. Swarm configs cannot be changed after creation, so every change replaces the config; a config still referenced by a service cannot be removed, so change the referencing service in the same apply (or use `create_before_destroy` with a new name).
+A Swarm config: a non-secret blob mounted into service tasks as a file. Requires the provider to point at a Swarm manager. The content of a swarm config cannot be changed after creation, so a content or name change replaces the config, while labels are updated in place (`ConfigUpdate`); a config still referenced by a service cannot be removed, so change the referencing service in the same apply (or use `create_before_destroy` with a new name).
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json; changes whenever the object changes. |
 | `data` | `string` | optional | yes |  | Config content, base64-encoded (use `base64encode()`); it must decode. Kept from state on refresh and filled from the daemon on import. Changing this forces a new resource. Exactly one of `data` and `data_wo` is required. |
 | `data_wo` | `string` | optional, write-only |  | yes | Config content as a write-only argument (Terraform 1.11+), base64-encoded (use `base64encode()`); it is never stored in plan or state, so it can come from an ephemeral value. Requires `data_wo_version`; bump the version to replace the config with new content. Conflicts with `data`. |
 | `data_wo_version` | `number` | optional | yes |  | Version of `data_wo`. Terraform cannot see changes to a write-only value, so change this number whenever `data_wo` changes; changing it forces a new resource (swarm secrets and configs are immutable). |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
 | `id` | `string` | computed |  |  | The Swarm config ID. |
-| `labels` | `map(string)` | optional | yes |  | User labels on the config. Changing this forces a new resource. |
+| `inspect` | `object` | computed |  |  | The config inspect response as a nested object mirroring Config field by field (snake_case). |
+| `inspect_json` | `string` | computed |  |  | The exact Engine API inspect response for the config, as JSON. |
+| `labels` | `map(string)` | optional |  |  | User labels on the config. Updated in place (`ConfigUpdate`); the content cannot change, so only labels can. |
 | `name` | `string` | required | yes |  | Config name, unique in the Swarm. Changing this forces a new resource. |
+| `version_index` | `number` | computed |  |  | The config object's `Version.Index`; it changes when the labels are updated. |
+
+### `inspect`
+
+nested attribute, object. The config inspect response as a nested object mirroring Config field by field (snake_case).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `inspect.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `data` | `string` | computed |  |  | Upstream `Data`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `templating` | `object` | computed |  |  | Upstream `Templating`. |
+
+### `inspect.spec.templating`
+
+nested attribute, object. Upstream `Templating`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `inspect.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
 
 ## Example
 
@@ -29,6 +75,11 @@ resource "docker_config" "nginx" {
     }
   CONF
   )
+
+  # Labels update in place (ConfigUpdate); new content replaces the config.
+  labels = {
+    app = "shop"
+  }
 }
 
 # Terraform 1.11+: write-only content, kept out of plan and state. Bump

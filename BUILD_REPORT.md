@@ -827,3 +827,205 @@ Goal: three of the four Lane Z decisions were applied short of what was decided.
 - Outputs went from 1149 to 1165: identity 462, version 302, structured 121, raw 106, hash 106, result 68. The 1149 to 1165 change: logs -4 raw, -8 hash, +4 hash, +3 structured; result +26; docker_cli_version -5.
 - Rules V1-V6 and L1; the version names come from the SCHEMA.md registry; uses_cli is on every item. No allowed violations.
 - Unchanged and still open: A's raw names for non-JSON streams; the result shape for A and C (one `result` object or flat fields).
+
+## Pass 5
+
+Goal: lock the naming decisions (reference/DECISIONS.md), then build the full inventory, so that every non-skipped item is implemented, tested and documented. Lane 0 ran serially in the main tree. Lanes A (engine), B (swarm), C (compose + stack), D (dockerfile), E (buildx + BuildKit) and F (migration) then ran in parallel, each in its own worktree under %TEMP%\tpd-p5. The lane worktrees started from one Lane 0 patch, each lane owned a disjoint set of files (reference/_gen/pass5/ownership.json), and each lane's work came back as a patch. Lane Z then integrated the six patches in the main tree. Nothing is committed.
+
+Pass 5 replaces the unrun Pass 4 lanes:
+- Pass 4 Lane A (Engine API coverage) went to Pass 5 Lanes A, B, C and E, which built the whole inventory. That includes the nine Pass 4 apiwatch TODOs and the engine:image-attestations gate, now applied through gateItemAPI.
+- Pass 4 Lane B (the Pass 3 TODOs) went to the lane that owns each file. The TODOs were not re-checked one by one; the open ones that touched implemented types were covered by the Pass 5 renames, contract and gap work.
+- Pass 4 Lane C (release pipeline) was dropped from Pass 5 as out of scope, and stays open.
+- Pass 4 Lane D (Claude.Agent dogfood) was dropped from Pass 5 as out of scope, and stays open.
+- Pass 4 Lane E (skill, docs, climap, apiwatch) went to Lane Z: GenSkill, Docs, climap at 143 rows, and the genskill layer map.
+- Pass 4 Lane F (harness and verification) went to Lane Z, which ran TestAcc. Lane C made the harness change for ComposeParity.
+
+### Log
+
+[P5-0] [VERIFIED] engine-api-watch at pass start: `go run ./tools/apiwatch` reports v1.56 -> v1.56, no endpoint or definition changes. Nothing to file.
+[P5-0] [BUILD] DECISIONS.md: all 51 Decision lines are filled with the user's rulings, plus a "General rule (Pass 5)" entry for the upstream-name audit. Q24 was applied with the plural-noun rule (history ls -> docker_buildx_history_records, history inspect -> docker_buildx_history); the user confirmed this afterwards.
+[P5-0] [BUILD] reference/_gen/generators/pass5/p5_decisions.py applied the decisions to the fragments.
+- Six items became skips: network-attachment Q1, image-build Q3, buildx:prune Q23, buildx:stop Q25, compose up/down Q11.
+- Six items were renamed or changed kind: container-upload -> docker_container_cp Q9, docker_logs -> docker_container_logs Q6, swarm_ca_rotate -> docker_swarm_rotate_ca Q10, the two history items Q24, and registry-auth -> ephemeral docker_registry_login Q7.
+- The Dockerfile blocks were renamed to docker_dockerfile.<block>.
+- Q35: each action now has one `result` output, a `result_path` input, and target inputs (Q40).
+- Q33/Q34/Q41/Q47/Q49/Q50/Q51 were applied to the outputs.
+- 19 new items were added in fragments/pass5.json + outputs/P5.json: docker_node (Q4), and every type registered before Pass 5 that the harvest had missed (three ephemeral resources, eight list resources, four functions, data docker_registry_image_tags, data docker_swarm_tokens, action docker_system_prune).
+- New inventory kinds: ephemeral_resource, list_resource, function. New registered version name: distribution_api_version.
+[P5-0] [BUILD] Status is computed, not hand-set. merge.py derives missing, partial and exists from internal/provider/registry_gen.go and the `STUB(pass5) <id> [partial: note]` markers; hand-set status/status_note/existing values in a fragment are now an error. V1/V2 skip list resources and functions (CONTRACT.md "Kinds outside the contract").
+[P5-0] [BUILD] tools/registrygen generates internal/provider/registry_gen.go and registry_gen_test.go (TestRegistryGen checks every constructor's Metadata name against the inventory).
+- Constructors are derived as New<CamelName><Kind>; eight existing constructors were renamed with gofmt -r. The 13 register_*.go files were removed and provider.go now calls the gen* functions.
+- New tasks: RegistryGen, RegistryCheck (in the default task) and StubReport.
+- `-stubs` wrote 80 stub constructors (stubs_pass5_<lane>.go) on generic types in stub_pass5.go, which fail with "not implemented (Pass 5)". p5_markers.py wrote the partial markers (pass5_todo_<lane>.go).
+[P5-0] [BUILD] Shared helpers, written by a Lane 0 worker in its own worktree and merged:
+- tools/contractgen -> contract_gen.go: the outputs-contract tables plus one model struct per item. Lanes embed the struct in their model (framework v1.19 promotes embedded struct fields). Per-field sensitivity follows the inventory; an unmapped object becomes a dynamic attribute, or a JSON string when it sits under a collection. New tasks ContractGen and ContractCheck (in the default task).
+- contract.go / contract_version.go: the schema builders, contractFill, hashes and version outputs.
+- action_result.go: one result object; the progress message carries it with sensitive fields redacted; result_path gets it as JSON with sorted keys and a trailing newline.
+- log_entries.go: stream demux, the TTY "combined" stream, tail and since.
+- api_version.go gateItemAPI, plus apiFloorHook installed in client.go (closes the Pass 4 floor TODO).
+- seams.go: four seams. BuildKit build (Lane E), buildx prune (Lane E), Dockerfile render/parse (Lane D), and compose load/normalize/config-hash (Lane C).
+[P5-0] [BUILD] reference/_gen/renames.json has 708 rows, built by build_renames.py from the kreuzwerker v4.6.0 tag (commit 1e48613c) and the genskill reference. renames_post.py then applies pass5/renames_overrides.json: the user's shape decisions (shape_mappings for logging across Engine HostConfig.LogConfig / Swarm TaskTemplate.LogDriver / compose logging, and for the service networks map {aliases, driver_opts}) and the gap flips. p5_shape_fields.py adds `input_attr` to 17 structured-output fields.
+[P5-0] [BUILD] reference/_gen/pass5/lanes.json maps every item to a lane (A 65, B 36, C 40, D 22, E 8). ownership.json assigns each file under internal/provider, examples and test to one lane, with naming-prefix rules for new files and a `--check <lane> <files>` mode.
+[P5-0] [VERIFIED] With the stubs in place, the default task (11 tasks) and FmtCheck passed. Six lane worktrees were built with `git apply --index` of the Lane 0 patch; every base tree equals the main tree's staged tree 86bb137, and each worktree passed Invoke-Build Build.
+[P5-0] [ASSUMED] The three judgment calls in the rename audit were kept, and the user confirmed them: command/read_only keep their compose/CLI names, `logging { driver, options }` is the one shape, and the service networks are a map.
+[P5-0] [FIXED] The lane brief described renames.json gap rows wrongly (it said our_attr was set). The 144 gap rows were sent to their lanes as explicit lists (A 104, B 28, C 1, E 11), on the user's ruling that gap rows are work, not drops.
+[P5-A] [BUILD] ctr: docker_container Q1 networks map (in-place connect/disconnect), Q9 files, 42 renames, 56 gap attributes, logging{driver,options} -> HostConfig.LogConfig, contract outputs from the raw inspect body
+[P5-A] [BUILD] img: docker_image Q20/Q44/Q46, 21 build gap attributes, contract; data docker_image contract; docker_tag contract + triggers; data docker_image_history/_search/_attestations/docker_images; action docker_image_commit; result + result_path on import/load/save
+[P5-A] [BUILD] img: BuildKit builds always go through seamBuildKitImpl (no fallback), named buildx builders -> Builder.Name, build.ssh/no_cache_filter/outputs/attestations, buildx:build outputs metadata_json/_sha256, build_metadata, buildx_version, build_ref
+[P5-A] [BUILD] reg: docker_registry_manifest_list (new), ephemeral docker_registry_login (new), contract outputs on docker_registry_image, data docker_registry_image / _tags / _manifests, ephemeral docker_registry_token
+[P5-A] [BUILD] obj: data docker_networks/_volumes/_plugins/_info/_version/_system_df; actions docker_container_prune/_network_prune/_volume_prune/_builder_prune/_plugin_create/_plugin_push; contract on network/volume/plugin; plugin in-place PluginUpgrade
+[P5-A] [BUILD] obj: docker_volume cluster_volume_spec + cluster_volume_id (Swarm CSI volumes, availability in place via VolumeUpdate, API 1.42 check)
+[P5-A] [BUILD] cop: data docker_container/_changes/_file/_stats/_top, docker_container_logs (Q6), docker_containers; actions docker_container_start/stop/restart/kill/pause/unpause (one implementation), _wait, _cp, _export; docker_exec Q33/Q34/Q35; docker_exec_output contract
+[P5-A] [FIXED] docker_system_prune / docker_image_prune / image import/load/save / container_export / exec: one result object + result_path
+[P5-A] [ASSUMED] *_json outputs of list/system data sources, DistributionInspect, /auth, container changes/top/list are re-encoded moby structs (no raw body in moby client v0.6.2)
+[P5-A] [ASSUMED] docker_registry_token.token became the contract object {token, expires_in, issued_at}
+[P5-A] [ASSUMED] docker_tag id = source image ID (inventory); old state migrated on Read
+[P5-A] [ASSUMED] data docker_registry_image insecure_skip_verify has no effect (reads go through the daemon)
+[P5-A] [ASSUMED] docker_builder_prune with builder: until/unused-for validated as Go durations, other filters passed as given (leading ~ = substring)
+[P5-A] [TEST] go test ./internal/provider -short passes; acceptance tests not run (no daemon)
+[P5-A] [TODO] tools/compose2stack, tools/climap/commands.json, tools/genskill/main.go: follow the renames (TestConvertGolden, TestCLIMapRealProvider fail until then)
+[P5-A] [TODO] seams.go: seamBuildRequest.AdditionalContexts
+[P5-A] [TODO] $SwarmAccRegex += TestAccObjClusterVolume
+[P5-B] [TODO] Lane C, internal/provider/stack_resource_test.go:88: replace the line with
+[P5-B] [TODO] Lane C, stack_resource_test.go HCL (lines ~185, 209, 370), `networks = ["front"]` / `["net"]` -> `networks = { front = {} }` / `{ net = {} }`. Also update the import check `"service.1.networks.0": "front"`. With these changes TestStackFakeDaemonLifecycle should pass.
+[P5-B] [TODO] Lane C, examples/resources/docker_stack/resource.tf: `networks = ["backend"]` -> `networks = { backend = {} }` (lines ~43 and ~68). This fixes TestStackExamplesPlan/docker_stack.
+[P5-B] [TODO] compose2stack owner, tools/compose2stack/convert.go (swarm service output):
+[P5-B] [TODO] Lane Z, tools/genskill/main.go:747 -> `"action.docker_service_scale": {"service_id", "replicas"}`.
+[P5-B] [TODO] Lane Z, tools/genskill/templates/skill.md.tmpl:
+[P5-B] [TODO] Lane Z, tools/climap/commands.json. TestCLIMapRealProvider fails until these are done.
+[P5-B] [TODO] Lane Z, $SwarmAccRegex: add TestAccSwarmDataSources, TestAccNodeResource_basic, TestAccActionNodePromoteDemote_basic, TestAccActionSwarmRotateCA_basic, TestAccActionSwarmUnlockKey_basic. Remove TestAccNode_byHostname and TestAccNodes_all if they are listed (deleted).
+[P5-B] [TODO] Lane Z, tools/parity/paritydata: add rows for docker_node, docker_node_promote, docker_node_demote, docker_swarm_unlock, docker_swarm_rotate_unlock_key, docker_swarm_rotate_ca, data docker_swarm/docker_service/docker_task/docker_tasks/docker_secret/docker_config/docker_service_logs/docker_task_logs (if paritydata tracks our-only types).
+[P5-B] [TODO] Lane Z: delete the compose:service-deploy marker in pass5_todo_c.go (docker_service now carries deploy / compose_spec_version / compose_go_version).
+[P5-B] [TODO] Lane Z: run GenSkill and Docs. Schemas changed for docker_service, docker_stack (shared service block), docker_secret, docker_config, docker_swarm_init, docker_swarm_node, the node, service and swarm actions, and all swarm data sources.
+[P5-B] [BUILD] docker_service: networks map, dns_config, mount option blocks, 28 gap attributes, contract outputs + version_index + image_digest_ref + compose:service-deploy outputs (deploy, compose_spec_version, compose_go_version).
+[P5-B] [BUILD] docker_secret/docker_config: labels in place via SecretUpdate/ConfigUpdate; contract outputs; version_index.
+[P5-B] [BUILD] docker_node resource (Q4); docker_swarm_init spec update (orchestration, raft, dispatcher, ca_config, labels) + contract; docker_swarm_node contract.
+[P5-B] [BUILD] Actions docker_node_promote/demote, docker_swarm_unlock, docker_swarm_rotate_unlock_key, docker_swarm_rotate_ca. All 11 swarm actions now report one result object and take result_path; their targets are node_id/service_id (Q40).
+[P5-B] [BUILD] Data sources docker_swarm, docker_secret, docker_config, docker_service, docker_task, docker_tasks, docker_service_logs, docker_task_logs. docker_node/nodes/secrets/configs/services rebuilt on the contract (Q39 full objects + ids/names). Swarm tokens DS/ephemeral: join_tokens + versions.
+[P5-B] [ASSUMED] SwarmInspect and the list endpoints expose no raw body in moby client v0.6.2, so docker_swarm / docker_swarm_init inspect_json and the plural *_json are the decoded moby values re-encoded with encoding/json. The other inspect_json values are the Engine body as received (*InspectResult.Raw).
+[P5-B] [ASSUMED] docker_tasks/docker_task names are "<service>.<slot>" (or "<service>.<node ID>") when the Engine's Task.Name is empty, as the CLI shows them. Node names are Spec.Name, else the hostname.
+[P5-B] [ASSUMED] docker_service_logs applies `tail` per service after merging by time (the Engine applies it per task).
+[P5-B] [ASSUMED] The docker_service `deploy` output is the service spec rendered in compose `deploy` shape. Mode uses the compose spelling (replicated-job); cpus is a decimal string.
+[P5-B] [TEST] go test -short ./internal/provider: everything passes except TestStackFakeDaemonLifecycle and TestStackExamplesPlan/docker_stack (Lane C HCL, see TODO). That run used a temporary local fix of stack_resource_test.go:88, which was reverted before producing the patch. tools/genskill TestCLIMapRealProvider fails on commands.json (Lane Z TODO).
+[P5-B] [VERIFIED] go run ./tools/genskill -strict: passes (17 resources, 51 actions, 4 ephemeral, 8 list, 4 functions).
+[P5-B] [VERIFIED] The new acceptance tests skip cleanly without TF_ACC. The dind harness was not run.
+[P5-C] [BUILD] compose seam: seamComposeImpl = composeSeam{} (Load wraps composeLoad; Normalize = Project.MarshalYAML; ConfigHash = CLI confighash port)
+[P5-C] [VERIFIED] composeServiceConfigHash/NetworkHash/VolumeHash equal docker/compose internal/confighash golden digests (TestComposeConfigHashGolden)
+[P5-C] [BUILD] local mode: com.docker.compose.config-hash = CLI value; provider digest in io.terraform.provider.compose-spec-hash; legacy config-hash still matches (no recreate on upgrade)
+[P5-C] [BUILD] docker_compose: name/project_directory renames (schema v1 + v0 upgrader), remove_orphans, compose:name contract, identity outputs, Q18 jobs warning, service builds via seamBuildKitImpl
+[P5-C] [BUILD] 10 data sources (compose_config/containers/projects/volumes/images/logs/port/top, stacks, stack), 17 actions (compose start/stop/restart/kill/pause/unpause/scale/run/exec/build/pull/push/publish/commit/cp/export/wait)
+[P5-C] [BUILD] docker_stack contract outputs + identity maps (stack_contract.go, stack_status.go)
+[P5-C] [TEST] 25 unit tests added, all pass with -short; 5 acceptance tests added (not run)
+[P5-C] [BUILD] TestAccComposeParity + harness TF_ACC_COMPOSE_CLI (harness-up.sh/.ps1, README)
+[P5-C] [ASSUMED] remove_orphans defaults to true (the existing docker_compose behaviour), not the CLI's false
+[P5-C] [ASSUMED] the provider config-hash does not resolve service: refs (network_mode/volumes_from) to container IDs before hashing, as the CLI's serviceHashWithResolvedRefs does; TestAccComposeParity will show any difference
+[P5-C] [ASSUMED] docker_compose_publish publishes the compose files only (no env files), as `docker compose publish` without --with-env
+[P5-C] [ASSUMED] docker_compose_run fails on a non-zero exit (as docker_exec does); docker_compose_wait only reports codes unless fail_on_error = true
+[P5-C] [ASSUMED] docker_stack stack_yaml renders the live specs; image values keep the daemon's @sha256 pin
+[P5-C] [BLOCKED] C compose:service-build docker_image contract outputs | type owned by Lane A/E | build implemented in docker_compose via seam
+[P5-C] [BLOCKED] C compose:service-deploy docker_service contract outputs | type owned by Lane B | deploy mapping exists in compose_swarm.go
+[P5-C] [TODO] Lane Z: tools/climap/commands.json entries above (docker compose up attrs project_name -> name fixes TestCLIMapRealProvider)
+[P5-C] [TODO] Lane Z: $SwarmAccRegex += StackDataSources
+[P5-C] [TODO] orchestrator: after Lane B merge, update docker_stack example/tests to the networks map shape
+[P5-D] [TODO] inventory dockerfile:data-dockerfile notes: the `git` source became `url` this pass. It is an https fetch of a raw file, pure Go, with no git.
+[P5-D] [TODO] inventory dockerfile:FROM: the stage block has no computed `instruction` output (it would clash with the nested `instruction` block; it is always FROM). The FROM structured `from` object is exposed through `stages[*]` (base_image, platform, name, base_image_digest), not on the block.
+[P5-D] [TODO] inventory dockerfile_block items: the per-block `<keyword>` structured object is in `stages[*].instructions[*].<keyword>`, a JSON string because data-dockerfile's instruction fields are not complete. Making those fields complete in the fragment would give typed objects after contractgen. The block-level outputs instruction, stage_index, instruction_index, dockerfile, content_sha256 and dockerfile_syntax are computed attributes on each builder block.
+[P5-D] [TODO] tools/parity/paritydata/paritydata.go line 146: replace the docker_dockerfile description with "Reads, parses and renders one Dockerfile from content, a local path, an https url, an image history (approximate) or ordered stage/instruction blocks." Drop "Pass 5:" and the `git` wording.
+[P5-D] [TODO] climap: no entry needed. docker_dockerfile replaces no CLI command; `docker image history` belongs to docker_image_history.
+[P5-D] [TODO] Lanes A and E can now call seamDockerfileImpl.Render/Parse. The stub error is gone.
+[P5-D] [BUILD] data docker_dockerfile implemented: content/path/url/image/blocks sources, ordered `stage`/`instruction` blocks with one keyword block each, directives syntax/escape/check, onbuild attribute, MAINTAINER read-only.
+[P5-D] [BUILD] seamDockerfileImpl implemented in dockerfile_seam.go (buildkit parser + our renderer).
+[P5-D] [BUILD] image-mode reconstruction from ImageHistory + ImageInspect config, fidelity approximate.
+[P5-D] [TEST] 20 unit test functions; golden round-trip of 196 of 213 doc examples plus 3 fixtures with .golden renders.
+[P5-D] [VERIFIED] go.mod/go.sum unchanged; build graph +3 buildkit packages (command, shell, parser) from the existing module.
+[P5-D] [ASSUMED] url source accepts https only; responses capped at 4 MiB; text/html responses refused.
+[P5-D] [ASSUMED] builder blocks render one line per instruction (no continuations), LABEL/ENV keys sorted, and the JSON form chosen automatically for COPY/ADD/VOLUME paths with whitespace.
+[P5-D] [ASSUMED] instruction_index: FROM = 0, instructions 1..n (stages[*].instructions[*].index uses the same numbering); global ARGs are 0..n with stage_index null.
+[P5-D] [TODO] Lane Z: inventory notes for git -> url, the source_type values and the block output placement (see above); paritydata description.
+[P5-E] [TODO] Lane A, image_resource.go / image_build.go:
+[P5-E] [TODO] Lane A, docker_builder_prune: with `builder` set, call `seamBuildxPruneImpl.Prune`.
+[P5-E] [TODO] Lane 0, seams.go: add to seamBuildRequest:
+[P5-E] [TODO] Lane 0, contract: buildx:bake `dockerfile_syntax` is map(string) in the inventory, but contractVersionValue and actFinishResult only take a string, so the result gets the default syntax as a single string. Fix one of two ways:
+[P5-E] [TODO] Lane Z, tools/climap/commands.json, new entries:
+[P5-E] [TODO] Lane Z, existing climap entries:
+[P5-E] [TODO] Lane Z: regenerate docs and the genskill outputs (renamed builder attributes, 5 data sources, 1 action). Update the paritydata status of docker_buildx_builder if wanted (still Partial: docker-container driver only).
+[P5-E] [BUILD] buildkit_conn.go: builder discovery on the daemon (default via /grpc+/session, buildx_buildkit_* nodes via buildctl dial-stdio, tcp/unix endpoints) and bkConnect.
+[P5-E] [BUILD] buildkit_build.go: seamBuildKitImpl (Solve with dockerfile.v0, exporters, cache, secrets, ssh, attestations, metadata, progress), plus bkExtra for named contexts, annotations, call and entitlements.
+[P5-E] [BUILD] buildkit_prune.go: seamBuildxPruneImpl.
+[P5-E] [BUILD] buildx_builder_resource.go: 3 renames, 11 gap attributes, contract outputs, a labels output, multi-node append/node.
+[P5-E] [BUILD] datasource_buildx_builder.go, datasource_buildx_history.go, datasource_buildx_disk_usage.go: 5 data sources with their contract outputs.
+[P5-E] [BUILD] buildx_bake_parse.go + action_buildx_bake.go: docker_buildx_bake.
+[P5-E] [BUILD] buildx_build_contract.go: contract input helper for docker_image (buildx:build).
+[P5-E] [TEST] 22 new unit tests plus 2 updated, with a fake BuildKit gRPC control server; 2 new acceptance tests plus 1 updated.
+[P5-E] [VERIFIED] `Invoke-Build Build, Vet, Test, FmtCheck` in wt-E: Build succeeded. 4 tasks, 0 errors, 0 warnings.
+[P5-E] [ASSUMED] Bake variables are overridden only from the action's `variables` argument, never from the provider's environment, so a run depends only on its configuration. BAKE_LOCAL_PLATFORM is `linux/<provider GOARCH>`.
+[P5-E] [ASSUMED] docker_buildx_disk_usage uses BuildKit DiskUsage for every builder, including `default` (over the daemon's /grpc), not GET /system/df, so mutable/shared are real values.
+[P5-E] [ASSUMED] Builder last_activity is the newest node container's creation time; buildx's own value lives in its client-side store.
+[P5-E] [ASSUMED] For builder containers without the provider's label, the builder name is the container name minus `buildx_buildkit_` and one trailing node digit.
+[P5-E] [TODO] See the TODO section.
+[P5-E] [BLOCKED] See the BLOCKED section.
+[P5-F] [TODO] Lane Z: after the merge, run `TPD_MOVE_STRICT=1 go test ./internal/provider -run TestMoveTargetsInSchema -short`. Every logged target must exist once lanes A-E have applied the renames. Today 53 targets are missing (container networks/files/logging/cap_add/..., service dns_config/volume_options/..., image image_digest_ref, network enable_ipv6, registry_image digest, compose name/project_directory, buildx buildkitd_*). Any target still missing is a rename that lane did not apply.
+[P5-F] [TODO] Lane Z: after flipping implemented gap rows in reference/_gen/renames.json:
+[P5-F] [TODO] Lane Z: update the CLAUDE.md tools/parity line, for example: "`tools/parity/`: kreuzwerker/docker v4.6.0 parity. Types: hand-maintained list in `tools/parity/paritydata`. Attributes: `paritydata/kreuzwerker_v4.6.0_attrs.json` (from `-extract`) checked against reference/_gen/renames.json: every attribute mapped or dropped with a reason; "gap:" rows fail (use "won't implement:" for deliberate drops). `-check BUILD_REPORT.md` also fails on a missing type with no `[BLOCKED]` line. `-guide` regenerates templates/guides/migrating-from-kreuzwerker.md.tmpl."
+[P5-F] [TODO] Lane Z: `Invoke-Build Parity` (`go run ./tools/parity`) exits 1 until the 144 gap rows are implemented or re-reasoned "won't implement: ...". This is by decision.
+[P5-F] [TODO] Lane Z: run TestAccMoveFromKreuzwerker in the harness plain pass. It needs outbound access to registry.terraform.io and releases.hashicorp.com. If the harness has none, record it as BLOCKED rather than skipping silently.
+[P5-F] [TODO] Lane 0/Z (optional): paritydata.Kreuzwerker still names the data source `docker_logs`, with the note "renamed data docker_container_logs in Pass 5 (Q6)". I left it unchanged so TestCLIMapRealProvider keeps passing.
+[P5-F] [BUILD] ResourceWithMoveState from registry.terraform.io/kreuzwerker/docker for 12 resource types (move_<type>.go + schema-driven engine move_common.go).
+[P5-F] [BUILD] tools/parity: attribute-level check against reference/_gen/renames.json (gap rows fail, grouped by type), checked-in kreuzwerker_v4.6.0_attrs.json (685 attributes, -extract), -guide/-guide-check generator.
+[P5-F] [BUILD] templates/guides/migrating-from-kreuzwerker.md.tmpl generated from renames.json.
+[P5-F] [VERIFIED] Terraform v1.12.2 source: cross-provider move when provider or type differs; source provider taken from state; from == to rejected ("Redundant move statement"); framework docs: state move needs Terraform >= 1.8.
+[P5-F] [TEST] 26 unit tests in internal/provider (move_*_test.go), 9 new in tools/parity, all pass with -short; TestKreuzwerkerAttrsFresh passed against the clone.
+[P5-F] [ASSUMED] SDKv2 empty values ("" and empty lists/maps) map to null; numbers and bools are kept. The guide warns to expect in-place updates where defaults differ.
+[P5-F] [ASSUMED] container network_data entries are merged only into networks declared by networks_advanced; the others are left to the post-move refresh.
+[P5-F] [TODO] Lane Z: TPD_MOVE_STRICT=1 TestMoveTargetsInSchema after merge; regenerate the guide after renames.json gap flips; CLAUDE.md tools/parity text; harness run of TestAccMoveFromKreuzwerker (needs registry access).
+[P5-Z] [VERIFIED] The six patches were applied in order A..F with `git apply --index --3way`. There were 0 conflicts, no path appears in two lanes, no lane touched reference/, docs/, .claude/, go.mod or the generated files, and `p5_ownership.py --check` passes for every lane.
+[P5-Z] [FIXED] Integration leftovers:
+- stack_resource_test.go:88 and the stack tests, the example and the acc configs now use Lane B's service networks map.
+- tools/compose2stack writes the renamed attributes in both modes; the goldens were regenerated and a new kitchen fixture was added.
+- tools/climap/commands.json: the 21 stale names are fixed and the rows grew from 76 to 143 with every lane's entries.
+- tools/genskill main.go, the skill template, and typeLayer (30 -> 115 types) were updated.
+- e2e/dockerfile/image_build_buildkit tests now use `id` instead of `image_id`.
+- seams.go seamBuildRequest gained Contexts, Annotations, Call and Entitlements, wired through Lane E's bkExtra. docker_image build.additional_contexts works now (it previously returned "not supported yet").
+- kwTypeHas in move_common_test.go walked into lists/maps by consuming a path segment. It is fixed, and the strict move check (TPD_MOVE_STRICT=1) passes: every migration target exists.
+[P5-Z] [BUILD] p5_gap_flips.py turned every lane's "Gap rows implemented" section into overrides, flipping all 143 open gap rows (the 144th, service networks_advanced.driver_opts, had already been mapped by the user's decision). renames.json: 286 kept, 269 renamed, 153 dropped with a reason, 0 still gap.
+[P5-Z] [BUILD] p5_lanez.py:
+- The dockerfile notes and descriptions now say the git source became url and builder mode is a source (Lane D).
+- compose:service-build no longer has compose_spec/compose_go versions; they describe compose parsing, which docker_image does not do.
+- buildx:bake dockerfile_syntax (map) moved into `result` (the version registry holds one value per item).
+- The last three markers (compose:service-build, compose:service-deploy, buildx:build) were checked against the schema and removed: docker_service carries deploy plus the compose versions (Lane B), and docker_image carries the buildx build outputs (Lane A).
+[P5-Z] [BUILD] Build file: Guide / GuideCheck tasks were added, and $SwarmAccRegex gained SwarmDataSources, NodeResource, ObjClusterVolume and Action(NodePromoteDemote|SwarmRotateCA|SwarmUnlockKey). CLAUDE.md now describes the tools/parity attribute check, RegistryGen/StubReport/ContractGen and the generated registration.
+[P5-Z] [TEST] First TestAcc: the plain pass had 59 pass, 12 fail, 37 skip; the swarm pass had 30 pass, 2 fail, 2 skip.
+[P5-Z] [FIXED] Acceptance fixes, re-run on the harness:
+- Write-only attributes on actions (swarm_unlock unlock_key, swarm_rotate_ca signing_ca_key) are rejected by framework v1.19. They are now plain Required attributes and are kept out of progress and result output.
+- must_run start: the computed outputs are now unknown when a start is planned. This fixes the inconsistent result.
+- docker_dockerfile: required arguments inside absent keyword blocks are now Optional and are checked by dfInstruction.
+- docker_compose_scale starts kept containers that had stopped (CLI parity).
+- docker_compose local create now matches `docker compose up`: com.docker.compose.image is the image ID, depends_on uses svc:condition:restart, the container name is the first alias, and named volumes go through Binds. This is applied at create time, so spec hashes are unchanged.
+- docker_network ipam_config uses RequiresReplaceIf, so a daemon-assigned pool from migrated state no longer forces replacement.
+- Test-side fixes: stack map check, compose volumes fixture, the compose kill race, cop verbs test design, multi-line error patterns, and keep_locally on the shared busybox:1.36 in three image tests.
+[P5-Z] [VERIFIED] Final default task + FmtCheck + DocsValidate + StubReport + GuideCheck + Parity + GenSkillStrict: 16 tasks, 0 errors. InventoryValidate: 159 items, 1156 outputs, 0 violations. StubReport: 0 markers.
+[P5-Z] [TEST] Unit tests (`go test ./... -short -json`, TF_ACC unset): 556 top-level pass, 0 fail, 114 skip (TestAcc), plus 75 subtests pass. Pass 4 ended at 303/0/77. Test functions: unit 304 -> 560, acceptance 76 -> 108.
+[P5-Z] [TEST] Final TestAcc (Invoke-Build TestAcc, dind harness): the plain pass had 71 pass, 0 fail, 37 skip; the swarm pass (-SwarmInit) had 32 pass, 0 fail, 2 skip.
+- 33 of the plain-pass skips are swarm tests that run in the swarm pass.
+- The environment skips are TestAccImageSearch (TPD_ACC_INTERNET), TestAccObjPluginCreatePush (TF_ACC_PLUGIN_DIR), TestAccPlugin_basic (TF_ACC_PLUGIN), TestAccObjClusterVolume (TF_ACC_CSI_PLUGIN, in both passes) and TestAccActionNodePromoteDemote_basic (needs a ready worker node).
+- ComposeParity: 3 sub-cases pass with no diff. 10 skip because the CLI itself cannot bring them up on dind: images that do not exist, Windows bind paths, a missing external network, a fixed host port with 2 replicas, and leftovers from the CLI's failed c2s_webapp run.
+- TestAccMoveFromKreuzwerker passed.
+[P5-Z] [TODO] The harness exports no TF_ACC_CSI_PLUGIN, TF_ACC_PLUGIN_DIR or TF_ACC_PLUGIN, and has no Docker Hub flag, so 5 acceptance tests never run there. TestAccActionNodePromoteDemote_basic needs a joined worker in the -SwarmInit pass.
+[P5-Z] [TODO] Not implemented in bake (Lane E): `target:` contexts and cross-target refs, plus `policy`/`resources` (no client option in BuildKit v0.34.2). history-inspect materials and attachment bodies (BuildKit content store) are also not implemented.
+
+### Pass 5 summary
+
+- **Decisions:** 51 decisions plus the general rule are written in DECISIONS.md and applied to the inventory. The inventory has 252 items: 171 not skipped (28 resources, 55 data sources, 51 actions, 4 ephemeral resources, 8 list resources, 4 functions, 21 Dockerfile blocks), all computed **exists**, and 81 skipped. The provider registers 138 types.
+- **Renames:** renames.json has 708 rows: 286 kept, 269 renamed, 153 dropped with a reason, 0 gap. The parity check covers 685 kreuzwerker attributes (532 mapped, 153 dropped with a reason, 0 open) and 26 types (24 have, 2 partial). There is one type rename, data.docker_logs -> data.docker_container_logs. Every kreuzwerker resource type (12) can move its state from registry.terraform.io/kreuzwerker/docker (Terraform >= 1.8). The migration guide is templates/guides/migrating-from-kreuzwerker.md.tmpl.
+- **Dependencies:** none added (go.mod/go.sum unchanged). Lane D pulls three more packages from the buildkit v0.34.2 module already required (frontend/dockerfile/{command,shell,parser}).
+- **Tests:** unit 556/0/114 (+75 subtests); acceptance plain 71/0/37, swarm 32/0/2.
+- **Blocked:** no inventory item is blocked. Sub-features: bake `target:` contexts, cross-target refs, policy and resources; buildx history materials and attachment bodies; the buildx kubernetes/remote drivers and client store, which are not Engine API objects (remote BuildKit endpoints work through the seam).
+- **Behaviour changes to note in release notes:**
+  - docker_tag.id is the source image ID (state migrated on read).
+  - docker_registry_token.token is an object.
+  - Plural data sources hold full Engine objects (Q39; e.g. nodes[*].description.hostname).
+  - com.docker.compose.config-hash is the CLI's value; the provider digest moved to io.terraform.provider.compose-spec-hash, with no recreation (TestComposeHashCompat passes).
+  - remove_orphans defaults to true.
+  - Removing docker_network ipam_config is now in place.
+  - Some plural *_json outputs and the swarm inspect_json are re-encoded, not the exact bytes, because the moby client returns no raw body for them.
+- **Commit groups:** reference/_gen/pass5/commit-groups/ (0-decisions-scaffold, A..F, Z-docs-inventory). They are meant to be committed in order; only the last is guaranteed to build.

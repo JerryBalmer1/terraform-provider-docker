@@ -26,9 +26,21 @@ ephemeral "docker_swarm_tokens" "<name>" {
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
+| `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon. |
 | `id` | `string` | computed |  |  | Swarm cluster ID. |
+| `join_tokens` | `object` | computed |  | yes | The `join_tokens` structured output. |
 | `manager` | `string` | computed |  | yes | Token that joins a node as a manager. |
 | `worker` | `string` | computed |  | yes | Token that joins a node as a worker. |
+
+### `join_tokens`
+
+nested attribute, object. The `join_tokens` structured output.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `manager` | `string` | computed |  | yes | Upstream `Manager`. |
+| `worker` | `string` | computed |  | yes | Upstream `Worker`. |
 
 ## Example
 

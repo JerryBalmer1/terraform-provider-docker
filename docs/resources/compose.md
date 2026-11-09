@@ -3,12 +3,12 @@
 page_title: "docker_compose Resource - docker"
 subcategory: ""
 description: |-
-  A Docker Compose project applied through the Engine API, with no compose CLI plugin involved. The project is parsed with compose-go (the library docker compose uses) from content or files, with interpolation limited to env and env_file. In mode = "local" every service becomes containers named <project>-<service>-<n> (or container_name), every network <project>_<name> and every volume <project>_<name>, all labelled com.docker.compose.project like docker compose up does, so docker compose ps shows them. In mode = "swarm" the project becomes a stack (services, overlay networks, secrets and configs labelled com.docker.stack.namespace) like docker stack deploy. Refresh compares the live objects with the parsed project (a com.docker.compose.config-hash label on each object, plus container state or service image/replicas) and marks spec_hash as drifted so the next plan shows an update. An update creates what is missing, recreates what changed and removes objects of the project that are no longer in it. Destroy removes everything labelled with the project. build is not supported: build images with docker_image.
+  A Docker Compose project applied through the Engine API, with no compose CLI plugin involved. The project is parsed with compose-go (the library docker compose uses) from content or files, with interpolation limited to env and env_file. In mode = "local" every service becomes containers named <project>-<service>-<n> (or container_name), every network <project>_<name> and every volume <project>_<name>, all labelled com.docker.compose.project like docker compose up does (including the com.docker.compose.config-hash values the CLI computes), so docker compose ps shows them. In mode = "swarm" the project becomes a stack (services, overlay networks, secrets and configs labelled com.docker.stack.namespace) like docker stack deploy. Refresh compares the live objects with the parsed project (a com.docker.compose.config-hash label on each object, plus container state or service image/replicas) and marks spec_hash as drifted so the next plan shows an update. An update creates what is missing, recreates what changed and removes objects of the project that are no longer in it. Destroy removes everything labelled with the project. In local mode a service with a build: section is built through BuildKit when its image is missing (always with pull_policy: build) and tagged image or <project>-<service>. A project that defines jobs plans with a warning: jobs are not run yet (use the docker_compose_run action). The whole normalized project is exposed as compose_yaml (what docker compose config prints) and the structured project.
 ---
 
 # docker_compose (Resource)
 
-A Docker Compose project applied through the Engine API, with no compose CLI plugin involved. The project is parsed with compose-go (the library `docker compose` uses) from `content` or `files`, with interpolation limited to `env` and `env_file`. In `mode = "local"` every service becomes containers named `<project>-<service>-<n>` (or `container_name`), every network `<project>_<name>` and every volume `<project>_<name>`, all labelled `com.docker.compose.project` like `docker compose up` does, so `docker compose ps` shows them. In `mode = "swarm"` the project becomes a stack (services, overlay networks, secrets and configs labelled `com.docker.stack.namespace`) like `docker stack deploy`. Refresh compares the live objects with the parsed project (a `com.docker.compose.config-hash` label on each object, plus container state or service image/replicas) and marks `spec_hash` as drifted so the next plan shows an update. An update creates what is missing, recreates what changed and removes objects of the project that are no longer in it. Destroy removes everything labelled with the project. `build` is not supported: build images with `docker_image`.
+A Docker Compose project applied through the Engine API, with no compose CLI plugin involved. The project is parsed with compose-go (the library `docker compose` uses) from `content` or `files`, with interpolation limited to `env` and `env_file`. In `mode = "local"` every service becomes containers named `<project>-<service>-<n>` (or `container_name`), every network `<project>_<name>` and every volume `<project>_<name>`, all labelled `com.docker.compose.project` like `docker compose up` does (including the `com.docker.compose.config-hash` values the CLI computes), so `docker compose ps` shows them. In `mode = "swarm"` the project becomes a stack (services, overlay networks, secrets and configs labelled `com.docker.stack.namespace`) like `docker stack deploy`. Refresh compares the live objects with the parsed project (a `com.docker.compose.config-hash` label on each object, plus container state or service image/replicas) and marks `spec_hash` as drifted so the next plan shows an update. An update creates what is missing, recreates what changed and removes objects of the project that are no longer in it. Destroy removes everything labelled with the project. In local mode a service with a `build:` section is built through BuildKit when its image is missing (always with `pull_policy: build`) and tagged `image` or `<project>-<service>`. A project that defines `jobs` plans with a warning: jobs are not run yet (use the `docker_compose_run` action). The whole normalized project is exposed as `compose_yaml` (what `docker compose config` prints) and the structured `project`.
 
 ## Example Usage
 
@@ -17,8 +17,8 @@ A Docker Compose project applied through the Engine API, with no compose CLI plu
 # would run it: containers shop-web-1, shop-db-1, networks shop_default and a
 # shop_pgdata volume, all labelled com.docker.compose.project=shop.
 resource "docker_compose" "shop" {
-  project_name = "shop"
-  working_dir  = path.module
+  name              = "shop"
+  project_directory = path.module
 
   # Only these variables are visible to ${...} interpolation.
   env = {
@@ -59,8 +59,8 @@ resource "docker_compose" "shop" {
 
 # The same file format deployed as a Swarm stack (needs a Swarm manager).
 resource "docker_compose" "stack" {
-  project_name = "shopstack"
-  mode         = "swarm"
+  name = "shopstack"
+  mode = "swarm"
 
   content = <<-EOT
     services:
@@ -77,6 +77,16 @@ resource "docker_compose" "stack" {
 output "web_container_ids" {
   value = docker_compose.shop.services["web"]
 }
+
+# The normalized project (what `docker compose config` prints) and its hash,
+# for a downstream runner.
+output "compose_yaml_sha256" {
+  value = docker_compose.shop.content_sha256
+}
+
+output "web_image" {
+  value = docker_compose.shop.project.services["web"].image
+}
 ```
 
 <!-- schema generated by tfplugindocs -->
@@ -84,25 +94,679 @@ output "web_container_ids" {
 
 ### Optional
 
-- `content` (String) Compose YAML as a string. Exactly one of `content` and `files` must be set; relative paths in it resolve against `working_dir` (default: the Terraform working directory).
+- `content` (String) Compose YAML as a string. Exactly one of `content` and `files` must be set; relative paths in it resolve against `project_directory` (default: the Terraform working directory).
 - `env` (Map of String, Sensitive) Variables for `${VAR}` interpolation and `environment:`-sourced secrets and configs. The provider's own environment is never read; values here override `env_file`.
 - `env_file` (List of String) Dotenv files read for interpolation variables, later files winning. Relative paths resolve like compose file paths.
-- `files` (List of String) Compose file paths, merged in order like repeated `docker compose -f`. Relative paths in them resolve against `working_dir` or, when unset, the first file's directory.
+- `files` (List of String) Compose file paths, merged in order like repeated `docker compose -f`. Relative paths in them resolve against `project_directory` or, when unset, the first file's directory.
 - `keep_volumes` (Boolean) Keep the project's named volumes on destroy and when they leave the project (default `false`, which removes them).
-- `mode` (String) Deployment target: `local` (default) or `swarm`. `local` creates containers on the provider's daemon; `swarm` creates a stack and needs a Swarm manager. Changing it forces a new resource.
+- `mode` (String) Deployment target: `local` (default) or `swarm`. `local` creates containers on the provider's daemon; `swarm` creates a stack and needs a Swarm manager. Forces replacement.
+- `name` (String) The compose project name (compose-spec top-level `name`, CLI `--project-name`), used to name and label every object. Defaults to the file's top-level `name`, then to the project directory's name. Forces replacement.
 - `profiles` (List of String) Profiles to enable. Services with a `profiles` list run only when one of them is enabled; services without one always run.
-- `project_name` (String) Project name used to name and label every object. Defaults to the file's top-level `name`, then to the working directory's name; changing it forces a new resource.
+- `project_directory` (String) The project directory relative paths resolve against (CLI `--project-directory`). Defaults to the first file's directory, or the Terraform working directory for `content`.
+- `remove_orphans` (Boolean) Remove containers (local) or Swarm services (swarm) of the project whose service is no longer configured, like `docker compose up --remove-orphans` (default `true`). With `false` they are left running and not reported as drift.
 - `wait` (Boolean) Wait for the project to be ready after create and update (default `true`). Local mode waits for containers to run (and be healthy when they have a healthcheck) or to exit 0; swarm mode waits for services to converge.
 - `wait_timeout` (String) Maximum time for each wait, as a Go duration (default `2m`). It also bounds `depends_on` conditions in local mode.
-- `working_dir` (String) Project directory that relative paths resolve against. Defaults to the first file's directory, or the Terraform working directory for `content`.
 
 ### Read-Only
 
+- `compose_go_version` (String) compose-go version that loads, interpolates, merges and validates the project (v2.16.2, from go.mod).
+- `compose_spec_version` (String) Pinned compose-spec commit the structured fields follow (main @ 3a4a699...).
+- `compose_yaml` (String, Sensitive) Normalized compose config as `docker compose config` prints it: interpolated, include/extends resolved, merged, profiles applied.
+- `config_files` (List of String) The compose files that make up the project, in merge order (`com.docker.compose.project.config_files`). For `content` it is `docker-compose.yml` in the project directory.
+- `configs` (Map of String) Map of config key to the Swarm config ID (swarm) or the config name (local, where the content is copied into the containers).
+- `container_names` (Map of List of String) Map of service name to its container names (`<project>-<service>-<n>` or `container_name`); in swarm mode the Swarm service name.
+- `content_sha256` (String) Hex SHA-256 of `compose_yaml`.
+- `docker_server_version` (String) Docker Engine version of the daemon.
+- `engine_api_version` (String) Engine API version negotiated with the daemon.
 - `id` (String) The project name.
+- `image_refs` (Map of String) Map of service name to the image reference it runs after interpolation (`image`, or `<project>-<service>` for a build-only service).
+- `jobs` (Map of List of String) Map of job name to the container IDs of its runs. Jobs are not run by docker_compose yet, so every list is empty; run one with the `docker_compose_run` action.
+- `labels` (Map of String) The project label every created object carries (`com.docker.compose.project`, or `com.docker.stack.namespace` in swarm mode), usable as a label selector downstream.
+- `models` (Map of String) Map of top-level model key to its `model` reference (an OCI artifact). Models are recorded but not run.
+- `network_names` (Map of String) Map of network key to the Engine network name (`<project>_<key>` unless `name:` is set), external networks included.
 - `networks` (Map of String) Map of network key to the ID of the network the project created. External networks are not listed.
+- `project` (Attributes) The whole normalized project, mirroring the compose-spec top-level schema: `project.services["web"].ports`, `project.networks`, ... (see [below for nested schema](#nestedatt--project))
+- `secrets` (Map of String) Map of secret key to the Swarm secret ID (swarm) or the secret name (local). IDs and names only, never the data.
 - `services` (Map of List of String) Map of service name to the IDs of its containers (local, in container-number order) or to its Swarm service ID (swarm).
 - `spec_hash` (String) Digest of the parsed project. Refresh replaces it with `drifted: <reasons>` when the live objects no longer match, which makes the next plan show an update.
 - `volumes` (Map of String) Map of volume key to the volume name. In swarm mode volumes are created by each node on first use, so the names come from the services' mounts.
+
+<a id="nestedatt--project"></a>
+### Nested Schema for `project`
+
+Read-Only:
+
+- `configs` (Attributes Map) Upstream `configs`. (see [below for nested schema](#nestedatt--project--configs))
+- `include` (Attributes List) Upstream `include`. (see [below for nested schema](#nestedatt--project--include))
+- `jobs` (Attributes Map) Upstream `jobs`. (see [below for nested schema](#nestedatt--project--jobs))
+- `models` (Attributes Map) Upstream `models`. (see [below for nested schema](#nestedatt--project--models))
+- `name` (String) Upstream `name`.
+- `networks` (Attributes Map) Upstream `networks`. (see [below for nested schema](#nestedatt--project--networks))
+- `secrets` (Attributes Map) Upstream `secrets`. (see [below for nested schema](#nestedatt--project--secrets))
+- `services` (Attributes Map) Upstream `services`. (see [below for nested schema](#nestedatt--project--services))
+- `version` (String) Upstream `version`.
+- `volumes` (Attributes Map) Upstream `volumes`. (see [below for nested schema](#nestedatt--project--volumes))
+
+<a id="nestedatt--project--configs"></a>
+### Nested Schema for `project.configs`
+
+Read-Only:
+
+- `content` (String, Sensitive) Upstream `content`. Sensitive.
+- `environment` (String, Sensitive) Upstream `environment`. Sensitive.
+- `external` (Boolean) Upstream `external`.
+- `file` (String) Upstream `file`.
+- `labels` (Map of String) Upstream `labels`.
+- `name` (String) Upstream `name`.
+- `template_driver` (String) Upstream `template_driver`.
+
+
+<a id="nestedatt--project--include"></a>
+### Nested Schema for `project.include`
+
+Read-Only:
+
+- `env_file` (List of String, Sensitive) Upstream `env_file`. Sensitive.
+- `path` (List of String) Upstream `path`.
+- `project_directory` (String) Upstream `project_directory`.
+
+
+<a id="nestedatt--project--jobs"></a>
+### Nested Schema for `project.jobs`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `blkio_config` (String) Upstream `blkio_config`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `build` (Attributes) Upstream `build`. (see [below for nested schema](#nestedatt--project--jobs--build))
+- `cap_add` (List of String) Upstream `cap_add`.
+- `cap_drop` (List of String) Upstream `cap_drop`.
+- `cgroup` (String) Upstream `cgroup`.
+- `cgroup_parent` (String) Upstream `cgroup_parent`.
+- `command` (List of String) Upstream `command`.
+- `configs` (List of String) Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `cpu_count` (Number) Upstream `cpu_count`.
+- `cpu_percent` (Number) Upstream `cpu_percent`.
+- `cpu_period` (Number) Upstream `cpu_period`.
+- `cpu_quota` (Number) Upstream `cpu_quota`.
+- `cpu_rt_period` (Number) Upstream `cpu_rt_period`.
+- `cpu_rt_runtime` (Number) Upstream `cpu_rt_runtime`.
+- `cpu_shares` (Number) Upstream `cpu_shares`.
+- `cpus` (Number) Upstream `cpus`.
+- `cpuset` (String) Upstream `cpuset`.
+- `credential_spec` (String) Upstream `credential_spec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `depends_on` (Map of String) Upstream `depends_on`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `device_cgroup_rules` (List of String) Upstream `device_cgroup_rules`.
+- `devices` (List of String) Upstream `devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `dns` (List of String) Upstream `dns`.
+- `dns_opt` (List of String) Upstream `dns_opt`.
+- `dns_search` (List of String) Upstream `dns_search`.
+- `domainname` (String) Upstream `domainname`.
+- `entrypoint` (List of String) Upstream `entrypoint`.
+- `env_file` (List of String, Sensitive) Upstream `env_file`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `environment` (Map of String, Sensitive) Upstream `environment`. Sensitive.
+- `expose` (List of String) Upstream `expose`.
+- `extends` (String) Upstream `extends`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `extra_hosts` (Map of List of String) Upstream `extra_hosts`.
+- `gpus` (List of String) Upstream `gpus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `group_add` (List of String) Upstream `group_add`.
+- `healthcheck` (Attributes) Upstream `healthcheck`. (see [below for nested schema](#nestedatt--project--jobs--healthcheck))
+- `hostname` (String) Upstream `hostname`.
+- `image` (String) Upstream `image`.
+- `init` (Boolean) Upstream `init`.
+- `ipc` (String) Upstream `ipc`.
+- `isolation` (String) Upstream `isolation`.
+- `label_file` (List of String) Upstream `label_file`.
+- `labels` (Map of String) Upstream `labels`.
+- `logging` (String) Upstream `logging`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `mac_address` (String) Upstream `mac_address`.
+- `mem_limit` (Number) Upstream `mem_limit`.
+- `mem_reservation` (Number) Upstream `mem_reservation`.
+- `mem_swappiness` (Number) Upstream `mem_swappiness`.
+- `memswap_limit` (Number) Upstream `memswap_limit`.
+- `models` (Map of String) Upstream `models`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `network_mode` (String) Upstream `network_mode`.
+- `networks` (Map of String) Upstream `networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `oom_kill_disable` (Boolean) Upstream `oom_kill_disable`.
+- `oom_score_adj` (Number) Upstream `oom_score_adj`.
+- `pid` (String) Upstream `pid`.
+- `pids_limit` (Number) Upstream `pids_limit`.
+- `platform` (String) Upstream `platform`.
+- `ports` (Attributes List) Upstream `ports`. (see [below for nested schema](#nestedatt--project--jobs--ports))
+- `privileged` (Boolean) Upstream `privileged`.
+- `profiles` (List of String) Upstream `profiles`.
+- `pull_policy` (String) Upstream `pull_policy`.
+- `pull_refresh_after` (String) Upstream `pull_refresh_after`.
+- `read_only` (Boolean) Upstream `read_only`.
+- `runtime` (String) Upstream `runtime`.
+- `secrets` (List of String, Sensitive) Upstream `secrets`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `security_opt` (List of String) Upstream `security_opt`.
+- `shm_size` (Number) Upstream `shm_size`.
+- `stdin_open` (Boolean) Upstream `stdin_open`.
+- `stop_grace_period` (String) Upstream `stop_grace_period`.
+- `stop_signal` (String) Upstream `stop_signal`.
+- `storage_opt` (Map of String) Upstream `storage_opt`.
+- `sysctls` (Map of String) Upstream `sysctls`.
+- `tmpfs` (List of String) Upstream `tmpfs`.
+- `triggers` (String) Upstream `triggers`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `tty` (Boolean) Upstream `tty`.
+- `ulimits` (Map of String) Upstream `ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `umask` (String) Upstream `umask`.
+- `use_api_socket` (Boolean) Upstream `use_api_socket`.
+- `user` (String) Upstream `user`.
+- `userns_mode` (String) Upstream `userns_mode`.
+- `uts` (String) Upstream `uts`.
+- `volumes` (Attributes List) Upstream `volumes`. (see [below for nested schema](#nestedatt--project--jobs--volumes))
+- `volumes_from` (List of String) Upstream `volumes_from`.
+- `working_dir` (String) Upstream `working_dir`.
+
+<a id="nestedatt--project--jobs--build"></a>
+### Nested Schema for `project.jobs.build`
+
+Read-Only:
+
+- `additional_contexts` (Map of String) Upstream `additional_contexts`.
+- `args` (Map of String, Sensitive) Upstream `args`. Sensitive.
+- `cache_from` (List of String) Upstream `cache_from`.
+- `cache_to` (List of String) Upstream `cache_to`.
+- `context` (String) Upstream `context`.
+- `dockerfile` (String) Upstream `dockerfile`.
+- `dockerfile_inline` (String, Sensitive) Upstream `dockerfile_inline`. Sensitive.
+- `entitlements` (List of String) Upstream `entitlements`.
+- `extra_hosts` (Map of List of String) Upstream `extra_hosts`.
+- `isolation` (String) Upstream `isolation`.
+- `labels` (Map of String) Upstream `labels`.
+- `network` (String) Upstream `network`.
+- `no_cache` (Boolean) Upstream `no_cache`.
+- `no_cache_filter` (List of String) Upstream `no_cache_filter`.
+- `platforms` (List of String) Upstream `platforms`.
+- `privileged` (Boolean) Upstream `privileged`.
+- `provenance` (Boolean) Upstream `provenance`.
+- `pull` (Boolean) Upstream `pull`.
+- `sbom` (Boolean) Upstream `sbom`.
+- `secrets` (Attributes List, Sensitive) Upstream `secrets`. Sensitive. (see [below for nested schema](#nestedatt--project--jobs--build--secrets))
+- `shm_size` (Number) Upstream `shm_size`.
+- `ssh` (Map of String, Sensitive) Upstream `ssh`. Sensitive.
+- `tags` (List of String) Upstream `tags`.
+- `target` (String) Upstream `target`.
+- `ulimits` (Attributes Map) Upstream `ulimits`. (see [below for nested schema](#nestedatt--project--jobs--build--ulimits))
+
+<a id="nestedatt--project--jobs--build--secrets"></a>
+### Nested Schema for `project.jobs.build.secrets`
+
+Read-Only:
+
+- `gid` (String, Sensitive) Upstream `gid`.
+- `mode` (Number, Sensitive) Upstream `mode`.
+- `source` (String, Sensitive) Upstream `source`.
+- `target` (String, Sensitive) Upstream `target`.
+- `uid` (String, Sensitive) Upstream `uid`.
+
+
+<a id="nestedatt--project--jobs--build--ulimits"></a>
+### Nested Schema for `project.jobs.build.ulimits`
+
+Read-Only:
+
+- `hard` (Number) Upstream `hard`.
+- `soft` (Number) Upstream `soft`.
+
+
+
+<a id="nestedatt--project--jobs--healthcheck"></a>
+### Nested Schema for `project.jobs.healthcheck`
+
+Read-Only:
+
+- `disable` (Boolean) Upstream `disable`.
+- `interval` (String) Upstream `interval`.
+- `retries` (Number) Upstream `retries`.
+- `start_interval` (String) Upstream `start_interval`.
+- `start_period` (String) Upstream `start_period`.
+- `test` (List of String) Upstream `test`.
+- `timeout` (String) Upstream `timeout`.
+
+
+<a id="nestedatt--project--jobs--ports"></a>
+### Nested Schema for `project.jobs.ports`
+
+Read-Only:
+
+- `app_protocol` (String) Upstream `app_protocol`.
+- `host_ip` (String) Upstream `host_ip`.
+- `mode` (String) Upstream `mode`.
+- `name` (String) Upstream `name`.
+- `protocol` (String) Upstream `protocol`.
+- `published` (Number) Upstream `published`.
+- `target` (Number) Upstream `target`.
+
+
+<a id="nestedatt--project--jobs--volumes"></a>
+### Nested Schema for `project.jobs.volumes`
+
+Read-Only:
+
+- `bind` (Attributes) Upstream `bind`. (see [below for nested schema](#nestedatt--project--jobs--volumes--bind))
+- `consistency` (String) Upstream `consistency`.
+- `image` (Attributes) Upstream `image`. (see [below for nested schema](#nestedatt--project--jobs--volumes--image))
+- `read_only` (Boolean) Upstream `read_only`.
+- `source` (String) Upstream `source`.
+- `target` (String) Upstream `target`.
+- `tmpfs` (Attributes) Upstream `tmpfs`. (see [below for nested schema](#nestedatt--project--jobs--volumes--tmpfs))
+- `type` (String) Upstream `type`.
+- `volume` (Attributes) Upstream `volume`. (see [below for nested schema](#nestedatt--project--jobs--volumes--volume))
+
+<a id="nestedatt--project--jobs--volumes--bind"></a>
+### Nested Schema for `project.jobs.volumes.bind`
+
+Read-Only:
+
+- `create_host_path` (Boolean) Upstream `create_host_path`.
+- `propagation` (String) Upstream `propagation`.
+- `recursive` (String) Upstream `recursive`.
+- `selinux` (String) Upstream `selinux`.
+
+
+<a id="nestedatt--project--jobs--volumes--image"></a>
+### Nested Schema for `project.jobs.volumes.image`
+
+Read-Only:
+
+- `subpath` (String) Upstream `subpath`.
+
+
+<a id="nestedatt--project--jobs--volumes--tmpfs"></a>
+### Nested Schema for `project.jobs.volumes.tmpfs`
+
+Read-Only:
+
+- `mode` (Number) Upstream `mode`.
+- `size` (Number) Upstream `size`.
+
+
+<a id="nestedatt--project--jobs--volumes--volume"></a>
+### Nested Schema for `project.jobs.volumes.volume`
+
+Read-Only:
+
+- `labels` (Map of String) Upstream `labels`.
+- `nocopy` (Boolean) Upstream `nocopy`.
+- `subpath` (String) Upstream `subpath`.
+
+
+
+
+<a id="nestedatt--project--models"></a>
+### Nested Schema for `project.models`
+
+Read-Only:
+
+- `context_size` (Number) Upstream `context_size`.
+- `model` (String) Upstream `model`.
+- `name` (String) Upstream `name`.
+- `runtime_flags` (List of String) Upstream `runtime_flags`.
+
+
+<a id="nestedatt--project--networks"></a>
+### Nested Schema for `project.networks`
+
+Read-Only:
+
+- `attachable` (Boolean) Upstream `attachable`.
+- `driver` (String) Upstream `driver`.
+- `driver_opts` (Map of String) Upstream `driver_opts`.
+- `enable_ipv4` (Boolean) Upstream `enable_ipv4`.
+- `enable_ipv6` (Boolean) Upstream `enable_ipv6`.
+- `external` (Boolean) Upstream `external`.
+- `internal` (Boolean) Upstream `internal`.
+- `ipam` (Attributes) Upstream `ipam`. (see [below for nested schema](#nestedatt--project--networks--ipam))
+- `labels` (Map of String) Upstream `labels`.
+- `name` (String) Upstream `name`.
+
+<a id="nestedatt--project--networks--ipam"></a>
+### Nested Schema for `project.networks.ipam`
+
+Read-Only:
+
+- `config` (List of String) Upstream `config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `driver` (String) Upstream `driver`.
+- `options` (Map of String) Upstream `options`.
+
+
+
+<a id="nestedatt--project--secrets"></a>
+### Nested Schema for `project.secrets`
+
+Read-Only:
+
+- `driver` (String) Upstream `driver`.
+- `driver_opts` (Map of String) Upstream `driver_opts`.
+- `environment` (String, Sensitive) Upstream `environment`. Sensitive.
+- `external` (Boolean) Upstream `external`.
+- `file` (String) Upstream `file`.
+- `labels` (Map of String) Upstream `labels`.
+- `name` (String) Upstream `name`.
+- `template_driver` (String) Upstream `template_driver`.
+
+
+<a id="nestedatt--project--services"></a>
+### Nested Schema for `project.services`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `attach` (Boolean) Upstream `attach`.
+- `blkio_config` (String) Upstream `blkio_config`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `build` (Attributes) Upstream `build`. (see [below for nested schema](#nestedatt--project--services--build))
+- `cap_add` (List of String) Upstream `cap_add`.
+- `cap_drop` (List of String) Upstream `cap_drop`.
+- `cgroup` (String) Upstream `cgroup`.
+- `cgroup_parent` (String) Upstream `cgroup_parent`.
+- `command` (List of String) Upstream `command`.
+- `configs` (List of String) Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `container_name` (String) Upstream `container_name`.
+- `cpu_count` (Number) Upstream `cpu_count`.
+- `cpu_percent` (Number) Upstream `cpu_percent`.
+- `cpu_period` (Number) Upstream `cpu_period`.
+- `cpu_quota` (Number) Upstream `cpu_quota`.
+- `cpu_rt_period` (Number) Upstream `cpu_rt_period`.
+- `cpu_rt_runtime` (Number) Upstream `cpu_rt_runtime`.
+- `cpu_shares` (Number) Upstream `cpu_shares`.
+- `cpus` (Number) Upstream `cpus`.
+- `cpuset` (String) Upstream `cpuset`.
+- `credential_spec` (String) Upstream `credential_spec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `depends_on` (Map of String) Upstream `depends_on`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `deploy` (Attributes) Upstream `deploy`. (see [below for nested schema](#nestedatt--project--services--deploy))
+- `develop` (String) Upstream `develop`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `device_cgroup_rules` (List of String) Upstream `device_cgroup_rules`.
+- `devices` (List of String) Upstream `devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `dns` (List of String) Upstream `dns`.
+- `dns_opt` (List of String) Upstream `dns_opt`.
+- `dns_search` (List of String) Upstream `dns_search`.
+- `domainname` (String) Upstream `domainname`.
+- `entrypoint` (List of String) Upstream `entrypoint`.
+- `env_file` (List of String, Sensitive) Upstream `env_file`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `environment` (Map of String, Sensitive) Upstream `environment`. Sensitive.
+- `expose` (List of String) Upstream `expose`.
+- `extends` (String) Upstream `extends`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `external_links` (List of String) Upstream `external_links`.
+- `extra_hosts` (Map of List of String) Upstream `extra_hosts`.
+- `gpus` (List of String) Upstream `gpus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `group_add` (List of String) Upstream `group_add`.
+- `healthcheck` (Attributes) Upstream `healthcheck`. (see [below for nested schema](#nestedatt--project--services--healthcheck))
+- `hostname` (String) Upstream `hostname`.
+- `image` (String) Upstream `image`.
+- `init` (Boolean) Upstream `init`.
+- `ipc` (String) Upstream `ipc`.
+- `isolation` (String) Upstream `isolation`.
+- `label_file` (List of String) Upstream `label_file`.
+- `labels` (Map of String) Upstream `labels`.
+- `links` (List of String) Upstream `links`.
+- `logging` (String) Upstream `logging`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `mac_address` (String) Upstream `mac_address`.
+- `mem_limit` (Number) Upstream `mem_limit`.
+- `mem_reservation` (Number) Upstream `mem_reservation`.
+- `mem_swappiness` (Number) Upstream `mem_swappiness`.
+- `memswap_limit` (Number) Upstream `memswap_limit`.
+- `models` (Map of String) Upstream `models`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `network_mode` (String) Upstream `network_mode`.
+- `networks` (Map of String) Upstream `networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `oom_kill_disable` (Boolean) Upstream `oom_kill_disable`.
+- `oom_score_adj` (Number) Upstream `oom_score_adj`.
+- `pid` (String) Upstream `pid`.
+- `pids_limit` (Number) Upstream `pids_limit`.
+- `platform` (String) Upstream `platform`.
+- `ports` (Attributes List) Upstream `ports`. (see [below for nested schema](#nestedatt--project--services--ports))
+- `post_start` (List of String) Upstream `post_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `pre_start` (List of String) Upstream `pre_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `pre_stop` (List of String) Upstream `pre_stop`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `privileged` (Boolean) Upstream `privileged`.
+- `profiles` (List of String) Upstream `profiles`.
+- `provider` (String) Upstream `provider`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `pull_policy` (String) Upstream `pull_policy`.
+- `pull_refresh_after` (String) Upstream `pull_refresh_after`.
+- `read_only` (Boolean) Upstream `read_only`.
+- `restart` (String) Upstream `restart`.
+- `runtime` (String) Upstream `runtime`.
+- `scale` (Number) Upstream `scale`.
+- `secrets` (List of String, Sensitive) Upstream `secrets`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `security_opt` (List of String) Upstream `security_opt`.
+- `shm_size` (Number) Upstream `shm_size`.
+- `stdin_open` (Boolean) Upstream `stdin_open`.
+- `stop_grace_period` (String) Upstream `stop_grace_period`.
+- `stop_signal` (String) Upstream `stop_signal`.
+- `storage_opt` (Map of String) Upstream `storage_opt`.
+- `sysctls` (Map of String) Upstream `sysctls`.
+- `tmpfs` (List of String) Upstream `tmpfs`.
+- `tty` (Boolean) Upstream `tty`.
+- `ulimits` (Map of String) Upstream `ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `umask` (String) Upstream `umask`.
+- `use_api_socket` (Boolean) Upstream `use_api_socket`.
+- `user` (String) Upstream `user`.
+- `userns_mode` (String) Upstream `userns_mode`.
+- `uts` (String) Upstream `uts`.
+- `volumes` (Attributes List) Upstream `volumes`. (see [below for nested schema](#nestedatt--project--services--volumes))
+- `volumes_from` (List of String) Upstream `volumes_from`.
+- `working_dir` (String) Upstream `working_dir`.
+
+<a id="nestedatt--project--services--build"></a>
+### Nested Schema for `project.services.build`
+
+Read-Only:
+
+- `additional_contexts` (Map of String) Upstream `additional_contexts`.
+- `args` (Map of String, Sensitive) Upstream `args`. Sensitive.
+- `cache_from` (List of String) Upstream `cache_from`.
+- `cache_to` (List of String) Upstream `cache_to`.
+- `context` (String) Upstream `context`.
+- `dockerfile` (String) Upstream `dockerfile`.
+- `dockerfile_inline` (String, Sensitive) Upstream `dockerfile_inline`. Sensitive.
+- `entitlements` (List of String) Upstream `entitlements`.
+- `extra_hosts` (Map of List of String) Upstream `extra_hosts`.
+- `isolation` (String) Upstream `isolation`.
+- `labels` (Map of String) Upstream `labels`.
+- `network` (String) Upstream `network`.
+- `no_cache` (Boolean) Upstream `no_cache`.
+- `no_cache_filter` (List of String) Upstream `no_cache_filter`.
+- `platforms` (List of String) Upstream `platforms`.
+- `privileged` (Boolean) Upstream `privileged`.
+- `provenance` (Boolean) Upstream `provenance`.
+- `pull` (Boolean) Upstream `pull`.
+- `sbom` (Boolean) Upstream `sbom`.
+- `secrets` (Attributes List, Sensitive) Upstream `secrets`. Sensitive. (see [below for nested schema](#nestedatt--project--services--build--secrets))
+- `shm_size` (Number) Upstream `shm_size`.
+- `ssh` (Map of String, Sensitive) Upstream `ssh`. Sensitive.
+- `tags` (List of String) Upstream `tags`.
+- `target` (String) Upstream `target`.
+- `ulimits` (Attributes Map) Upstream `ulimits`. (see [below for nested schema](#nestedatt--project--services--build--ulimits))
+
+<a id="nestedatt--project--services--build--secrets"></a>
+### Nested Schema for `project.services.build.secrets`
+
+Read-Only:
+
+- `gid` (String, Sensitive) Upstream `gid`.
+- `mode` (Number, Sensitive) Upstream `mode`.
+- `source` (String, Sensitive) Upstream `source`.
+- `target` (String, Sensitive) Upstream `target`.
+- `uid` (String, Sensitive) Upstream `uid`.
+
+
+<a id="nestedatt--project--services--build--ulimits"></a>
+### Nested Schema for `project.services.build.ulimits`
+
+Read-Only:
+
+- `hard` (Number) Upstream `hard`.
+- `soft` (Number) Upstream `soft`.
+
+
+
+<a id="nestedatt--project--services--deploy"></a>
+### Nested Schema for `project.services.deploy`
+
+Read-Only:
+
+- `endpoint_mode` (String) Upstream `endpoint_mode`.
+- `labels` (Map of String) Upstream `labels`.
+- `mode` (String) Upstream `mode`.
+- `placement` (Attributes) Upstream `placement`. (see [below for nested schema](#nestedatt--project--services--deploy--placement))
+- `replicas` (Number) Upstream `replicas`.
+- `resources` (Attributes) Upstream `resources`. (see [below for nested schema](#nestedatt--project--services--deploy--resources))
+- `restart_policy` (Attributes) Upstream `restart_policy`. (see [below for nested schema](#nestedatt--project--services--deploy--restart_policy))
+- `rollback_config` (Attributes) Upstream `rollback_config`. (see [below for nested schema](#nestedatt--project--services--deploy--rollback_config))
+- `update_config` (Attributes) Upstream `update_config`. (see [below for nested schema](#nestedatt--project--services--deploy--update_config))
+
+<a id="nestedatt--project--services--deploy--placement"></a>
+### Nested Schema for `project.services.deploy.placement`
+
+Read-Only:
+
+- `constraints` (List of String) Upstream `constraints`.
+- `max_replicas_per_node` (Number) Upstream `max_replicas_per_node`.
+- `preferences` (List of String) Upstream `preferences`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+
+
+<a id="nestedatt--project--services--deploy--resources"></a>
+### Nested Schema for `project.services.deploy.resources`
+
+Read-Only:
+
+- `limits` (String) Upstream `limits`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `reservations` (String) Upstream `reservations`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+
+
+<a id="nestedatt--project--services--deploy--restart_policy"></a>
+### Nested Schema for `project.services.deploy.restart_policy`
+
+Read-Only:
+
+- `condition` (String) Upstream `condition`.
+- `delay` (String) Upstream `delay`.
+- `max_attempts` (Number) Upstream `max_attempts`.
+- `window` (String) Upstream `window`.
+
+
+<a id="nestedatt--project--services--deploy--rollback_config"></a>
+### Nested Schema for `project.services.deploy.rollback_config`
+
+Read-Only:
+
+- `delay` (String) Upstream `delay`.
+- `failure_action` (String) Upstream `failure_action`.
+- `max_failure_ratio` (Number) Upstream `max_failure_ratio`.
+- `monitor` (String) Upstream `monitor`.
+- `order` (String) Upstream `order`.
+- `parallelism` (Number) Upstream `parallelism`.
+
+
+<a id="nestedatt--project--services--deploy--update_config"></a>
+### Nested Schema for `project.services.deploy.update_config`
+
+Read-Only:
+
+- `delay` (String) Upstream `delay`.
+- `failure_action` (String) Upstream `failure_action`.
+- `max_failure_ratio` (Number) Upstream `max_failure_ratio`.
+- `monitor` (String) Upstream `monitor`.
+- `order` (String) Upstream `order`.
+- `parallelism` (Number) Upstream `parallelism`.
+
+
+
+<a id="nestedatt--project--services--healthcheck"></a>
+### Nested Schema for `project.services.healthcheck`
+
+Read-Only:
+
+- `disable` (Boolean) Upstream `disable`.
+- `interval` (String) Upstream `interval`.
+- `retries` (Number) Upstream `retries`.
+- `start_interval` (String) Upstream `start_interval`.
+- `start_period` (String) Upstream `start_period`.
+- `test` (List of String) Upstream `test`.
+- `timeout` (String) Upstream `timeout`.
+
+
+<a id="nestedatt--project--services--ports"></a>
+### Nested Schema for `project.services.ports`
+
+Read-Only:
+
+- `app_protocol` (String) Upstream `app_protocol`.
+- `host_ip` (String) Upstream `host_ip`.
+- `mode` (String) Upstream `mode`.
+- `name` (String) Upstream `name`.
+- `protocol` (String) Upstream `protocol`.
+- `published` (Number) Upstream `published`.
+- `target` (Number) Upstream `target`.
+
+
+<a id="nestedatt--project--services--volumes"></a>
+### Nested Schema for `project.services.volumes`
+
+Read-Only:
+
+- `bind` (Attributes) Upstream `bind`. (see [below for nested schema](#nestedatt--project--services--volumes--bind))
+- `consistency` (String) Upstream `consistency`.
+- `image` (Attributes) Upstream `image`. (see [below for nested schema](#nestedatt--project--services--volumes--image))
+- `read_only` (Boolean) Upstream `read_only`.
+- `source` (String) Upstream `source`.
+- `target` (String) Upstream `target`.
+- `tmpfs` (Attributes) Upstream `tmpfs`. (see [below for nested schema](#nestedatt--project--services--volumes--tmpfs))
+- `type` (String) Upstream `type`.
+- `volume` (Attributes) Upstream `volume`. (see [below for nested schema](#nestedatt--project--services--volumes--volume))
+
+<a id="nestedatt--project--services--volumes--bind"></a>
+### Nested Schema for `project.services.volumes.bind`
+
+Read-Only:
+
+- `create_host_path` (Boolean) Upstream `create_host_path`.
+- `propagation` (String) Upstream `propagation`.
+- `recursive` (String) Upstream `recursive`.
+- `selinux` (String) Upstream `selinux`.
+
+
+<a id="nestedatt--project--services--volumes--image"></a>
+### Nested Schema for `project.services.volumes.image`
+
+Read-Only:
+
+- `subpath` (String) Upstream `subpath`.
+
+
+<a id="nestedatt--project--services--volumes--tmpfs"></a>
+### Nested Schema for `project.services.volumes.tmpfs`
+
+Read-Only:
+
+- `mode` (Number) Upstream `mode`.
+- `size` (Number) Upstream `size`.
+
+
+<a id="nestedatt--project--services--volumes--volume"></a>
+### Nested Schema for `project.services.volumes.volume`
+
+Read-Only:
+
+- `labels` (Map of String) Upstream `labels`.
+- `nocopy` (Boolean) Upstream `nocopy`.
+- `subpath` (String) Upstream `subpath`.
+
+
+
+
+<a id="nestedatt--project--volumes"></a>
+### Nested Schema for `project.volumes`
+
+Read-Only:
+
+- `driver` (String) Upstream `driver`.
+- `driver_opts` (Map of String, Sensitive) Upstream `driver_opts`. Sensitive.
+- `external` (Boolean) Upstream `external`.
+- `labels` (Map of String) Upstream `labels`.
+- `name` (String) Upstream `name`.
 
 ## Import
 
@@ -112,7 +776,7 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 
 ```shell
 # Import by project name (local mode) or "<project>:swarm". The next apply
-# adopts objects whose com.docker.compose.config-hash label matches the
+# adopts objects whose provider spec-hash label (or, for objects made before Pass 5, config-hash label) matches the
 # configuration and recreates the rest.
 terraform import docker_compose.shop shop
 terraform import docker_compose.stack shopstack:swarm

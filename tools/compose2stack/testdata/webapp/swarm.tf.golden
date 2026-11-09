@@ -47,7 +47,9 @@ resource "docker_stack" "webapp" {
     image    = "redis:7-alpine"
     args     = ["redis-server", "--appendonly", "yes"]
     replicas = 2
-    networks = ["back"]
+    networks = {
+      back = {}
+    }
     healthcheck {
       test = ["CMD", "redis-cli", "ping"]
     }
@@ -65,7 +67,9 @@ resource "docker_stack" "webapp" {
       POSTGRES_DB            = "shop"
       POSTGRES_PASSWORD_FILE = "/run/secrets/db_password"
     }
-    networks = ["back"]
+    networks = {
+      back = {}
+    }
     healthcheck {
       test         = ["CMD-SHELL", "pg_isready -U postgres"]
       interval     = "5s"
@@ -97,7 +101,10 @@ resource "docker_stack" "webapp" {
     name     = "web"
     image    = "nginx:1.27-alpine"
     replicas = 3
-    networks = ["back", "front"]
+    networks = {
+      back  = {}
+      front = {}
+    }
     # TODO: build (context ./web) is not supported: build the image with docker_image and reference it
     # TODO: depends_on [cache db]: swarm starts services independently; add healthchecks and retry logic instead
     healthcheck {

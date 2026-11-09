@@ -3,12 +3,12 @@
 page_title: "docker_exec Action - docker"
 subcategory: ""
 description: |-
-  Runs a command inside a running container, like docker exec, and fails when it exits non-zero. stdout and stderr are streamed line by line as action progress and to the provider log; on failure the error carries the exit code and the last 20 lines of output. Runs through the Engine exec API; no docker CLI is involved.
+  Runs a command inside a running container, like docker exec, and fails when it exits non-zero. stdout and stderr are streamed line by line as action progress and to the provider log; on failure the error carries the exit code and the last 20 lines of output. The result object (GET /exec/{id}/json: exit_code, pid, process_config, ...) and the captured stdout / stderr (up to 4 MiB each, with their *_sha256) go to the final progress message and to result_path. Runs through the Engine exec API; no docker CLI is involved.
 ---
 
 # docker_exec (Action)
 
-Runs a command inside a running container, like `docker exec`, and fails when it exits non-zero. stdout and stderr are streamed line by line as action progress and to the provider log; on failure the error carries the exit code and the last 20 lines of output. Runs through the Engine exec API; no docker CLI is involved.
+Runs a command inside a running container, like `docker exec`, and fails when it exits non-zero. stdout and stderr are streamed line by line as action progress and to the provider log; on failure the error carries the exit code and the last 20 lines of output. The result object (`GET /exec/{id}/json`: `exit_code`, `pid`, `process_config`, ...) and the captured `stdout` / `stderr` (up to 4 MiB each, with their `*_sha256`) go to the final progress message and to `result_path`. Runs through the Engine exec API; no docker CLI is involved.
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_exec.<name>] } }`
@@ -21,7 +21,6 @@ Arguments go in the action's `config` block.
 resource "docker_container" "db" {
   name  = "db"
   image = "postgres:17"
-  env   = { POSTGRES_PASSWORD = "example" }
 
   lifecycle {
     action_trigger {
@@ -36,12 +35,14 @@ resource "docker_container" "db" {
 #   terraform apply -invoke=action.docker_exec.migrate
 action "docker_exec" "migrate" {
   config {
-    container = docker_container.db.name
-    command   = ["sh", "-c", "until pg_isready -U postgres; do sleep 1; done; psql -U postgres -c 'CREATE TABLE IF NOT EXISTS t (id int)'"]
-    env       = { PGCONNECT_TIMEOUT = "5" }
-    user      = "postgres"
-    workdir   = "/tmp"
-    timeout   = "2m"
+    container_id = docker_container.db.id
+    command      = ["sh", "-c", "until pg_isready -U postgres; do sleep 1; done; psql -U postgres -c 'CREATE TABLE IF NOT EXISTS t (id int)'"]
+    env          = { PGCONNECT_TIMEOUT = "5" }
+    user         = "postgres"
+    workdir      = "/tmp"
+    timeout      = "2m"
+    # stdout, stderr and the exec inspect (exit_code, pid, ...) as JSON.
+    result_path = "${path.module}/out/migrate.json"
   }
 }
 ```
@@ -55,10 +56,14 @@ action "docker_exec" "migrate" {
 
 ### Optional
 
-- `container` (String) Name or ID of a running container, e.g. `docker_container.app.name`. Exactly one of `container` and `service`.
-- `env` (Map of String) Extra environment variables for the command.
+- `container_id` (String) The running container to run the command in, by ID or name, e.g. `docker_container.app.id`. Exactly one of `container_id` and `service_id`.
+- `detach` (Boolean) Start the command and return at once without waiting for it (`docker exec --detach`). Default `false`. Output is not captured and the exit code is not checked.
+- `env` (Map of String) Extra environment variables for the command. They override `env_file` entries.
+- `env_file` (List of String) Local files of `KEY=VALUE` lines read on the machine running Terraform, like `docker exec --env-file`; `#` comments and blank lines are skipped and a bare `KEY` takes the value from Terraform's environment.
 - `privileged` (Boolean) Give the command extended privileges. Default `false`.
-- `service` (String) Name of a Swarm service: the command runs in one running task container of it on the provider's daemon (the first by name). Pin the service to that node with a placement constraint. Exactly one of `container` and `service`.
+- `result_path` (String) Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails.
+- `service_id` (String) A Swarm service, by name: the command runs in one running task container of it on the provider's daemon (the first by name). Pin the service to that node with a placement constraint. Exactly one of `container_id` and `service_id`.
 - `timeout` (String) How long the command may run, as a Go duration (`30s`, `10m`). Default `5m`. On timeout the action fails; the process keeps running in the container.
+- `tty` (Boolean) Allocate a pseudo-TTY (`docker exec --tty`). Default `false`. With a TTY, stdout and stderr arrive merged in `stdout`.
 - `user` (String) User (and optional group) to run as, `name|uid[:group|gid]`. Default: the container's user.
 - `workdir` (String) Working directory inside the container. Default: the container's working directory.

@@ -4,21 +4,169 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Looks up one swarm node through the provider's Docker host (which must be a manager), by `id` (full ID or unique prefix) or `hostname`. Set exactly one.
+Looks up one swarm node (`GET /nodes/{id}`) through the provider's Docker host (which must be a manager), by `id` (full ID or unique prefix) or `hostname`. Set exactly one. `inspect` holds the whole Engine node object.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `addr` | `string` | computed |  |  | IP address the node is reached at. |
+| `addr` | `string` | computed |  |  | IP address the node is reached at (`Status.Addr`). |
 | `availability` | `string` | computed |  |  | `active`, `pause` or `drain`. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json; changes whenever the object changes. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
 | `engine_version` | `string` | computed |  |  | Docker Engine version on the node. |
 | `hostname` | `string` | optional, computed |  |  | Node hostname (or node name). Conflicts with `id`. |
 | `id` | `string` | optional, computed |  |  | Node ID or unique ID prefix; resolved to the full ID. Conflicts with `hostname`. |
-| `labels` | `map(string)` | computed |  |  | Node labels (`node.labels.*`). |
+| `inspect` | `object` | computed |  |  | The node inspect response as a nested object mirroring Node field by field (snake_case). |
+| `inspect_json` | `string` | computed |  |  | The exact Engine API inspect response for the node, as JSON. |
+| `labels` | `map(string)` | computed |  |  | Labels on the node (`Spec.Labels`). |
 | `leader` | `bool` | computed |  |  | True when the node is the current raft leader. |
+| `name` | `string` | computed |  |  | Node name (`Spec.Name`), else the hostname. |
 | `role` | `string` | computed |  |  | `worker` or `manager`. |
 | `state` | `string` | computed |  |  | Node status: `ready`, `down`, `disconnected` or `unknown`. |
+| `version_index` | `number` | computed |  |  | The node object's `Version.Index`; it changes on every update. |
+
+### `inspect`
+
+nested attribute, object. The node inspect response as a nested object mirroring Node field by field (snake_case).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `description` | `object` | computed |  |  | Upstream `Description`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `manager_status` | `object` | computed |  |  | Upstream `ManagerStatus`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `status` | `object` | computed |  |  | Upstream `Status`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `inspect.description`
+
+nested attribute, object. Upstream `Description`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `engine` | `object` | computed |  |  | Upstream `Engine`. |
+| `hostname` | `string` | computed |  |  | Upstream `Hostname`. |
+| `platform` | `object` | computed |  |  | Upstream `Platform`. |
+| `resources` | `object` | computed |  |  | Upstream `Resources`. |
+| `tls_info` | `object` | computed |  |  | Upstream `TLSInfo`. |
+
+### `inspect.description.engine`
+
+nested attribute, object. Upstream `Engine`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `engine_version` | `string` | computed |  |  | Upstream `EngineVersion`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `plugins` | `list(object)` | computed |  |  | Upstream `Plugins`. |
+
+### `inspect.description.engine.plugins`
+
+nested attribute, list(object). Upstream `Plugins`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+
+### `inspect.description.platform`
+
+nested attribute, object. Upstream `Platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `Architecture`. |
+| `os` | `string` | computed |  |  | Upstream `OS`. |
+
+### `inspect.description.resources`
+
+nested attribute, object. Upstream `Resources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `generic_resources` | `list(object)` | computed |  |  | Upstream `GenericResources`. |
+| `memory_bytes` | `number` | computed |  |  | Upstream `MemoryBytes`. |
+| `nano_cpus` | `number` | computed |  |  | Upstream `NanoCPUs`. |
+
+### `inspect.description.resources.generic_resources`
+
+nested attribute, list(object). Upstream `GenericResources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `discrete_resource_spec` | `object` | computed |  |  | Upstream `DiscreteResourceSpec`. |
+| `named_resource_spec` | `object` | computed |  |  | Upstream `NamedResourceSpec`. |
+
+### `inspect.description.resources.generic_resources.discrete_resource_spec`
+
+nested attribute, object. Upstream `DiscreteResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `number` | computed |  |  | Upstream `Value`. |
+
+### `inspect.description.resources.generic_resources.named_resource_spec`
+
+nested attribute, object. Upstream `NamedResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `string` | computed |  |  | Upstream `Value`. |
+
+### `inspect.description.tls_info`
+
+nested attribute, object. Upstream `TLSInfo`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `cert_issuer_public_key` | `string` | computed |  |  | Upstream `CertIssuerPublicKey`. |
+| `cert_issuer_subject` | `string` | computed |  |  | Upstream `CertIssuerSubject`. |
+| `trust_root` | `string` | computed |  |  | Upstream `TrustRoot`. |
+
+### `inspect.manager_status`
+
+nested attribute, object. Upstream `ManagerStatus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `addr` | `string` | computed |  |  | Upstream `Addr`. |
+| `leader` | `bool` | computed |  |  | Upstream `Leader`. |
+| `reachability` | `string` | computed |  |  | Upstream `Reachability`. |
+
+### `inspect.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `availability` | `string` | computed |  |  | Upstream `Availability`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `role` | `string` | computed |  |  | Upstream `Role`. |
+
+### `inspect.status`
+
+nested attribute, object. Upstream `Status`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `addr` | `string` | computed |  |  | Upstream `Addr`. |
+| `message` | `string` | computed |  |  | Upstream `Message`. |
+| `state` | `string` | computed |  |  | Upstream `State`. |
+
+### `inspect.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
 
 ## Example
 
@@ -29,5 +177,10 @@ data "docker_node" "worker1" {
 
 output "worker1_state" {
   value = data.docker_node.worker1.state
+}
+
+# The whole Engine node object is under inspect.
+output "worker1_resources" {
+  value = data.docker_node.worker1.inspect.description.resources
 }
 ```

@@ -133,7 +133,7 @@ Gotchas to plan around:
   Put a content hash in `triggers` (for example
   `sha1(join("", [for f in fileset(path.module, "app/**") : filesha1("${path.module}/${f}")]))`)
   to rebuild when the build context changes. Pin services to
-  `docker_image.x.repo_digest` so a new pull of the same tag rolls the service.
+  `docker_image.x.image_digest_ref` so a new pull of the same tag rolls the service.
 - **`docker_swarm_init` destroy = leave the swarm.** Destroying or replacing it
   makes the manager leave and tears down every Swarm object with it. Changing
   `advertise_addr` or `listen_addr` therefore rebuilds the whole cluster; guard
@@ -387,11 +387,11 @@ resource "docker_secret" "db_password" {
 
 resource "docker_service" "web" {
   name     = "web"
-  image    = docker_image.web.repo_digest
+  image    = docker_image.web.image_digest_ref
   mode     = "replicated"
   replicas = 3
 
-  networks = [docker_network.app.id]
+  networks = { (docker_network.app.id) = {} }
 
   placement {
     constraints = ["node.role==worker"]
@@ -508,7 +508,7 @@ resource "docker_stack" "shop" {
       POSTGRES_DB            = "shop"
       POSTGRES_PASSWORD_FILE = "/run/secrets/db_password"
     }
-    networks = ["backend"]
+    networks = { backend = {} }
 
     secrets {
       secret_id = "db_password"
@@ -526,7 +526,7 @@ resource "docker_stack" "shop" {
     name     = "web"
     image    = "nginx:1.27-alpine"
     replicas = 2
-    networks = ["backend"]
+    networks = { backend = {} }
 
     endpoint_spec {
       ports {
@@ -567,16 +567,16 @@ resource "docker_swarm_init" "this" {
 # Runs inside a running task of shop_db on the provider's daemon.
 action "docker_exec" "seed_db" {
   config {
-    service = "shop_db"
-    command = ["sh", "-c", "until pg_isready -U postgres; do sleep 1; done; psql -U postgres -d shop -c 'CREATE TABLE IF NOT EXISTS items (id serial PRIMARY KEY, name text)'"]
+    service_id = "shop_db"
+    command    = ["sh", "-c", "until pg_isready -U postgres; do sleep 1; done; psql -U postgres -d shop -c 'CREATE TABLE IF NOT EXISTS items (id serial PRIMARY KEY, name text)'"]
   }
 }
 
 # Not triggered by any resource: run it on demand.
 action "docker_service_scale" "web_peak" {
   config {
-    service  = "shop_web"
-    replicas = 6
+    service_id = "shop_web"
+    replicas   = 6
   }
 }
 ```
@@ -618,13 +618,13 @@ resources:
 |---|---|---|
 | `services.<name>` | one `docker_service` | one `docker_container` |
 | `image` | `image` | `image` |
-| `build` | `docker_image` with a `build` block, then `docker_registry_image` so workers can pull | `docker_image` with a `build` block; `image = docker_image.x.image_id` |
+| `build` | `docker_image` with a `build` block, then `docker_registry_image` so workers can pull | `docker_image` with a `build` block; `image = docker_image.x.id` |
 | `command` / `entrypoint` | `args` / `command` | `command` / `entrypoint` |
 | `environment` | `env` map | `env` map |
-| `ports: ["8080:80"]` | `endpoint_spec { ports { target_port = 80, published_port = 8080 } }` | `ports { internal = 80, external = 8080 }` |
+| `ports: ["8080:80"]` | `endpoint_spec { ports { target_port = 80, published_port = 8080 } }` | `ports { container_port = 80, host_port = 8080 }` |
 | `volumes` (named) | `docker_volume` + `mounts { type = "volume", source, target }` | `docker_volume` + `mounts { type = "volume", source, target }` |
 | `volumes` (bind) | `mounts { type = "bind", source, target }` | `mounts { type = "bind", source, target }` |
-| `networks` | `docker_network` (`driver = "overlay"`) + `networks = [id]` | `docker_network` + `networks_advanced { name }` |
+| `networks` | `docker_network` (`driver = "overlay"`) + `networks = { (id) = {} }` (aliases in the value) | `docker_network` + `networks = { (name) = { aliases = [...] } }` |
 | `secrets` / `configs` | `docker_secret` / `docker_config` + `secrets {}` / `configs {}` blocks | not supported by the Engine for plain containers; use a bind or tmpfs mount |
 | `deploy.replicas` / `deploy.mode` | `replicas` / `mode` | n/a |
 | `deploy.placement` | `placement { constraints, preferences }` | n/a |
@@ -633,7 +633,7 @@ resources:
 | `deploy.restart_policy` / `restart` | `restart_policy {}` | `restart = "unless-stopped"` |
 | `deploy.labels` / `labels` | `labels` / `container_labels` | `labels` |
 | `healthcheck` | `healthcheck {}` | `healthcheck {}` |
-| `logging` | `logging { driver, options }` | `log_driver`, `log_opts` |
+| `logging` | `logging { driver, options }` | `logging { driver, options }` |
 | `depends_on` | Terraform references or `depends_on` (orders creation only, not readiness) | same |
 | whole file / `docker stack deploy` | `docker_stack` with `service`, `network`, `volume`, `secret`, `config` blocks, or separate resources | separate resources |
 

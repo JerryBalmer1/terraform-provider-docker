@@ -1,0 +1,80 @@
+# converted from testdata/kitchen/compose.yml
+# by tools/compose2stack -mode swarm (project "kitchen")
+
+resource "docker_stack" "kitchen" {
+  name = "kitchen"
+
+  network {
+    name = "core"
+    # TODO: ipam (driver "", 1 pools) is not supported by docker_stack networks; create the network with docker_network and mark it external
+    # TODO: enable_ipv6 is not supported by docker_stack networks
+  }
+
+  volume {
+    name   = "blobs"
+    driver = "local"
+    driver_opts = {
+      type = "none"
+    }
+  }
+
+  service {
+    name     = "api"
+    image    = "example/api:2.1"
+    cap_add  = ["NET_ADMIN"]
+    cap_drop = ["MKNOD"]
+    # TODO: network core: static addresses 172.28.0.10 are not supported by swarm services
+    networks = {
+      core = {
+        aliases = ["api.internal"]
+      }
+      shared_edge = {}
+    }
+    # TODO: devices is not supported by docker_stack services
+    # TODO: ipc is not supported by docker_stack services
+    # TODO: shm_size is not supported by docker_stack services
+    read_only   = true
+    stop_signal = "SIGINT"
+    init        = true
+    groups      = ["audio"]
+    dns_config {
+      nameservers = ["10.0.0.2"]
+      search      = ["corp.example"]
+      options     = ["ndots:2"]
+    }
+    logging {
+      driver = "json-file"
+      options = {
+        max-size = "10m"
+      }
+    }
+    mounts {
+      type = "tmpfs"
+      tmpfs_options {
+        size_bytes = 67108864
+      }
+      target = "/cache"
+    }
+    mounts {
+      type   = "volume"
+      source = "blobs"
+      target = "/blobs"
+    }
+    restart_policy {
+      condition    = "on-failure"
+      max_attempts = 3
+    }
+    endpoint_spec {
+      ports {
+        target_port    = 8443
+        published_port = 443
+        # TODO: host_ip 0.0.0.0 is not supported in swarm
+      }
+      ports {
+        target_port    = 53
+        published_port = 5353
+        protocol       = "udp"
+      }
+    }
+  }
+}

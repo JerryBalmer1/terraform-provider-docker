@@ -3,12 +3,12 @@
 page_title: "docker_plugin Data Source - docker"
 subcategory: ""
 description: |-
-  Looks up a managed plugin installed on the provider's daemon by id or alias (PluginInspectWithRaw). Fails if no such plugin exists.
+  Looks up a managed plugin installed on the provider's daemon by id or alias (GET /plugins/{name}/json). Fails if no such plugin exists. The raw inspect_json output is sensitive because plugin settings can hold credentials.
 ---
 
 # docker_plugin (Data Source)
 
-Looks up a managed plugin installed on the provider's daemon by `id` or `alias` (`PluginInspectWithRaw`). Fails if no such plugin exists.
+Looks up a managed plugin installed on the provider's daemon by `id` or `alias` (`GET /plugins/{name}/json`). Fails if no such plugin exists. The raw `inspect_json` output is sensitive because plugin settings can hold credentials.
 
 ## Example Usage
 
@@ -32,7 +32,56 @@ output "sshfs_enabled" {
 
 ### Read-Only
 
+- `content_sha256` (String) sha256 of inspect_json.
+- `docker_server_version` (String) Docker Engine version from GET /version.
 - `enabled` (Boolean) Whether the plugin is enabled.
+- `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `env` (Set of String) Current plugin settings as `KEY=VALUE`.
+- `inspect` (Attributes) The GET /plugins/{name}/json response as a nested object, field by field. (see [below for nested schema](#nestedatt--inspect))
+- `inspect_json` (String, Sensitive) The exact Engine API GET /plugins/{name}/json response as JSON.
 - `name` (String) Familiar reference of the plugin, e.g. `vieux/sshfs:latest` (same spelling as `docker_plugin.name`).
 - `plugin_reference` (String) Fully qualified reference the plugin was installed from, e.g. `docker.io/vieux/sshfs:latest`.
+
+<a id="nestedatt--inspect"></a>
+### Nested Schema for `inspect`
+
+Read-Only:
+
+- `config` (Attributes) Upstream `Config`. (see [below for nested schema](#nestedatt--inspect--config))
+- `enabled` (Boolean) Upstream `Enabled`.
+- `id` (String) Upstream `Id`.
+- `name` (String) Upstream `Name`.
+- `plugin_reference` (String) Upstream `PluginReference`.
+- `settings` (Attributes) Upstream `Settings`. (see [below for nested schema](#nestedatt--inspect--settings))
+
+<a id="nestedatt--inspect--config"></a>
+### Nested Schema for `inspect.config`
+
+Read-Only:
+
+- `args` (Dynamic) Upstream `Args`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `description` (String) Upstream `Description`.
+- `documentation` (String) Upstream `Documentation`.
+- `entrypoint` (List of String) Upstream `Entrypoint`.
+- `env` (List of String, Sensitive) Upstream `Env`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `interface` (Dynamic) Upstream `Interface`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `ipc_host` (Boolean) Upstream `IpcHost`.
+- `linux` (Dynamic) Upstream `Linux`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `mounts` (List of String) Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `network` (Dynamic) Upstream `Network`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `pid_host` (Boolean) Upstream `PidHost`.
+- `propagated_mount` (String) Upstream `PropagatedMount`.
+- `rootfs` (Dynamic) Upstream `rootfs`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `user` (Dynamic) Upstream `User`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `work_dir` (String) Upstream `WorkDir`.
+
+
+<a id="nestedatt--inspect--settings"></a>
+### Nested Schema for `inspect.settings`
+
+Read-Only:
+
+- `args` (List of String) Upstream `Args`.
+- `devices` (List of String) Upstream `Devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
+- `mounts` (List of String) Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.

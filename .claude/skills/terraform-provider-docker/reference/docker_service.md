@@ -14,26 +14,748 @@ A Swarm service: a desired number of tasks (containers) of one image scheduled a
 | `cap_add` | `set(string)` | optional |  |  | Linux capabilities to add to the task containers, e.g. `NET_ADMIN` (case and `CAP_` prefix are ignored when comparing). Updated in place. |
 | `cap_drop` | `set(string)` | optional |  |  | Linux capabilities to drop, e.g. `ALL`. Updated in place. |
 | `command` | `list(string)` | optional |  |  | Command to run (overrides the image `ENTRYPOINT`). |
+| `compose_go_version` | `string` | computed |  |  | compose-go version that loads, interpolates, merges and validates the project (v2.16.2, from go.mod). |
+| `compose_spec_version` | `string` | computed |  |  | Pinned compose-spec commit the structured fields follow (main @ 3a4a699...). |
 | `container_labels` | `map(string)` | optional |  |  | Labels on the task containers. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json; changes whenever the object changes. |
+| `deploy` | `object` | computed |  |  | The service's normalized `deploy` section (mode, replicas, resources, restart/update/rollback policy, placement, labels). |
 | `dir` | `string` | optional |  |  | Working directory of the task process. Unset uses the image's. Updated in place. |
+| `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
+| `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
 | `env` | `map(string)` | optional |  |  | Environment variables of the task containers. |
 | `force_update` | `number` | optional |  |  | Counter (`TaskTemplate.ForceUpdate`): change it (e.g. increment) to force a rolling restart of every task even when nothing else changed, like `docker service update --force`. Unset leaves the daemon's counter alone and ignores it on refresh. Updated in place. |
+| `groups` | `list(string)` | optional |  |  | Additional groups the task process runs with (`ContainerSpec.Groups`). Updated in place. |
 | `hostname` | `string` | optional |  |  | Hostname of the task containers (`ContainerSpec.Hostname`; Go templates such as `{{.Task.Name}}` work). Unset: the container ID prefix. Updated in place (rolling update). |
 | `hosts` | `list(string)` | optional |  |  | Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` like `docker service create --host`. The provider sends them in the daemon's `"<ip> <hostname>"` (hosts(5)) format; an entry that already contains a space is sent as is. Updated in place. |
 | `id` | `string` | computed |  |  | The Swarm service ID. |
 | `image` | `string` | required |  |  | Image reference the tasks run. The provider asks the registry for the digest and the daemon pins tasks to it (`@sha256:...`); that pin is ignored on refresh when this value has no digest. Credentials come from the provider's `registry_auth`. Updated in place (rolling update). |
+| `image_digest_ref` | `string` | computed |  |  | Image the tasks run, pinned by digest (`repo@sha256:...`), from the daemon's digest pin; null when the daemon did not pin one. |
+| `init` | `bool` | optional |  |  | Run an init process inside the task containers that forwards signals and reaps processes (`ContainerSpec.Init`). Unset uses the daemon default. Updated in place. |
+| `inspect` | `object` | computed |  |  | The service inspect response as a nested object mirroring Service field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans. |
+| `inspect_json` | `string` | computed |  | yes | The exact Engine API inspect response for the service, as JSON. Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans. |
+| `isolation` | `string` | optional |  |  | Isolation technology of the task containers (`ContainerSpec.Isolation`): `default`, `process` or `hyperv` (Windows only). Updated in place. |
 | `labels` | `map(string)` | optional |  |  | Labels on the service object. |
 | `max_concurrent` | `number` | optional |  |  | `replicated_job` only: tasks run at the same time (daemon default 1). Updated in place (re-runs the job). |
 | `mode` | `string` | optional, computed | yes |  | `replicated` (default; runs `replicas` tasks), `global` (one task per eligible node), `replicated_job` (runs `total_completions` tasks to completion, `max_concurrent` at a time) or `global_job` (one run-to-completion task per eligible node). The Engine API cannot change a service's mode type, so changing this forces replacement. |
 | `name` | `string` | required | yes |  | Service name. Changing this forces a new resource. |
-| `networks` | `set(string)` | optional |  |  | Networks to attach the tasks to, by ID or name (resolved to IDs; overlay networks). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. Use `networks_advanced` instead for per-network aliases; the two cannot be combined. Updated in place. |
+| `networks` | `map(object)` | optional |  |  | Networks the tasks attach to (`TaskTemplate.Networks`), keyed by network name or ID (resolved to the ID, the attachment's `Target`); use `{}` as the value for a plain attachment. In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. Updated in place. |
+| `published_ports` | `list(object)` | computed |  |  | Endpoint.Ports: the ports actually published, after the manager assigned any PublishedPort. Non-sensitive copy for handoff. |
+| `read_only` | `bool` | optional |  |  | Mount the task containers' root filesystem read-only (`ContainerSpec.ReadOnly`). Updated in place. |
 | `replicas` | `number` | optional, computed |  |  | Number of tasks for `replicated` mode (default 1); ignored by the other modes. Updated in place. |
+| `runtime` | `string` | optional |  |  | Runtime of the tasks (`TaskTemplate.Runtime`). Only `container` (the default) is useful here: this type always sends a `ContainerSpec`, and the `plugin` and `attachment` runtimes need a plugin or network-attachment spec instead. Updated in place. |
 | `stop_grace_period` | `string` | optional |  |  | Time to wait after the stop signal before killing a task (Go duration, e.g. `30s`; daemon default 10s). Updated in place. |
+| `stop_signal` | `string` | optional |  |  | Signal that stops the task containers, e.g. `SIGTERM` (`ContainerSpec.StopSignal`). Unset uses the image's. Updated in place. |
 | `sysctls` | `map(string)` | optional |  |  | Namespaced kernel parameters for the task containers, e.g. `{ "net.core.somaxconn" = "1024" }`. Updated in place. |
 | `total_completions` | `number` | optional |  |  | `replicated_job` only: tasks that must complete successfully (daemon default: `max_concurrent`). Updated in place (re-runs the job). |
 | `user` | `string` | optional |  |  | User (`uid`, `name`, optionally `:group`) the task process runs as. Unset uses the image's. Updated in place. |
+| `version_index` | `number` | computed |  |  | The service object's `Version.Index`; it changes on every update of the service. |
 
-Nested blocks: `configs` (list of blocks), `converge_config` (single block), `dns` (single block), `endpoint_spec` (single block), `healthcheck` (single block), `logging` (single block), `mounts` (list of blocks), `networks_advanced` (list of blocks), `placement` (single block), `resources` (single block), `restart_policy` (single block), `rollback_config` (single block), `secrets` (list of blocks), `ulimits` (list of blocks), `update_config` (single block).
+Nested blocks: `configs` (list of blocks), `converge_config` (single block), `dns_config` (single block), `endpoint_spec` (single block), `healthcheck` (single block), `logging` (single block), `mounts` (list of blocks), `placement` (single block), `privileges` (single block), `resources` (single block), `restart_policy` (single block), `rollback_config` (single block), `secrets` (list of blocks), `ulimits` (list of blocks), `update_config` (single block).
+
+### `deploy`
+
+nested attribute, object. The service's normalized `deploy` section (mode, replicas, resources, restart/update/rollback policy, placement, labels).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `endpoint_mode` | `string` | computed |  |  | Upstream `endpoint_mode`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `mode` | `string` | computed |  |  | Upstream `mode`. |
+| `placement` | `object` | computed |  |  | Upstream `placement`. |
+| `replicas` | `number` | computed |  |  | Upstream `replicas`. |
+| `resources` | `object` | computed |  |  | Upstream `resources`. |
+| `restart_policy` | `object` | computed |  |  | Upstream `restart_policy`. |
+| `rollback_config` | `object` | computed |  |  | Upstream `rollback_config`. |
+| `update_config` | `object` | computed |  |  | Upstream `update_config`. |
+
+### `deploy.placement`
+
+nested attribute, object. Upstream `placement`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `constraints` | `list(string)` | computed |  |  | Upstream `constraints`. |
+| `max_replicas_per_node` | `number` | computed |  |  | Upstream `max_replicas_per_node`. |
+| `preferences` | `list(string)` | computed |  |  | Upstream `preferences`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `deploy.resources`
+
+nested attribute, object. Upstream `resources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `limits` | `dynamic` | computed |  |  | Upstream `limits`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `reservations` | `dynamic` | computed |  |  | Upstream `reservations`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+
+### `deploy.restart_policy`
+
+nested attribute, object. Upstream `restart_policy`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `condition` | `string` | computed |  |  | Upstream `condition`. |
+| `delay` | `string` | computed |  |  | Upstream `delay`. |
+| `max_attempts` | `number` | computed |  |  | Upstream `max_attempts`. |
+| `window` | `string` | computed |  |  | Upstream `window`. |
+
+### `deploy.rollback_config`
+
+nested attribute, object. Upstream `rollback_config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `delay` | `string` | computed |  |  | Upstream `delay`. |
+| `failure_action` | `string` | computed |  |  | Upstream `failure_action`. |
+| `max_failure_ratio` | `number` | computed |  |  | Upstream `max_failure_ratio`. |
+| `monitor` | `string` | computed |  |  | Upstream `monitor`. |
+| `order` | `string` | computed |  |  | Upstream `order`. |
+| `parallelism` | `number` | computed |  |  | Upstream `parallelism`. |
+
+### `deploy.update_config`
+
+nested attribute, object. Upstream `update_config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `delay` | `string` | computed |  |  | Upstream `delay`. |
+| `failure_action` | `string` | computed |  |  | Upstream `failure_action`. |
+| `max_failure_ratio` | `number` | computed |  |  | Upstream `max_failure_ratio`. |
+| `monitor` | `string` | computed |  |  | Upstream `monitor`. |
+| `order` | `string` | computed |  |  | Upstream `order`. |
+| `parallelism` | `number` | computed |  |  | Upstream `parallelism`. |
+
+### `inspect`
+
+nested attribute, object. The service inspect response as a nested object mirroring Service field by field (snake_case). Only ContainerSpec.Env and volume driver options are sensitive (field-level); the rest, including Args/Command, stays plain in plans.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `endpoint` | `object` | computed |  |  | Upstream `Endpoint`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `job_status` | `object` | computed |  |  | Upstream `JobStatus`. |
+| `service_status` | `object` | computed |  |  | Upstream `ServiceStatus`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `update_status` | `object` | computed |  |  | Upstream `UpdateStatus`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `inspect.endpoint`
+
+nested attribute, object. Upstream `Endpoint`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ports` | `list(object)` | computed |  |  | Upstream `Ports`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `virtual_ips` | `list(object)` | computed |  |  | Upstream `VirtualIPs`. |
+
+### `inspect.endpoint.ports`
+
+nested attribute, list(object). Upstream `Ports`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `protocol` | `string` | computed |  |  | Upstream `Protocol`. |
+| `publish_mode` | `string` | computed |  |  | Upstream `PublishMode`. |
+| `published_port` | `number` | computed |  |  | Upstream `PublishedPort`. |
+| `target_port` | `number` | computed |  |  | Upstream `TargetPort`. |
+
+### `inspect.endpoint.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+| `ports` | `list(object)` | computed |  |  | Upstream `Ports`. |
+
+### `inspect.endpoint.spec.ports`
+
+nested attribute, list(object). Upstream `Ports`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `protocol` | `string` | computed |  |  | Upstream `Protocol`. |
+| `publish_mode` | `string` | computed |  |  | Upstream `PublishMode`. |
+| `published_port` | `number` | computed |  |  | Upstream `PublishedPort`. |
+| `target_port` | `number` | computed |  |  | Upstream `TargetPort`. |
+
+### `inspect.endpoint.virtual_ips`
+
+nested attribute, list(object). Upstream `VirtualIPs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `addr` | `string` | computed |  |  | Upstream `Addr`. |
+| `network_id` | `string` | computed |  |  | Upstream `NetworkID`. |
+
+### `inspect.job_status`
+
+nested attribute, object. Upstream `JobStatus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `job_iteration` | `object` | computed |  |  | Upstream `JobIteration`. |
+| `last_execution` | `string` | computed |  |  | Upstream `LastExecution`. |
+
+### `inspect.job_status.job_iteration`
+
+nested attribute, object. Upstream `JobIteration`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
+
+### `inspect.service_status`
+
+nested attribute, object. Upstream `ServiceStatus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `completed_tasks` | `number` | computed |  |  | Upstream `CompletedTasks`. |
+| `desired_tasks` | `number` | computed |  |  | Upstream `DesiredTasks`. |
+| `running_tasks` | `number` | computed |  |  | Upstream `RunningTasks`. |
+
+### `inspect.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `endpoint_spec` | `object` | computed |  |  | Upstream `EndpointSpec`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `mode` | `object` | computed |  |  | Upstream `Mode`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `networks` | `list(object)` | computed |  |  | Upstream `Networks`. |
+| `rollback_config` | `object` | computed |  |  | Upstream `RollbackConfig`. |
+| `task_template` | `object` | computed |  |  | Upstream `TaskTemplate`. |
+| `update_config` | `object` | computed |  |  | Upstream `UpdateConfig`. |
+
+### `inspect.spec.endpoint_spec`
+
+nested attribute, object. Upstream `EndpointSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+| `ports` | `list(object)` | computed |  |  | Upstream `Ports`. |
+
+### `inspect.spec.endpoint_spec.ports`
+
+nested attribute, list(object). Upstream `Ports`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `protocol` | `string` | computed |  |  | Upstream `Protocol`. |
+| `publish_mode` | `string` | computed |  |  | Upstream `PublishMode`. |
+| `published_port` | `number` | computed |  |  | Upstream `PublishedPort`. |
+| `target_port` | `number` | computed |  |  | Upstream `TargetPort`. |
+
+### `inspect.spec.mode`
+
+nested attribute, object. Upstream `Mode`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `global` | `dynamic` | computed |  |  | Upstream `Global`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `global_job` | `dynamic` | computed |  |  | Upstream `GlobalJob`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `replicated` | `object` | computed |  |  | Upstream `Replicated`. |
+| `replicated_job` | `object` | computed |  |  | Upstream `ReplicatedJob`. |
+
+### `inspect.spec.mode.replicated`
+
+nested attribute, object. Upstream `Replicated`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `replicas` | `number` | computed |  |  | Upstream `Replicas`. |
+
+### `inspect.spec.mode.replicated_job`
+
+nested attribute, object. Upstream `ReplicatedJob`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `max_concurrent` | `number` | computed |  |  | Upstream `MaxConcurrent`. |
+| `total_completions` | `number` | computed |  |  | Upstream `TotalCompletions`. |
+
+### `inspect.spec.networks`
+
+nested attribute, list(object). Upstream `Networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  |  | Upstream `Aliases`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `DriverOpts`. |
+| `target` | `string` | computed |  |  | Upstream `Target`. |
+
+### `inspect.spec.rollback_config`
+
+nested attribute, object. Upstream `RollbackConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `delay` | `number` | computed |  |  | Upstream `Delay`. |
+| `failure_action` | `string` | computed |  |  | Upstream `FailureAction`. |
+| `max_failure_ratio` | `number` | computed |  |  | Upstream `MaxFailureRatio`. |
+| `monitor` | `number` | computed |  |  | Upstream `Monitor`. |
+| `order` | `string` | computed |  |  | Upstream `Order`. |
+| `parallelism` | `number` | computed |  |  | Upstream `Parallelism`. |
+
+### `inspect.spec.task_template`
+
+nested attribute, object. Upstream `TaskTemplate`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `container_spec` | `object` | computed |  |  | Upstream `ContainerSpec`. |
+| `force_update` | `number` | computed |  |  | Upstream `ForceUpdate`. |
+| `log_driver` | `object` | computed |  |  | Upstream `LogDriver`. |
+| `network_attachment_spec` | `object` | computed |  |  | Upstream `NetworkAttachmentSpec`. |
+| `networks` | `list(object)` | computed |  |  | Upstream `Networks`. |
+| `placement` | `object` | computed |  |  | Upstream `Placement`. |
+| `plugin_spec` | `object` | computed |  |  | Upstream `PluginSpec`. |
+| `resources` | `object` | computed |  |  | Upstream `Resources`. |
+| `restart_policy` | `object` | computed |  |  | Upstream `RestartPolicy`. |
+| `runtime` | `string` | computed |  |  | Upstream `Runtime`. |
+
+### `inspect.spec.task_template.container_spec`
+
+nested attribute, object. Upstream `ContainerSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args` | `list(string)` | computed |  |  | Upstream `Args`. |
+| `capability_add` | `list(string)` | computed |  |  | Upstream `CapabilityAdd`. |
+| `capability_drop` | `list(string)` | computed |  |  | Upstream `CapabilityDrop`. |
+| `command` | `list(string)` | computed |  |  | Upstream `Command`. |
+| `configs` | `list(object)` | computed |  |  | Upstream `Configs`. |
+| `dir` | `string` | computed |  |  | Upstream `Dir`. |
+| `dns_config` | `object` | computed |  |  | Upstream `DNSConfig`. |
+| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
+| `groups` | `list(string)` | computed |  |  | Upstream `Groups`. |
+| `healthcheck` | `object` | computed |  |  | Upstream `Healthcheck`. |
+| `hostname` | `string` | computed |  |  | Upstream `Hostname`. |
+| `hosts` | `list(string)` | computed |  |  | Upstream `Hosts`. |
+| `image` | `string` | computed |  |  | Upstream `Image`. |
+| `init` | `bool` | computed |  |  | Upstream `Init`. |
+| `isolation` | `string` | computed |  |  | Upstream `Isolation`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `mounts` | `list(object)` | computed |  |  | Upstream `Mounts`. |
+| `oom_score_adj` | `number` | computed |  |  | Upstream `OomScoreAdj`. |
+| `open_stdin` | `bool` | computed |  |  | Upstream `OpenStdin`. |
+| `privileges` | `object` | computed |  |  | Upstream `Privileges`. |
+| `read_only` | `bool` | computed |  |  | Upstream `ReadOnly`. |
+| `secrets` | `list(object)` | computed |  |  | Upstream `Secrets`. |
+| `stop_grace_period` | `number` | computed |  |  | Upstream `StopGracePeriod`. |
+| `stop_signal` | `string` | computed |  |  | Upstream `StopSignal`. |
+| `sysctls` | `map(string)` | computed |  |  | Upstream `Sysctls`. |
+| `tty` | `bool` | computed |  |  | Upstream `TTY`. |
+| `ulimits` | `list(object)` | computed |  |  | Upstream `Ulimits`. |
+| `user` | `string` | computed |  |  | Upstream `User`. |
+
+### `inspect.spec.task_template.container_spec.configs`
+
+nested attribute, list(object). Upstream `Configs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config_id` | `string` | computed |  |  | Upstream `ConfigID`. |
+| `config_name` | `string` | computed |  |  | Upstream `ConfigName`. |
+| `file` | `object` | computed |  |  | Upstream `File`. |
+| `runtime` | `string` | computed |  |  | Upstream `Runtime`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `inspect.spec.task_template.container_spec.configs.file`
+
+nested attribute, object. Upstream `File`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  |  | Upstream `GID`. |
+| `mode` | `number` | computed |  |  | Upstream `Mode`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `uid` | `string` | computed |  |  | Upstream `UID`. |
+
+### `inspect.spec.task_template.container_spec.dns_config`
+
+nested attribute, object. Upstream `DNSConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `nameservers` | `list(string)` | computed |  |  | Upstream `Nameservers`. |
+| `options` | `list(string)` | computed |  |  | Upstream `Options`. |
+| `search` | `list(string)` | computed |  |  | Upstream `Search`. |
+
+### `inspect.spec.task_template.container_spec.healthcheck`
+
+nested attribute, object. Upstream `Healthcheck`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `interval` | `number` | computed |  |  | Upstream `Interval`. |
+| `retries` | `number` | computed |  |  | Upstream `Retries`. |
+| `start_interval` | `number` | computed |  |  | Upstream `StartInterval`. |
+| `start_period` | `number` | computed |  |  | Upstream `StartPeriod`. |
+| `test` | `list(string)` | computed |  |  | Upstream `Test`. |
+| `timeout` | `number` | computed |  |  | Upstream `Timeout`. |
+
+### `inspect.spec.task_template.container_spec.mounts`
+
+nested attribute, list(object). Upstream `Mounts`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `bind_options` | `object` | computed |  |  | Upstream `BindOptions`. |
+| `consistency` | `string` | computed |  |  | Upstream `Consistency`. |
+| `image_options` | `object` | computed |  |  | Upstream `ImageOptions`. |
+| `read_only` | `bool` | computed |  |  | Upstream `ReadOnly`. |
+| `source` | `string` | computed |  |  | Upstream `Source`. |
+| `target` | `string` | computed |  |  | Upstream `Target`. |
+| `tmpfs_options` | `object` | computed |  |  | Upstream `TmpfsOptions`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `volume_options` | `object` | computed |  |  | Upstream `VolumeOptions`. |
+
+### `inspect.spec.task_template.container_spec.mounts.bind_options`
+
+nested attribute, object. Upstream `BindOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `create_mountpoint` | `bool` | computed |  |  | Upstream `CreateMountpoint`. |
+| `non_recursive` | `bool` | computed |  |  | Upstream `NonRecursive`. |
+| `propagation` | `string` | computed |  |  | Upstream `Propagation`. |
+| `read_only_force_recursive` | `bool` | computed |  |  | Upstream `ReadOnlyForceRecursive`. |
+| `read_only_non_recursive` | `bool` | computed |  |  | Upstream `ReadOnlyNonRecursive`. |
+
+### `inspect.spec.task_template.container_spec.mounts.image_options`
+
+nested attribute, object. Upstream `ImageOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `subpath` | `string` | computed |  |  | Upstream `Subpath`. |
+
+### `inspect.spec.task_template.container_spec.mounts.tmpfs_options`
+
+nested attribute, object. Upstream `TmpfsOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `number` | computed |  |  | Upstream `Mode`. |
+| `options` | `list(list(string))` | computed |  |  | Upstream `Options`. |
+| `size_bytes` | `number` | computed |  |  | Upstream `SizeBytes`. |
+
+### `inspect.spec.task_template.container_spec.mounts.volume_options`
+
+nested attribute, object. Upstream `VolumeOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `driver_config` | `object` | computed |  |  | Upstream `DriverConfig`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `no_copy` | `bool` | computed |  |  | Upstream `NoCopy`. |
+| `subpath` | `string` | computed |  |  | Upstream `Subpath`. |
+
+### `inspect.spec.task_template.container_spec.mounts.volume_options.driver_config`
+
+nested attribute, object. Upstream `DriverConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  | yes | Upstream `Options`. Sensitive. |
+
+### `inspect.spec.task_template.container_spec.privileges`
+
+nested attribute, object. Upstream `Privileges`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `app_armor` | `object` | computed |  |  | Upstream `AppArmor`. |
+| `credential_spec` | `object` | computed |  |  | Upstream `CredentialSpec`. |
+| `no_new_privileges` | `bool` | computed |  |  | Upstream `NoNewPrivileges`. |
+| `seccomp` | `object` | computed |  |  | Upstream `Seccomp`. |
+| `selinux_context` | `object` | computed |  |  | Upstream `SELinuxContext`. |
+
+### `inspect.spec.task_template.container_spec.privileges.app_armor`
+
+nested attribute, object. Upstream `AppArmor`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+
+### `inspect.spec.task_template.container_spec.privileges.credential_spec`
+
+nested attribute, object. Upstream `CredentialSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `string` | computed |  |  | Upstream `Config`. |
+| `file` | `string` | computed |  |  | Upstream `File`. |
+| `registry` | `string` | computed |  |  | Upstream `Registry`. |
+
+### `inspect.spec.task_template.container_spec.privileges.seccomp`
+
+nested attribute, object. Upstream `Seccomp`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+| `profile` | `string` | computed |  |  | Upstream `Profile`. |
+
+### `inspect.spec.task_template.container_spec.privileges.selinux_context`
+
+nested attribute, object. Upstream `SELinuxContext`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `disable` | `bool` | computed |  |  | Upstream `Disable`. |
+| `level` | `string` | computed |  |  | Upstream `Level`. |
+| `role` | `string` | computed |  |  | Upstream `Role`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+| `user` | `string` | computed |  |  | Upstream `User`. |
+
+### `inspect.spec.task_template.container_spec.secrets`
+
+nested attribute, list(object). Upstream `Secrets`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `file` | `object` | computed |  |  | Upstream `File`. |
+| `secret_id` | `string` | computed |  |  | Upstream `SecretID`. |
+| `secret_name` | `string` | computed |  |  | Upstream `SecretName`. |
+
+### `inspect.spec.task_template.container_spec.secrets.file`
+
+nested attribute, object. Upstream `File`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  |  | Upstream `GID`. |
+| `mode` | `number` | computed |  |  | Upstream `Mode`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `uid` | `string` | computed |  |  | Upstream `UID`. |
+
+### `inspect.spec.task_template.container_spec.ulimits`
+
+nested attribute, list(object). Upstream `Ulimits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `hard` | `number` | computed |  |  | Upstream `Hard`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `soft` | `number` | computed |  |  | Upstream `Soft`. |
+
+### `inspect.spec.task_template.log_driver`
+
+nested attribute, object. Upstream `LogDriver`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `inspect.spec.task_template.network_attachment_spec`
+
+nested attribute, object. Upstream `NetworkAttachmentSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `container_id` | `string` | computed |  |  | Upstream `ContainerID`. |
+
+### `inspect.spec.task_template.networks`
+
+nested attribute, list(object). Upstream `Networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  |  | Upstream `Aliases`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `DriverOpts`. |
+| `target` | `string` | computed |  |  | Upstream `Target`. |
+
+### `inspect.spec.task_template.placement`
+
+nested attribute, object. Upstream `Placement`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `constraints` | `list(string)` | computed |  |  | Upstream `Constraints`. |
+| `max_replicas` | `number` | computed |  |  | Upstream `MaxReplicas`. |
+| `platforms` | `list(object)` | computed |  |  | Upstream `Platforms`. |
+| `preferences` | `list(object)` | computed |  |  | Upstream `Preferences`. |
+
+### `inspect.spec.task_template.placement.platforms`
+
+nested attribute, list(object). Upstream `Platforms`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `Architecture`. |
+| `os` | `string` | computed |  |  | Upstream `OS`. |
+
+### `inspect.spec.task_template.placement.preferences`
+
+nested attribute, list(object). Upstream `Preferences`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `spread` | `object` | computed |  |  | Upstream `Spread`. |
+
+### `inspect.spec.task_template.placement.preferences.spread`
+
+nested attribute, object. Upstream `Spread`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `spread_descriptor` | `string` | computed |  |  | Upstream `SpreadDescriptor`. |
+
+### `inspect.spec.task_template.plugin_spec`
+
+nested attribute, object. Upstream `PluginSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `disabled` | `bool` | computed |  |  | Upstream `Disabled`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `plugin_privilege` | `list(object)` | computed |  |  | Upstream `PluginPrivilege`. |
+| `remote` | `string` | computed |  |  | Upstream `Remote`. |
+
+### `inspect.spec.task_template.plugin_spec.plugin_privilege`
+
+nested attribute, list(object). Upstream `PluginPrivilege`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `description` | `string` | computed |  |  | Upstream `Description`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `value` | `list(string)` | computed |  |  | Upstream `Value`. |
+
+### `inspect.spec.task_template.resources`
+
+nested attribute, object. Upstream `Resources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `limits` | `object` | computed |  |  | Upstream `Limits`. |
+| `memory_swappiness` | `number` | computed |  |  | Upstream `MemorySwappiness`. |
+| `reservations` | `object` | computed |  |  | Upstream `Reservations`. |
+| `swap_bytes` | `number` | computed |  |  | Upstream `SwapBytes`. |
+
+### `inspect.spec.task_template.resources.limits`
+
+nested attribute, object. Upstream `Limits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `memory_bytes` | `number` | computed |  |  | Upstream `MemoryBytes`. |
+| `nano_cpus` | `number` | computed |  |  | Upstream `NanoCPUs`. |
+| `pids` | `number` | computed |  |  | Upstream `Pids`. |
+
+### `inspect.spec.task_template.resources.reservations`
+
+nested attribute, object. Upstream `Reservations`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `generic_resources` | `list(object)` | computed |  |  | Upstream `GenericResources`. |
+| `memory_bytes` | `number` | computed |  |  | Upstream `MemoryBytes`. |
+| `nano_cpus` | `number` | computed |  |  | Upstream `NanoCPUs`. |
+
+### `inspect.spec.task_template.resources.reservations.generic_resources`
+
+nested attribute, list(object). Upstream `GenericResources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `discrete_resource_spec` | `object` | computed |  |  | Upstream `DiscreteResourceSpec`. |
+| `named_resource_spec` | `object` | computed |  |  | Upstream `NamedResourceSpec`. |
+
+### `inspect.spec.task_template.resources.reservations.generic_resources.discrete_resource_spec`
+
+nested attribute, object. Upstream `DiscreteResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `number` | computed |  |  | Upstream `Value`. |
+
+### `inspect.spec.task_template.resources.reservations.generic_resources.named_resource_spec`
+
+nested attribute, object. Upstream `NamedResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `string` | computed |  |  | Upstream `Value`. |
+
+### `inspect.spec.task_template.restart_policy`
+
+nested attribute, object. Upstream `RestartPolicy`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `condition` | `string` | computed |  |  | Upstream `Condition`. |
+| `delay` | `number` | computed |  |  | Upstream `Delay`. |
+| `max_attempts` | `number` | computed |  |  | Upstream `MaxAttempts`. |
+| `window` | `number` | computed |  |  | Upstream `Window`. |
+
+### `inspect.spec.update_config`
+
+nested attribute, object. Upstream `UpdateConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `delay` | `number` | computed |  |  | Upstream `Delay`. |
+| `failure_action` | `string` | computed |  |  | Upstream `FailureAction`. |
+| `max_failure_ratio` | `number` | computed |  |  | Upstream `MaxFailureRatio`. |
+| `monitor` | `number` | computed |  |  | Upstream `Monitor`. |
+| `order` | `string` | computed |  |  | Upstream `Order`. |
+| `parallelism` | `number` | computed |  |  | Upstream `Parallelism`. |
+
+### `inspect.update_status`
+
+nested attribute, object. Upstream `UpdateStatus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `completed_at` | `string` | computed |  |  | Upstream `CompletedAt`. |
+| `message` | `string` | computed |  |  | Upstream `Message`. |
+| `started_at` | `string` | computed |  |  | Upstream `StartedAt`. |
+| `state` | `string` | computed |  |  | Upstream `State`. |
+
+### `inspect.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
+
+### `networks`
+
+nested attribute, map(object). Networks the tasks attach to (`TaskTemplate.Networks`), keyed by network name or ID (resolved to the ID, the attachment's `Target`); use `{}` as the value for a plain attachment. In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. Updated in place.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `set(string)` | optional |  |  | Extra DNS names the service gets on this network (`Aliases`); the service name always resolves. |
+| `driver_opts` | `map(string)` | optional |  |  | Driver options of this attachment (`DriverOpts`). |
+
+### `published_ports`
+
+nested attribute, list(object). Endpoint.Ports: the ports actually published, after the manager assigned any PublishedPort. Non-sensitive copy for handoff.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `protocol` | `string` | computed |  |  | Upstream `Protocol`. |
+| `publish_mode` | `string` | computed |  |  | Upstream `PublishMode`. |
+| `published_port` | `number` | computed |  |  | Upstream `PublishedPort`. |
+| `target_port` | `number` | computed |  |  | Upstream `TargetPort`. |
 
 ### `configs`
 
@@ -57,7 +779,7 @@ single block. When present, create and update wait until the service has converg
 | `delay` | `string` | optional, computed |  |  | Poll interval (Go duration, default `5s`). |
 | `timeout` | `string` | optional, computed |  |  | Maximum wait (Go duration, default `3m`). |
 
-### `dns`
+### `dns_config`
 
 single block. Resolver configuration of the task containers (`ContainerSpec.DNSConfig`). Updated in place.
 
@@ -83,6 +805,7 @@ list of blocks. Published ports.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `name` | `string` | optional |  |  | Name of the port mapping (`Name`). |
 | `protocol` | `string` | optional, computed |  |  | `tcp` (default), `udp` or `sctp`. |
 | `publish_mode` | `string` | optional, computed |  |  | `ingress` (default, routing mesh on every node) or `host` (only on nodes running a task). |
 | `published_port` | `number` | optional |  |  | Port published on the nodes. Unset lets Swarm choose one (30000+). |
@@ -118,20 +841,46 @@ list of blocks. Mounts in the task containers.
 | `read_only` | `bool` | optional, computed |  |  | Mount read-only. |
 | `source` | `string` | optional |  |  | Host path (`bind`) or volume name (`volume`; created on each node by the volume driver if missing). In a stack, the short name of a stack `volume` block resolves to `<stack>_<name>` with that block's driver, options and labels. |
 | `target` | `string` | required |  |  | Path inside the container. |
-| `tmpfs_size` | `number` | optional |  |  | Size of a `tmpfs` mount in bytes. |
 | `type` | `string` | required |  |  | `bind`, `volume` or `tmpfs`. |
-| `volume_driver` | `string` | optional |  |  | Volume driver used when the volume does not exist yet on the node. |
-| `volume_driver_opts` | `map(string)` | optional |  |  | Driver options for a volume created on first use. |
-| `volume_labels` | `map(string)` | optional |  |  | Labels for a volume created on first use. |
 
-### `networks_advanced`
+Nested blocks: `bind_options` (single block), `tmpfs_options` (single block), `volume_options` (single block).
 
-list of blocks. Networks to attach, with per-network DNS aliases (`TaskTemplate.Networks[].Aliases`). An alternative to `networks`: setting both is an error. Updated in place.
+### `mounts.bind_options`
+
+single block. Options of a `bind` mount (`Mount.BindOptions`).
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `aliases` | `set(string)` | optional |  |  | Extra DNS names the service gets on this network (the service name always resolves). |
-| `name` | `string` | required |  |  | Network ID or name (resolved to its ID). In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. |
+| `propagation` | `string` | optional |  |  | Bind propagation: `private`, `rprivate`, `shared`, `rshared`, `slave` or `rslave` (`Propagation`). |
+
+### `mounts.tmpfs_options`
+
+single block. Options of a `tmpfs` mount (`Mount.TmpfsOptions`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `number` | optional |  |  | Permission bits of the tmpfs as a decimal number, e.g. `448` for `0700` (`Mode`). |
+| `size_bytes` | `number` | optional |  |  | Size of the tmpfs in bytes (`SizeBytes`); unset is unlimited. |
+
+### `mounts.volume_options`
+
+single block. Options of a `volume` mount, used when the volume does not exist yet on the node (`Mount.VolumeOptions`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `labels` | `map(string)` | optional |  |  | Labels for a volume created on first use (`Labels`). |
+| `no_copy` | `bool` | optional |  |  | Do not populate a new volume with the image's data at the target (`NoCopy`). |
+
+Nested blocks: `driver_config` (single block).
+
+### `mounts.volume_options.driver_config`
+
+single block. Volume driver for a volume created on first use (`DriverConfig`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | optional |  |  | Volume driver name, e.g. `local` (`Name`). |
+| `options` | `map(string)` | optional |  |  | Driver options (`Options`). |
 
 ### `placement`
 
@@ -142,6 +891,45 @@ single block. Where tasks may run.
 | `constraints` | `list(string)` | optional |  |  | Constraints such as `node.role==manager` or `node.labels.zone==a`. |
 | `max_replicas` | `number` | optional |  |  | Maximum tasks per node; 0 or unset means unlimited. |
 | `preferences` | `list(string)` | optional |  |  | Spread preferences, each `spread=<descriptor>` such as `spread=node.labels.zone`. |
+
+Nested blocks: `platforms` (list of blocks).
+
+### `placement.platforms`
+
+list of blocks. Platforms the tasks may run on (`Placement.Platforms`). Unset lets the daemon fill them from the image manifest; that daemon value is then not shown.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | required |  |  | CPU architecture, e.g. `amd64` or `arm64` (`Architecture`). |
+| `os` | `string` | required |  |  | Operating system, e.g. `linux` (`OS`). |
+
+### `privileges`
+
+single block. Security options of the task containers (`ContainerSpec.Privileges`). Updated in place.
+
+Nested blocks: `credential_spec` (single block), `selinux_context` (single block).
+
+### `privileges.credential_spec`
+
+single block. Managed service account credential spec (`CredentialSpec`, Windows only); set one of `config`, `file` and `registry`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `string` | optional |  |  | ID of a swarm config holding the credential spec (`Config`). |
+| `file` | `string` | optional |  |  | Credential spec file name under the daemon's `CredentialSpecs` directory (`File`). |
+| `registry` | `string` | optional |  |  | Registry value name holding the credential spec (`Registry`). |
+
+### `privileges.selinux_context`
+
+single block. SELinux labels of the task containers (`SELinuxContext`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `disable` | `bool` | optional |  |  | Disable SELinux labeling (`Disable`). |
+| `level` | `string` | optional |  |  | SELinux level label (`Level`). |
+| `role` | `string` | optional |  |  | SELinux role label (`Role`). |
+| `type` | `string` | optional |  |  | SELinux type label (`Type`). |
+| `user` | `string` | optional |  |  | SELinux user label (`User`). |
 
 ### `resources`
 
@@ -166,6 +954,32 @@ single block. Reservations the scheduler must find on a node.
 |---|---|---|---|---|---|
 | `memory_bytes` | `number` | optional |  |  | Memory in bytes. |
 | `nano_cpus` | `number` | optional |  |  | CPU in units of 1e-9 CPUs (1000000000 = one CPU). |
+
+Nested blocks: `generic_resources` (list of blocks).
+
+### `resources.reservations.generic_resources`
+
+list of blocks. User-defined resources the node must advertise (`GenericResources`); each entry sets one of `named_resource_spec` and `discrete_resource_spec`.
+
+Nested blocks: `discrete_resource_spec` (single block), `named_resource_spec` (single block).
+
+### `resources.reservations.generic_resources.discrete_resource_spec`
+
+single block. A countable resource (`DiscreteResourceSpec`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | optional |  |  | Resource kind, e.g. `SSD` (`Kind`). |
+| `value` | `number` | optional |  |  | Amount (`Value`). |
+
+### `resources.reservations.generic_resources.named_resource_spec`
+
+single block. A resource with a string value, e.g. a GPU UUID (`NamedResourceSpec`).
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | optional |  |  | Resource kind, e.g. `GPU` (`Kind`). |
+| `value` | `string` | optional |  |  | Resource value (`Value`). |
 
 ### `restart_policy`
 
@@ -245,12 +1059,10 @@ resource "docker_service" "web" {
   image    = "nginx:1.27-alpine"
   replicas = 3
 
-  # Overlay networks by name or ID, with extra DNS aliases per network.
-  # (Use the plain `networks = ["frontend"]` set when no aliases are needed;
-  # the two cannot be combined.)
-  networks_advanced {
-    name    = "frontend"
-    aliases = ["www"]
+  # Overlay networks keyed by name or ID; `{}` attaches without extras.
+  networks = {
+    frontend = { aliases = ["www"] }
+    backend  = {}
   }
 
   env = {
@@ -264,8 +1076,10 @@ resource "docker_service" "web" {
   cap_drop          = ["NET_RAW"]
   sysctls           = { "net.core.somaxconn" = "1024" }
   stop_grace_period = "30s"
+  stop_signal       = "SIGQUIT"
+  init              = true
 
-  dns {
+  dns_config {
     nameservers = ["10.0.0.2"]
     options     = ["ndots:2"]
   }
@@ -287,10 +1101,28 @@ resource "docker_service" "web" {
     type   = "volume"
     source = "web-cache"
     target = "/var/cache/nginx"
+
+    volume_options {
+      no_copy = true
+      driver_config {
+        name = "local"
+      }
+    }
+  }
+
+  mounts {
+    type   = "tmpfs"
+    target = "/tmp"
+
+    tmpfs_options {
+      size_bytes = 67108864
+      mode       = 448 # 0700
+    }
   }
 
   endpoint_spec {
     ports {
+      name           = "http"
       target_port    = 80
       published_port = 8080
     }
