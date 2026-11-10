@@ -1,6 +1,8 @@
 package provider
 
-// Pass 3 Lane C: docker_buildx_builder, docker-container driver only.
+// Pass 3 Lane C: docker_buildx_builder, docker-container driver (Pass 5.3
+// Lane B: the remote driver, buildx_builder_remote.go, and the owner
+// label on the node container and its state volume).
 //
 // What buildx does for `docker buildx create --driver docker-container
 // --name X --bootstrap`, and what of it is reachable through the Engine API:
@@ -19,9 +21,12 @@ package provider
 //     implemented (see the [BLOCKED] log line); the container and volume
 //     names match buildx's, so `docker buildx create --name X --driver
 //     docker-container` afterwards reuses them.
-//   - kubernetes and remote drivers: not Engine API objects. Not implemented.
+//   - remote driver: implemented (buildx_builder_remote.go).
+//   - kubernetes driver: buildx creates a Deployment through the Kubernetes
+//     API (k8s.io/client-go), which is not a dependency of this provider
+//     and is not reachable through the Engine API or BuildKit.
 //
-// PARTIAL(pass5) buildx:builder only the docker-container driver; the kubernetes and remote drivers and the buildx instance store (`docker buildx ls`, `--use`) are not implemented
+// PARTIAL(pass5) buildx:builder the kubernetes driver needs the Kubernetes API (k8s.io/client-go, not a dependency); the buildx instance store (`docker buildx ls`, `--use`) is buildx-private client files (github.com/docker/buildx/store, not a dependency), not BuildKit or Engine API
 
 import (
 	"archive/tar"
@@ -66,6 +71,7 @@ var (
 	_ resource.ResourceWithConfigure      = (*buildxBuilderResource)(nil)
 	_ resource.ResourceWithImportState    = (*buildxBuilderResource)(nil)
 	_ resource.ResourceWithValidateConfig = (*buildxBuilderResource)(nil)
+	_ resource.ResourceWithModifyPlan     = (*buildxBuilderResource)(nil)
 )
 
 const (
@@ -124,6 +130,8 @@ type bxbModel struct {
 	Platforms              types.List         `tfsdk:"platforms"`
 	Labels                 types.Map          `tfsdk:"labels"`
 	DockerContainer        *bxbContainerModel `tfsdk:"docker_container"`
+	Remote                 *bxbRemoteModel    `tfsdk:"remote"`
+	Adopt                  types.Bool         `tfsdk:"adopt"`
 }
 
 type bxbContainerModel struct {
@@ -174,10 +182,11 @@ func (r *buildxBuilderResource) Schema(_ context.Context, _ resource.SchemaReque
 		},
 		"driver": schema.StringAttribute{
 			Optional: true, Computed: true, Default: stringdefault.StaticString(bxbDriverDockerContainer),
-			MarkdownDescription: "Builder driver. Only `docker-container` (default) is supported: `docker` is the daemon's built-in builder " +
-				"(use `docker_image` without `build.builder`), and `kubernetes`/`remote` are not Engine API objects. Forces replacement.",
+			MarkdownDescription: "Builder driver: `docker-container` (default), a BuildKit container on the provider's daemon, or `remote`, a " +
+				"BuildKit daemon run elsewhere and reached at `endpoint` (TLS in the `remote` block). `docker` is the daemon's built-in builder " +
+				"(use `docker_image` without `build.builder`); `kubernetes` is not supported (it needs the Kubernetes API). Forces replacement.",
 			PlanModifiers: rr,
-			Validators:    []validator.String{stringvalidator.OneOf(bxbDriverDockerContainer)},
+			Validators:    []validator.String{stringvalidator.OneOf(bxbDriverDockerContainer, bxbDriverRemote)},
 		},
 		"platform": schema.ListAttribute{
 			ElementType: types.StringType, Optional: true,
@@ -220,9 +229,13 @@ func (r *buildxBuilderResource) Schema(_ context.Context, _ resource.SchemaReque
 			PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()},
 		},
 		"endpoint": schema.StringAttribute{
-			Computed: true, PlanModifiers: keep,
-			MarkdownDescription: "BuildKit address of the node for `buildctl --addr`: `docker-container://buildx_buildkit_<node>`.",
+			Optional: true, Computed: true,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()},
+			MarkdownDescription: "BuildKit address of the builder, for `buildctl --addr` and `docker_image.build.builder`. With `driver = \"remote\"` " +
+				"it is required: the remote BuildKit's `tcp://host:port` or `unix:///path` (the `docker buildx create --driver remote` " +
+				"endpoint argument). With `docker-container` it is computed: `docker-container://buildx_buildkit_<node>`. Forces replacement.",
 		},
+		"adopt": ownerAdoptAttribute(),
 		"tcp_address": schema.StringAttribute{
 			Computed: true, PlanModifiers: keep,
 			MarkdownDescription: "TCP address of BuildKit, `tcp://<daemon host>:<tcp_port>`, when `tcp_port` is set: the host of the provider's `tcp://`/`ssh://` " +
@@ -256,9 +269,12 @@ func (r *buildxBuilderResource) Schema(_ context.Context, _ resource.SchemaReque
 			"`docker_image.build.builder`, or use `endpoint` with `buildctl --addr` (`tcp_address` when `tcp_port` is set). The buildx CLI's own " +
 			"instance list (`~/.docker/buildx/instances`) is not written, so `docker buildx ls` does not show the builder until " +
 			"`docker buildx create --name <name> --driver docker-container` is run, which adopts the same container. Only the `docker-container` " +
-			"driver is supported. Every argument except `keep_state` forces a new resource.",
+			"driver creates a container; the `remote` driver only checks and reports a BuildKit daemon run elsewhere, selected in builds by its " +
+			"`endpoint`. With the provider's `owner` set, the node container and state volume carry the owner label. Every argument except " +
+			"`keep_state` and `adopt` forces a new resource.",
 		Attributes: attrs,
 		Blocks: map[string]schema.Block{
+			"remote": bxbRemoteBlock(),
 			"docker_container": schema.SingleNestedBlock{
 				MarkdownDescription: "Settings for the BuildKit container (`--driver-opt`). Changing anything here forces a new resource.",
 				PlanModifiers:       []planmodifier.Object{objectplanmodifier.RequiresReplace()},
@@ -351,6 +367,7 @@ func (r *buildxBuilderResource) ValidateConfig(ctx context.Context, req resource
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	bxbValidateRemote(m, &resp.Diagnostics)
 	if p, ok := knownInt64(m.TCPPort); ok && (p < 1 || p > 65535) {
 		resp.Diagnostics.AddAttributeError(path.Root("tcp_port"), "Invalid tcp_port", "tcp_port must be 1-65535.")
 	}
@@ -616,8 +633,22 @@ func (r *buildxBuilderResource) Create(ctx context.Context, req resource.CreateR
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
+	if plan.Driver.ValueString() == bxbDriverRemote {
+		resp.Diagnostics.Append(r.bxbRemoteCreate(ctx, &plan)...)
+		if !resp.Diagnostics.HasError() {
+			resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+		}
+		return
+	}
 	node := bxbNodeName(plan)
 	plan.Node = types.StringValue(node)
+	cname := bxbContainerName(node)
+	if res, err := r.pd.Client.ContainerInspect(ctx, cname, client.ContainerInspectOptions{}); err == nil && res.Container.Config != nil {
+		if err := ownerCreateCheck(r.pd, "builder node container", cname, res.Container.Config.Labels); err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root("name"), "Builder node owned by another configuration", err.Error())
+			return
+		}
+	}
 	if err := r.bxbCheckAppend(ctx, plan); err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("append"), "Cannot create builder node", err.Error())
 		return
@@ -631,6 +662,7 @@ func (r *buildxBuilderResource) Create(ctx context.Context, req resource.CreateR
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	cfg.Labels = r.pd.ownerInject(cfg.Labels)
 	if err := containerEnsureImage(ctx, r.pd, cfg.Image); err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("docker_container").AtName("image"), "Cannot pull BuildKit image", fmt.Sprintf("%s: %v", cfg.Image, err))
 		return
@@ -640,7 +672,6 @@ func (r *buildxBuilderResource) Create(ctx context.Context, req resource.CreateR
 		resp.Diagnostics.AddError("Cannot create BuildKit state volume", fmt.Sprintf("%s: %v", vol, err))
 		return
 	}
-	cname := bxbContainerName(node)
 	created, err := r.pd.Client.ContainerCreate(ctx, client.ContainerCreateOptions{Config: cfg, HostConfig: hc, NetworkingConfig: nil, Platform: nil, Name: cname})
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot create BuildKit container", fmt.Sprintf("%s: %v", cname, err))
@@ -749,6 +780,17 @@ func (r *buildxBuilderResource) Read(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
+	if state.Driver.ValueString() == bxbDriverRemote {
+		n := bxbRemoteNode(state)
+		ws, err := bxbRemoteWorkers(ctx, r.pd, n)
+		if err != nil {
+			resp.Diagnostics.AddWarning("Remote builder not reachable", fmt.Sprintf("%s: %v; keeping the last known state.", n.Endpoint, err))
+			return
+		}
+		resp.Diagnostics.Append(r.bxbRemoteFill(ctx, &state, ws, true)...)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+		return
+	}
 	inspRes, err := r.pd.Client.ContainerInspect(ctx, state.ID.ValueString(), client.ContainerInspectOptions{})
 	insp := inspRes.Container
 	if isNotFound(err) {
@@ -760,6 +802,9 @@ func (r *buildxBuilderResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 	bxbFromInspect(&state, insp, r.pd.Endpoint.Host)
+	if insp.Config != nil && resp.Private != nil {
+		resp.Diagnostics.Append(ownerRecord(ctx, resp.Private, insp.Config.Labels)...)
+	}
 	resp.Diagnostics.Append(r.bxbFillOutputs(ctx, &state, nil, false)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -834,7 +879,23 @@ func (r *buildxBuilderResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 	state.KeepState = plan.KeepState
+	state.Adopt = plan.Adopt
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+// ModifyPlan checks the owner label of an existing node container (after
+// import, or when `owner` changed): planning it needs adopt = true when it
+// names another owner.
+func (r *buildxBuilderResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() {
+		return
+	}
+	var plan bxbModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(ownerPlanCheck(ctx, r.pd, req.Private, "docker_buildx_builder", plan.Name.ValueString(), plan.Adopt)...)
 }
 
 func (r *buildxBuilderResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -842,6 +903,9 @@ func (r *buildxBuilderResource) Delete(ctx context.Context, req resource.DeleteR
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
+	}
+	if state.Driver.ValueString() == bxbDriverRemote {
+		return // nothing was created on the daemon
 	}
 	_, err := r.pd.Client.ContainerRemove(ctx, state.ID.ValueString(), client.ContainerRemoveOptions{Force: true, RemoveVolumes: false})
 	if err != nil && !isNotFound(err) {

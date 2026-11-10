@@ -1,0 +1,12 @@
+{
+  "about": "Pass 5.3 Lane B: manual field-coverage entries for the buildx items (POST /build query parameters whose Go names differ from the swagger names; the bake matrix/name attributes auto-map through the parser's case \"matrix\", \"name\").",
+  "fields": {
+    "engine:ImageBuild#body": {"item": "buildx:build", "attr": "build.context"},
+    "engine:ImageBuild?t": {"item": "buildx:build", "attr": "build.tags"},
+    "engine:ImageBuild?remote": {"item": "buildx:build", "attr": "build.remote"},
+    "engine:ImageBuild?pull": {"item": "buildx:build", "attr": "build.pull"},
+    "engine:ImageBuild?forcerm": {"item": "buildx:build", "attr": "build.force_rm"},
+    "engine:ImageBuild?q": {"skip": "Output verbosity only (suppresses the step output stream; swagger: 'Suppress verbose build output'): it changes nothing in the image, and the provider needs the stream to report the image ID and to log build output at debug level."},
+    "engine:ImageBuild?rm": {"skip": "The provider always sends rm=true (img_build_opts.go Remove: true) so a successful classic build never leaves intermediate containers that Terraform does not track; keeping containers after a failed step for debugging is build.force_rm = false."}
+  }
+}

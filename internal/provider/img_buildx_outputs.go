@@ -10,6 +10,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -140,7 +141,11 @@ func imgUsesBuildKit(b *imageBuildModel) bool {
 // imgSeamBuilder maps build.builder to the seam's builder reference: the
 // embedded BuildKit for `buildkit`, else the buildx builder of that name.
 func imgSeamBuilder(b *imageBuildModel) seamBuilderRef {
-	if v := b.Builder.ValueString(); v != imgBuilderBuildKit {
+	if v := b.Builder.ValueString(); strings.Contains(v, "://") {
+		// A BuildKit address (docker_buildx_builder.endpoint): a remote
+		// driver builder, or a docker-container node by container name.
+		return seamBuilderRef{Endpoint: v}
+	} else if v != imgBuilderBuildKit {
 		return seamBuilderRef{Name: v}
 	}
 	return seamBuilderRef{}

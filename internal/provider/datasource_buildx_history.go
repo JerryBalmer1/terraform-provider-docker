@@ -194,10 +194,9 @@ func bxhPlatforms(fattrs map[string]string) []string {
 	return out
 }
 
-// bxhAttachments lists attestation descriptors per platform.
-// Materials and attachment bodies live in the builder's content store, which
-// the provider does not read.
-// PARTIAL(pass5) buildx:history-inspect materials are always empty and attachment bodies are not read (digests and types only)
+// bxhAttachments lists attestation descriptors per platform. Their bodies
+// (and the materials of the provenance one) are read from the builder's
+// content store (datasource_buildx_history_content.go).
 func bxhAttachments(r *controlapi.BuildHistoryRecord) []map[string]any {
 	out := []map[string]any{}
 	add := func(platform string, res *controlapi.BuildResultInfo) {
@@ -238,7 +237,10 @@ func bxhSyntax(r *controlapi.BuildHistoryRecord) string {
 
 // bxhInspect is the `history inspect --format json` object and the
 // contract `record` object for one record.
-func bxhInspect(r bxhRecord, now time.Time) (map[string]any, map[string]any) {
+func bxhInspect(r bxhRecord, now time.Time, materials []map[string]any) (map[string]any, map[string]any) {
+	if materials == nil {
+		materials = []map[string]any{}
+	}
 	rec := r.Rec
 	fa := rec.GetFrontendAttrs()
 	keepGit, _ := strconv.ParseBool(fa["build-arg:BUILDKIT_CONTEXT_KEEP_GIT_DIR"])
@@ -283,7 +285,7 @@ func bxhInspect(r bxhRecord, now time.Time) (map[string]any, map[string]any) {
 		"NumCompletedSteps": rec.GetNumCompletedSteps(), "NumTotalSteps": rec.GetNumTotalSteps(), "NumCachedSteps": rec.GetNumCachedSteps(),
 		"BuildArgs": buildArgs, "Labels": labels,
 		"Config":      map[string]any{"ImageResolveMode": fa["image-resolve-mode"]},
-		"Materials":   []any{},
+		"Materials":   materials,
 		"Attachments": attachments,
 		"Builder":     r.Node.Builder, "Node": r.Node.Name,
 	}
@@ -294,7 +296,7 @@ func bxhInspect(r bxhRecord, now time.Time) (map[string]any, map[string]any) {
 		"duration": int64(dur), "status": status,
 		"num_completed_steps": rec.GetNumCompletedSteps(), "num_total_steps": rec.GetNumTotalSteps(), "num_cached_steps": rec.GetNumCachedSteps(),
 		"config":      map[string]any{"image_resolve_mode": fa["image-resolve-mode"]},
-		"materials":   []any{},
+		"materials":   bxhMaterialsStructured(materials),
 		"attachments": attachments,
 	}
 	return raw, structured
@@ -356,6 +358,11 @@ type bxhInspectModel struct {
 	Name        types.String `tfsdk:"name"`
 	Platforms   types.List   `tfsdk:"platforms"`
 	VCSRevision types.String `tfsdk:"vcs_revision"`
+	// Attachment selects one attachment whose body is read into
+	// AttachmentBody (`history inspect attachment`).
+	Attachment         types.String `tfsdk:"attachment"`
+	AttachmentPlatform types.String `tfsdk:"attachment_platform"`
+	AttachmentBody     types.String `tfsdk:"attachment_body"`
 }
 
 func (d *buildxHistoryDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -387,12 +394,27 @@ func (d *buildxHistoryDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			ElementType: types.StringType, Computed: true, MarkdownDescription: "Platforms the build produced (empty for the builder's default).",
 		},
 		"vcs_revision": schema.StringAttribute{Computed: true, MarkdownDescription: "Source revision the build was made from, when BuildKit recorded one."},
+		"attachment": schema.StringAttribute{
+			Optional: true,
+			MarkdownDescription: "Attachment whose body to read into `attachment_body`, like `docker buildx history inspect attachment`: its digest " +
+				"(a unique prefix is enough), or a type: `provenance`, `sbom`, or a full predicate or media type (`--type`).",
+		},
+		"attachment_platform": schema.StringAttribute{
+			Optional:            true,
+			MarkdownDescription: "Platform of the attachment to read, for multi-platform builds (`--platform`), e.g. `linux/arm64`.",
+		},
+		"attachment_body": schema.StringAttribute{
+			Computed: true, Sensitive: true,
+			MarkdownDescription: "Body of the attachment `attachment` selects (an in-toto statement for provenance and SBOMs), read from the " +
+				"builder's content store. Null without `attachment`. Sensitive: provenance can carry build arguments and source URLs.",
+		},
 	}
 	contractAddDataSourceAttributes(attrs, bxhInspectItemID)
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Reads one build record of a buildx builder, like `docker buildx history inspect`: context, Dockerfile, target, " +
 			"platforms, status, timing, step counts and attestation attachments. Records come from BuildKit's build history API on the " +
-			"builder's running nodes. Materials and attachment bodies are not read (only attachment digests and types).",
+			"builder's running nodes; materials come from the record's provenance attestation, and `attachment` reads one attachment's body " +
+			"from the builder's content store.",
 		Attributes: attrs,
 	}
 }
@@ -421,7 +443,45 @@ func (d *buildxHistoryDataSource) Read(ctx context.Context, req datasource.ReadR
 		resp.Diagnostics.AddAttributeError(tfpath.Root("ref"), "Cannot find build record", err.Error())
 		return
 	}
-	raw, structured := bxhInspect(r, time.Now())
+	atts := bxhAttachments(r.Rec)
+	var want []string
+	prov := ""
+	for _, a := range atts {
+		if t, _ := a["type"].(string); bxhIsProvenance(t) {
+			prov, _ = a["digest"].(string)
+			want = append(want, prov)
+			break
+		}
+	}
+	var picked map[string]any
+	if sel, ok := knownString(m.Attachment); ok && sel != "" {
+		picked, err = bxhPickAttachment(atts, sel, m.AttachmentPlatform.ValueString())
+		if err != nil {
+			resp.Diagnostics.AddAttributeError(tfpath.Root("attachment"), "Cannot find attachment", err.Error())
+			return
+		}
+		want = append(want, picked["digest"].(string))
+	}
+	var blobs map[string][]byte
+	if len(want) > 0 {
+		blobs, err = bxhReadContent(ctx, d.pd, r.Node, want)
+		if err != nil && picked != nil {
+			resp.Diagnostics.AddAttributeError(tfpath.Root("attachment"), "Cannot read attachment", err.Error())
+			return
+		}
+		if err != nil {
+			resp.Diagnostics.AddWarning("Cannot read build materials", fmt.Sprintf("The provenance attestation of %s could not be read from the builder: %v", r.Rec.GetRef(), err))
+		}
+	}
+	var materials []map[string]any
+	if b, ok := blobs[prov]; ok && prov != "" {
+		materials = bxhMaterials(b)
+	}
+	m.AttachmentBody = types.StringNull()
+	if picked != nil {
+		m.AttachmentBody = types.StringValue(string(blobs[picked["digest"].(string)]))
+	}
+	raw, structured := bxhInspect(r, time.Now(), materials)
 	b, _ := json.Marshal(raw)
 	m.Builder = types.StringValue(builder)
 	m.Ref = types.StringValue(r.Rec.GetRef())

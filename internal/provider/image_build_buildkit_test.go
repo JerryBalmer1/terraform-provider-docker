@@ -366,8 +366,15 @@ func TestImageBuildKitValidate(t *testing.T) {
 			errs: []string{"build.secrets[1].id"},
 		},
 		"multi platform": {
-			b:    imageBuildModel{Builder: types.StringValue(imgBuilderBuildKit), CacheFrom: nullList, Platforms: list("linux/amd64", "linux/arm64")},
-			errs: []string{"build.platforms"},
+			b: imageBuildModel{Builder: types.StringValue(imgBuilderBuildKit), CacheFrom: nullList, Platforms: list("linux/amd64", "linux/arm64")},
+		},
+		"platform list in one element": {
+			b:    imageBuildModel{Builder: types.StringValue(imgBuilderBuildKit), CacheFrom: nullList, Platforms: list("linux/amd64,linux/arm64")},
+			errs: []string{"build.platforms[0]"},
+		},
+		"duplicate platform": {
+			b:    imageBuildModel{Builder: types.StringValue(imgBuilderBuildKit), CacheFrom: nullList, Platforms: list("linux/amd64", "linux/amd64")},
+			errs: []string{"build.platforms[1]"},
 		},
 		"platform and platforms": {
 			b:    imageBuildModel{Builder: types.StringValue(imgBuilderBuildKit), Platform: types.StringValue("linux/amd64"), CacheFrom: nullList, Platforms: list("linux/amd64")},

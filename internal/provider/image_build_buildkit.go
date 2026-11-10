@@ -59,7 +59,10 @@ func imgIsBuildKit(b *imageBuildModel) bool {
 	return b != nil && b.Builder.ValueString() == imgBuilderBuildKit
 }
 
-// PARTIAL(pass5) buildx:build build.platforms takes one platform; multi-platform builds (`docker buildx build --platform a,b`) are only available through docker_buildx_bake
+// Multi-platform builds (build.platforms with several entries, `docker
+// buildx build --platform a,b`) go through the BuildKit seam; the result is
+// an image index, which needs the daemon's containerd image store
+// (buildkit_platforms.go checks it at apply).
 
 // imgValidateBuildKit checks the BuildKit-only attributes of a build block.
 // Unknown values are skipped (validated again at apply).
@@ -104,11 +107,21 @@ func imgValidateBuildKit(ctx context.Context, b *imageBuildModel) diag.Diagnosti
 	}
 	if !b.Platforms.IsUnknown() && !b.Platforms.IsNull() {
 		elems := b.Platforms.Elements()
-		if len(elems) > 1 {
-			diags.AddAttributeError(root.AtName("platforms"), "Multi-platform build not supported",
-				"The Engine API /build endpoint accepts a single platform (the daemon parses it with containerd's platforms.Parse, "+
-					"which rejects comma-separated lists, whatever the image store). Multi-platform builds need buildx/BuildKit's "+
-					"own API. Declare one docker_image per platform instead.")
+		seenP := map[string]bool{}
+		for i, e := range elems {
+			s, ok := e.(types.String)
+			if !ok || s.IsUnknown() || s.IsNull() {
+				continue
+			}
+			p := s.ValueString()
+			if strings.Count(p, "/") < 1 || strings.Contains(p, ",") {
+				diags.AddAttributeError(root.AtName("platforms").AtListIndex(i), "Invalid platform",
+					fmt.Sprintf("%q is not os/arch[/variant]; list each platform as its own element.", p))
+			}
+			if seenP[p] {
+				diags.AddAttributeError(root.AtName("platforms").AtListIndex(i), "Duplicate platform", fmt.Sprintf("%q is listed twice.", p))
+			}
+			seenP[p] = true
 		}
 		if len(elems) > 0 && !b.Platform.IsNull() && !b.Platform.IsUnknown() {
 			diags.AddAttributeError(root.AtName("platforms"), "Conflicting attributes",
@@ -183,16 +196,44 @@ func imgBuildKitAttachables(secrets []imageBuildSecretModel, creds []registryCre
 type imgBuildKitAuth struct {
 	auth.UnimplementedAuthServer
 	creds []registryCredential
+	// pd, when set, resolves each host through pd.registryCredentialFor:
+	// registry_auth first, then the default docker config (credHelpers,
+	// credsStore, auths), like every other registry call (Pass 5.3 D4).
+	pd *providerData
+}
+
+// imgBuildKitAuthUseProvider points the session's auth server at pd.
+func imgBuildKitAuthUseProvider(att []session.Attachable, pd *providerData) {
+	for _, a := range att {
+		if ba, ok := a.(*imgBuildKitAuth); ok {
+			ba.pd = pd
+		}
+	}
 }
 
 func (a *imgBuildKitAuth) Register(s *grpc.Server) { auth.RegisterAuthServer(s, a) }
 
-func (a *imgBuildKitAuth) Credentials(_ context.Context, req *auth.CredentialsRequest) (*auth.CredentialsResponse, error) {
-	host := normalizeRegistry(req.GetHost())
-	for _, c := range a.creds {
-		if normalizeRegistry(c.Address) != host {
-			continue
+// imgBuildKitCredentialFor is the one per-host credential lookup of
+// BuildKit sessions (FROM pulls, cache and image exports).
+// TODO(Z, Pass 5.3): replace the registry_auth scan with
+// pd.registryCredentialFor(ctx, host) (Lane R D4: default docker config,
+// credHelpers / credsStore).
+func imgBuildKitCredentialFor(creds []registryCredential, host string) (registryCredential, bool) {
+	host = normalizeRegistry(host)
+	for _, c := range creds {
+		if normalizeRegistry(c.Address) == host {
+			return c, true
 		}
+	}
+	return registryCredential{}, false
+}
+
+func (a *imgBuildKitAuth) Credentials(ctx context.Context, req *auth.CredentialsRequest) (*auth.CredentialsResponse, error) {
+	c, ok := imgBuildKitCredentialFor(a.creds, req.GetHost())
+	if a.pd != nil {
+		c, ok = a.pd.registryCredentialFor(ctx, req.GetHost())
+	}
+	if ok {
 		if c.IdentityToken != "" {
 			// An identity (refresh) token goes in Secret with no username, as the CLI does.
 			return &auth.CredentialsResponse{Secret: c.IdentityToken}, nil

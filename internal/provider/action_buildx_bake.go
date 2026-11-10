@@ -64,8 +64,9 @@ func (a *buildxBakeAction) Schema(_ context.Context, _ action.SchemaRequest, res
 			"JSON or compose files and/or inline `content`; groups, targets, `inherits`, `matrix`, variables (overridden by `variables`), " +
 			"user functions and the bake standard library are resolved as the buildx bake reference describes, then every target is built " +
 			"through BuildKit on the selected builder. The result object holds the resolved definition (`bake --print`), the per-target " +
-			"metadata (`--metadata-file`), tags, digests and build refs. Images are not tracked in state; use `docker_image` for images " +
-			"Terraform should own.",
+			"metadata (`--metadata-file`), tags, digests and build refs. Targets may refer to each other (`target.<name>.<attr>` and " +
+			"`target:<name>` named contexts), and `resources` sets per-step limits. With the provider's `owner` set, every image carries " +
+			"the owner label. Images are not tracked in state; use `docker_image` for images Terraform should own.",
 		Attributes: map[string]schema.Attribute{
 			"files": schema.ListAttribute{
 				ElementType: types.StringType, Optional: true,
@@ -100,7 +101,8 @@ func (a *buildxBakeAction) Schema(_ context.Context, _ action.SchemaRequest, res
 			"builder": schema.StringAttribute{
 				Optional: true,
 				MarkdownDescription: "Builder to build on (`--builder`): `default` (the daemon's BuildKit, the default) or the name of a " +
-					"docker-container builder, e.g. `docker_buildx_builder.ci.name`.",
+					"docker-container builder, e.g. `docker_buildx_builder.ci.name`, or a BuildKit address such as a remote builder's " +
+					"`docker_buildx_builder.remote.endpoint` (`tcp://`, `unix://`, `docker-container://`).",
 			},
 			"push": schema.BoolAttribute{Optional: true, MarkdownDescription: "Whether to push every target's tags (`--push`, `*.output=type=registry`)."},
 			"load": schema.BoolAttribute{Optional: true, MarkdownDescription: "Whether to load every target's image into the daemon (`--load`, `*.output=type=docker`)."},
@@ -435,8 +437,66 @@ func bakeRequest(t *bakeTarget, wd string, g bakeGlobals) (seamBuildRequest, *bk
 		extra.Call = *t.Call
 	}
 	extra.Entitlements = append([]string(nil), t.Entitlements...)
+	if len(t.Resources) > 0 {
+		extra.Resources = map[string]string{}
+		for k, v := range t.Resources {
+			extra.Resources[k] = v
+		}
+	}
 	return req, extra, nil
 }
+
+// bakeLinkSteps returns the targets a linked build of t needs, in build
+// order and ending with t: every target its `target:` named contexts name,
+// transitively. A cycle is an error.
+func bakeLinkSteps(def *bakeDef, set map[string]string, t *bakeTarget, wd string, g bakeGlobals) ([]bkLinkStep, error) {
+	var steps []bkLinkStep
+	done := map[string]bool{}
+	var visit func(tt *bakeTarget, stack []string) error
+	visit = func(tt *bakeTarget, stack []string) error {
+		for _, s := range stack {
+			if s == tt.Name {
+				return fmt.Errorf("target: context cycle: %s -> %s", strings.Join(stack, " -> "), tt.Name)
+			}
+		}
+		if done[tt.Name] {
+			return nil
+		}
+		names := make([]string, 0, len(tt.Contexts))
+		for k := range tt.Contexts {
+			names = append(names, k)
+		}
+		sort.Strings(names)
+		for _, k := range names {
+			dep := bkTargetRef(tt.Contexts[k])
+			if dep == "" {
+				continue
+			}
+			dt, err := def.resolveTarget(dep, set)
+			if err != nil {
+				return fmt.Errorf("target %q: named context %s=target:%s: %w", tt.Name, k, dep, err)
+			}
+			if err := visit(dt, append(stack, tt.Name)); err != nil {
+				return err
+			}
+		}
+		req, extra, err := bakeRequest(tt, wd, g)
+		if err != nil {
+			return err
+		}
+		done[tt.Name] = true
+		steps = append(steps, bkLinkStep{ID: tt.Name, Req: req, Extra: extra})
+		return nil
+	}
+	if err := visit(t, nil); err != nil {
+		return nil, err
+	}
+	return steps, nil
+}
+
+// bakeBuildLinked builds a target with `target:` contexts; a var so unit
+// tests can skip BuildKit.
+var bakeBuildLinked = bkBuildLinked
 
 // bakeParseSecret parses a bake secret entry (buildx --secret syntax).
 func bakeParseSecret(s string) (seamBuildSecret, error) {
@@ -525,7 +585,8 @@ func (a *buildxBakeAction) Invoke(ctx context.Context, req action.InvokeRequest,
 		resp.Diagnostics.AddError("Invalid bake definition", err.Error())
 		return
 	}
-	resolved, err := def.resolve(stringListFrom(ctx, m.Targets, &resp.Diagnostics), stringMapFrom(ctx, m.Set, &resp.Diagnostics))
+	setMap := stringMapFrom(ctx, m.Set, &resp.Diagnostics)
+	resolved, err := def.resolve(stringListFrom(ctx, m.Targets, &resp.Diagnostics), setMap)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("targets"), "Cannot resolve bake targets", err.Error())
 		return
@@ -535,7 +596,11 @@ func (a *buildxBakeAction) Invoke(ctx context.Context, req action.InvokeRequest,
 	}
 	g := bakeGlobals{push: m.Push.ValueBool(), load: m.Load.ValueBool(), noCache: m.NoCache.ValueBool(), pull: m.Pull.ValueBool(),
 		sbom: m.SBOM.ValueBool(), provenance: m.Provenance.ValueString()}
-	conn, err := bakeConnect(ctx, a.pd, seamBuilderRef{Name: m.Builder.ValueString()})
+	bref := seamBuilderRef{Name: m.Builder.ValueString()}
+	if strings.Contains(bref.Name, "://") {
+		bref = seamBuilderRef{Endpoint: bref.Name}
+	}
+	conn, err := bakeConnect(ctx, a.pd, bref)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("builder"), "Cannot connect to the builder", err.Error())
 		return
@@ -550,15 +615,33 @@ func (a *buildxBakeAction) Invoke(ctx context.Context, req action.InvokeRequest,
 			failures = append(failures, err.Error())
 			continue
 		}
-		// BuildKit v0.34.2's client has no option for them, so they are parsed and reported, never sent.
-		// PARTIAL(pass5) buildx:bake target `policy` and `resources` are parsed but not applied to the build
-		if len(t.Resources) > 0 || len(t.Policy) > 0 {
-			actProgress(ctx, resp, "target %s: resources and policy are not applied by this provider", t.Name)
+		// Owner label, inject-only: an action owns nothing in state, so
+		// there is no conflict check.
+		breq.Labels = a.pd.ownerInject(breq.Labels)
+		// Policies are Rego files evaluated client-side by buildx (its
+		// policy package on github.com/open-policy-agent/opa) and answered
+		// over BuildKit's policy session (sourcepolicy/policysession). The
+		// session API is in buildkit v0.34.2, the Rego evaluator is not a
+		// dependency of this provider, so policies are parsed and reported.
+		// PARTIAL(pass5) buildx:bake target `policy` is parsed but not evaluated: Rego evaluation needs github.com/open-policy-agent/opa (buildx's policy package), not a dependency; buildkit v0.34.2 only has the policysession transport
+		if len(t.Policy) > 0 {
+			actProgress(ctx, resp, "target %s: policy is not evaluated by this provider", t.Name)
 		}
 		name := t.Name
 		breq.Progress = func(line string) { tflog.Debug(ctx, line, map[string]any{"target": name}) }
 		actProgress(ctx, resp, "building target %s on builder %s", t.Name, conn.Node.Builder)
-		res, err := bakeBuild(ctx, a.pd, conn, breq, extra)
+		var res *seamBuildResult
+		if bkHasTargetContexts(extra) {
+			steps, lerr := bakeLinkSteps(def, setMap, t, wd, g)
+			if lerr != nil {
+				failures = append(failures, fmt.Sprintf("target %q: %v", t.Name, lerr))
+				continue
+			}
+			steps[len(steps)-1].Req = breq
+			res, err = bakeBuildLinked(ctx, a.pd, conn, steps)
+		} else {
+			res, err = bakeBuild(ctx, a.pd, conn, breq, extra)
+		}
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("target %q: %v", t.Name, err))
 			continue

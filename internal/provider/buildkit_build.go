@@ -104,6 +104,9 @@ type bkExtra struct {
 	Call string
 	// Entitlements are extra allowed entitlements (network.host, security.insecure).
 	Entitlements []string
+	// Resources are per-step resource limits (--resource key=value; bake
+	// target.resources), see bkApplyResources.
+	Resources map[string]string
 }
 
 // bkPrepared is a build turned into SolveOpt parts.
@@ -270,6 +273,9 @@ func bkPrepare(ctx context.Context, pd *providerData, conn *bkConn, req seamBuil
 	if err != nil {
 		return p, err
 	}
+	if pd != nil {
+		imgBuildKitAuthUseProvider(att, pd)
+	}
 	p.opt.Session = att
 	// Caches.
 	for _, s := range req.CacheFrom {
@@ -299,6 +305,12 @@ func bkPrepare(ctx context.Context, pd *providerData, conn *bkConn, req seamBuil
 	if err := bkApplyExtra(p, extra); err != nil {
 		return p, err
 	}
+	if err := bkApplyResources(p.opt.FrontendAttrs, extra.Resources); err != nil {
+		return p, err
+	}
+	if err := bkMultiPlatformExports(ctx, pd, conn, req.Platforms, p); err != nil {
+		return p, err
+	}
 	return p, nil
 }
 
@@ -317,7 +329,9 @@ func bkApplyExtra(p *bkPrepared, extra *bkExtra) error {
 		case strings.HasPrefix(v, "docker-image://") || bkRemoteContext(v):
 			attrs["context:"+name] = v
 		case strings.HasPrefix(v, "target:"):
-			return fmt.Errorf("named context %s=%s: target: contexts are not supported; build that target and refer to its image with docker-image://", name, v)
+			// Bake resolves them in a linked build (buildx_bake_contexts.go).
+			return fmt.Errorf("named context %s=%s: target: contexts refer to bake targets and are only available in docker_buildx_bake; "+
+				"elsewhere build that target first and refer to its image with docker-image://", name, v)
 		case strings.Contains(v, "://"):
 			return fmt.Errorf("named context %s=%s: unsupported scheme (use a local directory, docker-image://, git or https)", name, v)
 		default:
@@ -604,6 +618,8 @@ func bkAttachables(req seamBuildRequest, creds []registryCredential) ([]session.
 type bkLoad struct {
 	wg  sync.WaitGroup
 	err error
+	// idx is the index of the export entry that feeds the load.
+	idx int
 }
 
 func (l *bkLoad) wait() error {
@@ -685,6 +701,7 @@ func bkExports(ctx context.Context, pd *providerData, conn *bkConn, o seamBuildO
 		}
 		if load {
 			fn, l := bkLoader(ctx, pd)
+			l.idx = len(out)
 			loads = append(loads, l)
 			out = append(out, bkclient.ExportEntry{Type: bkclient.ExporterDocker, Attrs: nameAttrs(nil), Output: fn})
 		}
@@ -695,6 +712,7 @@ func bkExports(ctx context.Context, pd *providerData, conn *bkConn, o seamBuildO
 			return nil, nil, fmt.Errorf("output %q: %w", raw, err)
 		}
 		if l != nil {
+			l.idx = len(out)
 			loads = append(loads, l)
 		}
 		out = append(out, e)

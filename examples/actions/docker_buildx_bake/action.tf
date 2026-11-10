@@ -39,10 +39,19 @@ action "docker_buildx_bake" "release" {
         tags     = ["registry.example.com/app:$${VERSION}"]
       }
 
+      # Built first and handed to "worker" as its FROM base (target: context).
+      target "base" {
+        dockerfile = "base.Dockerfile"
+      }
+
       target "worker" {
-        inherits = ["_common"]
-        context  = "worker"
-        tags     = ["registry.example.com/worker:$${VERSION}"]
+        inherits  = ["_common"]
+        context   = "worker"
+        contexts  = { base = "target:base" }
+        tags      = ["registry.example.com/worker:$${VERSION}"]
+        # The app target's VERSION argument (target.<name>.<attr>).
+        labels    = { "org.opencontainers.image.version" = target.app.args.VERSION }
+        resources = { memory = "2g", cpu-quota = 50000 }
       }
     EOT
     targets     = ["release"]

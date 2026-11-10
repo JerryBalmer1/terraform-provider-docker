@@ -315,6 +315,8 @@ func imgBuildViaSeam(ctx context.Context, pd *providerData, plan *imageResourceM
 	var diags diag.Diagnostics
 	b := plan.Build
 	req := imgSeamRequest(ctx, plan, opts, &diags)
+	// Owner label (Pass 5.3): build labels become image labels.
+	req.Labels = pd.ownerInject(req.Labels)
 	if !b.AdditionalContexts.IsNull() && !b.AdditionalContexts.IsUnknown() {
 		req.Contexts = stringMapFrom(ctx, b.AdditionalContexts, &diags)
 	}

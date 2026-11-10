@@ -14,3 +14,13 @@ output "last_build" {
     revision = data.docker_buildx_history.last.vcs_revision
   }
 }
+
+# The provenance attestation of the newest build, and its materials.
+data "docker_buildx_history" "provenance" {
+  ref        = "^0"
+  attachment = "provenance"
+}
+
+output "build_materials" {
+  value = [for m in data.docker_buildx_history.provenance.record.materials : m.digests]
+}

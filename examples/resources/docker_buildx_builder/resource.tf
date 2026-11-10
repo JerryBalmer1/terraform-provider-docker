@@ -37,3 +37,18 @@ output "buildkit_tcp" {
 output "buildkit_version" {
   value = docker_buildx_builder.ci.buildkit_version
 }
+
+# A BuildKit daemon run elsewhere (docker buildx create --driver remote).
+# Nothing is created on the Docker daemon; builds select it by endpoint.
+resource "docker_buildx_builder" "remote" {
+  name     = "remote"
+  driver   = "remote"
+  endpoint = "tcp://buildkit.internal:1234"
+
+  remote {
+    cacert     = "${path.module}/certs/ca.pem"
+    cert       = "${path.module}/certs/client-cert.pem"
+    key        = "${path.module}/certs/client-key.pem"
+    servername = "buildkit.internal"
+  }
+}

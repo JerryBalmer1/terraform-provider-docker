@@ -110,7 +110,8 @@ func bkOpenNode(ctx context.Context, pd *providerData, node bkNode) (*bkclient.C
 			return bxbDialStdio(ctx, pd, id)
 		}))
 	default:
-		return bkclient.New(ctx, node.Endpoint)
+		// remote driver: TLS options from its driver options.
+		return bkclient.New(ctx, node.Endpoint, bkTLSOpts(node.DriverOpts)...)
 	}
 }
 

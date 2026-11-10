@@ -11,11 +11,13 @@ package provider
 //   - `function` blocks (hcl userfunc) and the go-cty standard library;
 //   - `group` blocks, `target` blocks with `inherits`, `matrix` and `name`;
 //   - files merged in order: a later definition of a target overrides the
-//     single-valued attributes and merges the rest (bake's merge rules).
-// Not supported: `target.<name>.<attr>` references between targets, and
-// `target:` named contexts (both need buildx's evaluation graph).
-//
-// PARTIAL(pass5) buildx:bake `target:` named contexts and `target.<name>.<attr>` cross-target references are not supported
+//     single-valued attributes and merges the rest (bake's merge rules);
+//   - `target.<name>.<attr>` references between targets: target blocks are
+//     evaluated in dependency order and each evaluated target is exposed
+//     to the next ones as `target.<name>` (its own attributes, before
+//     `inherits` are applied); a reference cycle is an error;
+//   - `target:<name>` named contexts are resolved by the action
+//     (buildx_bake_contexts.go).
 
 import (
 	"crypto/md5"
@@ -346,11 +348,27 @@ func bakeParse(files []bakeFile, overrides map[string]string, compose func(bakeF
 		def.Groups[name] = tgts // a later file overrides the group
 	}
 
-	// Targets (with matrix expansion).
-	for _, blk := range targets {
-		ts, err := bakeDecodeTarget(ectx, blk)
+	// Targets (with matrix expansion), in cross-reference order.
+	ordered, err := bakeOrderTargets(targets)
+	if err != nil {
+		return nil, err
+	}
+	targetVals := map[string]map[string]cty.Value{}
+	for _, blk := range ordered {
+		if _, user := vars["target"]; !user {
+			ectx.Variables["target"] = bakeTargetObject(targetVals)
+		}
+		ts, vals, err := bakeDecodeTarget(ectx, blk)
 		if err != nil {
 			return nil, err
+		}
+		for i, t := range ts {
+			if targetVals[t.Name] == nil {
+				targetVals[t.Name] = map[string]cty.Value{}
+			}
+			for k, v := range vals[i] {
+				targetVals[t.Name][k] = v
+			}
 		}
 		if len(ts) > 1 || (len(ts) == 1 && ts[0].Name != blk.Labels[0]) {
 			// A matrix target becomes a group of its variants.
@@ -625,11 +643,105 @@ func bakeAnyMap(v any) (map[string]*string, error) {
 	return out, nil
 }
 
-// bakeDecodeTarget evaluates one target block, expanding its matrix.
-func bakeDecodeTarget(ectx *hcl.EvalContext, blk *hcl.Block) ([]*bakeTarget, error) {
+// bakeTargetRefs returns the target names a block refers to with
+// `target.<name>...` traversals.
+func bakeTargetRefs(blk *hcl.Block) []string {
 	attrs, diags := blk.Body.JustAttributes()
 	if diags.HasErrors() {
-		return nil, errors.New(diags.Error())
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, a := range attrs {
+		for _, tr := range a.Expr.Variables() {
+			if tr.RootName() != "target" || len(tr) < 2 {
+				continue
+			}
+			var name string
+			switch step := tr[1].(type) {
+			case hcl.TraverseAttr:
+				name = step.Name
+			case hcl.TraverseIndex:
+				if step.Key.Type() == cty.String && step.Key.IsKnown() && !step.Key.IsNull() {
+					name = step.Key.AsString()
+				}
+			}
+			if name != "" && !seen[name] {
+				seen[name] = true
+				out = append(out, name)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// bakeOrderTargets orders target blocks so a block comes after the blocks
+// of every target it refers to (file order otherwise). A reference to a
+// name no block has is left to evaluation (a matrix variant, or an error).
+func bakeOrderTargets(blocks []*hcl.Block) ([]*hcl.Block, error) {
+	byLabel := map[string][]int{}
+	for i, b := range blocks {
+		byLabel[b.Labels[0]] = append(byLabel[b.Labels[0]], i)
+	}
+	state := make([]int, len(blocks)) // 0 new, 1 visiting, 2 done
+	var out []*hcl.Block
+	var visit func(i int, stack []string) error
+	visit = func(i int, stack []string) error {
+		switch state[i] {
+		case 2:
+			return nil
+		case 1:
+			return fmt.Errorf("target reference cycle: %s -> %s", strings.Join(stack, " -> "), blocks[i].Labels[0])
+		}
+		state[i] = 1
+		stack = append(stack, blocks[i].Labels[0])
+		for _, dep := range bakeTargetRefs(blocks[i]) {
+			for _, j := range byLabel[dep] {
+				if j == i {
+					return fmt.Errorf("target %q refers to itself (target.%s)", dep, dep)
+				}
+				if err := visit(j, stack); err != nil {
+					return err
+				}
+			}
+		}
+		state[i] = 2
+		out = append(out, blocks[i])
+		return nil
+	}
+	for i := range blocks {
+		if err := visit(i, nil); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// bakeTargetObject is the `target` variable: every target evaluated so far
+// as an object of its attributes.
+func bakeTargetObject(vals map[string]map[string]cty.Value) cty.Value {
+	if len(vals) == 0 {
+		return cty.EmptyObjectVal
+	}
+	m := make(map[string]cty.Value, len(vals))
+	for name, attrs := range vals {
+		if len(attrs) == 0 {
+			m[name] = cty.EmptyObjectVal
+			continue
+		}
+		m[name] = cty.ObjectVal(attrs)
+	}
+	return cty.ObjectVal(m)
+}
+
+// bakeDecodeTarget evaluates one target block, expanding its matrix. It
+// also returns, per produced target, the evaluated attribute values (for
+// `target.<name>.<attr>` references).
+func bakeDecodeTarget(ectx *hcl.EvalContext, blk *hcl.Block) ([]*bakeTarget, []map[string]cty.Value, error) {
+	attrs, diags := blk.Body.JustAttributes()
+	if diags.HasErrors() {
+		return nil, nil, errors.New(diags.Error())
 	}
 	label := blk.Labels[0]
 	norm := map[string]*hcl.Attribute{}
@@ -641,24 +753,24 @@ func bakeDecodeTarget(ectx *hcl.EvalContext, blk *hcl.Block) ([]*bakeTarget, err
 		if na, ok := norm["name"]; ok {
 			v, diags := na.Expr.Value(ectx)
 			if diags.HasErrors() {
-				return nil, errors.New(diags.Error())
+				return nil, nil, errors.New(diags.Error())
 			}
 			if v.Type() == cty.String && !v.IsNull() && v.AsString() != label {
-				return nil, fmt.Errorf("target %q: name can only be set together with matrix", label)
+				return nil, nil, fmt.Errorf("target %q: name can only be set together with matrix", label)
 			}
 		}
-		t, err := bakeEvalTarget(ectx, label, norm)
+		t, vals, err := bakeEvalTarget(ectx, label, norm)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return []*bakeTarget{t}, nil
+		return []*bakeTarget{t}, []map[string]cty.Value{vals}, nil
 	}
 	mv, diags := matrixAttr.Expr.Value(ectx)
 	if diags.HasErrors() {
-		return nil, errors.New(diags.Error())
+		return nil, nil, errors.New(diags.Error())
 	}
 	if !mv.Type().IsObjectType() && !mv.Type().IsMapType() {
-		return nil, fmt.Errorf("target %q: matrix must be a map of lists", label)
+		return nil, nil, fmt.Errorf("target %q: matrix must be a map of lists", label)
 	}
 	var keys []string
 	axes := map[string][]cty.Value{}
@@ -666,7 +778,7 @@ func bakeDecodeTarget(ectx *hcl.EvalContext, blk *hcl.Block) ([]*bakeTarget, err
 		k, v := it.Element()
 		key := k.AsString()
 		if !v.CanIterateElements() {
-			return nil, fmt.Errorf("target %q: matrix.%s must be a list", label, key)
+			return nil, nil, fmt.Errorf("target %q: matrix.%s must be a list", label, key)
 		}
 		var vals []cty.Value
 		for it2 := v.ElementIterator(); it2.Next(); {
@@ -694,6 +806,7 @@ func bakeDecodeTarget(ectx *hcl.EvalContext, blk *hcl.Block) ([]*bakeTarget, err
 	}
 	seen := map[string]bool{}
 	var out []*bakeTarget
+	var outVals []map[string]cty.Value
 	for _, c := range combos {
 		child := ectx.NewChild()
 		child.Variables = c
@@ -701,10 +814,10 @@ func bakeDecodeTarget(ectx *hcl.EvalContext, blk *hcl.Block) ([]*bakeTarget, err
 		if na, ok := norm["name"]; ok {
 			v, diags := na.Expr.Value(child)
 			if diags.HasErrors() {
-				return nil, errors.New(diags.Error())
+				return nil, nil, errors.New(diags.Error())
 			}
 			if v.IsNull() || v.Type() != cty.String {
-				return nil, fmt.Errorf("target %q: name must be a string", label)
+				return nil, nil, fmt.Errorf("target %q: name must be a string", label)
 			}
 			name = v.AsString()
 		} else {
@@ -717,24 +830,28 @@ func bakeDecodeTarget(ectx *hcl.EvalContext, blk *hcl.Block) ([]*bakeTarget, err
 			name = strings.Join(parts, "-")
 		}
 		if !bakeNameRe.MatchString(name) {
-			return nil, fmt.Errorf("target %q: matrix name %q may only contain letters, digits, '_' and '-'", label, name)
+			return nil, nil, fmt.Errorf("target %q: matrix name %q may only contain letters, digits, '_' and '-'", label, name)
 		}
 		if seen[name] {
-			return nil, fmt.Errorf("target %q: matrix produces the name %q twice; make name unique per combination", label, name)
+			return nil, nil, fmt.Errorf("target %q: matrix produces the name %q twice; make name unique per combination", label, name)
 		}
 		seen[name] = true
-		t, err := bakeEvalTarget(child, name, norm)
+		t, vals, err := bakeEvalTarget(child, name, norm)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		out = append(out, t)
+		outVals = append(outVals, vals)
 	}
-	return out, nil
+	return out, outVals, nil
 }
 
-// bakeEvalTarget evaluates the attributes of a target.
-func bakeEvalTarget(ectx *hcl.EvalContext, name string, attrs map[string]*hcl.Attribute) (*bakeTarget, error) {
+// bakeEvalTarget evaluates the attributes of a target, and returns them
+// as values too (keyed by the bake name and, when it differs, the name as
+// written).
+func bakeEvalTarget(ectx *hcl.EvalContext, name string, attrs map[string]*hcl.Attribute) (*bakeTarget, map[string]cty.Value, error) {
 	t := &bakeTarget{Name: name}
+	vals := map[string]cty.Value{"name": cty.StringVal(name)}
 	keys := make([]string, 0, len(attrs))
 	for k := range attrs {
 		keys = append(keys, k)
@@ -747,17 +864,21 @@ func bakeEvalTarget(ectx *hcl.EvalContext, name string, attrs map[string]*hcl.At
 		a := attrs[k]
 		v, diags := a.Expr.Value(ectx)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("target %q: %s", name, diags.Error())
+			return nil, nil, fmt.Errorf("target %q: %s", name, diags.Error())
 		}
 		g, err := bakeGo(v)
 		if err != nil {
-			return nil, fmt.Errorf("target %q: %s: %w", name, k, err)
+			return nil, nil, fmt.Errorf("target %q: %s: %w", name, k, err)
 		}
 		if err := t.set(k, g); err != nil {
-			return nil, fmt.Errorf("target %q: %s: %w", name, k, err)
+			return nil, nil, fmt.Errorf("target %q: %s: %w", name, k, err)
+		}
+		vals[k] = v
+		if a.Name != k {
+			vals[a.Name] = v
 		}
 	}
-	return t, nil
+	return t, vals, nil
 }
 
 // set assigns one attribute by its bake name.
@@ -790,6 +911,10 @@ func (t *bakeTarget) set(k string, v any) error {
 	}
 	var err error
 	switch k {
+	case "matrix", "name":
+		// Expanded by bakeDecodeTarget before the other attributes are
+		// set: matrix forks the target, name names each variant.
+		return nil
 	case "description":
 		t.Description, err = strp()
 	case "context":
@@ -1049,24 +1174,37 @@ func (d *bakeDef) resolve(names []string, set map[string]string) (*bakeResolved,
 		res.Groups["default"] = append([]string(nil), names...)
 	}
 	for _, n := range order {
-		t, err := d.inherit(n, nil)
+		t, err := d.resolveTarget(n, set)
 		if err != nil {
 			return nil, err
-		}
-		if err := t.applySet(set); err != nil {
-			return nil, err
-		}
-		if t.Context == nil {
-			s := "."
-			t.Context = &s
-		}
-		if t.Dockerfile == nil && t.DockerfileInline == nil {
-			s := "Dockerfile"
-			t.Dockerfile = &s
 		}
 		res.Targets = append(res.Targets, t)
 	}
 	return res, nil
+}
+
+// resolveTarget returns target n with inherits, overrides and defaults
+// applied.
+func (d *bakeDef) resolveTarget(n string, set map[string]string) (*bakeTarget, error) {
+	if _, ok := d.Targets[n]; !ok {
+		return nil, fmt.Errorf("failed to find target %q (targets: %s)", n, strings.Join(d.TargetOrder, ", "))
+	}
+	t, err := d.inherit(n, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := t.applySet(set); err != nil {
+		return nil, err
+	}
+	if t.Context == nil {
+		s := "."
+		t.Context = &s
+	}
+	if t.Dockerfile == nil && t.DockerfileInline == nil {
+		s := "Dockerfile"
+		t.Dockerfile = &s
+	}
+	return t, nil
 }
 
 // inherit returns a copy of target n with its parents merged in.
@@ -1116,7 +1254,7 @@ func (t *bakeTarget) applySet(set map[string]string) error {
 		attr, sub, _ := strings.Cut(rest, ".")
 		attr = strings.ReplaceAll(attr, "_", "-")
 		switch attr {
-		case "args", "labels", "contexts":
+		case "args", "labels", "contexts", "resource", "resources":
 			if sub == "" {
 				return fmt.Errorf("set %q: %s needs a key (%s.<key>)", k, attr, attr)
 			}
@@ -1132,6 +1270,11 @@ func (t *bakeTarget) applySet(set map[string]string) error {
 					t.Labels = map[string]*string{}
 				}
 				t.Labels[sub] = &vv
+			case "resource", "resources":
+				if t.Resources == nil {
+					t.Resources = map[string]string{}
+				}
+				t.Resources[sub] = vv
 			default:
 				if t.Contexts == nil {
 					t.Contexts = map[string]string{}
