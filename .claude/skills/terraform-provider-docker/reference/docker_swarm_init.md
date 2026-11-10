@@ -10,11 +10,13 @@ Initializes a Docker Swarm on the provider's Docker host (`docker swarm init` th
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `advertise_addr` | `string` | optional | yes |  | Address advertised to other nodes, as `<ip\|interface>[:port]`, e.g. `10.0.0.5` or `eth0:2377`. Needed when the host has several addresses. The daemon does not report it back, so the configured value is kept. Changing this forces a new resource. |
 | `autolock` | `bool` | optional, computed |  |  | Enable manager autolock: managers need `unlock_key` after a daemon restart. Updated in place through SwarmUpdate. |
 | `ca_config` | `object` | optional |  |  | CA settings (`Spec.CAConfig`). Updated in place (SwarmUpdate); rotate the root CA with `docker_swarm_rotate_ca`. |
 | `cluster_id` | `string` | computed |  |  | Swarm cluster ID reported by SwarmInspect. |
 | `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json; changes whenever the object changes. |
+| `data_path_addr` | `string` | optional | yes |  | Address or interface for data-path (overlay VXLAN) traffic, `<ip\|interface>` without a port (`DataPathAddr`, `docker swarm init --data-path-addr`); separates it from management traffic. Unset uses `advertise_addr`. The daemon does not report it back, so the configured value is kept. Forces replacement. |
 | `data_path_port` | `number` | optional, computed | yes |  | UDP port for VXLAN data-path traffic. Daemon default 4789. Changing this forces a new resource. |
 | `default_addr_pool` | `list(string)` | optional, computed | yes |  | CIDR pools that overlay network subnets are allocated from, e.g. `["10.20.0.0/16"]`. When unset the daemon default (`10.0.0.0/8`) is used and reported. Changing this forces a new resource. |
 | `dispatcher` | `object` | optional |  |  | Dispatcher settings (`Spec.Dispatcher`). Updated in place (SwarmUpdate). |
@@ -42,7 +44,19 @@ nested attribute, object. CA settings (`Spec.CAConfig`). Updated in place (Swarm
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `external_cas` | `list(object)` | optional |  |  | External certificate authorities that sign node certificates (`ExternalCAs`, `docker swarm init --external-ca`). When set, the swarm gets exactly this list; unset leaves it as it is. |
 | `node_cert_expiry` | `string` | optional |  |  | Validity of node certificates, as a Go duration such as `2160h` (`NodeCertExpiry`, `--cert-expiry`). |
+
+### `ca_config.external_cas`
+
+nested attribute, list(object). External certificate authorities that sign node certificates (`ExternalCAs`, `docker swarm init --external-ca`). When set, the swarm gets exactly this list; unset leaves it as it is.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ca_cert` | `string` | optional |  |  | PEM root CA certificate the external CA signs with; unset means the swarm's current root CA (`CACert`). |
+| `options` | `map(string)` | optional |  |  | Protocol-specific options for the CA (`Options`). |
+| `protocol` | `string` | optional, computed |  |  | Protocol of the CA, only `cfssl` (the default) (`Protocol`). |
+| `url` | `string` | required |  |  | URL of the CA's signing endpoint (`URL`). |
 
 ### `dispatcher`
 
@@ -212,6 +226,8 @@ resource "docker_swarm_init" "this" {
   advertise_addr    = "10.0.0.5"
   default_addr_pool = ["10.20.0.0/16"]
   subnet_size       = 24
+  # Overlay (VXLAN) traffic on a separate interface.
+  data_path_addr = "10.1.0.5"
 
   # `docker swarm update` settings, changed in place.
   labels = {

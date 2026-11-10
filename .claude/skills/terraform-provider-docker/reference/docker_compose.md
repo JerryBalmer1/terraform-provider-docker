@@ -4,12 +4,13 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A Docker Compose project applied through the Engine API, with no compose CLI plugin involved. The project is parsed with compose-go (the library `docker compose` uses) from `content` or `files`, with interpolation limited to `env` and `env_file`. In `mode = "local"` every service becomes containers named `<project>-<service>-<n>` (or `container_name`), every network `<project>_<name>` and every volume `<project>_<name>`, all labelled `com.docker.compose.project` like `docker compose up` does (including the `com.docker.compose.config-hash` values the CLI computes), so `docker compose ps` shows them. In `mode = "swarm"` the project becomes a stack (services, overlay networks, secrets and configs labelled `com.docker.stack.namespace`) like `docker stack deploy`. Refresh compares the live objects with the parsed project (a `com.docker.compose.config-hash` label on each object, plus container state or service image/replicas) and marks `spec_hash` as drifted so the next plan shows an update. An update creates what is missing, recreates what changed and removes objects of the project that are no longer in it, orphans included: `remove_orphans` defaults to `true` here, where the compose CLI's `--remove-orphans` defaults to false, because Terraform owns the whole project and an orphan is drift. Destroy removes everything labelled with the project. In local mode a service with a `build:` section is built through BuildKit when its image is missing (always with `pull_policy: build`) and tagged `image` or `<project>-<service>`. A project that defines `jobs` plans with a warning: jobs are not run yet (use the `docker_compose_run` action). The whole normalized project is exposed as `compose_yaml` (what `docker compose config` prints) and the structured `project`.
+A Docker Compose project applied through the Engine API, with no compose CLI plugin involved. The project is parsed with compose-go (the library `docker compose` uses) from `content` or `files`, with interpolation limited to `env` and `env_file`. In `mode = "local"` every service becomes containers named `<project>-<service>-<n>` (or `container_name`), every network `<project>_<name>` and every volume `<project>_<name>`, all labelled `com.docker.compose.project` like `docker compose up` does (including the `com.docker.compose.config-hash` values the CLI computes), so `docker compose ps` shows them. In `mode = "swarm"` the project becomes a stack (services, overlay networks, secrets and configs labelled `com.docker.stack.namespace`) like `docker stack deploy`. Refresh compares the live objects with the parsed project (a `com.docker.compose.config-hash` label on each object, plus container state or service image/replicas) and marks `spec_hash` as drifted so the next plan shows an update. An update creates what is missing, recreates what changed and removes objects of the project that are no longer in it, orphans included: `remove_orphans` defaults to `true` here, where the compose CLI's `--remove-orphans` defaults to false, because Terraform owns the whole project and an orphan is drift. Destroy removes everything labelled with the project. In local mode a service with a `build:` section is built through BuildKit when its image is missing (always with `pull_policy: build`) and tagged `image` or `<project>-<service>`. Service lifecycle hooks run in local mode as compose runs them: `pre_start` steps as init containers before the service container starts, `post_start` and `pre_stop` commands exec'd in the container. A change that only `com.docker.compose.config-hash` sees (an environment entry with no value, a hook, `env_file` paths) recreates the container, like `docker compose up`. A project that defines `jobs` plans with a warning: jobs are not run yet (use the `docker_compose_run` action). The whole normalized project is exposed as `compose_yaml` (what `docker compose config` prints) and the structured `project`.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `compose_go_version` | `string` | computed |  |  | compose-go version that loads, interpolates, merges and validates the project (v2.16.2, from go.mod). |
 | `compose_spec_version` | `string` | computed |  |  | Pinned compose-spec commit the structured fields follow (main @ 3a4a699...). |
 | `compose_yaml` | `string` | computed |  | yes | Normalized compose config as `docker compose config` prints it: interpolated, include/extends resolved, merged, profiles applied. |
@@ -709,6 +710,13 @@ resource "docker_compose" "shop" {
             target: /etc/nginx/conf.d/default.conf
         depends_on:
           db: {condition: service_healthy}
+        # Lifecycle hooks run through the Engine API: post_start / pre_stop
+        # are exec'd in the container (pre_start steps run as init
+        # containers; see the docs).
+        post_start:
+          - command: ["sh", "-c", "nginx -t"]
+        pre_stop:
+          - command: ["nginx", "-s", "quit"]
       db:
         image: postgres:16-alpine
         environment:

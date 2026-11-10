@@ -32,6 +32,7 @@ action "docker_container_cp" "<name>" {
 | `container_id` | `string` | required |  |  | The container the action targets, by ID or name, e.g. `docker_container.app.id`. |
 | `content` | `string` | optional |  |  | Inline UTF-8 file content. Exactly one of `content`, `content_base64` and `source`. |
 | `content_base64` | `string` | optional |  |  | Inline binary file content, base64-encoded. Exactly one of `content`, `content_base64` and `source`. |
+| `copy_uidgid` | `bool` | optional |  |  | Map the archive's `uid` / `gid` through the container's user-namespace mapping so the files belong to the same user inside the container as they would without remapping (Engine `copyUIDGID`, `docker cp --archive`). Default `false`. |
 | `gid` | `number` | optional |  |  | Numeric group of the copied files. Default 0 (root). |
 | `mode` | `string` | optional |  |  | Octal permission bits for the copied files, e.g. `0644` or `0755`. Default `0644` for inline content, the local file's mode for `source`. |
 | `path` | `string` | required |  |  | Absolute destination path inside the container: the file to write, or the directory to create for a directory `source`. Its parent directory must exist. |
@@ -62,6 +63,9 @@ action "docker_container_cp" "index" {
     path         = "/usr/share/nginx/html/index.html"
     content      = "<h1>deployed by Terraform</h1>"
     mode         = "0644"
+    uid          = 101 # nginx
+    gid          = 101
+    copy_uidgid  = true # map uid / gid through a user-namespace remapping (docker cp -a)
   }
 }
 ```

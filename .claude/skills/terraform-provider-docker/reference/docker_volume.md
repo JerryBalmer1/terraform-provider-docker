@@ -10,6 +10,7 @@ A Docker volume (`VolumeCreate`). Volumes cannot be changed after creation, so e
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `cluster_volume_id` | `string` | computed |  |  | Swarm object ID of a cluster volume (`ClusterVolume.ID`); null for a local volume. |
 | `cluster_volume_spec` | `object` | optional | yes |  | Swarm cluster (CSI) volume specification (`ClusterVolumeSpec`, API 1.42+); setting it creates a cluster volume through the Swarm manager instead of a local volume, so the provider must point at a manager and `driver` must name an installed CSI plugin. Changing anything except `availability` forces replacement. |
 | `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |

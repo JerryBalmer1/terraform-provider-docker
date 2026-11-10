@@ -57,6 +57,7 @@ resource "docker_volume" "csi" {
 
 ### Optional
 
+- `adopt` (Boolean) Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`.
 - `cluster_volume_spec` (Attributes) Swarm cluster (CSI) volume specification (`ClusterVolumeSpec`, API 1.42+); setting it creates a cluster volume through the Swarm manager instead of a local volume, so the provider must point at a manager and `driver` must name an installed CSI plugin. Changing anything except `availability` forces replacement. (see [below for nested schema](#nestedatt--cluster_volume_spec))
 - `driver` (String) Volume driver. Default `local`. Changing this forces a new resource.
 - `driver_opts` (Map of String) Driver options, e.g. `{ type = "nfs", o = "addr=10.0.0.1,rw", device = ":/export" }` for `local`. Changing this forces a new resource.

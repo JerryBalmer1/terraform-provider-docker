@@ -1800,10 +1800,10 @@
       "type": "docker_container",
       "kreuzwerker_attr": "attach",
       "previous_attr": null,
-      "our_attr": null,
-      "transform": "dropped",
-      "upstream": "swagger #/definitions/ContainerAttach",
-      "reason": "dropped: the resource never attaches; use wait for readiness and data.docker_container_logs for output."
+      "our_attr": "state",
+      "transform": "attach = true -> state = \"exited\" (run once, wait for the exit, keep the container)",
+      "upstream": "swagger #/definitions/ContainerState Status (exited)",
+      "reason": "Pass 5.3 D1: state = \"exited\" is the one-shot run kreuzwerker's attach performed; the provider still never attaches (it waits with ContainerWait and reads ContainerLogs)."
     },
     {
       "type": "docker_container",
@@ -1875,7 +1875,7 @@
       "our_attr": null,
       "transform": "dropped",
       "upstream": "none",
-      "reason": "dropped: use data.docker_container_logs (logs / log_entries)."
+      "reason": "dropped from moved state: with state = \"exited\" the run's output is in logs / log_entries (logs contract shape), captured at create; a moved container starts with them null."
     },
     {
       "type": "docker_container",
@@ -2415,7 +2415,7 @@
       "our_attr": null,
       "transform": "dropped",
       "upstream": "none",
-      "reason": "dropped: use data.docker_container_logs."
+      "reason": "dropped: the logs flag is not needed; with state = \"exited\" (attach = true) the run's output is captured at create in logs / log_entries, and data.docker_container_logs reads any container's logs."
     },
     {
       "type": "docker_container",
@@ -2619,10 +2619,10 @@
       "type": "docker_container",
       "kreuzwerker_attr": "must_run",
       "previous_attr": "must_run",
-      "our_attr": "must_run",
-      "transform": "identity",
-      "upstream": "contract (provider's own setting, no upstream field)",
-      "reason": "Same name as upstream."
+      "our_attr": null,
+      "transform": "dropped",
+      "upstream": "swagger #/definitions/ContainerState Status (running)",
+      "reason": "dropped (Pass 5.3 D1): subsumed by state = \"running\", which starts a container found stopped in place. must_run = false (start once, then leave a stopped container alone) has no counterpart: use state = \"created\" plus the docker_container_start action."
     },
     {
       "type": "docker_container",
@@ -2952,10 +2952,10 @@
       "type": "docker_container",
       "kreuzwerker_attr": "start",
       "previous_attr": null,
-      "our_attr": null,
-      "transform": "dropped",
-      "upstream": "none",
-      "reason": "dropped: the container is always started; must_run keeps it running."
+      "our_attr": "state",
+      "transform": "start = false -> state = \"created\"; otherwise \"running\" (or \"exited\" with attach = true)",
+      "upstream": "swagger #/definitions/ContainerState Status (created | running | exited)",
+      "reason": "Pass 5.3 D1: state names Docker's State.Status values; created = create only, never started by the provider."
     },
     {
       "type": "docker_container",

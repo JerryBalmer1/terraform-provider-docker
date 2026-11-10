@@ -4,12 +4,13 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A BuildKit builder run by the daemon as a `docker-container` driver node, the same container and state volume `docker buildx create --driver docker-container --bootstrap` makes, created through the Engine API without the buildx CLI. The container `buildx_buildkit_<node>` runs `moby/buildkit` privileged with the state volume `buildx_buildkit_<node>_state`; readiness is checked by listing BuildKit workers over `buildctl dial-stdio` in the container. Pass `name` to `docker_image.build.builder`, or use `endpoint` with `buildctl --addr` (`tcp_address` when `tcp_port` is set). The buildx CLI's own instance list (`~/.docker/buildx/instances`) is not written, so `docker buildx ls` does not show the builder until `docker buildx create --name <name> --driver docker-container` is run, which adopts the same container. Only the `docker-container` driver is supported. Every argument except `keep_state` forces a new resource.
+A BuildKit builder run by the daemon as a `docker-container` driver node, the same container and state volume `docker buildx create --driver docker-container --bootstrap` makes, created through the Engine API without the buildx CLI. The container `buildx_buildkit_<node>` runs `moby/buildkit` privileged with the state volume `buildx_buildkit_<node>_state`; readiness is checked by listing BuildKit workers over `buildctl dial-stdio` in the container. Pass `name` to `docker_image.build.builder`, or use `endpoint` with `buildctl --addr` (`tcp_address` when `tcp_port` is set). The buildx CLI's own instance list (`~/.docker/buildx/instances`) is not written, so `docker buildx ls` does not show the builder until `docker buildx create --name <name> --driver docker-container` is run, which adopts the same container. Only the `docker-container` driver creates a container; the `remote` driver only checks and reports a BuildKit daemon run elsewhere, selected in builds by its `endpoint`. With the provider's `owner` set, the node container and state volume carry the owner label. Every argument except `keep_state` and `adopt` forces a new resource.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `append` | `bool` | optional, computed | yes |  | Whether this node joins an existing builder of the same `name` (`--append`). The builder must already have a node on the daemon, and `node` must differ from its nodes. With `false` (default) creating fails when the builder already exists. Destroy removes only this node. Forces replacement. |
 | `bootstrap` | `bool` | optional, computed | yes |  | Whether to start the builder and wait until BuildKit lists its workers (`--bootstrap`). With `false` the container is only created. Default `true`. Forces replacement. |
 | `builder` | `object` | computed |  |  | The builder object field by field (name, driver, last activity, nodes with endpoint, status, BuildKit version, platforms, labels, GC policy). |
@@ -21,8 +22,8 @@ A BuildKit builder run by the daemon as a `docker-container` driver node, the sa
 | `container_name` | `string` | computed |  |  | Name of the node container, `buildx_buildkit_<node>`. |
 | `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json, to detect drift without diffing the document. |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon (GET /version Version). |
-| `driver` | `string` | optional, computed | yes |  | Builder driver. Only `docker-container` (default) is supported: `docker` is the daemon's built-in builder (use `docker_image` without `build.builder`), and `kubernetes`/`remote` are not Engine API objects. Forces replacement. |
-| `endpoint` | `string` | computed |  |  | BuildKit address of the node for `buildctl --addr`: `docker-container://buildx_buildkit_<node>`. |
+| `driver` | `string` | optional, computed | yes |  | Builder driver: `docker-container` (default), a BuildKit container on the provider's daemon, or `remote`, a BuildKit daemon run elsewhere and reached at `endpoint` (TLS in the `remote` block). `docker` is the daemon's built-in builder (use `docker_image` without `build.builder`); `kubernetes` is not supported (it needs the Kubernetes API). Forces replacement. |
+| `endpoint` | `string` | optional, computed | yes |  | BuildKit address of the builder, for `buildctl --addr` and `docker_image.build.builder`. With `driver = "remote"` it is required: the remote BuildKit's `tcp://host:port` or `unix:///path` (the `docker buildx create --driver remote` endpoint argument). With `docker-container` it is computed: `docker-container://buildx_buildkit_<node>`. Forces replacement. |
 | `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon for this read/apply. |
 | `id` | `string` | computed |  |  | ID of the BuildKit node container. |
 | `inspect_json` | `string` | computed |  | yes | The builder and its nodes as one JSON document (the `docker buildx inspect` view, keys as in `buildx ls --format json` Builder object). Sensitive: driver options carry env.* values. |
@@ -36,7 +37,7 @@ A BuildKit builder run by the daemon as a `docker-container` driver node, the sa
 | `tcp_port` | `number` | optional | yes |  | Host port on which BuildKit is also served over TCP: buildkitd listens on `tcp://0.0.0.0:1234` in the container and the port is published on this host port. Unauthenticated and unencrypted; bind it only on trusted networks. Forces replacement. |
 | `volume_name` | `string` | computed |  |  | Name of the state volume, `buildx_buildkit_<node>_state`, mounted on `/var/lib/buildkit`. |
 
-Nested blocks: `docker_container` (single block, forces replacement).
+Nested blocks: `docker_container` (single block, forces replacement), `remote` (single block, forces replacement).
 
 ### `builder`
 
@@ -98,6 +99,17 @@ single block. Settings for the BuildKit container (`--driver-opt`). Changing any
 | `network` | `string` | optional |  |  | Network mode or network name for the container (`network=`), e.g. `host`. Default: the daemon's bridge. |
 | `restart_policy` | `string` | optional |  |  | Restart policy (`restart-policy=`): `no`, `always`, `unless-stopped` (default, like buildx) or `on-failure`. |
 
+### `remote`
+
+single block. TLS settings of a `remote` driver builder (`--driver-opt cacert=,cert=,key=,servername=`). Only with `driver = "remote"`. Changing anything here forces a new resource.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `cacert` | `string` | optional |  |  | Path of the CA certificate that signed the BuildKit server certificate (`cacert=`). |
+| `cert` | `string` | optional |  |  | Path of the client certificate presented to BuildKit (`cert=`); needs `key`. |
+| `key` | `string` | optional |  |  | Path of the client certificate's private key (`key=`); needs `cert`. |
+| `servername` | `string` | optional |  |  | Server name the BuildKit certificate is checked against (`servername=`). Default: the endpoint's host. |
+
 ## Example
 
 ```terraform
@@ -139,6 +151,21 @@ output "buildkit_tcp" {
 
 output "buildkit_version" {
   value = docker_buildx_builder.ci.buildkit_version
+}
+
+# A BuildKit daemon run elsewhere (docker buildx create --driver remote).
+# Nothing is created on the Docker daemon; builds select it by endpoint.
+resource "docker_buildx_builder" "remote" {
+  name     = "remote"
+  driver   = "remote"
+  endpoint = "tcp://buildkit.internal:1234"
+
+  remote {
+    cacert     = "${path.module}/certs/ca.pem"
+    cert       = "${path.module}/certs/client-cert.pem"
+    key        = "${path.module}/certs/client-key.pem"
+    servername = "buildkit.internal"
+  }
 }
 ```
 

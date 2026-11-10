@@ -3,12 +3,12 @@
 page_title: "docker_buildx_bake Action - docker"
 subcategory: ""
 description: |-
-  Builds one or more targets from a bake definition, like docker buildx bake. The definition comes from HCL, JSON or compose files and/or inline content; groups, targets, inherits, matrix, variables (overridden by variables), user functions and the bake standard library are resolved as the buildx bake reference describes, then every target is built through BuildKit on the selected builder. The result object holds the resolved definition (bake --print), the per-target metadata (--metadata-file), tags, digests and build refs. Images are not tracked in state; use docker_image for images Terraform should own.
+  Builds one or more targets from a bake definition, like docker buildx bake. The definition comes from HCL, JSON or compose files and/or inline content; groups, targets, inherits, matrix, variables (overridden by variables), user functions and the bake standard library are resolved as the buildx bake reference describes, then every target is built through BuildKit on the selected builder. The result object holds the resolved definition (bake --print), the per-target metadata (--metadata-file), tags, digests and build refs. Targets may refer to each other (target.<name>.<attr> and target:<name> named contexts), and resources sets per-step limits. With the provider's owner set, every image carries the owner label. Images are not tracked in state; use docker_image for images Terraform should own.
 ---
 
 # docker_buildx_bake (Action)
 
-Builds one or more targets from a bake definition, like `docker buildx bake`. The definition comes from HCL, JSON or compose files and/or inline `content`; groups, targets, `inherits`, `matrix`, variables (overridden by `variables`), user functions and the bake standard library are resolved as the buildx bake reference describes, then every target is built through BuildKit on the selected builder. The result object holds the resolved definition (`bake --print`), the per-target metadata (`--metadata-file`), tags, digests and build refs. Images are not tracked in state; use `docker_image` for images Terraform should own.
+Builds one or more targets from a bake definition, like `docker buildx bake`. The definition comes from HCL, JSON or compose files and/or inline `content`; groups, targets, `inherits`, `matrix`, variables (overridden by `variables`), user functions and the bake standard library are resolved as the buildx bake reference describes, then every target is built through BuildKit on the selected builder. The result object holds the resolved definition (`bake --print`), the per-target metadata (`--metadata-file`), tags, digests and build refs. Targets may refer to each other (`target.<name>.<attr>` and `target:<name>` named contexts), and `resources` sets per-step limits. With the provider's `owner` set, every image carries the owner label. Images are not tracked in state; use `docker_image` for images Terraform should own.
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_buildx_bake.<name>] } }`
@@ -59,10 +59,19 @@ action "docker_buildx_bake" "release" {
         tags     = ["registry.example.com/app:$${VERSION}"]
       }
 
+      # Built first and handed to "worker" as its FROM base (target: context).
+      target "base" {
+        dockerfile = "base.Dockerfile"
+      }
+
       target "worker" {
-        inherits = ["_common"]
-        context  = "worker"
-        tags     = ["registry.example.com/worker:$${VERSION}"]
+        inherits  = ["_common"]
+        context   = "worker"
+        contexts  = { base = "target:base" }
+        tags      = ["registry.example.com/worker:$${VERSION}"]
+        # The app target's VERSION argument (target.<name>.<attr>).
+        labels    = { "org.opencontainers.image.version" = target.app.args.VERSION }
+        resources = { memory = "2g", cpu-quota = 50000 }
       }
     EOT
     targets     = ["release"]
@@ -78,7 +87,7 @@ action "docker_buildx_bake" "release" {
 
 ### Optional
 
-- `builder` (String) Builder to build on (`--builder`): `default` (the daemon's BuildKit, the default) or the name of a docker-container builder, e.g. `docker_buildx_builder.ci.name`.
+- `builder` (String) Builder to build on (`--builder`): `default` (the daemon's BuildKit, the default) or the name of a docker-container builder, e.g. `docker_buildx_builder.ci.name`, or a BuildKit address such as a remote builder's `docker_buildx_builder.remote.endpoint` (`tcp://`, `unix://`, `docker-container://`).
 - `content` (String) Inline bake definition, HCL or JSON (detected by a leading `{`), merged after `files`.
 - `files` (List of String) Bake files to read, in merge order (`--file`): `.hcl`, `.json` or compose `.yml`/`.yaml`. Without `files` and `content`, the files bake looks for (`compose.yaml` ... `docker-bake.override.hcl`) are read from `working_dir`.
 - `load` (Boolean) Whether to load every target's image into the daemon (`--load`, `*.output=type=docker`).

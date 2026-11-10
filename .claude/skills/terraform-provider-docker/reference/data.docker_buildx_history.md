@@ -4,12 +4,15 @@
 
 Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
-Reads one build record of a buildx builder, like `docker buildx history inspect`: context, Dockerfile, target, platforms, status, timing, step counts and attestation attachments. Records come from BuildKit's build history API on the builder's running nodes. Materials and attachment bodies are not read (only attachment digests and types).
+Reads one build record of a buildx builder, like `docker buildx history inspect`: context, Dockerfile, target, platforms, status, timing, step counts and attestation attachments. Records come from BuildKit's build history API on the builder's running nodes; materials come from the record's provenance attestation, and `attachment` reads one attachment's body from the builder's content store.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `attachment` | `string` | optional |  |  | Attachment whose body to read into `attachment_body`, like `docker buildx history inspect attachment`: its digest (a unique prefix is enough), or a type: `provenance`, `sbom`, or a full predicate or media type (`--type`). |
+| `attachment_body` | `string` | computed |  | yes | Body of the attachment `attachment` selects (an in-toto statement for provenance and SBOMs), read from the builder's content store. Null without `attachment`. Sensitive: provenance can carry build arguments and source URLs. |
+| `attachment_platform` | `string` | optional |  |  | Platform of the attachment to read, for multi-platform builds (`--platform`), e.g. `linux/arm64`. |
 | `builder` | `string` | optional, computed |  |  | Builder whose records are read (`--builder`). Default `default`, the daemon's built-in BuildKit; other names are docker-container builders on the provider's daemon (see `docker_buildx_builder`). |
 | `buildx_version` | `string` | computed |  |  | The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx. |
 | `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json, to detect drift without diffing the document. |
@@ -92,5 +95,15 @@ output "last_build" {
     cached   = "${data.docker_buildx_history.last.record.num_cached_steps}/${data.docker_buildx_history.last.record.num_total_steps}"
     revision = data.docker_buildx_history.last.vcs_revision
   }
+}
+
+# The provenance attestation of the newest build, and its materials.
+data "docker_buildx_history" "provenance" {
+  ref        = "^0"
+  attachment = "provenance"
+}
+
+output "build_materials" {
+  value = [for m in data.docker_buildx_history.provenance.record.materials : m.digests]
 }
 ```

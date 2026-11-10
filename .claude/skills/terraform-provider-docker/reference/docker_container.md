@@ -4,23 +4,33 @@
 
 Kind: resource. Back to [SKILL.md](../SKILL.md).
 
-A single-host Docker container, created with `ContainerCreate`, attached to its networks and started. Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `maximum_retry_count`, `memory`, `memory_swap`, `memory_reservation`, `cpu_shares`, `nano_cpus`, `cpu_period`, `cpu_quota` and `cpuset_cpus` update in place (`ContainerRename`/`ContainerUpdate`); `networks` entries are connected and disconnected in place (`NetworkConnect`/`NetworkDisconnect`); `files` blocks are copied in with `PutContainerArchive` before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
+A single-host Docker container, created with `ContainerCreate`, attached to its networks and, per `state`, started (`running`, the default), left created (`created`) or run once to completion (`exited`). Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `maximum_retry_count`, `memory`, `memory_swap`, `memory_reservation`, `cpu_shares`, `nano_cpus`, `cpu_period`, `cpu_quota`, `cpuset_cpus`, `cpuset_mems`, `blkio_weight`, `cpu_realtime_period`, `cpu_realtime_runtime` and `pids_limit` update in place (`ContainerRename`/`ContainerUpdate`); `networks` entries are connected and disconnected in place (`NetworkConnect`/`NetworkDisconnect`); `files` blocks are copied in with `PutContainerArchive` before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
 
 ## Arguments and attributes
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
+| `annotations` | `map(string)` | optional | yes |  | Arbitrary non-identifying metadata passed to the OCI runtime when the container starts (`HostConfig.Annotations`, `docker run --annotation`). Forces replacement. |
 | `auto_remove` | `bool` | optional, computed | yes |  | Remove the container when its process exits (`HostConfig.AutoRemove`, `docker run --rm`); Terraform then plans a new one. Default `false`. Forces replacement. |
+| `blkio_weight` | `number` | optional | yes |  | Block IO weight, relative to other containers, 10 to 1000 (`HostConfig.BlkioWeight`). Updated in place (`ContainerUpdate`); removing it forces a new resource. |
 | `cap_add` | `set(string)` | optional | yes |  | Linux capabilities to add, e.g. `NET_ADMIN` (`HostConfig.CapAdd`). Forces replacement. |
 | `cap_drop` | `set(string)` | optional | yes |  | Linux capabilities to drop, e.g. `ALL` (`HostConfig.CapDrop`). Forces replacement. |
+| `cgroup` | `string` | optional | yes |  | Cgroup the container joins (`HostConfig.Cgroup`), e.g. `container:<name\|id>`. Forces replacement. |
 | `cgroup_parent` | `string` | optional | yes |  | Parent cgroup of the container (`HostConfig.CgroupParent`). Forces replacement. |
 | `cgroupns_mode` | `string` | optional | yes |  | Cgroup namespace mode (`HostConfig.CgroupnsMode`): `private` or `host`. Unset uses the daemon default, which is not reported. Forces replacement. |
 | `command` | `list(string)` | optional | yes |  | Command (`CMD`) override. Unset uses the image's. Changing this forces a new resource. |
+| `console_size` | `list(number)` | optional | yes |  | Initial console size as `[height, width]` (`HostConfig.ConsoleSize`); used with `tty = true`. Forces replacement. |
 | `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `cpu_count` | `number` | optional | yes |  | Number of usable CPUs (`HostConfig.CpuCount`). Windows daemons only; a Linux daemon ignores it. Forces replacement. |
+| `cpu_percent` | `number` | optional | yes |  | Usable percentage of the available CPUs (`HostConfig.CpuPercent`). Windows daemons only; a Linux daemon ignores it. Forces replacement. |
 | `cpu_period` | `number` | optional | yes |  | CPU CFS period in microseconds (`HostConfig.CpuPeriod`). Updated in place; removing it forces a new resource. |
 | `cpu_quota` | `number` | optional | yes |  | CPU CFS quota in microseconds per `cpu_period` (`HostConfig.CpuQuota`). Updated in place; removing it forces a new resource. |
+| `cpu_realtime_period` | `number` | optional | yes |  | CPU real-time period in microseconds (`HostConfig.CpuRealtimePeriod`). Updated in place; removing it forces a new resource. |
+| `cpu_realtime_runtime` | `number` | optional | yes |  | CPU real-time runtime in microseconds (`HostConfig.CpuRealtimeRuntime`). Updated in place; removing it forces a new resource. |
 | `cpu_shares` | `number` | optional | yes |  | Relative CPU weight (default 1024 in the daemon). Updated in place; removing it forces a new resource. |
 | `cpuset_cpus` | `string` | optional | yes |  | CPUs the container may use, e.g. `0-2` or `0,1` (`HostConfig.CpusetCpus`). Updated in place; removing it forces a new resource. |
+| `cpuset_mems` | `string` | optional | yes |  | Memory nodes (NUMA) the container may use, e.g. `0-3` or `0,1` (`HostConfig.CpusetMems`). Updated in place; removing it forces a new resource. |
 | `device_cgroup_rules` | `list(string)` | optional | yes |  | Rules added to the device cgroup, e.g. `c 1:3 mr` (`HostConfig.DeviceCgroupRules`). Forces replacement. |
 | `dns` | `list(string)` | optional | yes |  | DNS server IPs for the container's resolver (`HostConfig.Dns`). Unset uses the daemon/network default. Forces replacement. |
 | `dns_options` | `list(string)` | optional | yes |  | Resolver options, e.g. `ndots:2` (`HostConfig.DnsOptions`). Forces replacement. |
@@ -31,7 +41,9 @@ A single-host Docker container, created with `ContainerCreate`, attached to its 
 | `entrypoint` | `list(string)` | optional | yes |  | Entrypoint override. Unset uses the image's; setting it also drops the image's `CMD` unless `command` is set. Changing this forces a new resource. |
 | `env` | `map(string)` | optional | yes |  | Environment variables, merged over the image's. Image-provided variables are not reported in state. Changing this forces a new resource. |
 | `exit_code` | `number` | computed |  |  | Exit code of the container's main process at the last refresh (`State.ExitCode`); 0 while it runs. |
+| `expected_exit_codes` | `list(number)` | optional, computed |  |  | Exit codes that count as success for `state = "exited"`. Default `[0]`. Checked once, when the run finishes. |
 | `extra_hosts` | `list(string)` | optional | yes |  | Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` exactly like `docker run --add-host` (e.g. `"db.local:10.0.0.5"`, or `"host.docker.internal:host-gateway"` for the host's gateway IP). Forces replacement. |
+| `finished_at` | `string` | computed |  |  | With `state = "exited"`: when the run's process exited (`State.FinishedAt`, RFC 3339). Null for the other states. |
 | `gpus` | `string` | optional | yes |  | GPUs to expose, like `docker run --gpus`: `"all"`, a count such as `"2"`, or `"device=0,1"` (indexes or UUIDs). Sent as a `HostConfig.DeviceRequests` entry with driver `nvidia` and capabilities `[["gpu"]]`; the host needs the NVIDIA container toolkit. Forces replacement. |
 | `group_add` | `set(string)` | optional | yes |  | Additional groups the container process runs as (`HostConfig.GroupAdd`). Forces replacement. |
 | `hostname` | `string` | optional | yes |  | Container hostname (`Config.Hostname`). Unset: the daemon uses the first 12 characters of the container ID, which is not reported in state. Forces replacement. |
@@ -41,42 +53,61 @@ A single-host Docker container, created with `ContainerCreate`, attached to its 
 | `init` | `bool` | optional | yes |  | Run an init process inside the container that forwards signals and reaps processes (`HostConfig.Init`, `docker run --init`). Unset uses the daemon setting. Forces replacement. |
 | `inspect` | `object` | computed |  |  | The GET /containers/{id}/json response as a nested object, field by field. |
 | `inspect_json` | `string` | computed |  | yes | The exact Engine API GET /containers/{id}/json response as JSON. |
+| `io_maximum_bandwidth` | `number` | optional | yes |  | Maximum IO in bytes per second for the container's system drive (`HostConfig.IOMaximumBandwidth`). Windows daemons only. Forces replacement. |
+| `io_maximum_iops` | `number` | optional | yes |  | Maximum IO operations per second for the container's system drive (`HostConfig.IOMaximumIOps`). Windows daemons only. Forces replacement. |
 | `ipc_mode` | `string` | optional | yes |  | IPC namespace (`HostConfig.IpcMode`): `none`, `private`, `shareable`, `host` or `container:<name\|id>`. Unset uses the daemon default, which is not reported. Forces replacement. |
+| `isolation` | `string` | optional | yes |  | Isolation technology (`HostConfig.Isolation`): `default`, `process` or `hyperv`. Windows daemons only; unset uses the daemon default, which is not reported. Forces replacement. |
 | `labels` | `map(string)` | optional | yes |  | Container labels. Image labels are not reported in state. Docker cannot change labels of an existing container, so changing this forces a new resource. |
+| `links` | `list(string)` | optional | yes |  | Legacy container links, each `<name\|id>[:<alias>]` (`HostConfig.Links`, `docker run --link`). Prefer user-defined `networks`, whose DNS resolves container names. Forces replacement. |
+| `log_entries` | `list(object)` | computed |  |  | With `state = "exited"`: one object per log line (`timestamp`, `stream`, `source`, `message`) of the run, the last `logs_tail` lines; only `message` is sensitive. Null for the other states. |
+| `logs` | `string` | computed |  | yes | With `state = "exited"`: the container's output when it exited, as text, one line per entry (`<timestamp> <stream> <source> <message>`), the last `logs_tail` lines. Null for the other states. Sensitive: log lines can print secrets. |
+| `logs_tail` | `number` | optional, computed |  |  | With `state = "exited"`: how many lines from the end of the run's output `logs` and `log_entries` keep (the Engine's `tail`). Default `1000`. Read once, when the run finishes. |
+| `masked_paths` | `list(string)` | optional | yes |  | Paths masked inside the container (`HostConfig.MaskedPaths`); setting it replaces the daemon's default list. Unset keeps the default, which is not reported. Forces replacement. |
 | `maximum_retry_count` | `number` | optional, computed |  |  | Maximum restart attempts for `restart = "on-failure"` (0 = unlimited). Ignored by other policies. Updated in place. |
 | `memory` | `number` | optional | yes |  | Memory limit in bytes. Updated in place; removing the limit forces a new resource. |
 | `memory_reservation` | `number` | optional | yes |  | Memory soft limit in bytes (`HostConfig.MemoryReservation`). Updated in place; removing it forces a new resource. |
 | `memory_swap` | `number` | optional, computed |  |  | Total memory + swap limit in bytes (`-1` = unlimited swap). Unset: the daemon uses twice `memory` when `memory` is set. Updated in place. |
-| `must_run` | `bool` | optional, computed |  |  | When `true` (default) a container found stopped on refresh is planned for start (`running` goes to `true`) and started by the next apply. |
+| `memory_swappiness` | `number` | optional | yes |  | Memory swappiness, 0 to 100 (`HostConfig.MemorySwappiness`). Unset uses the host's. Forces replacement. |
 | `name` | `string` | required |  |  | Container name. Changing it renames the container in place. |
 | `nano_cpus` | `number` | optional | yes |  | CPU quota in units of 1e-9 CPUs (`1500000000` = 1.5 CPUs). Updated in place; removing it forces a new resource. |
+| `network_disabled` | `bool` | optional | yes |  | Disable networking for the container (`Config.NetworkDisabled`). Forces replacement. |
 | `network_mode` | `string` | optional | yes |  | Network mode (`HostConfig.NetworkMode`): `bridge`, `host`, `none`, `container:<name\|id>` or a network name. Unset: the alphabetically first `networks` key, else the daemon default `bridge`. Forces replacement. |
 | `networks` | `map(object)` | optional |  |  | Networks the container is attached to, keyed by network name (e.g. a `docker_network`'s `name`); each value mirrors `NetworkingConfig.EndpointsConfig` (`EndpointSettings`). Use `{}` for an endpoint with no settings. All endpoints are configured at create; the container's `NetworkMode` is `network_mode` when set, else the alphabetically first key. Adding or removing a key, or changing an endpoint's settings, connects or disconnects the container in place (`NetworkConnect` / `NetworkDisconnect`) without replacing it. Unset, the container joins the daemon's default `bridge`, which is not reported. |
+| `oom_kill_disable` | `bool` | optional | yes |  | Disable the OOM killer for the container (`HostConfig.OomKillDisable`); set `memory` with it. Forces replacement. |
+| `oom_score_adj` | `number` | optional | yes |  | OOM killer score adjustment, -1000 to 1000 (`HostConfig.OomScoreAdj`). Forces replacement. |
 | `pid_mode` | `string` | optional | yes |  | PID namespace (`HostConfig.PidMode`): `host` or `container:<name\|id>`. Forces replacement. |
+| `pids_limit` | `number` | optional |  |  | Maximum number of processes in the container (`HostConfig.PidsLimit`); `0` or `-1` is unlimited. Updated in place (`ContainerUpdate`); removing it lifts the limit in place. |
 | `platform` | `string` | optional | yes |  | Platform of the image to run, `os[/arch[/variant]]`, e.g. `linux/arm64` (the create `platform` parameter). Forces replacement. |
 | `privileged` | `bool` | optional, computed | yes |  | Run the container privileged. Changing this forces a new resource. |
 | `publish_all_ports` | `bool` | optional, computed | yes |  | Publish every exposed port on a random host port (`HostConfig.PublishAllPorts`, `docker run -P`). Default `false`. Forces replacement. |
 | `read_only` | `bool` | optional, computed | yes |  | Mount the container's root filesystem read-only (`docker run --read-only`); use `mounts` (e.g. tmpfs) for writable paths. Default `false`. Forces replacement. |
+| `readonly_paths` | `list(string)` | optional | yes |  | Paths made read-only inside the container (`HostConfig.ReadonlyPaths`); setting it replaces the daemon's default list. Unset keeps the default, which is not reported. Forces replacement. |
 | `restart` | `string` | optional, computed |  |  | Restart policy: `no` (default), `always`, `unless-stopped` or `on-failure`. Updated in place. |
-| `running` | `bool` | computed |  |  | Whether the container was running at the last refresh. Planned `true` when `must_run` is set. |
+| `running` | `bool` | computed |  |  | Whether the container was running at the last refresh (`State.Running`). Planned `true` with `state = "running"`. |
 | `runtime` | `string` | optional | yes |  | OCI runtime, e.g. `runc` or `nvidia` (`HostConfig.Runtime`). Unset uses the daemon default, which is not reported. Forces replacement. |
 | `security_opt` | `set(string)` | optional | yes |  | Security options (`HostConfig.SecurityOpt`), e.g. `no-new-privileges:true`, `apparmor=unconfined`, `seccomp=unconfined`, `label=disable`. Forces replacement. |
+| `shell` | `list(string)` | optional | yes |  | Shell the daemon runs `CMD-SHELL` healthchecks with (`Config.Shell`), e.g. `["/bin/bash", "-c"]`. Unset uses the image's `SHELL` (else `/bin/sh -c`), which is not reported. Forces replacement. |
 | `shm_size` | `number` | optional | yes |  | Size of `/dev/shm` in bytes (`HostConfig.ShmSize`). Unset uses the daemon default (64 MiB), which is not reported. Forces replacement. |
+| `state` | `string` | optional, computed | yes |  | Lifecycle the provider keeps the container in, named after Docker's `State.Status`: `running` (default: started at create, and started again in place when found stopped), `created` (created only, never started by the provider; found running, the plan warns and changes nothing) or `exited` (a one-shot run: created, started and waited for until it exits, within `wait_timeout`; an exit code outside `expected_exit_codes` fails the apply, and a later refresh never runs it again). Switching between `running` and `created` is applied in place; a change to or from `exited` forces replacement. See the container-state guide. |
 | `stdin_open` | `bool` | optional, computed | yes |  | Keep stdin open (`docker run -i`); with `tty` this keeps shells such as `sh` from exiting immediately. Default `false`. Forces replacement. |
 | `stop_signal` | `string` | optional | yes |  | Signal sent to stop the container, e.g. `SIGTERM` or `SIGQUIT`. Unset uses the image's `STOPSIGNAL` (else `SIGTERM`); the image value is not reported in state. Forces replacement. |
-| `stop_timeout` | `number` | optional | yes |  | Seconds to wait after the stop signal before killing the container. Unset uses the daemon default (10s). Forces replacement. |
+| `stop_timeout` | `number` | optional, computed | yes |  | Seconds to wait after the stop signal before killing the container. Unset uses the daemon default (10s on Docker Engine; Docker Desktop fills in its own), which is then reported here. Changing a configured value forces replacement. |
 | `storage_opt` | `map(string)` | optional | yes |  | Storage driver options, e.g. `{ size = "20G" }` (`HostConfig.StorageOpt`). Forces replacement. |
 | `sysctls` | `map(string)` | optional | yes |  | Namespaced kernel parameters, e.g. `{ "net.core.somaxconn" = "1024" }`. Only keys you set are reported (except on import). Forces replacement. |
 | `tmpfs` | `map(string)` | optional | yes |  | tmpfs mounts keyed by container path, values are mount options such as `rw,size=64m` (`HostConfig.Tmpfs`, `docker run --tmpfs`). `mounts` with `type = "tmpfs"` is the structured alternative. Forces replacement. |
 | `tty` | `bool` | optional, computed | yes |  | Allocate a pseudo-TTY (`docker run -t`). Default `false`. Forces replacement. |
+| `umask` | `string` | optional | yes |  | Initial umask of the container's processes (entrypoint, exec processes and healthchecks) as an octal string, e.g. `"0027"` (`HostConfig.Umask`). Unset leaves the runtime default. Forces replacement. Needs Engine API >= 1.56. |
 | `user` | `string` | optional | yes |  | User (and optionally `:group`) to run as. Unset uses the image's. Changing this forces a new resource. |
 | `userns_mode` | `string` | optional | yes |  | User namespace mode (`HostConfig.UsernsMode`), e.g. `host`. Forces replacement. |
+| `uts_mode` | `string` | optional | yes |  | UTS namespace (`HostConfig.UTSMode`), e.g. `host`. Forces replacement. |
+| `volume_driver` | `string` | optional | yes |  | Volume driver for the volumes this container creates through `HostConfig.Binds` (`HostConfig.VolumeDriver`); `mounts` entries take their driver from `volume_options.driver_config`. Forces replacement. |
+| `volumes` | `set(string)` | optional | yes |  | Container paths that get an anonymous volume (`Config.Volumes`, like `docker run -v /data`). A `mounts` entry with `type = "volume"` and no `source` is the structured alternative. The image's own `VOLUME` paths are not reported. Forces replacement. |
 | `volumes_from` | `list(string)` | optional | yes |  | Mount the volumes of other containers, `<name\|id>[:ro\|:rw]` (`HostConfig.VolumesFrom`). Forces replacement. |
-| `wait` | `bool` | optional, computed |  |  | Wait after start until the container's healthcheck reports `healthy` (or, without a healthcheck, until it is running). Fails if the container exits or `wait_timeout` elapses. |
-| `wait_timeout` | `string` | optional, computed |  |  | How long `wait` waits, as a Go duration. Default `60s`. |
+| `wait` | `bool` | optional, computed |  |  | Wait after start until the container's healthcheck reports `healthy` (or, without a healthcheck, until it is running). Fails if the container exits or `wait_timeout` elapses. Only with `state = "running"`. |
+| `wait_timeout` | `string` | optional, computed |  |  | How long `wait` waits for a healthy container, or how long a `state = "exited"` run may take, as a Go duration. Default `60s`, or `5m` with `state = "exited"`. |
 | `working_dir` | `string` | optional | yes |  | Working directory. Unset uses the image's. Changing this forces a new resource. |
 
-Nested blocks: `blkio_device_read_bps` (list of blocks, forces replacement), `blkio_device_read_iops` (list of blocks, forces replacement), `blkio_device_write_bps` (list of blocks, forces replacement), `blkio_device_write_iops` (list of blocks, forces replacement), `device_requests` (list of blocks, forces replacement), `devices` (list of blocks, forces replacement), `files` (list of blocks, forces replacement), `healthcheck` (single block, forces replacement), `logging` (single block, forces replacement), `mounts` (list of blocks, forces replacement), `ports` (list of blocks, forces replacement), `ulimits` (list of blocks, forces replacement).
+Nested blocks: `blkio_device_read_bps` (list of blocks, forces replacement), `blkio_device_read_iops` (list of blocks, forces replacement), `blkio_device_write_bps` (list of blocks, forces replacement), `blkio_device_write_iops` (list of blocks, forces replacement), `blkio_weight_device` (list of blocks, forces replacement), `device_requests` (list of blocks, forces replacement), `devices` (list of blocks, forces replacement), `files` (list of blocks, forces replacement), `healthcheck` (single block, forces replacement), `logging` (single block, forces replacement), `mounts` (list of blocks, forces replacement), `ports` (list of blocks, forces replacement), `ulimits` (list of blocks, forces replacement).
 
 ### `inspect`
 
@@ -297,6 +328,17 @@ nested attribute, object. Upstream `Storage`.
 |---|---|---|---|---|---|
 | `root_fs` | `dynamic` | computed |  |  | Upstream `RootFS`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
 
+### `log_entries`
+
+nested attribute, list(object). With `state = "exited"`: one object per log line (`timestamp`, `stream`, `source`, `message`) of the run, the last `logs_tail` lines; only `message` is sensitive. Null for the other states.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `message` | `string` | computed |  | yes | Upstream `log line without the timestamp prefix and trailing newline`. Sensitive. |
+| `source` | `string` | computed |  |  | Upstream `Name (leading "/" removed)`. |
+| `stream` | `string` | computed |  |  | Upstream `multiplexed frame header stream type: 1 = stdout, 2 = stderr; a TTY stream is not multiplexed (the Engine merges stdout and stderr at the source), so it is "combined"`. |
+| `timestamp` | `string` | computed |  |  | Upstream `timestamps=true line prefix (RFC 3339 nano)`. |
+
 ### `networks`
 
 nested attribute, map(object). Networks the container is attached to, keyed by network name (e.g. a `docker_network`'s `name`); each value mirrors `NetworkingConfig.EndpointsConfig` (`EndpointSettings`). Use `{}` for an endpoint with no settings. All endpoints are configured at create; the container's `NetworkMode` is `network_mode` when set, else the alphabetically first key. Adding or removing a key, or changing an endpoint's settings, connects or disconnects the container in place (`NetworkConnect` / `NetworkDisconnect`) without replacing it. Unset, the container joins the daemon's default `bridge`, which is not reported.
@@ -316,6 +358,7 @@ nested attribute, map(object). Networks the container is attached to, keyed by n
 | `ipv6_address` | `string` | optional |  |  | Static IPv6 address (`IPAMConfig.IPv6Address`); needs an IPv6-enabled network with a user-defined IPv6 subnet. |
 | `ipv6_gateway` | `string` | computed |  |  | IPv6 gateway of the network (`IPv6Gateway`). |
 | `link_local_ips` | `set(string)` | optional |  |  | Link-local addresses (`IPAMConfig.LinkLocalIPs`). |
+| `links` | `list(string)` | optional |  |  | Legacy links on this network, each `<name\|id>[:<alias>]` (`Links`, `docker network connect --link`): the alias resolves to that container on this network only. |
 | `mac_address` | `string` | optional, computed |  |  | MAC address of the endpoint (`MacAddress`). Unset, the daemon generates one, which is reported. |
 | `network_id` | `string` | computed |  |  | ID of the network (`NetworkID`). |
 
@@ -355,6 +398,15 @@ list of blocks. Per-device limit in IO operations per second (`HostConfig.BlkioD
 | `path` | `string` | required |  |  | Device path on the host, e.g. `/dev/sda`. |
 | `rate` | `number` | required |  |  | Limit in IO operations per second. |
 
+### `blkio_weight_device`
+
+list of blocks. Per-device block IO weight (`HostConfig.BlkioWeightDevice`). Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | required |  |  | Device path on the host, e.g. `/dev/sda` (`Path`). |
+| `weight` | `number` | required |  |  | Relative weight, 10 to 1000 (`Weight`). |
+
 ### `device_requests`
 
 list of blocks. Device requests to device drivers (`HostConfig.DeviceRequests`), e.g. GPUs from a driver other than the one `gpus` uses. Forces replacement.
@@ -379,7 +431,7 @@ list of blocks. Host devices mapped into the container (`HostConfig.Devices`, li
 
 ### `files`
 
-list of blocks. Files written into the container with `PutContainerArchive` after create and before start (like `docker cp`). Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `path` must already exist in the image. Files are not read back from the daemon. Changing a file forces a new container, unless the container is stopped (`must_run = false` and not running), in which case the files are copied in place. To copy files into a running container at any time use the `docker_container_cp` action.
+list of blocks. Files written into the container with `PutContainerArchive` after create and before start (like `docker cp`). Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `path` must already exist in the image. Files are not read back from the daemon. Changing a file forces a new container, unless the container is stopped and `state = "created"`, in which case the files are copied in place. To copy files into a running container at any time use the `docker_container_cp` action.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
@@ -420,13 +472,14 @@ list of blocks. Mounts (`HostConfig.Mounts`). Changing mounts forces a new resou
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `consistency` | `string` | optional |  |  | Consistency requirement (`Consistency`): `default`, `consistent`, `cached` or `delegated`; only Docker Desktop's file sharing honors it. Unset is not reported. |
 | `read_only` | `bool` | optional, computed |  |  | Mount read-only. Default `false`. |
 | `selinux_relabel` | `string` | optional | yes |  | SELinux relabel for a `bind` or named `volume` mount: `z` (shared label) or `Z` (private label), like the `docker run -v src:dst:z` suffix. The entry is then sent as a `HostConfig.Binds` string, because the `Mounts` API has no relabel option. Forces replacement like any mounts change. |
-| `source` | `string` | optional |  |  | Host path (bind) or volume name (volume; unset = anonymous volume). Not allowed for tmpfs. |
+| `source` | `string` | optional |  |  | Host path (bind), volume name (volume; unset = anonymous volume) or image reference (image). Not allowed for tmpfs. |
 | `target` | `string` | required |  |  | Path inside the container. |
-| `type` | `string` | required |  |  | `bind`, `volume` or `tmpfs`. |
+| `type` | `string` | required |  |  | `bind`, `volume`, `tmpfs` or `image` (Engine API >= 1.48: another image's filesystem, read-only). |
 
-Nested blocks: `bind_options` (single block), `tmpfs_options` (single block), `volume_options` (single block).
+Nested blocks: `bind_options` (single block), `image_options` (single block), `tmpfs_options` (single block), `volume_options` (single block).
 
 ### `mounts.bind_options`
 
@@ -434,7 +487,19 @@ single block. Bind mount options (`BindOptions`); `type = "bind"` only.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `create_mountpoint` | `bool` | optional |  |  | Create the source path on the host when it is missing (`CreateMountpoint`). |
+| `non_recursive` | `bool` | optional |  |  | Do not bind-mount the submounts of the source recursively (`NonRecursive`). |
 | `propagation` | `string` | optional |  |  | Mount propagation (`Propagation`): `private`, `rprivate`, `shared`, `rshared`, `slave` or `rslave`. |
+| `read_only_force_recursive` | `bool` | optional |  |  | With `read_only`, fail when the mount cannot be made recursively read-only (`ReadOnlyForceRecursive`). |
+| `read_only_non_recursive` | `bool` | optional |  |  | With `read_only`, make only the mount itself read-only, not its submounts (`ReadOnlyNonRecursive`). |
+
+### `mounts.image_options`
+
+single block. Image mount options (`ImageOptions`); `type = "image"` only. Needs Engine API >= 1.48.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `subpath` | `string` | optional |  |  | Path inside the image to mount instead of its root (`Subpath`). |
 
 ### `mounts.tmpfs_options`
 
@@ -443,6 +508,7 @@ single block. tmpfs options (`TmpfsOptions`); `type = "tmpfs"` only.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `mode` | `string` | optional |  |  | Permission bits of the tmpfs root as an octal string, e.g. `"1777"` (`Mode`). |
+| `options` | `list(list(string))` | optional |  |  | Options passed to the tmpfs mount (`Options`): a flag as a one-element list, a key and value as two, e.g. `[["noexec"], ["nr_inodes", "1000"]]`. Needs Engine API >= 1.46. |
 | `size_bytes` | `number` | optional |  |  | Size of the tmpfs in bytes (`SizeBytes`). Unset is unlimited. |
 
 ### `mounts.volume_options`
@@ -597,12 +663,30 @@ resource "docker_container" "web" {
     options = { max-size = "10m", max-file = "3" }
   }
 
-  memory    = 268435456 # 256 MiB, updated in place
-  nano_cpus = 500000000 # 0.5 CPU, updated in place
+  memory       = 268435456 # 256 MiB, updated in place
+  nano_cpus    = 500000000 # 0.5 CPU, updated in place
+  pids_limit   = 512       # updated in place
+  blkio_weight = 300       # updated in place
 
-  must_run     = true
+  oom_score_adj = 100
+  annotations   = { "com.example.team" = "web" }
+
+  state        = "running" # the default: started, and started again if found stopped
   wait         = true
   wait_timeout = "2m"
+}
+
+# A one-shot run kept as an exited container: created, started and waited for.
+# A non-zero exit code fails the apply; the output is kept in logs / log_entries.
+resource "docker_container" "migrate" {
+  name    = "migrate"
+  image   = "busybox:1.36"
+  command = ["sh", "-c", "echo migrating; exit 0"]
+
+  state               = "exited"
+  expected_exit_codes = [0]
+  wait_timeout        = "10m"
+  logs_tail           = 200
 }
 
 # Read-only endpoint values sit beside the settings in each networks entry;

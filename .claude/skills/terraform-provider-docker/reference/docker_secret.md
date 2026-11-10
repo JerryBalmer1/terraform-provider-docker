@@ -10,18 +10,30 @@ A Swarm secret: a blob the Swarm managers store encrypted and mount into service
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json; changes whenever the object changes. |
-| `data` | `string` | optional | yes | yes | Secret content, base64-encoded (use `base64encode()`); it must decode. The daemon never returns secret data, so it is kept from state on refresh and ignored on import. Changing this forces a new resource. Exactly one of `data` and `data_wo` is required. |
+| `data` | `string` | optional | yes | yes | Secret content, base64-encoded (use `base64encode()`); it must decode. The daemon never returns secret data, so it is kept from state on refresh and ignored on import. Changing this forces a new resource. Exactly one of `data` and `data_wo` is required, unless `driver` provides the value. |
 | `data_wo` | `string` | optional, write-only |  | yes | Secret content as a write-only argument (Terraform 1.11+), base64-encoded (use `base64encode()`); it is never stored in plan or state, so it can come from an ephemeral value. Requires `data_wo_version`; bump the version to replace the secret with new content. Conflicts with `data`. |
 | `data_wo_version` | `number` | optional | yes |  | Version of `data_wo`. Terraform cannot see changes to a write-only value, so change this number whenever `data_wo` changes; changing it forces a new resource (swarm secrets and configs are immutable). |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
+| `driver` | `object` | optional | yes |  | Secret store driver (`Spec.Driver`): a secret driver plugin that provides the value, so `data` and `data_wo` may be omitted. Forces replacement. |
 | `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
 | `id` | `string` | computed |  |  | The Swarm secret ID. |
 | `inspect` | `object` | computed |  |  | The secret inspect response as a nested object mirroring Secret field by field (snake_case). Not sensitive: SecretSpec.Data is write-only and never returned by SecretInspect. |
 | `inspect_json` | `string` | computed |  |  | The exact Engine API inspect response for the secret, as JSON. Not sensitive: SecretSpec.Data is write-only and never returned by SecretInspect. |
 | `labels` | `map(string)` | optional |  |  | User labels on the secret. Updated in place (`SecretUpdate`); the content cannot change, so only labels can. |
 | `name` | `string` | required | yes |  | Secret name, unique in the Swarm. Changing this forces a new resource. |
+| `templating` | `object` | optional | yes |  | Templating driver (`Spec.Templating`): the secret content is a template the driver expands per task, e.g. `name = "golang"` for Go templates such as `{{ .Service.Name }}`. Forces replacement. Needs Engine API >= 1.37. |
 | `version_index` | `number` | computed |  |  | The secret object's `Version.Index`; it changes when the labels are updated. |
+
+### `driver`
+
+nested attribute, object. Secret store driver (`Spec.Driver`): a secret driver plugin that provides the value, so `data` and `data_wo` may be omitted. Forces replacement.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | required |  |  | Driver name (`Name`). |
+| `options` | `map(string)` | optional |  |  | Driver-specific options (`Options`). |
 
 ### `inspect`
 
@@ -73,6 +85,15 @@ nested attribute, object. Upstream `Version`.
 |---|---|---|---|---|---|
 | `index` | `number` | computed |  |  | Upstream `Index`. |
 
+### `templating`
+
+nested attribute, object. Templating driver (`Spec.Templating`): the secret content is a template the driver expands per task, e.g. `name = "golang"` for Go templates such as `{{ .Service.Name }}`. Forces replacement. Needs Engine API >= 1.37.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | required |  |  | Driver name (`Name`). |
+| `options` | `map(string)` | optional |  |  | Driver-specific options (`Options`). |
+
 ## Example
 
 ```terraform
@@ -99,6 +120,13 @@ resource "docker_secret" "api_key" {
   name            = "api_key_v1"
   data_wo         = base64encode("replace-with-an-ephemeral-value")
   data_wo_version = 1
+}
+
+# A templated secret: the golang templating driver expands it per task.
+resource "docker_secret" "per_task" {
+  name       = "per_task_id"
+  data       = base64encode("{{ .Service.Name }}-{{ .Task.Slot }}")
+  templating = { name = "golang" }
 }
 ```
 

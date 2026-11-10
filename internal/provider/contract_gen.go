@@ -3717,6 +3717,23 @@ var contractItems = map[string]*contractItem{
 			{Name: "container_id", TFType: "string", Default: "", Upstream: "id", Description: "The container (ID or name) the action targets (Q40)."},
 		},
 	},
+	"engine:container-run": {
+		ID: "engine:container-run", Kind: "action", Name: "docker_container_run", MinAPI: "",
+		Outputs: []contractOutput{
+			{Name: "container_id", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "ID of the run's container (removed afterwards unless remove = false)."},
+			{Name: "result", Category: "result", TFType: "object({...})", Sensitive: false, KnownAfterApply: true, Description: "The run's outcome (Q35): exit_code, stdout, stderr.", FieldsComplete: true, Fields: []contractField{
+				{Name: "exit_code", Upstream: "StatusCode", TFType: "number"},
+				{Name: "stdout", Upstream: "logs stream 1 (stdout)", TFType: "string", Sensitive: true},
+				{Name: "stderr", Upstream: "logs stream 2 (stderr)", TFType: "string", Sensitive: true},
+			}},
+			{Name: "engine_api_version", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion)."},
+			{Name: "docker_server_version", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "Docker Engine version from GET /version."},
+		},
+		Inputs: []contractInputSpec{
+			{Name: "result_path", TFType: "string", Default: "", Upstream: "", Description: "Optional local file the action writes its result object to (Q35)."},
+			{Name: "tail", TFType: "number", Default: "1000", Upstream: "tail", Description: "Lines kept from the end of the run's output in stdout / stderr (Engine `tail`); default 1000."},
+		},
+	},
 	"engine:container-start": {
 		ID: "engine:container-start", Kind: "action", Name: "docker_container_start", MinAPI: "",
 		Outputs: []contractOutput{

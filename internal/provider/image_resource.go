@@ -59,6 +59,7 @@ type imageResourceModel struct {
 	KeepLocally    types.Bool       `tfsdk:"keep_locally"`
 	ForceRemove    types.Bool       `tfsdk:"force_remove"`
 	Triggers       types.Map        `tfsdk:"triggers"`
+	Adopt          types.Bool       `tfsdk:"adopt"`
 	ContextDigest  types.String     `tfsdk:"context_digest"`
 	Build          *imageBuildModel `tfsdk:"build"`
 	contractEngineImage
@@ -174,6 +175,7 @@ func (r *imageResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			Default:             booldefault.StaticBool(false),
 			MarkdownDescription: "Remove the image on destroy even when stopped containers use it (`docker rmi -f`). Default `false`.",
 		},
+		"adopt": ownerAdoptAttribute(),
 		"triggers": schema.MapAttribute{
 			Optional:    true,
 			ElementType: types.StringType,
@@ -245,7 +247,8 @@ func imgBuildBlock() schema.SingleNestedBlock {
 		"builder": schema.StringAttribute{
 			Optional: true,
 			MarkdownDescription: "Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's " +
-				"embedded BuildKit) or the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`). " +
+				"embedded BuildKit), the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`) or a " +
+				"BuildKit address (`tcp://`, `unix://`, `docker-container://`, e.g. a remote-driver builder's endpoint). " +
 				"With BuildKit the build runs with a session (serving `secrets`, `ssh` and `registry_auth` credentials) so Dockerfile " +
 				"features such as `RUN --mount=type=secret` and heredocs work, and `cache_to`, `ssh`, `outputs`, `attestations`, `provenance`, " +
 				"`sbom` and `no_cache_filter` become available. Requires a daemon with BuildKit enabled (default since Docker 23). Forces replacement.",
@@ -260,9 +263,10 @@ func imgBuildBlock() schema.SingleNestedBlock {
 		"platforms": schema.ListAttribute{
 			Optional:    true,
 			ElementType: types.StringType,
-			MarkdownDescription: "BuildKit only. Target platform list; exactly one element is supported (sent as the build platform, " +
-				"like `platform`): the image lands in the daemon's image store, which holds one platform per tag. Use one `docker_image` per platform. " +
-				"Conflicts with `build.platform`. Forces replacement.",
+			MarkdownDescription: "BuildKit only. Platforms to build (`docker buildx build --platform a,b`). One platform builds a single " +
+				"image; several build a multi-platform image index, which the daemon can only hold with the containerd image store " +
+				"(checked before the build, with a clear error otherwise); `id` and `digest` are then the index digest and `platforms` " +
+				"lists every platform. Conflicts with `build.platform`. Forces replacement.",
 		},
 	}
 	for k, v := range imgBuildGapAttributes() {
@@ -343,6 +347,10 @@ func (r *imageResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanR
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	resp.Diagnostics.Append(ownerPlanCheck(ctx, r.pd, req.Private, "image", st.Name.ValueString(), plan.Adopt)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	imgCopyComputed(&plan, &st)
 	resp.Diagnostics.Append(resp.Plan.Set(ctx, &plan)...)
 	if st.ContextDigest.IsNull() || plan.Build == nil {
@@ -412,6 +420,12 @@ func (r *imageResource) Create(ctx context.Context, req resource.CreateRequest, 
 	var dockerfile []byte
 	var seamRes *seamBuildResult
 	if plan.Build != nil {
+		// Owner label: a build whose name is an image another owner built
+		// fails here; pulls are never labelled or checked.
+		if err := imgOwnerCreateCheck(ctx, r.pd, name); err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root("name"), "Image owned by another configuration", err.Error())
+			return
+		}
 		out, diags := r.build(ctx, &plan)
 		resp.Diagnostics.Append(diags...)
 		if resp.Diagnostics.HasError() {
@@ -509,6 +523,7 @@ func (r *imageResource) build(ctx context.Context, plan *imageResourceModel) (im
 	}
 	out := imgBuildOutcome{ContextDigest: digest, Dockerfile: imgReadDockerfile(b.Context.ValueString(), bc)}
 	opts := imgBuildOptions(ctx, plan, bc.Dockerfile, &diags)
+	imgOwnerBuildLabels(r.pd, &opts)
 	opts.AuthConfigs = imgAuthConfigs(r.pd.RegistryAuth)
 	if diags.HasError() {
 		return imgBuildOutcome{}, diags
@@ -539,6 +554,7 @@ func (r *imageResource) buildRemote(ctx context.Context, plan *imageResourceMode
 		df = imgDefaultDockerfile
 	}
 	opts := imgBuildOptions(ctx, plan, df, &diags)
+	imgOwnerBuildLabels(r.pd, &opts)
 	opts.AuthConfigs = imgAuthConfigs(r.pd.RegistryAuth)
 	opts.RemoteContext = remote
 	if diags.HasError() {
@@ -623,6 +639,11 @@ func imgApplyInspect(m *imageResourceModel, insp image.InspectResponse) {
 			m.Name = types.StringValue(insp.ID)
 		}
 	}
+	if insp.Config != nil {
+		c := *insp.Config
+		c.Labels = ownerStrip(c.Labels)
+		insp.Config = &c
+	}
 	id := imgIdentityOf(m.Name.ValueString(), insp)
 	m.ImageRef, m.ImageDigestRef, m.Digest, m.Platforms, m.Labels = id.ImageRef, id.ImageDigestRef, id.Digest, id.Platforms, id.Labels
 	if m.KeepLocally.IsNull() {
@@ -660,6 +681,9 @@ func (r *imageResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	if imported && !imgIsIDRef(ref, insp.ID) {
 		// Imported by name: keep the reference the user gave.
 		st.Name = types.StringValue(ref)
+	}
+	if resp.Private != nil && insp.Config != nil {
+		resp.Diagnostics.Append(ownerRecord(ctx, resp.Private, insp.Config.Labels)...)
 	}
 	imgApplyInspect(&st, insp)
 	var dockerfile []byte

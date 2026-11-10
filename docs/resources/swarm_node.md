@@ -27,6 +27,7 @@ resource "docker_swarm_node" "worker1" {
   join_token      = docker_swarm_init.this.worker_join_token
   manager_address = "10.0.0.5:2377"
   advertise_addr  = "10.0.0.6"
+  data_path_addr  = "10.1.0.6" # overlay traffic on a separate interface
 
   tls {
     ca   = "~/.docker/worker1/ca.pem"
@@ -55,8 +56,10 @@ resource "docker_swarm_node" "worker1" {
 
 > **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
 
+- `adopt` (Boolean) Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`.
 - `advertise_addr` (String) Address the node advertises, `<ip|interface>[:port]`. Changing this forces a new resource.
 - `availability` (String) Scheduling availability: `active`, `pause` or `drain`. Default `active`. Updated in place through the manager.
+- `data_path_addr` (String) Address or interface the node uses for data-path (overlay VXLAN) traffic, `<ip|interface>` without a port (`DataPathAddr`, `docker swarm join --data-path-addr`). Unset uses `advertise_addr`. Not reported back by the daemon, so the configured value is kept. Forces replacement (except to fill it in after import).
 - `labels` (Map of String) Node labels (`node.labels.*` in placement constraints). Updated in place; labels set outside Terraform are removed.
 - `listen_addr` (String) Listen address for swarm traffic on the node. Default `0.0.0.0:2377`. Changing this forces a new resource.
 - `role` (String) Node role: `worker` or `manager`. Default `worker`. Updated in place (promote/demote) through the manager, whichever token was used to join.

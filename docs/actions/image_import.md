@@ -3,12 +3,12 @@
 page_title: "docker_image_import Action - docker"
 subcategory: ""
 description: |-
-  Creates an image from a filesystem tarball, like docker import. The source is a local tar file (streamed by the provider) or an http(s):// URL (fetched by the daemon). The image is not tracked in state; manage its lifetime yourself. The result object holds id, image_ref and result.image (size, created, architecture, os and variant of the new image).
+  Creates an image from a filesystem tarball, like docker import. The source is a local tar file (streamed by the provider) or an http(s):// URL (fetched by the daemon). The image is not tracked in state; manage its lifetime yourself. The result object holds id, image_ref and result.image (size, created, architecture, os and variant of the new image). With the provider's owner set, the image gets the owner label (an extra LABEL change).
 ---
 
 # docker_image_import (Action)
 
-Creates an image from a filesystem tarball, like `docker import`. The source is a local tar file (streamed by the provider) or an `http(s)://` URL (fetched by the daemon). The image is not tracked in state; manage its lifetime yourself. The result object holds `id`, `image_ref` and `result.image` (size, created, architecture, os and variant of the new image).
+Creates an image from a filesystem tarball, like `docker import`. The source is a local tar file (streamed by the provider) or an `http(s)://` URL (fetched by the daemon). The image is not tracked in state; manage its lifetime yourself. The result object holds `id`, `image_ref` and `result.image` (size, created, architecture, os and variant of the new image). With the provider's `owner` set, the image gets the owner label (an extra `LABEL` change).
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_image_import.<name>] } }`

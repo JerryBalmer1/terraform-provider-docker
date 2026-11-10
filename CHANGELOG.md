@@ -7,7 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-This section covers build passes 5, 5.1 and 5.2 (the log of each pass is in [BUILD_REPORT.md](BUILD_REPORT.md)).
+This section covers build passes 5, 5.1, 5.2 and 5.3 (the log of each pass is in [BUILD_REPORT.md](BUILD_REPORT.md)). Pass 5.3 comes first; the sections after it are passes 5 to 5.2.
+
+### Pass 5.3
+
+#### Breaking
+
+- **`docker_container`: `must_run` is replaced by `state`** = `"running"` (default) | `"created"` | `"exited"`, named after Docker's `State.Status` values (see the [container state guide](docs/guides/container-state.md)).
+  - `running` starts a stopped container in place on the next apply (no replacement).
+  - `created` creates the container and never starts it; a running one only gets a plan warning.
+  - `exited` runs the container once to completion (`wait_timeout`, default 5m), records `exit_code`, `finished_at`, `logs` and `log_entries`, fails the apply when the exit code is not in `expected_exit_codes` (default `[0]`), and is never run again by a refresh. `auto_remove` with `state = "exited"` is a validation error: use the new `docker_container_run` action.
+  - Existing state upgrades automatically (schema v0 -> v1); there is no exact counterpart for `must_run = false`. Moving from kreuzwerker/docker: `start = false` becomes `created`, `attach = true` becomes `exited`, everything else `running`; `must_run` is dropped (subsumed by `running`).
+- `docker_container`: `stop_timeout` is now Optional + Computed. When unset it reports the daemon default (Docker Desktop 29.5.3 fills in 1), which used to fail the apply with "inconsistent result after apply"; only changing a configured value forces replacement.
+- `docker_network`: `scope` is now an optional argument (Forces replacement).
+- **Registry credentials (D4).** A registry with no `registry_auth` block now gets credentials from the default docker config (`DOCKER_CONFIG`, else `~/.docker/config.json`); it used to be anonymous. Lookup order: `registry_auth` (username/password, then `DOCKER_REGISTRY_USER` / `DOCKER_REGISTRY_PASS`, then its config file), then in a config file `credHelpers[registry]`, then `credsStore`, then `auths`. Credential helpers still run only with `allow_credential_helpers = true`. Nothing found still means anonymous, never an error. BuildKit builds use the same lookup.
+- Moving state from kreuzwerker/docker accepts only the source address `registry.terraform.io/kreuzwerker/docker` (Terraform >= 1.8). Any other registry host, or the bare `kreuzwerker/docker`, is no longer treated as kreuzwerker.
+
+#### Added
+
+- **`docker_container_run` action**: create, start, wait, capture `{exit_code, stdout, stderr}`, then remove (`remove`, default true), like `docker run --rm`. Takes `result_path` like every action.
+- **Owner labels.** Provider argument `owner`: every object the provider creates gets the label `io.terraform.provider.owner=<owner>`. Resources (12 types) also refuse to create over a same-named object owned by someone else, and need `adopt = true` to manage one (for example after import); actions that create objects (8 types) only add the label. Unset: no labels and no checks. The full lists, and the types deliberately not labelled with their reasons, are in [reference/CONTRACT.md](reference/CONTRACT.md) ("Owner label").
+- **Engine API call logging**: one DEBUG entry per Engine API call (subsystem `docker_api`, shown with `TF_LOG_PROVIDER=DEBUG`) with `request_id`, `method`, `path` (secret query values redacted), `status`, `duration_ms` and `api_version`.
+- **Field coverage.** New tool `tools/fieldcov` and task `FieldCoverage` (in the default task, enforce mode): every writable upstream field is implemented, or skipped or partial with a reason. 1200 fields: Engine API 756 (692 mapped, 64 skipped), compose-spec 414 (378 mapped, 29 skipped, 7 partial), bake 30 (30 mapped). This pass added, under the upstream names:
+  - `docker_container`: `umask` (Engine API 1.56), `annotations`, `blkio_weight`, `blkio_weight_device`, the `blkio_device_*` throttles, `cpu_realtime_*`, `memory_swappiness`, `oom_*`, `pids_limit`, `masked_paths`, `readonly_paths`, `links`, `console_size`, `cgroup`, `uts_mode`, `volume_driver`, `shell`, `volumes`; mount `consistency`, bind and tmpfs options and type `image`; per-network `links`.
+  - `docker_network`: `scope`, `config_only`, `config_from`, `enable_ipv4`. `docker_exec`: `console_size`. `docker_container_cp`: `copy_uidgid`.
+  - `docker_service` and `docker_stack` services: `tty`, `open_stdin`, `oom_score_adj`, `privileges.{no_new_privileges, seccomp, app_armor}`, tmpfs and bind mount options, `healthcheck.start_interval`, `resources.limits.pids`, `resources.swap_bytes` and `resources.memory_swappiness` (Engine API 1.52), `configs.runtime`.
+  - `docker_secret`: `driver` and `templating`; `docker_config`: `templating`; `docker_swarm_init`: `data_path_addr`, `ca_config.external_cas`; `docker_swarm_node`: `data_path_addr`; `docker_node`: `name`.
+  - `docker_image_commit`: `config` (all container config fields); `docker_image_load`: `quiet`; `docker_registry_image`: `platform` (Engine API 1.46).
+  - `docker_compose` local mode now applies lifecycle hooks (`pre_start`, `post_start`, `pre_stop`), `blkio_config`, `credential_spec`, `use_api_socket`, `links`, `external_links`, `mac_address`, `umask`, volume labels, per-network `gw_priority`, `link_local_ips`, `driver_opts`, `interface_name` and `use_service_name_alias`, and `pull_policy` `daily` / `weekly` / `every_<n>` / `refresh` (from the image's last pull time, like compose). Swarm mode sends secret `driver` / `template_driver` and config `template_driver`. `docker_compose_publish`: `with_env`, `resolve_image_digests`, `oci_version`.
+- **Multi-platform builds**: `docker_image` `build.platforms` takes several platforms and builds an image index (needs the daemon's containerd image store, checked before the build). `build.builder` also accepts a BuildKit address.
+- buildx: bake `target:` contexts and `target.<name>.<attr>` references, bake `resources`, the `remote` driver for `docker_buildx_builder`, and build-history materials and attachment bodies (`attachment`, `attachment_platform`, `attachment_body`).
+- `insecure_skip_verify` on `data.docker_registry_image` now takes effect: when set, the registry is read directly, with TLS verification as configured.
+
+#### Changed
+
+- **docker_compose recreate rule (D5).** Every container is recreated when its `com.docker.compose.config-hash` label no longer matches the service, as `docker compose up` decides it (compose `mustRecreate`). Who gets a one-time recreate after upgrading, and why:
+  - Local mode: containers created by an earlier version whose config-hash label is stale while the provider's own spec hash still matched. That is a service changed after creation only in something that hash did not see: a `KEY: null` environment entry added or removed (the gap left in Pass 5.2), or a changed hook, `env_file`, `label_file`, `extends`, `develop`, `attach`, `models` or `provider`. For such projects the first plan shows one in-place update, which recreates only those containers. Containers without the provider's spec-hash label are judged as before, and services without those keys see no plan change.
+  - Local mode: services that set `blkio_config`, `links`, `external_links`, `mac_address`, `umask`, `credential_spec`, `use_api_socket` or volume labels, which used to be ignored, are recreated once to apply them.
+  - Swarm mode (D6): services with a `KEY: null` environment entry are updated in place once; the bare `KEY` is now sent as `docker stack deploy` does (docker/cli v29.9.3 cli/compose/convert/service.go:614-626). Secrets with `driver` / `template_driver` and configs with `template_driver` are recreated once.
+  - Setting or changing `owner` recreates nothing.
+- PARTIAL sub-features: 10 before this pass, 4 now. Remaining: `compose:models` (Engine API 1.56 has no model endpoint; compose runs the docker-model CLI plugin), `compose:cli-publish` (`--app`), `buildx:builder` (the kubernetes driver and the buildx instance store need modules this provider does not depend on), `buildx:bake` (`policy` is parsed but not evaluated: Rego needs open-policy-agent).
+
+#### Removed (development)
+
+- `GNUmakefile`. Invoke-Build is the only build entry point: CI installs InvokeBuild and runs the same tasks under pwsh, and acceptance runs go through `test/harness/Invoke-E2E.ps1`. New tasks: `FieldCoverage`, `FieldMap`, `DocCounts` / `DocCountsCheck` (the type counts in CLAUDE.md and README.md are generated and checked), `ParityCheck`, `ApiWatchCheck`.
+
 
 ### Breaking
 

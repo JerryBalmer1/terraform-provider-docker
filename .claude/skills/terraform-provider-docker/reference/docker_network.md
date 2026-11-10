@@ -10,10 +10,14 @@ A Docker network (`NetworkCreate`): a local `bridge`/`macvlan`/`ipvlan` network,
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `attachable` | `bool` | optional, computed | yes |  | Let standalone containers attach to an `overlay` network. Changing this forces a new resource. |
+| `config_from` | `string` | optional | yes |  | Name of the config-only network that provides this network's configuration (`ConfigFrom.Network`), e.g. for a swarm-scoped `macvlan` network. Changing this forces a new resource. |
+| `config_only` | `bool` | optional, computed | yes |  | Create a config-only network (`ConfigOnly`): a placeholder holding IPAM and driver options for other networks' `config_from`; containers cannot attach to it. Changing this forces a new resource. |
 | `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `driver` | `string` | optional, computed | yes |  | Network driver: `bridge` (default), `overlay` (Swarm manager only), `macvlan`, `ipvlan`, or a plugin. Changing this forces a new resource. |
+| `enable_ipv4` | `bool` | optional | yes |  | Enable IPv4 on the network (`EnableIPv4`); `false` disables IPv4 IPAM (only for networks that support it). Unset uses the daemon default (enabled), which is not reported. Changing this forces a new resource. Needs Engine API >= 1.48. |
 | `enable_ipv6` | `bool` | optional, computed | yes |  | Enable IPv6 on the network (`EnableIPv6`). Changing this forces a new resource. |
 | `engine_api_version` | `string` | computed |  |  | Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion). |
 | `id` | `string` | computed |  |  | Network ID. |
@@ -26,7 +30,7 @@ A Docker network (`NetworkCreate`): a local `bridge`/`macvlan`/`ipvlan` network,
 | `labels` | `map(string)` | optional | yes |  | Network labels. Docker has no network update, so changing this forces a new resource. |
 | `name` | `string` | required | yes |  | Network name. Changing this forces a new resource. |
 | `options` | `map(string)` | optional | yes |  | Driver options, e.g. `{ "com.docker.network.bridge.name" = "br-app" }`. Options the driver adds itself are not reported. Changing this forces a new resource. |
-| `scope` | `string` | computed |  |  | `local` or `swarm`, as reported by the daemon. |
+| `scope` | `string` | optional, computed | yes |  | Level at which the network exists (`Scope`): `local` (this host) or `swarm` (cluster-wide; `global` is also accepted by plugins). Unset lets the driver decide, and the daemon's value is reported. Changing this forces a new resource. |
 
 Nested blocks: `ipam_config` (list of blocks, forces replacement).
 
@@ -134,6 +138,27 @@ resource "docker_network" "mesh" {
   name       = "mesh"
   driver     = "overlay"
   attachable = true
+}
+
+# A swarm-scoped macvlan network: each node holds a config-only network with
+# its local parent interface and subnet, and the swarm network takes its
+# configuration from it (docker network create --config-only / --config-from).
+resource "docker_network" "macvlan_config" {
+  name        = "macvlan-config"
+  driver      = "macvlan"
+  config_only = true
+  options     = { parent = "eth0" }
+
+  ipam_config {
+    subnet = "192.168.50.0/24"
+  }
+}
+
+resource "docker_network" "macvlan" {
+  name        = "macvlan"
+  driver      = "macvlan"
+  scope       = "swarm"
+  config_from = docker_network.macvlan_config.name
 }
 ```
 

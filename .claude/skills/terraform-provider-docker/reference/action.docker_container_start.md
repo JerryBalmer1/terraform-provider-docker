@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Starts a stopped or created container, like `docker container start`. docker_container starts its container only at create (`must_run`); use this action to start one later, for example after `docker_container_stop`. Starting a running container is a no-op. The result object holds the container's `state` after the call.
+Starts a stopped or created container, like `docker container start`. docker_container never starts a container with `state = "created"`; use this action to start one later, for example after `docker_container_stop`. Starting a running container is a no-op. The result object holds the container's `state` after the call.
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
@@ -35,9 +35,9 @@ action "docker_container_start" "<name>" {
 
 ```terraform
 resource "docker_container" "app" {
-  name     = "app"
-  image    = "nginx:1.27"
-  must_run = false
+  name  = "app"
+  image = "nginx:1.27"
+  state = "created" # created only: the provider never starts it
 
   lifecycle {
     action_trigger {
@@ -47,7 +47,7 @@ resource "docker_container" "app" {
   }
 }
 
-# Start a container that docker_container created but left stopped. On demand:
+# Start a container that docker_container created but left stopped (state = "created"). On demand:
 #   terraform apply -invoke=action.docker_container_start.app
 action "docker_container_start" "app" {
   config {

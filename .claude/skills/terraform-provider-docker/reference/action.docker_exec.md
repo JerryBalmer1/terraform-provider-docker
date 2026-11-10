@@ -29,6 +29,7 @@ action "docker_exec" "<name>" {
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `command` | `list(string)` | required |  |  | Command and arguments, exec form, e.g. `["sh", "-c", "echo hello"]`. No shell is added. |
+| `console_size` | `list(number)` | optional |  |  | Initial terminal size as `[height, width]` (Engine `ConsoleSize`); only with `tty = true`, e.g. for programs that format output to the terminal width. |
 | `container_id` | `string` | optional |  |  | The running container to run the command in, by ID or name, e.g. `docker_container.app.id`. Exactly one of `container_id` and `service_id`. |
 | `detach` | `bool` | optional |  |  | Start the command and return at once without waiting for it (`docker exec --detach`). Default `false`. Output is not captured and the exit code is not checked. |
 | `env` | `map(string)` | optional |  |  | Extra environment variables for the command. They override `env_file` entries. |
@@ -67,6 +68,10 @@ action "docker_exec" "migrate" {
     user         = "postgres"
     workdir      = "/tmp"
     timeout      = "2m"
+    # A TTY with a fixed size (height, width) for tools that format to it;
+    # stdout and stderr then arrive merged in stdout.
+    # tty          = true
+    # console_size = [40, 160]
     # stdout, stderr and the exec inspect (exit_code, pid, ...) as JSON.
     result_path = "${path.module}/out/migrate.json"
   }

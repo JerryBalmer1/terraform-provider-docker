@@ -3,12 +3,12 @@
 page_title: "docker_compose_publish Action - docker"
 subcategory: ""
 description: |-
-  Publishes a compose application as an OCI artifact, like docker compose publish: each compose file becomes a application/vnd.docker.compose.file+yaml layer of an OCI manifest with artifact type application/vnd.docker.compose.project, pushed with the registry HTTP API v2 (credentials from registry_auth). The project is loaded and validated first. Env files are not published.
+  Publishes a compose application as an OCI artifact, like docker compose publish: each compose file becomes a application/vnd.docker.compose.file+yaml layer of an OCI manifest with artifact type application/vnd.docker.compose.project, pushed with the registry HTTP API v2 (credentials from registry_auth). The project is loaded and validated first. As in docker compose publish, each env_file path in the published files is replaced by <sha256 of the path>.env; the env files themselves are published only with with_env. --app (copying the service images into the repository) is not supported.
 ---
 
 # docker_compose_publish (Action)
 
-Publishes a compose application as an OCI artifact, like `docker compose publish`: each compose file becomes a `application/vnd.docker.compose.file+yaml` layer of an OCI manifest with artifact type `application/vnd.docker.compose.project`, pushed with the registry HTTP API v2 (credentials from `registry_auth`). The project is loaded and validated first. Env files are not published.
+Publishes a compose application as an OCI artifact, like `docker compose publish`: each compose file becomes a `application/vnd.docker.compose.file+yaml` layer of an OCI manifest with artifact type `application/vnd.docker.compose.project`, pushed with the registry HTTP API v2 (credentials from `registry_auth`). The project is loaded and validated first. As in `docker compose publish`, each `env_file` path in the published files is replaced by `<sha256 of the path>.env`; the env files themselves are published only with `with_env`. `--app` (copying the service images into the repository) is not supported.
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_compose_publish.<name>] } }`
@@ -45,6 +45,11 @@ action "docker_compose_publish" "this" {
     name       = "shop"
     content    = docker_compose.shop.content
     repository = "registry.example.com/apps/shop:1.0"
+
+    # Pin every image to its digest in an extra image-digests.yaml layer,
+    # and push an OCI 1.0 manifest for registries without artifact types.
+    resolve_image_digests = true
+    oci_version           = "1.0"
   }
 }
 ```
@@ -64,6 +69,9 @@ action "docker_compose_publish" "this" {
 - `files` (List of String) Compose file paths, merged in order like repeated `docker compose -f`.
 - `insecure_skip_verify` (Boolean) Skip TLS verification of the registry. Default `false`. Loopback registries also fall back to plain http.
 - `name` (String) The compose project name (compose-spec top-level `name`, CLI `--project-name`). Defaults to the file's top-level `name`, then to the project directory's name.
+- `oci_version` (String) OCI image specification version of the manifest (CLI `--oci-version`): `1.1` (artifact type, empty config) or `1.0` (no artifact type, config media type `application/vnd.docker.compose.config.empty.v1+json`). Unset: try 1.1 and fall back to 1.0 when the registry rejects the manifest with a non-auth 4xx, like the CLI.
 - `profiles` (List of String) Profiles to enable (CLI `--profile`).
 - `project_directory` (String) The project directory relative paths resolve against (CLI `--project-directory`). Defaults to the first file's directory, or the Terraform working directory for `content`.
+- `resolve_image_digests` (Boolean) Pin every service image to its registry digest in an extra `image-digests.yaml` layer (CLI `--resolve-image-digests`), resolved through the Engine API's distribution inspect. Default `false`.
 - `result_path` (String) Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails.
+- `with_env` (Boolean) Publish the services' env files as `application/vnd.docker.compose.envfile` layers (CLI `--with-env`). Default `false`. Env files often hold secrets: check them first.

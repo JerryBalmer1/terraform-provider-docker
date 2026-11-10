@@ -95,6 +95,7 @@ resource "docker_stack" "shop" {
 
 ### Optional
 
+- `adopt` (Boolean) Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`.
 - `config` (Block List) A Swarm config created as `<stack>_<name>`. Services reference it by its short `name`. configs are immutable: a change removes the services using it, replaces the config and recreates those services. (see [below for nested schema](#nestedblock--config))
 - `network` (Block List) A network created as `<stack>_<name>` (swarm scope). A change replaces it after removing the services attached to it. (see [below for nested schema](#nestedblock--network))
 - `secret` (Block List) A Swarm secret created as `<stack>_<name>`. Services reference it by its short `name`. secrets are immutable: a change removes the services using it, replaces the secret and recreates those services. (see [below for nested schema](#nestedblock--secret))
@@ -194,6 +195,8 @@ Optional:
 - `mode` (String) `replicated` (default), `global`, `replicated_job` or `global_job` (see `docker_service`). Changing it recreates this service.
 - `mounts` (Block List) Mounts in the task containers. (see [below for nested schema](#nestedblock--service--mounts))
 - `networks` (Attributes Map) Networks the tasks attach to (`TaskTemplate.Networks`), keyed by network name or ID (resolved to the ID, the attachment's `Target`); use `{}` as the value for a plain attachment. In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. Updated in place. (see [below for nested schema](#nestedatt--service--networks))
+- `oom_score_adj` (Number) OOM killer score adjustment of the task containers, -1000 to 1000 (`ContainerSpec.OomScoreAdj`, `docker service create --oom-score-adj`). Updated in place. Needs Engine API >= 1.46.
+- `open_stdin` (Boolean) Keep the task containers' standard input open (`ContainerSpec.OpenStdin`). Updated in place.
 - `placement` (Block, Optional) Where tasks may run. (see [below for nested schema](#nestedblock--service--placement))
 - `privileges` (Block, Optional) Security options of the task containers (`ContainerSpec.Privileges`). Updated in place. (see [below for nested schema](#nestedblock--service--privileges))
 - `read_only` (Boolean) Mount the task containers' root filesystem read-only (`ContainerSpec.ReadOnly`). Updated in place.
@@ -207,6 +210,7 @@ Optional:
 - `stop_signal` (String) Signal that stops the task containers, e.g. `SIGTERM` (`ContainerSpec.StopSignal`). Unset uses the image's. Updated in place.
 - `sysctls` (Map of String) Namespaced kernel parameters for the task containers, e.g. `{ "net.core.somaxconn" = "1024" }`. Updated in place.
 - `total_completions` (Number) `replicated_job` only: tasks that must complete successfully (daemon default: `max_concurrent`). Updated in place (re-runs the job).
+- `tty` (Boolean) Allocate a pseudo-TTY for the task containers (`ContainerSpec.TTY`, `docker service create --tty`). Updated in place.
 - `ulimits` (Block List) Resource ulimits of the task containers. Updated in place. (see [below for nested schema](#nestedblock--service--ulimits))
 - `update_config` (Block, Optional) How a changed service rolls out to its tasks. (see [below for nested schema](#nestedblock--service--update_config))
 - `user` (String) User (`uid`, `name`, optionally `:group`) the task process runs as. Unset uses the image's. Updated in place.
@@ -224,6 +228,7 @@ Optional:
 - `file_name` (String) File name (or absolute path) in the container. Defaults to the reference as written when it is a name, otherwise the config name.
 - `gid` (String) File group GID (default `0`).
 - `mode` (Number) File mode as a decimal number (default `292`, i.e. `0444`).
+- `runtime` (Boolean) Reference the config as a runtime target instead of a file (`ConfigReference.Runtime`): it is not mounted, the runtime uses it, e.g. the config named in `privileges.credential_spec.config`. `file_name`, `uid`, `gid` and `mode` are then not sent. Needs Engine API >= 1.40.
 - `uid` (String) File owner UID (default `0`).
 
 
@@ -277,6 +282,7 @@ Optional:
 
 - `interval` (String) Time between checks (Go duration).
 - `retries` (Number) Consecutive failures before unhealthy.
+- `start_interval` (String) Time between checks during the start period (Go duration, `StartInterval`). Needs Engine API >= 1.44.
 - `start_period` (String) Start-up grace period (Go duration).
 - `test` (List of String) Test command, e.g. `["CMD", "curl", "-f", "http://localhost/"]`, `["CMD-SHELL", "..."]` or `["NONE"]`.
 - `timeout` (String) Time before a check counts as hung (Go duration).
@@ -312,6 +318,7 @@ Optional:
 
 Optional:
 
+- `non_recursive` (Boolean) Do not bind-mount submounts of the source recursively (`NonRecursive`, `bind-nonrecursive`). Needs Engine API >= 1.41.
 - `propagation` (String) Bind propagation: `private`, `rprivate`, `shared`, `rshared`, `slave` or `rslave` (`Propagation`).
 
 
@@ -321,6 +328,7 @@ Optional:
 Optional:
 
 - `mode` (Number) Permission bits of the tmpfs as a decimal number, e.g. `448` for `0700` (`Mode`).
+- `options` (List of List of String) Extra tmpfs mount options (`Options`): each entry is a one-element list for a flag, e.g. `["exec"]`, or a two-element key/value list, e.g. `["nr_inodes", "1000"]`. Needs Engine API >= 1.46.
 - `size_bytes` (Number) Size of the tmpfs in bytes (`SizeBytes`); unset is unlimited.
 
 
@@ -378,8 +386,19 @@ Required:
 
 Optional:
 
+- `app_armor` (Block, Optional) AppArmor confinement of the task containers (`AppArmor`); custom profiles are not supported by Swarm. Needs Engine API >= 1.44. (see [below for nested schema](#nestedblock--service--privileges--app_armor))
 - `credential_spec` (Block, Optional) Managed service account credential spec (`CredentialSpec`, Windows only); set one of `config`, `file` and `registry`. (see [below for nested schema](#nestedblock--service--privileges--credential_spec))
+- `no_new_privileges` (Boolean) Set the no_new_privs bit, so task processes cannot gain privileges (setuid, file capabilities) (`NoNewPrivileges`). Needs Engine API >= 1.44.
+- `seccomp` (Block, Optional) Seccomp filtering of the task containers (`Seccomp`). Needs Engine API >= 1.44. (see [below for nested schema](#nestedblock--service--privileges--seccomp))
 - `selinux_context` (Block, Optional) SELinux labels of the task containers (`SELinuxContext`). (see [below for nested schema](#nestedblock--service--privileges--selinux_context))
+
+<a id="nestedblock--service--privileges--app_armor"></a>
+### Nested Schema for `service.privileges.app_armor`
+
+Optional:
+
+- `mode` (String) `default` (the daemon's profile) or `disabled` (`Mode`).
+
 
 <a id="nestedblock--service--privileges--credential_spec"></a>
 ### Nested Schema for `service.privileges.credential_spec`
@@ -389,6 +408,15 @@ Optional:
 - `config` (String) ID of a swarm config holding the credential spec (`Config`).
 - `file` (String) Credential spec file name under the daemon's `CredentialSpecs` directory (`File`).
 - `registry` (String) Registry value name holding the credential spec (`Registry`).
+
+
+<a id="nestedblock--service--privileges--seccomp"></a>
+### Nested Schema for `service.privileges.seccomp`
+
+Optional:
+
+- `mode` (String) `default` (the daemon's profile), `unconfined` (no filtering) or `custom` (the JSON in `profile`) (`Mode`).
+- `profile` (String) Seccomp profile JSON, used with `mode = "custom"` (`Profile`); e.g. `file("seccomp.json")`.
 
 
 <a id="nestedblock--service--privileges--selinux_context"></a>
@@ -410,7 +438,9 @@ Optional:
 Optional:
 
 - `limits` (Block, Optional) Hard limits. (see [below for nested schema](#nestedblock--service--resources--limits))
+- `memory_swappiness` (Number) Memory swappiness of the task containers, 0 to 100 (`MemorySwappiness`); `-1` unsets a previous value. Unset: the OS default. Needs Engine API >= 1.52.
 - `reservations` (Block, Optional) Reservations the scheduler must find on a node. (see [below for nested schema](#nestedblock--service--resources--reservations))
+- `swap_bytes` (Number) Swap per task in bytes, only together with `limits.memory_bytes` (`SwapBytes`); `-1` is unlimited swap. Unset: twice the memory limit. Needs Engine API >= 1.52.
 
 <a id="nestedblock--service--resources--limits"></a>
 ### Nested Schema for `service.resources.limits`
@@ -419,6 +449,7 @@ Optional:
 
 - `memory_bytes` (Number) Memory in bytes.
 - `nano_cpus` (Number) CPU in units of 1e-9 CPUs (1000000000 = one CPU).
+- `pids` (Number) Maximum number of processes per task container (`Pids`); 0 or unset is unlimited. Needs Engine API >= 1.41.
 
 
 <a id="nestedblock--service--resources--reservations"></a>

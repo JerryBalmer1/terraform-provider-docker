@@ -1,0 +1,29 @@
+{
+ "about": "Pass 5.3 Lane Z manual field mappings: pointers fieldcov only filed once it looked inside compose map values (service networks.<name>, models.<name>).",
+ "fields": {
+  "compose:service/models/{}/endpoint_var": {
+   "item": "compose:models",
+   "partial": "service models bindings are ignored with a plan warning: Docker Model Runner is not in Engine API 1.56 and compose runs the docker-model CLI plugin (compose v5.1.4 pkg/compose/model.go:82-118); PARTIAL(pass5) compose:models"
+  },
+  "compose:service/models/{}/model_var": {
+   "item": "compose:models",
+   "partial": "service models bindings are ignored with a plan warning: Docker Model Runner is not in Engine API 1.56 and compose runs the docker-model CLI plugin (compose v5.1.4 pkg/compose/model.go:82-118); PARTIAL(pass5) compose:models"
+  },
+  "compose:service/networks/{}/priority": {
+   "item": "compose:services",
+   "attr": "content (local mode connects networks in priority order: compose-go ServiceConfig.NetworksByPriority, read in compose_local.go composeLocalService)"
+  },
+  "compose:service/pre_start/[]/models/{}/endpoint_var": {
+   "item": "compose:models",
+   "partial": "service models bindings are ignored with a plan warning: Docker Model Runner is not in Engine API 1.56 and compose runs the docker-model CLI plugin (compose v5.1.4 pkg/compose/model.go:82-118); PARTIAL(pass5) compose:models"
+  },
+  "compose:service/pre_start/[]/models/{}/model_var": {
+   "item": "compose:models",
+   "partial": "service models bindings are ignored with a plan warning: Docker Model Runner is not in Engine API 1.56 and compose runs the docker-model CLI plugin (compose v5.1.4 pkg/compose/model.go:82-118); PARTIAL(pass5) compose:models"
+  },
+  "compose:service/pre_start/[]/networks/{}/priority": {
+   "item": "compose:services",
+   "attr": "content (local mode connects networks in priority order: compose-go ServiceConfig.NetworksByPriority, read in compose_local.go composeLocalService)"
+  }
+ }
+}

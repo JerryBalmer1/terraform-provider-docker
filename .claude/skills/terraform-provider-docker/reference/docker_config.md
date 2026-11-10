@@ -10,6 +10,7 @@ A Swarm config: a non-secret blob mounted into service tasks as a file. Requires
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json; changes whenever the object changes. |
 | `data` | `string` | optional | yes |  | Config content, base64-encoded (use `base64encode()`); it must decode. Kept from state on refresh and filled from the daemon on import. Changing this forces a new resource. Exactly one of `data` and `data_wo` is required. |
 | `data_wo` | `string` | optional, write-only |  | yes | Config content as a write-only argument (Terraform 1.11+), base64-encoded (use `base64encode()`); it is never stored in plan or state, so it can come from an ephemeral value. Requires `data_wo_version`; bump the version to replace the config with new content. Conflicts with `data`. |
@@ -21,6 +22,7 @@ A Swarm config: a non-secret blob mounted into service tasks as a file. Requires
 | `inspect_json` | `string` | computed |  |  | The exact Engine API inspect response for the config, as JSON. |
 | `labels` | `map(string)` | optional |  |  | User labels on the config. Updated in place (`ConfigUpdate`); the content cannot change, so only labels can. |
 | `name` | `string` | required | yes |  | Config name, unique in the Swarm. Changing this forces a new resource. |
+| `templating` | `object` | optional | yes |  | Templating driver (`Spec.Templating`): the config content is a template the driver expands per task, e.g. `name = "golang"` for Go templates such as `{{ .Node.Hostname }}` or `{{ env "VAR" }}`. Forces replacement. Needs Engine API >= 1.37. |
 | `version_index` | `number` | computed |  |  | The config object's `Version.Index`; it changes when the labels are updated. |
 
 ### `inspect`
@@ -63,6 +65,15 @@ nested attribute, object. Upstream `Version`.
 |---|---|---|---|---|---|
 | `index` | `number` | computed |  |  | Upstream `Index`. |
 
+### `templating`
+
+nested attribute, object. Templating driver (`Spec.Templating`): the config content is a template the driver expands per task, e.g. `name = "golang"` for Go templates such as `{{ .Node.Hostname }}` or `{{ env "VAR" }}`. Forces replacement. Needs Engine API >= 1.37.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | required |  |  | Driver name (`Name`). |
+| `options` | `map(string)` | optional |  |  | Driver-specific options (`Options`). |
+
 ## Example
 
 ```terraform
@@ -88,6 +99,13 @@ resource "docker_config" "app" {
   name            = "app.ini"
   data_wo         = base64encode("debug = false\n")
   data_wo_version = 1
+}
+
+# A templated config, expanded per task by the golang templating driver.
+resource "docker_config" "node_banner" {
+  name       = "node-banner.txt"
+  data       = base64encode("running on {{ .Node.Hostname }}")
+  templating = { name = "golang" }
 }
 ```
 

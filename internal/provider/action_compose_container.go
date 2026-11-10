@@ -101,7 +101,9 @@ func (a *composeCommitAction) Invoke(ctx context.Context, req action.InvokeReque
 	}
 	res, err := c.ContainerCommit(ctx, ctr.ID, client.ContainerCommitOptions{
 		Reference: m.Repository.ValueString(), Comment: m.Comment.ValueString(), Author: m.Author.ValueString(),
-		Changes: stringListFrom(ctx, m.Changes, &resp.Diagnostics), NoPause: !actBool(m.Pause, true),
+		// Owner label, inject-only (Pass 5.3 Lane Z): a LABEL change, as
+		// docker_image_commit does without `config`.
+		Changes: rOwnerLabelChanges(a.pd, stringListFrom(ctx, m.Changes, &resp.Diagnostics)), NoPause: !actBool(m.Pause, true),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("docker_compose_commit failed", fmt.Sprintf("%s: %v", composeSummaryName(ctr), err))

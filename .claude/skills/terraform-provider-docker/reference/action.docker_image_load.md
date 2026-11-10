@@ -30,6 +30,7 @@ action "docker_image_load" "<name>" {
 |---|---|---|---|---|---|
 | `input` | `string` | required |  |  | Local path of the image archive (optionally gzip/bzip2/xz compressed), like `docker load --input`. `~` expands to the home directory. |
 | `platform` | `string` | optional |  |  | Only this platform of multi-platform images, `os[/arch[/variant]]` (`docker load --platform`; API 1.48+ with the containerd image store). Default: all platforms. |
+| `quiet` | `bool` | optional |  |  | Suppress progress details during the load (`quiet`, like `docker load --quiet`). Default `true`; with `false` the daemon's per-layer progress is forwarded as action progress messages. |
 | `result_path` | `string` | optional |  |  | Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails. |
 
 ## Example
@@ -51,6 +52,7 @@ resource "terraform_data" "bundle" {
 action "docker_image_load" "bundle" {
   config {
     input       = "${path.module}/images.tar"
+    quiet       = false # forward per-layer progress as action progress
     result_path = "${path.module}/out/load-result.json"
   }
 }

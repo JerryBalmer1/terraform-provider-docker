@@ -113,6 +113,7 @@ var registryGenWant = []string{
 	"action docker_container_pause",
 	"action docker_container_prune",
 	"action docker_container_restart",
+	"action docker_container_run",
 	"action docker_container_start",
 	"action docker_container_stop",
 	"action docker_container_unpause",

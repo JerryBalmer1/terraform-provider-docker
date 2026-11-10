@@ -38,6 +38,9 @@ action "docker_container_cp" "index" {
     path         = "/usr/share/nginx/html/index.html"
     content      = "<h1>deployed by Terraform</h1>"
     mode         = "0644"
+    uid          = 101 # nginx
+    gid          = 101
+    copy_uidgid  = true # map uid / gid through a user-namespace remapping (docker cp -a)
   }
 }
 ```
@@ -55,6 +58,7 @@ action "docker_container_cp" "index" {
 - `allow_overwrite_dir_with_file` (Boolean) Let a file replace an existing directory of the same name (Engine `noOverwriteDirNonDir=false`). Default `false`.
 - `content` (String) Inline UTF-8 file content. Exactly one of `content`, `content_base64` and `source`.
 - `content_base64` (String) Inline binary file content, base64-encoded. Exactly one of `content`, `content_base64` and `source`.
+- `copy_uidgid` (Boolean) Map the archive's `uid` / `gid` through the container's user-namespace mapping so the files belong to the same user inside the container as they would without remapping (Engine `copyUIDGID`, `docker cp --archive`). Default `false`.
 - `gid` (Number) Numeric group of the copied files. Default 0 (root).
 - `mode` (String) Octal permission bits for the copied files, e.g. `0644` or `0755`. Default `0644` for inline content, the local file's mode for `source`.
 - `result_path` (String) Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails.

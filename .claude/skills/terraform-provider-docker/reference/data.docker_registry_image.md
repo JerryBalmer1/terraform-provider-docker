@@ -19,7 +19,7 @@ Reads the current manifest digest and platforms of an image tag from its registr
 | `id` | `string` | computed |  |  | `<name>@<digest>`, the reference as given pinned to the digest. |
 | `image_digest_ref` | `string` | computed |  |  | Pinned reference `<registry>/<repository>@<digest>`. |
 | `image_ref` | `string` | computed |  |  | Normalized `<registry>/<repository>:<tag>` of `name`. |
-| `insecure_skip_verify` | `bool` | optional |  |  | Accepted for configurations migrated from other providers; it has no effect. The read goes through the daemon, which follows its own `insecure-registries` setting. |
+| `insecure_skip_verify` | `bool` | optional |  |  | Read the registry directly instead of through the daemon, with TLS certificate verification off (`true`) or on (`false`). Set either way, the provider itself calls the Registry HTTP API v2 (`GET /v2/<repo>/manifests/<ref>`, plus the image config blob of a single-platform manifest) with the `registry_auth` username and password, and fills the same outputs from the response. `true` accepts a self-signed or otherwise unverifiable certificate; `false` verifies it against the system roots and fails with the certificate error. Unset (default): the daemon reads the registry (`GET /distribution/<name>/json`) and follows its own `insecure-registries` setting. |
 | `inspect` | `object` | computed |  |  | Full DistributionInspect, field by field. |
 | `inspect_json` | `string` | computed |  |  | The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact). |
 | `labels` | `map(string)` | computed |  |  | Always null: the distribution endpoint returns no image config. Present so both image data sources share one shape. |
@@ -142,5 +142,12 @@ data "docker_registry_image" "alpine" {
 
 output "alpine_digest" {
   value = data.docker_registry_image.alpine.digest
+}
+
+# A registry with a self-signed certificate, read directly by the provider
+# with certificate verification off (unset: read through the daemon).
+data "docker_registry_image" "internal" {
+  name                 = "registry.internal:5443/team/app:1.0"
+  insecure_skip_verify = true
 }
 ```

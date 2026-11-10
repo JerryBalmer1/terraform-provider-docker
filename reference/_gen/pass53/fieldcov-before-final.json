@@ -1,0 +1,53 @@
+{
+  "by_source": {
+    "bake": {
+      "total": 30,
+      "mapped": 28,
+      "auto_code": 28,
+      "auto_schema": 0,
+      "manual": 0,
+      "skipped": 0,
+      "partial": 0,
+      "gap": 2
+    },
+    "compose": {
+      "total": 414,
+      "mapped": 283,
+      "auto_code": 283,
+      "auto_schema": 0,
+      "manual": 0,
+      "skipped": 0,
+      "partial": 0,
+      "gap": 131
+    },
+    "engine": {
+      "total": 756,
+      "mapped": 524,
+      "auto_code": 459,
+      "auto_schema": 65,
+      "manual": 0,
+      "skipped": 0,
+      "partial": 0,
+      "gap": 232
+    }
+  },
+  "total": {
+    "total": 1200,
+    "mapped": 835,
+    "auto_code": 770,
+    "auto_schema": 65,
+    "manual": 0,
+    "skipped": 0,
+    "partial": 0,
+    "gap": 365
+  },
+  "gaps_by_lane": {
+    "A": 96,
+    "B": 9,
+    "K": 131,
+    "R": 42,
+    "S": 87
+  },
+  "skips": {},
+  "partials": {}
+}

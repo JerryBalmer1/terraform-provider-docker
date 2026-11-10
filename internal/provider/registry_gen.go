@@ -123,6 +123,7 @@ func genActions() []func() action.Action {
 		NewContainerPauseAction,       // action docker_container_pause
 		NewContainerPruneAction,       // action docker_container_prune
 		NewContainerRestartAction,     // action docker_container_restart
+		NewContainerRunAction,         // action docker_container_run
 		NewContainerStartAction,       // action docker_container_start
 		NewContainerStopAction,        // action docker_container_stop
 		NewContainerUnpauseAction,     // action docker_container_unpause

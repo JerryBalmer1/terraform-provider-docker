@@ -3,12 +3,12 @@
 page_title: "docker_image_commit Action - docker"
 subcategory: ""
 description: |-
-  Creates an image from a container's filesystem changes, like docker container commit (POST /commit). The new image is not tracked in state. The result object holds id, image_ref, container_id and result.changes (the filesystem changes that went into the image, from GET /containers/{id}/changes just before the commit).
+  Creates an image from a container's filesystem changes, like docker container commit (POST /commit). The new image is not tracked in state. The result object holds id, image_ref, container_id and result.changes (the filesystem changes that went into the image, from GET /containers/{id}/changes just before the commit). With the provider's owner set, the new image's labels include the owner label.
 ---
 
 # docker_image_commit (Action)
 
-Creates an image from a container's filesystem changes, like `docker container commit` (`POST /commit`). The new image is not tracked in state. The result object holds `id`, `image_ref`, `container_id` and `result.changes` (the filesystem changes that went into the image, from `GET /containers/{id}/changes` just before the commit).
+Creates an image from a container's filesystem changes, like `docker container commit` (`POST /commit`). The new image is not tracked in state. The result object holds `id`, `image_ref`, `container_id` and `result.changes` (the filesystem changes that went into the image, from `GET /containers/{id}/changes` just before the commit). With the provider's `owner` set, the new image's labels include the owner label.
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_image_commit.<name>] } }`
@@ -41,6 +41,15 @@ action "docker_image_commit" "snapshot" {
     message      = "snapshot taken by Terraform"
     changes      = ["LABEL snapshot=true"]
     result_path  = "${path.module}/out/commit-result.json"
+
+    # Optional: the image configuration as the commit body (ContainerConfig).
+    # Unset fields such as env, labels and cmd fall back to the container's.
+    config = {
+      cmd         = ["sh"]
+      env         = ["SNAPSHOT=1"]
+      working_dir = "/"
+      healthcheck = { test = ["CMD", "true"], interval = "30s" }
+    }
   }
 }
 ```
@@ -56,7 +65,50 @@ action "docker_image_commit" "snapshot" {
 
 - `author` (String) Author recorded in the image (`--author`).
 - `changes` (List of String) Dockerfile instructions applied to the image config, e.g. `["ENV A=b", "EXPOSE 80"]` (`--change`).
+- `config` (Attributes) Image configuration sent as the commit body (`ContainerConfig`), the API-level counterpart of `changes`. When set, the daemon starts from this object instead of the container's configuration and fills `user`, `exposed_ports`, `env` (merged by key), `labels` (merged), `cmd`/`entrypoint`, `healthcheck`, `working_dir`, `volumes` (merged) and `stop_signal` from the container where they are unset; `on_build` and `shell` are not inherited. `changes` are applied on top. Without it the container's configuration is used, like `docker container commit`. (see [below for nested schema](#nestedatt--config))
 - `message` (String) Commit message recorded in the image history (`--message`).
 - `pause` (Boolean) Pause the container during the commit (`--pause`). Default `true`.
 - `reference` (String) Reference to tag the new image with, `repository[:tag]` (no tag means `latest`). Without it the image is untagged.
 - `result_path` (String) Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails.
+
+<a id="nestedatt--config"></a>
+### Nested Schema for `config`
+
+Optional:
+
+- `args_escaped` (Boolean) The command is already escaped (`ArgsEscaped`, Windows images only).
+- `attach_stderr` (Boolean) Attach to `stderr` by default (`AttachStderr`).
+- `attach_stdin` (Boolean) Attach to `stdin` by default (`AttachStdin`).
+- `attach_stdout` (Boolean) Attach to `stdout` by default (`AttachStdout`).
+- `cmd` (List of String) Default command (`Cmd`).
+- `domainname` (String) Domain name recorded in the image configuration (`Domainname`).
+- `entrypoint` (List of String) Entrypoint (`Entrypoint`).
+- `env` (List of String) Environment as `KEY=value` strings (`Env`).
+- `exposed_ports` (Set of String) Exposed ports as `<port>/<tcp|udp|sctp>`, e.g. `80/tcp` (`ExposedPorts`).
+- `healthcheck` (Attributes) Healthcheck of the image (`Healthcheck`). Durations are Go durations such as `30s`. (see [below for nested schema](#nestedatt--config--healthcheck))
+- `hostname` (String) Hostname recorded in the image configuration (`Hostname`).
+- `image` (String) Image name recorded in the configuration (`Image`).
+- `labels` (Map of String) Labels of the image (`Labels`).
+- `network_disabled` (Boolean) Disable networking for containers of the image (`NetworkDisabled`).
+- `on_build` (List of String) `ONBUILD` instructions (`OnBuild`).
+- `open_stdin` (Boolean) Keep `stdin` open (`OpenStdin`).
+- `shell` (List of String) Shell for the shell form of `RUN`, `CMD` and `ENTRYPOINT` (`Shell`).
+- `stdin_once` (Boolean) Close `stdin` after the first attached client disconnects (`StdinOnce`).
+- `stop_signal` (String) Signal that stops containers of the image, e.g. `SIGTERM` (`StopSignal`).
+- `stop_timeout` (Number) Seconds to wait before killing on stop (`StopTimeout`).
+- `tty` (Boolean) Allocate a TTY for containers of the image (`Tty`).
+- `user` (String) User (`user[:group]`, names or IDs) that commands run as (`User`).
+- `volumes` (Set of String) Mount point paths declared as volumes (`Volumes`).
+- `working_dir` (String) Working directory (`WorkingDir`).
+
+<a id="nestedatt--config--healthcheck"></a>
+### Nested Schema for `config.healthcheck`
+
+Optional:
+
+- `interval` (String) Time between checks (`Interval`).
+- `retries` (Number) Consecutive failures before `unhealthy` (`Retries`).
+- `start_interval` (String) Time between checks during the start period (`StartInterval`).
+- `start_period` (String) Start period before failures count (`StartPeriod`).
+- `test` (List of String) Test command: `["CMD", ...]`, `["CMD-SHELL", "..."]` or `["NONE"]` (`Test`).
+- `timeout` (String) Time before a check is considered hung (`Timeout`).

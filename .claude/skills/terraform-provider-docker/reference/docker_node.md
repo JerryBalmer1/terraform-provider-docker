@@ -20,7 +20,7 @@ Manages the labels, availability and role of a swarm node that has already joine
 | `inspect` | `object` | computed |  |  | The node inspect response as a nested object mirroring Node field by field (snake_case). |
 | `inspect_json` | `string` | computed |  |  | The exact Engine API inspect response for the node, as JSON. |
 | `labels` | `map(string)` | optional, computed |  |  | Node labels (`Spec.Labels`, `node.labels.*` in placement constraints). When set, the node gets exactly these labels (others are removed); unset leaves them as they are. Updated in place. |
-| `name` | `string` | computed |  |  | Node name (`Spec.Name`), else the hostname. |
+| `name` | `string` | optional, computed |  |  | Node name (`Spec.Name`), else the hostname. Set it to name the node (`NodeSpec.Name`); unset leaves the node's name as it is. Updated in place (NodeUpdate). |
 | `node_id` | `string` | required | yes |  | The node to manage: ID, unique ID prefix, hostname or node name (resolved to the node ID, see `id`). Forces replacement. |
 | `role` | `string` | optional, computed |  |  | Node role: `worker` or `manager` (`Spec.Role`). Unset leaves it as it is. Updated in place (promote / demote); the Engine refuses to demote the last manager. |
 | `version_index` | `number` | computed |  |  | The node object's `Version.Index`; it changes on every update of the node. |
@@ -175,6 +175,7 @@ nested attribute, object. Upstream `Version`.
 # swarm with its current labels, availability and role.
 resource "docker_node" "worker1" {
   node_id      = "worker1" # node ID or hostname
+  name         = "edge-worker-1"
   availability = "active"
   labels = {
     zone = "a"

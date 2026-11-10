@@ -13,9 +13,11 @@ Import with the node ID; `host`, `join_token` and `manager_address` must then be
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `addr` | `string` | computed |  |  | IP address the manager reaches the node at (`Status.Addr`). |
+| `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `advertise_addr` | `string` | optional | yes |  | Address the node advertises, `<ip\|interface>[:port]`. Changing this forces a new resource. |
 | `availability` | `string` | optional, computed |  |  | Scheduling availability: `active`, `pause` or `drain`. Default `active`. Updated in place through the manager. |
 | `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json; changes whenever the object changes. |
+| `data_path_addr` | `string` | optional | yes |  | Address or interface the node uses for data-path (overlay VXLAN) traffic, `<ip\|interface>` without a port (`DataPathAddr`, `docker swarm join --data-path-addr`). Unset uses `advertise_addr`. Not reported back by the daemon, so the configured value is kept. Forces replacement (except to fill it in after import). |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
 | `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max). |
 | `host` | `string` | required | yes |  | Docker endpoint of the JOINING node, e.g. `tcp://10.0.0.6:2376` or `ssh://admin@10.0.0.6` (with an optional `ssh` block for credentials). Changing this forces a new resource. |
@@ -218,6 +220,7 @@ resource "docker_swarm_node" "worker1" {
   join_token      = docker_swarm_init.this.worker_join_token
   manager_address = "10.0.0.5:2377"
   advertise_addr  = "10.0.0.6"
+  data_path_addr  = "10.1.0.6" # overlay traffic on a separate interface
 
   tls {
     ca   = "~/.docker/worker1/ca.pem"

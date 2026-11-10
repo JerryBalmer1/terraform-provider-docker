@@ -10,6 +10,7 @@ A Docker image on the provider's daemon, pulled from its registry or built from 
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `build_metadata` | `object` | computed |  |  | The build result field by field (dotted metadata keys become snake_case). |
 | `build_ref` | `string` | computed |  |  | BuildKit build record reference (`buildx.build.ref`, builder/node/ref) of a BuildKit build, the input of `docker_buildx_history`; null for classic builds, pulls and imports. |
 | `buildx_version` | `string` | computed |  |  | The buildx release whose output format and semantics this type mirrors (pin v0.38.2); not a runtime binary, the provider never runs buildx. |
@@ -290,7 +291,7 @@ single block. Build the image instead of pulling it, like `docker build`. Changi
 | `additional_contexts` | `map(string)` | optional | yes |  | BuildKit only. Named build contexts (`--build-context name=value`): a local directory, `docker-image://ref` or a URL, used by `FROM name` / `COPY --from=name`. Forces replacement. |
 | `args` | `map(string)` | optional | yes |  | Build arguments (`--build-arg`). Forces replacement. |
 | `attestations` | `list(string)` | optional | yes |  | BuildKit only. Extra attestation specs (`--attest`), e.g. `type=sbom,generator=image`; `provenance` and `sbom` cover the common cases. Forces replacement. |
-| `builder` | `string` | optional | yes |  | Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit) or the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`). With BuildKit the build runs with a session (serving `secrets`, `ssh` and `registry_auth` credentials) so Dockerfile features such as `RUN --mount=type=secret` and heredocs work, and `cache_to`, `ssh`, `outputs`, `attestations`, `provenance`, `sbom` and `no_cache_filter` become available. Requires a daemon with BuildKit enabled (default since Docker 23). Forces replacement. |
+| `builder` | `string` | optional | yes |  | Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit), the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`) or a BuildKit address (`tcp://`, `unix://`, `docker-container://`, e.g. a remote-driver builder's endpoint). With BuildKit the build runs with a session (serving `secrets`, `ssh` and `registry_auth` credentials) so Dockerfile features such as `RUN --mount=type=secret` and heredocs work, and `cache_to`, `ssh`, `outputs`, `attestations`, `provenance`, `sbom` and `no_cache_filter` become available. Requires a daemon with BuildKit enabled (default since Docker 23). Forces replacement. |
 | `cache_from` | `list(string)` | optional | yes |  | BuildKit only. Cache sources (`--cache-from`): image references carrying inline cache metadata, or buildx cache specs such as `type=registry,ref=...`. Forces replacement. |
 | `cache_to` | `list(string)` | optional | yes |  | BuildKit only. Cache export specs (`--cache-to`), e.g. `type=inline` or `type=registry,ref=registry.example.com/app:cache`. Forces replacement. |
 | `cgroup_parent` | `string` | optional | yes |  | Classic builder only. Parent cgroup for the `RUN` containers (`--cgroup-parent`). Forces replacement. |
@@ -312,7 +313,7 @@ single block. Build the image instead of pulling it, like `docker build`. Changi
 | `no_cache_filter` | `list(string)` | optional | yes |  | BuildKit only. Stages to build without cache (`--no-cache-filter`). Forces replacement. |
 | `outputs` | `list(string)` | optional | yes |  | BuildKit only. Extra exporters besides loading the image into the daemon (`--output`), e.g. `type=local,dest=out` or `type=registry` (push `name` and `tags`). Forces replacement. |
 | `platform` | `string` | optional | yes |  | Build platform, e.g. `linux/arm64`. Default: the top-level `platform`, else the daemon's. Forces replacement. |
-| `platforms` | `list(string)` | optional | yes |  | BuildKit only. Target platform list; exactly one element is supported (sent as the build platform, like `platform`): the image lands in the daemon's image store, which holds one platform per tag. Use one `docker_image` per platform. Conflicts with `build.platform`. Forces replacement. |
+| `platforms` | `list(string)` | optional | yes |  | BuildKit only. Platforms to build (`docker buildx build --platform a,b`). One platform builds a single image; several build a multi-platform image index, which the daemon can only hold with the containerd image store (checked before the build, with a clear error otherwise); `id` and `digest` are then the index digest and `platforms` lists every platform. Conflicts with `build.platform`. Forces replacement. |
 | `provenance` | `string` | optional | yes |  | BuildKit only. Provenance attestation mode (`--provenance`): `min`, `max` or `false`. Forces replacement. |
 | `pull` | `bool` | optional | yes |  | Always attempt to pull newer versions of base images (`--pull`). Forces replacement. |
 | `remote` | `string` | optional | yes |  | Classic builder only. Remote build context the daemon fetches instead of a local `context`: a Git URL (`https://github.com/org/repo.git#ref:dir`) or the URL of a tarball or plain Dockerfile (`docker build <URL>`). `dockerfile` is then relative to the remote context. Exactly one of `context` and `remote`. Forces replacement. |
@@ -456,6 +457,20 @@ resource "docker_image" "web" {
       id  = "netrc"
       src = "${path.module}/secrets/netrc"
     }
+  }
+}
+
+# Multi-platform: several platforms build one image index (like
+# `docker buildx build --platform linux/amd64,linux/arm64`). The daemon must
+# use the containerd image store to hold an index; the provider checks this
+# before building. id and digest are the index digest.
+resource "docker_image" "multi" {
+  name = "registry.example.com/team/app:1.4.0-multi"
+
+  build {
+    context   = "${path.module}/app"
+    builder   = "buildkit"
+    platforms = ["linux/amd64", "linux/arm64"]
   }
 }
 ```

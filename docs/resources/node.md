@@ -19,6 +19,7 @@ Manages the labels, availability and role of a swarm node that has already joine
 # swarm with its current labels, availability and role.
 resource "docker_node" "worker1" {
   node_id      = "worker1" # node ID or hostname
+  name         = "edge-worker-1"
   availability = "active"
   labels = {
     zone = "a"
@@ -42,6 +43,7 @@ output "worker1_addr" {
 
 - `availability` (String) Scheduling availability: `active`, `pause` or `drain` (`Spec.Availability`). Unset leaves it as it is. Updated in place (NodeUpdate); draining does not wait for tasks to leave (use `docker_node_drain` for that).
 - `labels` (Map of String) Node labels (`Spec.Labels`, `node.labels.*` in placement constraints). When set, the node gets exactly these labels (others are removed); unset leaves them as they are. Updated in place.
+- `name` (String) Node name (`Spec.Name`), else the hostname. Set it to name the node (`NodeSpec.Name`); unset leaves the node's name as it is. Updated in place (NodeUpdate).
 - `role` (String) Node role: `worker` or `manager` (`Spec.Role`). Unset leaves it as it is. Updated in place (promote / demote); the Engine refuses to demote the last manager.
 
 ### Read-Only
@@ -54,7 +56,6 @@ output "worker1_addr" {
 - `id` (String) Full node ID. This is the import ID (a hostname works too).
 - `inspect` (Attributes) The node inspect response as a nested object mirroring Node field by field (snake_case). (see [below for nested schema](#nestedatt--inspect))
 - `inspect_json` (String) The exact Engine API inspect response for the node, as JSON.
-- `name` (String) Node name (`Spec.Name`), else the hostname.
 - `version_index` (Number) The node object's `Version.Index`; it changes on every update of the node.
 
 <a id="nestedatt--inspect"></a>

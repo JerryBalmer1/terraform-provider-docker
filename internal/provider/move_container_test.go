@@ -110,7 +110,7 @@ var kwPass5ContainerType = tObj(
 	"maximum_retry_count", tN, "memory", tN, "memory_swap", tN, "shm_size", tN,
 	"mounts", tList(tObj("read_only", tB, "source", tS, "target", tS, "type", tS, "selinux_relabel", tS,
 		"tmpfs_options", tObj("size_bytes", tN))),
-	"must_run", tB,
+	"state", tS,
 	"networks", tMap(tObj("aliases", tSet(tS), "driver_opts", tMap(tS), "gw_priority", tN, "ipv4_address", tS,
 		"ipv6_address", tS, "link_local_ips", tSet(tS), "mac_address", tS, "gateway", tS, "ip_address", tS,
 		"ip_prefix_len", tN, "global_ipv6_address", tS, "global_ipv6_prefix_len", tN, "ipv6_gateway", tS)),
@@ -156,7 +156,7 @@ func TestMoveContainerPass5Schema(t *testing.T) {
 			map[string]any{"read_only": true, "source": "/srv/html", "target": "/usr/share/nginx/html", "type": "bind", "selinux_relabel": nil, "tmpfs_options": nil},
 			map[string]any{"read_only": nil, "source": "web_data", "target": "/data", "type": "volume", "selinux_relabel": nil, "tmpfs_options": nil},
 		},
-		"must_run": true,
+		"state": "running",
 		"networks": map[string]any{"app_net": map[string]any{
 			"aliases": []any{"web", "www"}, "driver_opts": map[string]any{"com.example.opt": "1"}, "gw_priority": 0.0,
 			"ipv4_address": nil, "ipv6_address": nil, "link_local_ips": nil, "mac_address": "02:42:ac:12:00:02",

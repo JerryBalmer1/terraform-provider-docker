@@ -10,6 +10,7 @@ A Swarm service: a desired number of tasks (containers) of one image scheduled a
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `args` | `list(string)` | optional |  |  | Arguments passed to the command (overrides the image `CMD`). |
 | `cap_add` | `set(string)` | optional |  |  | Linux capabilities to add to the task containers, e.g. `NET_ADMIN` (case and `CAP_` prefix are ignored when comparing). Updated in place. |
 | `cap_drop` | `set(string)` | optional |  |  | Linux capabilities to drop, e.g. `ALL`. Updated in place. |
@@ -39,6 +40,8 @@ A Swarm service: a desired number of tasks (containers) of one image scheduled a
 | `mode` | `string` | optional, computed | yes |  | `replicated` (default; runs `replicas` tasks), `global` (one task per eligible node), `replicated_job` (runs `total_completions` tasks to completion, `max_concurrent` at a time) or `global_job` (one run-to-completion task per eligible node). The Engine API cannot change a service's mode type, so changing this forces replacement. |
 | `name` | `string` | required | yes |  | Service name. Changing this forces a new resource. |
 | `networks` | `map(object)` | optional |  |  | Networks the tasks attach to (`TaskTemplate.Networks`), keyed by network name or ID (resolved to the ID, the attachment's `Target`); use `{}` as the value for a plain attachment. In a stack, the short name of a stack `network` block resolves to `<stack>_<name>`. Updated in place. |
+| `oom_score_adj` | `number` | optional |  |  | OOM killer score adjustment of the task containers, -1000 to 1000 (`ContainerSpec.OomScoreAdj`, `docker service create --oom-score-adj`). Updated in place. Needs Engine API >= 1.46. |
+| `open_stdin` | `bool` | optional |  |  | Keep the task containers' standard input open (`ContainerSpec.OpenStdin`). Updated in place. |
 | `published_ports` | `list(object)` | computed |  |  | Endpoint.Ports: the ports actually published, after the manager assigned any PublishedPort. Non-sensitive copy for handoff. |
 | `read_only` | `bool` | optional |  |  | Mount the task containers' root filesystem read-only (`ContainerSpec.ReadOnly`). Updated in place. |
 | `replicas` | `number` | optional, computed |  |  | Number of tasks for `replicated` mode (default 1); ignored by the other modes. Updated in place. |
@@ -47,6 +50,7 @@ A Swarm service: a desired number of tasks (containers) of one image scheduled a
 | `stop_signal` | `string` | optional |  |  | Signal that stops the task containers, e.g. `SIGTERM` (`ContainerSpec.StopSignal`). Unset uses the image's. Updated in place. |
 | `sysctls` | `map(string)` | optional |  |  | Namespaced kernel parameters for the task containers, e.g. `{ "net.core.somaxconn" = "1024" }`. Updated in place. |
 | `total_completions` | `number` | optional |  |  | `replicated_job` only: tasks that must complete successfully (daemon default: `max_concurrent`). Updated in place (re-runs the job). |
+| `tty` | `bool` | optional |  |  | Allocate a pseudo-TTY for the task containers (`ContainerSpec.TTY`, `docker service create --tty`). Updated in place. |
 | `user` | `string` | optional |  |  | User (`uid`, `name`, optionally `:group`) the task process runs as. Unset uses the image's. Updated in place. |
 | `version_index` | `number` | computed |  |  | The service object's `Version.Index`; it changes on every update of the service. |
 
@@ -768,6 +772,7 @@ list of blocks. Swarm configs mounted as files in the task containers (default p
 | `file_name` | `string` | optional |  |  | File name (or absolute path) in the container. Defaults to the reference as written when it is a name, otherwise the config name. |
 | `gid` | `string` | optional, computed |  |  | File group GID (default `0`). |
 | `mode` | `number` | optional, computed |  |  | File mode as a decimal number (default `292`, i.e. `0444`). |
+| `runtime` | `bool` | optional |  |  | Reference the config as a runtime target instead of a file (`ConfigReference.Runtime`): it is not mounted, the runtime uses it, e.g. the config named in `privileges.credential_spec.config`. `file_name`, `uid`, `gid` and `mode` are then not sent. Needs Engine API >= 1.40. |
 | `uid` | `string` | optional, computed |  |  | File owner UID (default `0`). |
 
 ### `converge_config`
@@ -819,6 +824,7 @@ single block. Container healthcheck; Swarm only counts healthy tasks as running.
 |---|---|---|---|---|---|
 | `interval` | `string` | optional |  |  | Time between checks (Go duration). |
 | `retries` | `number` | optional |  |  | Consecutive failures before unhealthy. |
+| `start_interval` | `string` | optional |  |  | Time between checks during the start period (Go duration, `StartInterval`). Needs Engine API >= 1.44. |
 | `start_period` | `string` | optional |  |  | Start-up grace period (Go duration). |
 | `test` | `list(string)` | optional |  |  | Test command, e.g. `["CMD", "curl", "-f", "http://localhost/"]`, `["CMD-SHELL", "..."]` or `["NONE"]`. |
 | `timeout` | `string` | optional |  |  | Time before a check counts as hung (Go duration). |
@@ -851,6 +857,7 @@ single block. Options of a `bind` mount (`Mount.BindOptions`).
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `non_recursive` | `bool` | optional |  |  | Do not bind-mount submounts of the source recursively (`NonRecursive`, `bind-nonrecursive`). Needs Engine API >= 1.41. |
 | `propagation` | `string` | optional |  |  | Bind propagation: `private`, `rprivate`, `shared`, `rshared`, `slave` or `rslave` (`Propagation`). |
 
 ### `mounts.tmpfs_options`
@@ -860,6 +867,7 @@ single block. Options of a `tmpfs` mount (`Mount.TmpfsOptions`).
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `mode` | `number` | optional |  |  | Permission bits of the tmpfs as a decimal number, e.g. `448` for `0700` (`Mode`). |
+| `options` | `list(list(string))` | optional |  |  | Extra tmpfs mount options (`Options`): each entry is a one-element list for a flag, e.g. `["exec"]`, or a two-element key/value list, e.g. `["nr_inodes", "1000"]`. Needs Engine API >= 1.46. |
 | `size_bytes` | `number` | optional |  |  | Size of the tmpfs in bytes (`SizeBytes`); unset is unlimited. |
 
 ### `mounts.volume_options`
@@ -907,7 +915,19 @@ list of blocks. Platforms the tasks may run on (`Placement.Platforms`). Unset le
 
 single block. Security options of the task containers (`ContainerSpec.Privileges`). Updated in place.
 
-Nested blocks: `credential_spec` (single block), `selinux_context` (single block).
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `no_new_privileges` | `bool` | optional |  |  | Set the no_new_privs bit, so task processes cannot gain privileges (setuid, file capabilities) (`NoNewPrivileges`). Needs Engine API >= 1.44. |
+
+Nested blocks: `app_armor` (single block), `credential_spec` (single block), `seccomp` (single block), `selinux_context` (single block).
+
+### `privileges.app_armor`
+
+single block. AppArmor confinement of the task containers (`AppArmor`); custom profiles are not supported by Swarm. Needs Engine API >= 1.44.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | optional |  |  | `default` (the daemon's profile) or `disabled` (`Mode`). |
 
 ### `privileges.credential_spec`
 
@@ -918,6 +938,15 @@ single block. Managed service account credential spec (`CredentialSpec`, Windows
 | `config` | `string` | optional |  |  | ID of a swarm config holding the credential spec (`Config`). |
 | `file` | `string` | optional |  |  | Credential spec file name under the daemon's `CredentialSpecs` directory (`File`). |
 | `registry` | `string` | optional |  |  | Registry value name holding the credential spec (`Registry`). |
+
+### `privileges.seccomp`
+
+single block. Seccomp filtering of the task containers (`Seccomp`). Needs Engine API >= 1.44.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | optional |  |  | `default` (the daemon's profile), `unconfined` (no filtering) or `custom` (the JSON in `profile`) (`Mode`). |
+| `profile` | `string` | optional |  |  | Seccomp profile JSON, used with `mode = "custom"` (`Profile`); e.g. `file("seccomp.json")`. |
 
 ### `privileges.selinux_context`
 
@@ -935,6 +964,11 @@ single block. SELinux labels of the task containers (`SELinuxContext`).
 
 single block. CPU and memory limits and reservations per task.
 
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `memory_swappiness` | `number` | optional |  |  | Memory swappiness of the task containers, 0 to 100 (`MemorySwappiness`); `-1` unsets a previous value. Unset: the OS default. Needs Engine API >= 1.52. |
+| `swap_bytes` | `number` | optional |  |  | Swap per task in bytes, only together with `limits.memory_bytes` (`SwapBytes`); `-1` is unlimited swap. Unset: twice the memory limit. Needs Engine API >= 1.52. |
+
 Nested blocks: `limits` (single block), `reservations` (single block).
 
 ### `resources.limits`
@@ -945,6 +979,7 @@ single block. Hard limits.
 |---|---|---|---|---|---|
 | `memory_bytes` | `number` | optional |  |  | Memory in bytes. |
 | `nano_cpus` | `number` | optional |  |  | CPU in units of 1e-9 CPUs (1000000000 = one CPU). |
+| `pids` | `number` | optional |  |  | Maximum number of processes per task container (`Pids`); 0 or unset is unlimited. Needs Engine API >= 1.41. |
 
 ### `resources.reservations`
 
@@ -1159,14 +1194,22 @@ resource "docker_service" "web" {
     limits {
       nano_cpus    = 500000000
       memory_bytes = 268435456
+      pids         = 256
     }
   }
 
+  # Hardening: no privilege escalation through setuid binaries.
+  privileges {
+    no_new_privileges = true
+  }
+
   healthcheck {
-    test     = ["CMD", "wget", "-q", "-O-", "http://localhost/"]
-    interval = "30s"
-    timeout  = "5s"
-    retries  = 3
+    test           = ["CMD", "wget", "-q", "-O-", "http://localhost/"]
+    interval       = "30s"
+    timeout        = "5s"
+    retries        = 3
+    start_period   = "1m"
+    start_interval = "5s" # check more often while starting
   }
 
   logging {

@@ -3,12 +3,12 @@
 page_title: "docker_container Resource - docker"
 subcategory: ""
 description: |-
-  A single-host Docker container, created with ContainerCreate, attached to its networks and started. Refresh diffs against ContainerInspect: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. name, restart, maximum_retry_count, memory, memory_swap, memory_reservation, cpu_shares, nano_cpus, cpu_period, cpu_quota and cpuset_cpus update in place (ContainerRename/ContainerUpdate); networks entries are connected and disconnected in place (NetworkConnect/NetworkDisconnect); files blocks are copied in with PutContainerArchive before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
+  A single-host Docker container, created with ContainerCreate, attached to its networks and, per state, started (running, the default), left created (created) or run once to completion (exited). Refresh diffs against ContainerInspect: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. name, restart, maximum_retry_count, memory, memory_swap, memory_reservation, cpu_shares, nano_cpus, cpu_period, cpu_quota, cpuset_cpus, cpuset_mems, blkio_weight, cpu_realtime_period, cpu_realtime_runtime and pids_limit update in place (ContainerRename/ContainerUpdate); networks entries are connected and disconnected in place (NetworkConnect/NetworkDisconnect); files blocks are copied in with PutContainerArchive before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
 ---
 
 # docker_container (Resource)
 
-A single-host Docker container, created with `ContainerCreate`, attached to its networks and started. Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `maximum_retry_count`, `memory`, `memory_swap`, `memory_reservation`, `cpu_shares`, `nano_cpus`, `cpu_period`, `cpu_quota` and `cpuset_cpus` update in place (`ContainerRename`/`ContainerUpdate`); `networks` entries are connected and disconnected in place (`NetworkConnect`/`NetworkDisconnect`); `files` blocks are copied in with `PutContainerArchive` before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
+A single-host Docker container, created with `ContainerCreate`, attached to its networks and, per `state`, started (`running`, the default), left created (`created`) or run once to completion (`exited`). Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, working_dir, healthcheck) are only reported when they differ from the image or you set them, so image defaults never show as drift. `name`, `restart`, `maximum_retry_count`, `memory`, `memory_swap`, `memory_reservation`, `cpu_shares`, `nano_cpus`, `cpu_period`, `cpu_quota`, `cpuset_cpus`, `cpuset_mems`, `blkio_weight`, `cpu_realtime_period`, `cpu_realtime_runtime` and `pids_limit` update in place (`ContainerRename`/`ContainerUpdate`); `networks` entries are connected and disconnected in place (`NetworkConnect`/`NetworkDisconnect`); `files` blocks are copied in with `PutContainerArchive` before start. Every other argument forces a new container. Destroy force-removes the container but keeps its volumes. Import by container name or ID.
 
 ## Example Usage
 
@@ -120,12 +120,30 @@ resource "docker_container" "web" {
     options = { max-size = "10m", max-file = "3" }
   }
 
-  memory    = 268435456 # 256 MiB, updated in place
-  nano_cpus = 500000000 # 0.5 CPU, updated in place
+  memory       = 268435456 # 256 MiB, updated in place
+  nano_cpus    = 500000000 # 0.5 CPU, updated in place
+  pids_limit   = 512       # updated in place
+  blkio_weight = 300       # updated in place
 
-  must_run     = true
+  oom_score_adj = 100
+  annotations   = { "com.example.team" = "web" }
+
+  state        = "running" # the default: started, and started again if found stopped
   wait         = true
   wait_timeout = "2m"
+}
+
+# A one-shot run kept as an exited container: created, started and waited for.
+# A non-zero exit code fails the apply; the output is kept in logs / log_entries.
+resource "docker_container" "migrate" {
+  name    = "migrate"
+  image   = "busybox:1.36"
+  command = ["sh", "-c", "echo migrating; exit 0"]
+
+  state               = "exited"
+  expected_exit_codes = [0]
+  wait_timeout        = "10m"
+  logs_tail           = 200
 }
 
 # Read-only endpoint values sit beside the settings in each networks entry;
@@ -145,20 +163,31 @@ output "web_ip" {
 
 ### Optional
 
+- `adopt` (Boolean) Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`.
+- `annotations` (Map of String) Arbitrary non-identifying metadata passed to the OCI runtime when the container starts (`HostConfig.Annotations`, `docker run --annotation`). Forces replacement.
 - `auto_remove` (Boolean) Remove the container when its process exits (`HostConfig.AutoRemove`, `docker run --rm`); Terraform then plans a new one. Default `false`. Forces replacement.
 - `blkio_device_read_bps` (Block List) Per-device limit in bytes per second (`HostConfig.BlkioDeviceReadBps`). Forces replacement. (see [below for nested schema](#nestedblock--blkio_device_read_bps))
 - `blkio_device_read_iops` (Block List) Per-device limit in IO operations per second (`HostConfig.BlkioDeviceReadIOps`). Forces replacement. (see [below for nested schema](#nestedblock--blkio_device_read_iops))
 - `blkio_device_write_bps` (Block List) Per-device limit in bytes per second (`HostConfig.BlkioDeviceWriteBps`). Forces replacement. (see [below for nested schema](#nestedblock--blkio_device_write_bps))
 - `blkio_device_write_iops` (Block List) Per-device limit in IO operations per second (`HostConfig.BlkioDeviceWriteIOps`). Forces replacement. (see [below for nested schema](#nestedblock--blkio_device_write_iops))
+- `blkio_weight` (Number) Block IO weight, relative to other containers, 10 to 1000 (`HostConfig.BlkioWeight`). Updated in place (`ContainerUpdate`); removing it forces a new resource.
+- `blkio_weight_device` (Block List) Per-device block IO weight (`HostConfig.BlkioWeightDevice`). Forces replacement. (see [below for nested schema](#nestedblock--blkio_weight_device))
 - `cap_add` (Set of String) Linux capabilities to add, e.g. `NET_ADMIN` (`HostConfig.CapAdd`). Forces replacement.
 - `cap_drop` (Set of String) Linux capabilities to drop, e.g. `ALL` (`HostConfig.CapDrop`). Forces replacement.
+- `cgroup` (String) Cgroup the container joins (`HostConfig.Cgroup`), e.g. `container:<name|id>`. Forces replacement.
 - `cgroup_parent` (String) Parent cgroup of the container (`HostConfig.CgroupParent`). Forces replacement.
 - `cgroupns_mode` (String) Cgroup namespace mode (`HostConfig.CgroupnsMode`): `private` or `host`. Unset uses the daemon default, which is not reported. Forces replacement.
 - `command` (List of String) Command (`CMD`) override. Unset uses the image's. Changing this forces a new resource.
+- `console_size` (List of Number) Initial console size as `[height, width]` (`HostConfig.ConsoleSize`); used with `tty = true`. Forces replacement.
+- `cpu_count` (Number) Number of usable CPUs (`HostConfig.CpuCount`). Windows daemons only; a Linux daemon ignores it. Forces replacement.
+- `cpu_percent` (Number) Usable percentage of the available CPUs (`HostConfig.CpuPercent`). Windows daemons only; a Linux daemon ignores it. Forces replacement.
 - `cpu_period` (Number) CPU CFS period in microseconds (`HostConfig.CpuPeriod`). Updated in place; removing it forces a new resource.
 - `cpu_quota` (Number) CPU CFS quota in microseconds per `cpu_period` (`HostConfig.CpuQuota`). Updated in place; removing it forces a new resource.
+- `cpu_realtime_period` (Number) CPU real-time period in microseconds (`HostConfig.CpuRealtimePeriod`). Updated in place; removing it forces a new resource.
+- `cpu_realtime_runtime` (Number) CPU real-time runtime in microseconds (`HostConfig.CpuRealtimeRuntime`). Updated in place; removing it forces a new resource.
 - `cpu_shares` (Number) Relative CPU weight (default 1024 in the daemon). Updated in place; removing it forces a new resource.
 - `cpuset_cpus` (String) CPUs the container may use, e.g. `0-2` or `0,1` (`HostConfig.CpusetCpus`). Updated in place; removing it forces a new resource.
+- `cpuset_mems` (String) Memory nodes (NUMA) the container may use, e.g. `0-3` or `0,1` (`HostConfig.CpusetMems`). Updated in place; removing it forces a new resource.
 - `device_cgroup_rules` (List of String) Rules added to the device cgroup, e.g. `c 1:3 mr` (`HostConfig.DeviceCgroupRules`). Forces replacement.
 - `device_requests` (Block List) Device requests to device drivers (`HostConfig.DeviceRequests`), e.g. GPUs from a driver other than the one `gpus` uses. Forces replacement. (see [below for nested schema](#nestedblock--device_requests))
 - `devices` (Block List) Host devices mapped into the container (`HostConfig.Devices`, like `docker run --device`). Forces replacement. (see [below for nested schema](#nestedblock--devices))
@@ -168,48 +197,66 @@ output "web_ip" {
 - `domainname` (String) Domain name of the container (`Config.Domainname`). Forces replacement.
 - `entrypoint` (List of String) Entrypoint override. Unset uses the image's; setting it also drops the image's `CMD` unless `command` is set. Changing this forces a new resource.
 - `env` (Map of String) Environment variables, merged over the image's. Image-provided variables are not reported in state. Changing this forces a new resource.
+- `expected_exit_codes` (List of Number) Exit codes that count as success for `state = "exited"`. Default `[0]`. Checked once, when the run finishes.
 - `extra_hosts` (List of String) Extra `/etc/hosts` entries, each `"<hostname>:<ip>"` exactly like `docker run --add-host` (e.g. `"db.local:10.0.0.5"`, or `"host.docker.internal:host-gateway"` for the host's gateway IP). Forces replacement.
-- `files` (Block List) Files written into the container with `PutContainerArchive` after create and before start (like `docker cp`). Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `path` must already exist in the image. Files are not read back from the daemon. Changing a file forces a new container, unless the container is stopped (`must_run = false` and not running), in which case the files are copied in place. To copy files into a running container at any time use the `docker_container_cp` action. (see [below for nested schema](#nestedblock--files))
+- `files` (Block List) Files written into the container with `PutContainerArchive` after create and before start (like `docker cp`). Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `path` must already exist in the image. Files are not read back from the daemon. Changing a file forces a new container, unless the container is stopped and `state = "created"`, in which case the files are copied in place. To copy files into a running container at any time use the `docker_container_cp` action. (see [below for nested schema](#nestedblock--files))
 - `gpus` (String) GPUs to expose, like `docker run --gpus`: `"all"`, a count such as `"2"`, or `"device=0,1"` (indexes or UUIDs). Sent as a `HostConfig.DeviceRequests` entry with driver `nvidia` and capabilities `[["gpu"]]`; the host needs the NVIDIA container toolkit. Forces replacement.
 - `group_add` (Set of String) Additional groups the container process runs as (`HostConfig.GroupAdd`). Forces replacement.
 - `healthcheck` (Block, Optional) Healthcheck override. Without this block the image's healthcheck (if any) applies. Changing it forces a new resource. (see [below for nested schema](#nestedblock--healthcheck))
 - `hostname` (String) Container hostname (`Config.Hostname`). Unset: the daemon uses the first 12 characters of the container ID, which is not reported in state. Forces replacement.
 - `init` (Boolean) Run an init process inside the container that forwards signals and reaps processes (`HostConfig.Init`, `docker run --init`). Unset uses the daemon setting. Forces replacement.
+- `io_maximum_bandwidth` (Number) Maximum IO in bytes per second for the container's system drive (`HostConfig.IOMaximumBandwidth`). Windows daemons only. Forces replacement.
+- `io_maximum_iops` (Number) Maximum IO operations per second for the container's system drive (`HostConfig.IOMaximumIOps`). Windows daemons only. Forces replacement.
 - `ipc_mode` (String) IPC namespace (`HostConfig.IpcMode`): `none`, `private`, `shareable`, `host` or `container:<name|id>`. Unset uses the daemon default, which is not reported. Forces replacement.
+- `isolation` (String) Isolation technology (`HostConfig.Isolation`): `default`, `process` or `hyperv`. Windows daemons only; unset uses the daemon default, which is not reported. Forces replacement.
 - `labels` (Map of String) Container labels. Image labels are not reported in state. Docker cannot change labels of an existing container, so changing this forces a new resource.
+- `links` (List of String) Legacy container links, each `<name|id>[:<alias>]` (`HostConfig.Links`, `docker run --link`). Prefer user-defined `networks`, whose DNS resolves container names. Forces replacement.
 - `logging` (Block, Optional) Logging driver and its options (`HostConfig.LogConfig`). Without this block the daemon defaults apply and are not reported. Adding or changing the block forces a new resource; removing it keeps the container as it is. (see [below for nested schema](#nestedblock--logging))
+- `logs_tail` (Number) With `state = "exited"`: how many lines from the end of the run's output `logs` and `log_entries` keep (the Engine's `tail`). Default `1000`. Read once, when the run finishes.
+- `masked_paths` (List of String) Paths masked inside the container (`HostConfig.MaskedPaths`); setting it replaces the daemon's default list. Unset keeps the default, which is not reported. Forces replacement.
 - `maximum_retry_count` (Number) Maximum restart attempts for `restart = "on-failure"` (0 = unlimited). Ignored by other policies. Updated in place.
 - `memory` (Number) Memory limit in bytes. Updated in place; removing the limit forces a new resource.
 - `memory_reservation` (Number) Memory soft limit in bytes (`HostConfig.MemoryReservation`). Updated in place; removing it forces a new resource.
 - `memory_swap` (Number) Total memory + swap limit in bytes (`-1` = unlimited swap). Unset: the daemon uses twice `memory` when `memory` is set. Updated in place.
+- `memory_swappiness` (Number) Memory swappiness, 0 to 100 (`HostConfig.MemorySwappiness`). Unset uses the host's. Forces replacement.
 - `mounts` (Block List) Mounts (`HostConfig.Mounts`). Changing mounts forces a new resource. (see [below for nested schema](#nestedblock--mounts))
-- `must_run` (Boolean) When `true` (default) a container found stopped on refresh is planned for start (`running` goes to `true`) and started by the next apply.
 - `nano_cpus` (Number) CPU quota in units of 1e-9 CPUs (`1500000000` = 1.5 CPUs). Updated in place; removing it forces a new resource.
+- `network_disabled` (Boolean) Disable networking for the container (`Config.NetworkDisabled`). Forces replacement.
 - `network_mode` (String) Network mode (`HostConfig.NetworkMode`): `bridge`, `host`, `none`, `container:<name|id>` or a network name. Unset: the alphabetically first `networks` key, else the daemon default `bridge`. Forces replacement.
 - `networks` (Attributes Map) Networks the container is attached to, keyed by network name (e.g. a `docker_network`'s `name`); each value mirrors `NetworkingConfig.EndpointsConfig` (`EndpointSettings`). Use `{}` for an endpoint with no settings. All endpoints are configured at create; the container's `NetworkMode` is `network_mode` when set, else the alphabetically first key. Adding or removing a key, or changing an endpoint's settings, connects or disconnects the container in place (`NetworkConnect` / `NetworkDisconnect`) without replacing it. Unset, the container joins the daemon's default `bridge`, which is not reported. (see [below for nested schema](#nestedatt--networks))
+- `oom_kill_disable` (Boolean) Disable the OOM killer for the container (`HostConfig.OomKillDisable`); set `memory` with it. Forces replacement.
+- `oom_score_adj` (Number) OOM killer score adjustment, -1000 to 1000 (`HostConfig.OomScoreAdj`). Forces replacement.
 - `pid_mode` (String) PID namespace (`HostConfig.PidMode`): `host` or `container:<name|id>`. Forces replacement.
+- `pids_limit` (Number) Maximum number of processes in the container (`HostConfig.PidsLimit`); `0` or `-1` is unlimited. Updated in place (`ContainerUpdate`); removing it lifts the limit in place.
 - `platform` (String) Platform of the image to run, `os[/arch[/variant]]`, e.g. `linux/arm64` (the create `platform` parameter). Forces replacement.
 - `ports` (Block List) Published ports (`HostConfig.PortBindings`). Changing ports forces a new resource. (see [below for nested schema](#nestedblock--ports))
 - `privileged` (Boolean) Run the container privileged. Changing this forces a new resource.
 - `publish_all_ports` (Boolean) Publish every exposed port on a random host port (`HostConfig.PublishAllPorts`, `docker run -P`). Default `false`. Forces replacement.
 - `read_only` (Boolean) Mount the container's root filesystem read-only (`docker run --read-only`); use `mounts` (e.g. tmpfs) for writable paths. Default `false`. Forces replacement.
+- `readonly_paths` (List of String) Paths made read-only inside the container (`HostConfig.ReadonlyPaths`); setting it replaces the daemon's default list. Unset keeps the default, which is not reported. Forces replacement.
 - `restart` (String) Restart policy: `no` (default), `always`, `unless-stopped` or `on-failure`. Updated in place.
 - `runtime` (String) OCI runtime, e.g. `runc` or `nvidia` (`HostConfig.Runtime`). Unset uses the daemon default, which is not reported. Forces replacement.
 - `security_opt` (Set of String) Security options (`HostConfig.SecurityOpt`), e.g. `no-new-privileges:true`, `apparmor=unconfined`, `seccomp=unconfined`, `label=disable`. Forces replacement.
+- `shell` (List of String) Shell the daemon runs `CMD-SHELL` healthchecks with (`Config.Shell`), e.g. `["/bin/bash", "-c"]`. Unset uses the image's `SHELL` (else `/bin/sh -c`), which is not reported. Forces replacement.
 - `shm_size` (Number) Size of `/dev/shm` in bytes (`HostConfig.ShmSize`). Unset uses the daemon default (64 MiB), which is not reported. Forces replacement.
+- `state` (String) Lifecycle the provider keeps the container in, named after Docker's `State.Status`: `running` (default: started at create, and started again in place when found stopped), `created` (created only, never started by the provider; found running, the plan warns and changes nothing) or `exited` (a one-shot run: created, started and waited for until it exits, within `wait_timeout`; an exit code outside `expected_exit_codes` fails the apply, and a later refresh never runs it again). Switching between `running` and `created` is applied in place; a change to or from `exited` forces replacement. See the container-state guide.
 - `stdin_open` (Boolean) Keep stdin open (`docker run -i`); with `tty` this keeps shells such as `sh` from exiting immediately. Default `false`. Forces replacement.
 - `stop_signal` (String) Signal sent to stop the container, e.g. `SIGTERM` or `SIGQUIT`. Unset uses the image's `STOPSIGNAL` (else `SIGTERM`); the image value is not reported in state. Forces replacement.
-- `stop_timeout` (Number) Seconds to wait after the stop signal before killing the container. Unset uses the daemon default (10s). Forces replacement.
+- `stop_timeout` (Number) Seconds to wait after the stop signal before killing the container. Unset uses the daemon default (10s on Docker Engine; Docker Desktop fills in its own), which is then reported here. Changing a configured value forces replacement.
 - `storage_opt` (Map of String) Storage driver options, e.g. `{ size = "20G" }` (`HostConfig.StorageOpt`). Forces replacement.
 - `sysctls` (Map of String) Namespaced kernel parameters, e.g. `{ "net.core.somaxconn" = "1024" }`. Only keys you set are reported (except on import). Forces replacement.
 - `tmpfs` (Map of String) tmpfs mounts keyed by container path, values are mount options such as `rw,size=64m` (`HostConfig.Tmpfs`, `docker run --tmpfs`). `mounts` with `type = "tmpfs"` is the structured alternative. Forces replacement.
 - `tty` (Boolean) Allocate a pseudo-TTY (`docker run -t`). Default `false`. Forces replacement.
 - `ulimits` (Block List) Resource ulimits. Changing them forces a new resource. (see [below for nested schema](#nestedblock--ulimits))
+- `umask` (String) Initial umask of the container's processes (entrypoint, exec processes and healthchecks) as an octal string, e.g. `"0027"` (`HostConfig.Umask`). Unset leaves the runtime default. Forces replacement. Needs Engine API >= 1.56.
 - `user` (String) User (and optionally `:group`) to run as. Unset uses the image's. Changing this forces a new resource.
 - `userns_mode` (String) User namespace mode (`HostConfig.UsernsMode`), e.g. `host`. Forces replacement.
+- `uts_mode` (String) UTS namespace (`HostConfig.UTSMode`), e.g. `host`. Forces replacement.
+- `volume_driver` (String) Volume driver for the volumes this container creates through `HostConfig.Binds` (`HostConfig.VolumeDriver`); `mounts` entries take their driver from `volume_options.driver_config`. Forces replacement.
+- `volumes` (Set of String) Container paths that get an anonymous volume (`Config.Volumes`, like `docker run -v /data`). A `mounts` entry with `type = "volume"` and no `source` is the structured alternative. The image's own `VOLUME` paths are not reported. Forces replacement.
 - `volumes_from` (List of String) Mount the volumes of other containers, `<name|id>[:ro|:rw]` (`HostConfig.VolumesFrom`). Forces replacement.
-- `wait` (Boolean) Wait after start until the container's healthcheck reports `healthy` (or, without a healthcheck, until it is running). Fails if the container exits or `wait_timeout` elapses.
-- `wait_timeout` (String) How long `wait` waits, as a Go duration. Default `60s`.
+- `wait` (Boolean) Wait after start until the container's healthcheck reports `healthy` (or, without a healthcheck, until it is running). Fails if the container exits or `wait_timeout` elapses. Only with `state = "running"`.
+- `wait_timeout` (String) How long `wait` waits for a healthy container, or how long a `state = "exited"` run may take, as a Go duration. Default `60s`, or `5m` with `state = "exited"`.
 - `working_dir` (String) Working directory. Unset uses the image's. Changing this forces a new resource.
 
 ### Read-Only
@@ -218,11 +265,14 @@ output "web_ip" {
 - `docker_server_version` (String) Docker Engine version from GET /version.
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `exit_code` (Number) Exit code of the container's main process at the last refresh (`State.ExitCode`); 0 while it runs.
+- `finished_at` (String) With `state = "exited"`: when the run's process exited (`State.FinishedAt`, RFC 3339). Null for the other states.
 - `id` (String) Full container ID.
 - `image_id` (String) ID (`sha256:...`) of the image the container runs.
 - `inspect` (Attributes) The GET /containers/{id}/json response as a nested object, field by field. (see [below for nested schema](#nestedatt--inspect))
 - `inspect_json` (String, Sensitive) The exact Engine API GET /containers/{id}/json response as JSON.
-- `running` (Boolean) Whether the container was running at the last refresh. Planned `true` when `must_run` is set.
+- `log_entries` (Attributes List) With `state = "exited"`: one object per log line (`timestamp`, `stream`, `source`, `message`) of the run, the last `logs_tail` lines; only `message` is sensitive. Null for the other states. (see [below for nested schema](#nestedatt--log_entries))
+- `logs` (String, Sensitive) With `state = "exited"`: the container's output when it exited, as text, one line per entry (`<timestamp> <stream> <source> <message>`), the last `logs_tail` lines. Null for the other states. Sensitive: log lines can print secrets.
+- `running` (Boolean) Whether the container was running at the last refresh (`State.Running`). Planned `true` with `state = "running"`.
 
 <a id="nestedblock--blkio_device_read_bps"></a>
 ### Nested Schema for `blkio_device_read_bps`
@@ -258,6 +308,15 @@ Required:
 
 - `path` (String) Device path on the host, e.g. `/dev/sda`.
 - `rate` (Number) Limit in IO operations per second.
+
+
+<a id="nestedblock--blkio_weight_device"></a>
+### Nested Schema for `blkio_weight_device`
+
+Required:
+
+- `path` (String) Device path on the host, e.g. `/dev/sda` (`Path`).
+- `weight` (Number) Relative weight, 10 to 1000 (`Weight`).
 
 
 <a id="nestedblock--device_requests"></a>
@@ -331,14 +390,16 @@ Optional:
 Required:
 
 - `target` (String) Path inside the container.
-- `type` (String) `bind`, `volume` or `tmpfs`.
+- `type` (String) `bind`, `volume`, `tmpfs` or `image` (Engine API >= 1.48: another image's filesystem, read-only).
 
 Optional:
 
 - `bind_options` (Block, Optional) Bind mount options (`BindOptions`); `type = "bind"` only. (see [below for nested schema](#nestedblock--mounts--bind_options))
+- `consistency` (String) Consistency requirement (`Consistency`): `default`, `consistent`, `cached` or `delegated`; only Docker Desktop's file sharing honors it. Unset is not reported.
+- `image_options` (Block, Optional) Image mount options (`ImageOptions`); `type = "image"` only. Needs Engine API >= 1.48. (see [below for nested schema](#nestedblock--mounts--image_options))
 - `read_only` (Boolean) Mount read-only. Default `false`.
 - `selinux_relabel` (String) SELinux relabel for a `bind` or named `volume` mount: `z` (shared label) or `Z` (private label), like the `docker run -v src:dst:z` suffix. The entry is then sent as a `HostConfig.Binds` string, because the `Mounts` API has no relabel option. Forces replacement like any mounts change.
-- `source` (String) Host path (bind) or volume name (volume; unset = anonymous volume). Not allowed for tmpfs.
+- `source` (String) Host path (bind), volume name (volume; unset = anonymous volume) or image reference (image). Not allowed for tmpfs.
 - `tmpfs_options` (Block, Optional) tmpfs options (`TmpfsOptions`); `type = "tmpfs"` only. (see [below for nested schema](#nestedblock--mounts--tmpfs_options))
 - `volume_options` (Block, Optional) Volume mount options (`VolumeOptions`); `type = "volume"` only. (see [below for nested schema](#nestedblock--mounts--volume_options))
 
@@ -347,7 +408,19 @@ Optional:
 
 Optional:
 
+- `create_mountpoint` (Boolean) Create the source path on the host when it is missing (`CreateMountpoint`).
+- `non_recursive` (Boolean) Do not bind-mount the submounts of the source recursively (`NonRecursive`).
 - `propagation` (String) Mount propagation (`Propagation`): `private`, `rprivate`, `shared`, `rshared`, `slave` or `rslave`.
+- `read_only_force_recursive` (Boolean) With `read_only`, fail when the mount cannot be made recursively read-only (`ReadOnlyForceRecursive`).
+- `read_only_non_recursive` (Boolean) With `read_only`, make only the mount itself read-only, not its submounts (`ReadOnlyNonRecursive`).
+
+
+<a id="nestedblock--mounts--image_options"></a>
+### Nested Schema for `mounts.image_options`
+
+Optional:
+
+- `subpath` (String) Path inside the image to mount instead of its root (`Subpath`).
 
 
 <a id="nestedblock--mounts--tmpfs_options"></a>
@@ -356,6 +429,7 @@ Optional:
 Optional:
 
 - `mode` (String) Permission bits of the tmpfs root as an octal string, e.g. `"1777"` (`Mode`).
+- `options` (List of List of String) Options passed to the tmpfs mount (`Options`): a flag as a one-element list, a key and value as two, e.g. `[["noexec"], ["nr_inodes", "1000"]]`. Needs Engine API >= 1.46.
 - `size_bytes` (Number) Size of the tmpfs in bytes (`SizeBytes`). Unset is unlimited.
 
 
@@ -391,6 +465,7 @@ Optional:
 - `ipv4_address` (String) Static IPv4 address (`IPAMConfig.IPv4Address`); needs a user-defined subnet.
 - `ipv6_address` (String) Static IPv6 address (`IPAMConfig.IPv6Address`); needs an IPv6-enabled network with a user-defined IPv6 subnet.
 - `link_local_ips` (Set of String) Link-local addresses (`IPAMConfig.LinkLocalIPs`).
+- `links` (List of String) Legacy links on this network, each `<name|id>[:<alias>]` (`Links`, `docker network connect --link`): the alias resolves to that container on this network only.
 - `mac_address` (String) MAC address of the endpoint (`MacAddress`). Unset, the daemon generates one, which is reported.
 
 Read-Only:
@@ -645,6 +720,18 @@ Read-Only:
 Read-Only:
 
 - `root_fs` (Dynamic) Upstream `RootFS`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+
+
+
+<a id="nestedatt--log_entries"></a>
+### Nested Schema for `log_entries`
+
+Read-Only:
+
+- `message` (String, Sensitive) Upstream `log line without the timestamp prefix and trailing newline`. Sensitive.
+- `source` (String) Upstream `Name (leading "/" removed)`.
+- `stream` (String) Upstream `multiplexed frame header stream type: 1 = stdout, 2 = stderr; a TTY stream is not multiplexed (the Engine merges stdout and stderr at the source), so it is "combined"`.
+- `timestamp` (String) Upstream `timestamps=true line prefix (RFC 3339 nano)`.
 
 ## Import
 

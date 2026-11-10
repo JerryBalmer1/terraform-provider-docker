@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Creates an image from a container's filesystem changes, like `docker container commit` (`POST /commit`). The new image is not tracked in state. The result object holds `id`, `image_ref`, `container_id` and `result.changes` (the filesystem changes that went into the image, from `GET /containers/{id}/changes` just before the commit).
+Creates an image from a container's filesystem changes, like `docker container commit` (`POST /commit`). The new image is not tracked in state. The result object holds `id`, `image_ref`, `container_id` and `result.changes` (the filesystem changes that went into the image, from `GET /containers/{id}/changes` just before the commit). With the provider's `owner` set, the new image's labels include the owner label.
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
@@ -30,11 +30,56 @@ action "docker_image_commit" "<name>" {
 |---|---|---|---|---|---|
 | `author` | `string` | optional |  |  | Author recorded in the image (`--author`). |
 | `changes` | `list(string)` | optional |  |  | Dockerfile instructions applied to the image config, e.g. `["ENV A=b", "EXPOSE 80"]` (`--change`). |
+| `config` | `object` | optional |  |  | Image configuration sent as the commit body (`ContainerConfig`), the API-level counterpart of `changes`. When set, the daemon starts from this object instead of the container's configuration and fills `user`, `exposed_ports`, `env` (merged by key), `labels` (merged), `cmd`/`entrypoint`, `healthcheck`, `working_dir`, `volumes` (merged) and `stop_signal` from the container where they are unset; `on_build` and `shell` are not inherited. `changes` are applied on top. Without it the container's configuration is used, like `docker container commit`. |
 | `container_id` | `string` | required |  |  | The container (ID or name) to commit. |
 | `message` | `string` | optional |  |  | Commit message recorded in the image history (`--message`). |
 | `pause` | `bool` | optional |  |  | Pause the container during the commit (`--pause`). Default `true`. |
 | `reference` | `string` | optional |  |  | Reference to tag the new image with, `repository[:tag]` (no tag means `latest`). Without it the image is untagged. |
 | `result_path` | `string` | optional |  |  | Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails. |
+
+### `config`
+
+nested attribute, object. Image configuration sent as the commit body (`ContainerConfig`), the API-level counterpart of `changes`. When set, the daemon starts from this object instead of the container's configuration and fills `user`, `exposed_ports`, `env` (merged by key), `labels` (merged), `cmd`/`entrypoint`, `healthcheck`, `working_dir`, `volumes` (merged) and `stop_signal` from the container where they are unset; `on_build` and `shell` are not inherited. `changes` are applied on top. Without it the container's configuration is used, like `docker container commit`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args_escaped` | `bool` | optional |  |  | The command is already escaped (`ArgsEscaped`, Windows images only). |
+| `attach_stderr` | `bool` | optional |  |  | Attach to `stderr` by default (`AttachStderr`). |
+| `attach_stdin` | `bool` | optional |  |  | Attach to `stdin` by default (`AttachStdin`). |
+| `attach_stdout` | `bool` | optional |  |  | Attach to `stdout` by default (`AttachStdout`). |
+| `cmd` | `list(string)` | optional |  |  | Default command (`Cmd`). |
+| `domainname` | `string` | optional |  |  | Domain name recorded in the image configuration (`Domainname`). |
+| `entrypoint` | `list(string)` | optional |  |  | Entrypoint (`Entrypoint`). |
+| `env` | `list(string)` | optional |  |  | Environment as `KEY=value` strings (`Env`). |
+| `exposed_ports` | `set(string)` | optional |  |  | Exposed ports as `<port>/<tcp\|udp\|sctp>`, e.g. `80/tcp` (`ExposedPorts`). |
+| `healthcheck` | `object` | optional |  |  | Healthcheck of the image (`Healthcheck`). Durations are Go durations such as `30s`. |
+| `hostname` | `string` | optional |  |  | Hostname recorded in the image configuration (`Hostname`). |
+| `image` | `string` | optional |  |  | Image name recorded in the configuration (`Image`). |
+| `labels` | `map(string)` | optional |  |  | Labels of the image (`Labels`). |
+| `network_disabled` | `bool` | optional |  |  | Disable networking for containers of the image (`NetworkDisabled`). |
+| `on_build` | `list(string)` | optional |  |  | `ONBUILD` instructions (`OnBuild`). |
+| `open_stdin` | `bool` | optional |  |  | Keep `stdin` open (`OpenStdin`). |
+| `shell` | `list(string)` | optional |  |  | Shell for the shell form of `RUN`, `CMD` and `ENTRYPOINT` (`Shell`). |
+| `stdin_once` | `bool` | optional |  |  | Close `stdin` after the first attached client disconnects (`StdinOnce`). |
+| `stop_signal` | `string` | optional |  |  | Signal that stops containers of the image, e.g. `SIGTERM` (`StopSignal`). |
+| `stop_timeout` | `number` | optional |  |  | Seconds to wait before killing on stop (`StopTimeout`). |
+| `tty` | `bool` | optional |  |  | Allocate a TTY for containers of the image (`Tty`). |
+| `user` | `string` | optional |  |  | User (`user[:group]`, names or IDs) that commands run as (`User`). |
+| `volumes` | `set(string)` | optional |  |  | Mount point paths declared as volumes (`Volumes`). |
+| `working_dir` | `string` | optional |  |  | Working directory (`WorkingDir`). |
+
+### `config.healthcheck`
+
+nested attribute, object. Healthcheck of the image (`Healthcheck`). Durations are Go durations such as `30s`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `interval` | `string` | optional |  |  | Time between checks (`Interval`). |
+| `retries` | `number` | optional |  |  | Consecutive failures before `unhealthy` (`Retries`). |
+| `start_interval` | `string` | optional |  |  | Time between checks during the start period (`StartInterval`). |
+| `start_period` | `string` | optional |  |  | Start period before failures count (`StartPeriod`). |
+| `test` | `list(string)` | optional |  |  | Test command: `["CMD", ...]`, `["CMD-SHELL", "..."]` or `["NONE"]` (`Test`). |
+| `timeout` | `string` | optional |  |  | Time before a check is considered hung (`Timeout`). |
 
 ## Example
 
@@ -62,6 +107,15 @@ action "docker_image_commit" "snapshot" {
     message      = "snapshot taken by Terraform"
     changes      = ["LABEL snapshot=true"]
     result_path  = "${path.module}/out/commit-result.json"
+
+    # Optional: the image configuration as the commit body (ContainerConfig).
+    # Unset fields such as env, labels and cmd fall back to the container's.
+    config = {
+      cmd         = ["sh"]
+      env         = ["SNAPSHOT=1"]
+      working_dir = "/"
+      healthcheck = { test = ["CMD", "true"], interval = "30s" }
+    }
   }
 }
 ```

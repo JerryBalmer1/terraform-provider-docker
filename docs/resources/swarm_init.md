@@ -17,6 +17,8 @@ resource "docker_swarm_init" "this" {
   advertise_addr    = "10.0.0.5"
   default_addr_pool = ["10.20.0.0/16"]
   subnet_size       = 24
+  # Overlay (VXLAN) traffic on a separate interface.
+  data_path_addr = "10.1.0.5"
 
   # `docker swarm update` settings, changed in place.
   labels = {
@@ -49,9 +51,11 @@ output "swarm_trust_root" {
 
 ### Optional
 
+- `adopt` (Boolean) Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`.
 - `advertise_addr` (String) Address advertised to other nodes, as `<ip|interface>[:port]`, e.g. `10.0.0.5` or `eth0:2377`. Needed when the host has several addresses. The daemon does not report it back, so the configured value is kept. Changing this forces a new resource.
 - `autolock` (Boolean) Enable manager autolock: managers need `unlock_key` after a daemon restart. Updated in place through SwarmUpdate.
 - `ca_config` (Attributes) CA settings (`Spec.CAConfig`). Updated in place (SwarmUpdate); rotate the root CA with `docker_swarm_rotate_ca`. (see [below for nested schema](#nestedatt--ca_config))
+- `data_path_addr` (String) Address or interface for data-path (overlay VXLAN) traffic, `<ip|interface>` without a port (`DataPathAddr`, `docker swarm init --data-path-addr`); separates it from management traffic. Unset uses `advertise_addr`. The daemon does not report it back, so the configured value is kept. Forces replacement.
 - `data_path_port` (Number) UDP port for VXLAN data-path traffic. Daemon default 4789. Changing this forces a new resource.
 - `default_addr_pool` (List of String) CIDR pools that overlay network subnets are allocated from, e.g. `["10.20.0.0/16"]`. When unset the daemon default (`10.0.0.0/8`) is used and reported. Changing this forces a new resource.
 - `dispatcher` (Attributes) Dispatcher settings (`Spec.Dispatcher`). Updated in place (SwarmUpdate). (see [below for nested schema](#nestedatt--dispatcher))
@@ -83,7 +87,22 @@ output "swarm_trust_root" {
 
 Optional:
 
+- `external_cas` (Attributes List) External certificate authorities that sign node certificates (`ExternalCAs`, `docker swarm init --external-ca`). When set, the swarm gets exactly this list; unset leaves it as it is. (see [below for nested schema](#nestedatt--ca_config--external_cas))
 - `node_cert_expiry` (String) Validity of node certificates, as a Go duration such as `2160h` (`NodeCertExpiry`, `--cert-expiry`).
+
+<a id="nestedatt--ca_config--external_cas"></a>
+### Nested Schema for `ca_config.external_cas`
+
+Required:
+
+- `url` (String) URL of the CA's signing endpoint (`URL`).
+
+Optional:
+
+- `ca_cert` (String) PEM root CA certificate the external CA signs with; unset means the swarm's current root CA (`CACert`).
+- `options` (Map of String) Protocol-specific options for the CA (`Options`).
+- `protocol` (String) Protocol of the CA, only `cfssl` (the default) (`Protocol`).
+
 
 
 <a id="nestedatt--dispatcher"></a>

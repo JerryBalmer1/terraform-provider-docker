@@ -11,13 +11,17 @@ This provider moves the state of every kreuzwerker/docker v4.6.0 managed resourc
 
 ## Requirements
 
-- **Terraform 1.8 or later.** Moving state between resource types or providers uses the MoveResourceState protocol call, added in Terraform 1.8. Terraform treats a `moved` block as a cross-provider move whenever the provider of the `to` resource differs from the provider recorded in state for the `from` resource, even when the type name (`docker_container`) is the same.
+- **Terraform 1.8 or later.** See the next section.
 - **kreuzwerker/docker v4.6.0 state.** The move reads the state at kreuzwerker's latest schema version for each type (the table below). Run `terraform apply -refresh-only` once with kreuzwerker/docker v4.6.0 before migrating so older states are upgraded; a move from an older schema version fails with that instruction.
 - **Different from and to addresses.** Terraform rejects a `moved` block whose `from` and `to` are the same address ("Redundant move statement"), so the resource label changes (`docker_container.web` to `docker_container.web_moved`). You can move it back to the old label later with an ordinary `moved` block (same provider, same type).
 
+## Terraform 1.8 or later
+
+Moving state between resource types or providers uses the MoveResourceState protocol call, added in Terraform 1.8. Terraform treats a `moved` block as a cross-provider move whenever the provider of the `to` resource differs from the provider recorded in state for the `from` resource, even when the type name (`docker_container`) is the same. Terraform reports the source provider as **`registry.terraform.io/kreuzwerker/docker`**, the address kreuzwerker/docker was installed from.
+
 ## How Terraform picks the providers
 
-A `moved` block has no provider argument. The source provider is the one recorded in state for the `from` address (registry.terraform.io/kreuzwerker/docker); the target is the provider of the `to` resource in configuration. Both type names start with `docker_`, so both providers want the default local name `docker`. Give this provider the local name `docker` and kreuzwerker another local name while the migration runs:
+A `moved` block has no provider argument. The source provider is the one recorded in state for the `from` address (`registry.terraform.io/kreuzwerker/docker`); the target is the provider of the `to` resource in configuration. Both type names start with `docker_`, so both providers want the default local name `docker`. Give this provider the local name `docker` and kreuzwerker another local name while the migration runs:
 
 ```terraform
 terraform {
@@ -295,6 +299,7 @@ Renamed or reshaped:
 
 | kreuzwerker | this provider | change |
 |---|---|---|
+| `attach` | `state` | attach = true -> state = "exited" (run once, wait for the exit, keep the container) |
 | `capabilities.add` | `cap_add` | rename; block attribute -> top-level set(string) |
 | `capabilities.drop` | `cap_drop` | rename; block attribute -> top-level set(string) |
 | `cgroup_parent` | `cgroup_parent` | added (gap, Pass 5) |
@@ -391,6 +396,7 @@ Renamed or reshaped:
 | `runtime` | `runtime` | added (gap, Pass 5) |
 | `security_opts` | `security_opt` | rename |
 | `shm_size` | `shm_size` | added (gap, Pass 5): bytes |
+| `start` | `state` | start = false -> state = "created"; otherwise "running" (or "exited" with attach = true) |
 | `storage_opts` | `storage_opt` | added (gap, Pass 5) |
 | `tmpfs` | `tmpfs` | added (gap, Pass 5) |
 | `ulimit` | `ulimits` | rename (set of blocks -> list of blocks) |
@@ -417,21 +423,20 @@ Renamed or reshaped:
 | `volumes.volume_name` | `mounts.source` | rename; sets mounts.type = "volume" |
 | `wait_timeout` | `wait_timeout` | number seconds -> string Go duration ("<n>s") |
 
-Unchanged: `command`, `cpu_shares`, `entrypoint`, `gpus`, `healthcheck.interval`, `healthcheck.retries`, `healthcheck.start_period`, `healthcheck.test`, `healthcheck.timeout`, `hostname`, `id`, `image`, `mounts.read_only`, `mounts.source`, `mounts.target`, `mounts.tmpfs_options.size_bytes`, `mounts.type`, `must_run`, `name`, `ports`, `ports.protocol`, `privileged`, `read_only`, `restart`, `stdin_open`, `stop_signal`, `stop_timeout`, `sysctls`, `tty`, `user`, `wait`, `working_dir`.
+Unchanged: `command`, `cpu_shares`, `entrypoint`, `gpus`, `healthcheck.interval`, `healthcheck.retries`, `healthcheck.start_period`, `healthcheck.test`, `healthcheck.timeout`, `hostname`, `id`, `image`, `mounts.read_only`, `mounts.source`, `mounts.target`, `mounts.tmpfs_options.size_bytes`, `mounts.type`, `name`, `ports`, `ports.protocol`, `privileged`, `read_only`, `restart`, `stdin_open`, `stop_signal`, `stop_timeout`, `sysctls`, `tty`, `user`, `wait`, `working_dir`.
 
 Dropped:
 
 | kreuzwerker | reason |
 |---|---|
-| `attach` | dropped: the resource never attaches; use wait for readiness and data.docker_container_logs for output. |
 | `bridge` | dropped: deprecated upstream field. |
 | `capabilities` | General rule: HostConfig has CapAdd/CapDrop, no capabilities object (compose cap_add/cap_drop; docker_service already uses them). |
-| `container_logs` | dropped: use data.docker_container_logs (logs / log_entries). |
+| `container_logs` | dropped from moved state: with state = "exited" the run's output is in logs / log_entries (logs contract shape), captured at create; a moved container starts with them null. |
 | `container_read_refresh_timeout_milliseconds` | dropped: wait / wait_timeout cover waiting for the container. |
 | `destroy_grace_seconds` | dropped: destroy force-removes the container; stop_timeout covers graceful stops. |
-| `logs` | dropped: use data.docker_container_logs. |
+| `logs` | dropped: the logs flag is not needed; with state = "exited" (attach = true) the run's output is captured at create in logs / log_entries, and data.docker_container_logs reads any container's logs. |
+| `must_run` | dropped (Pass 5.3 D1): subsumed by state = "running", which starts a container found stopped in place. must_run = false (start once, then leave a stopped container alone) has no counterpart: use state = "created" plus the docker_container_start action. |
 | `remove_volumes` | dropped: destroy keeps volumes; manage them with docker_volume. |
-| `start` | dropped: the container is always started; must_run keeps it running. |
 | `timeouts` | dropped: SDKv2 timeouts block not provided (no per-operation timeouts in our schema). |
 | `timeouts.create` | dropped: SDKv2 timeouts block not provided (no per-operation timeouts in our schema). |
 | `timeouts.delete` | dropped: SDKv2 timeouts block not provided (no per-operation timeouts in our schema). |

@@ -170,7 +170,8 @@ func (a *composeScaleAction) Invoke(ctx context.Context, req action.InvokeReques
 				}
 				continue
 			}
-			if _, err := composeLocalCreate(ctx, a.pd, dc, nil); err != nil {
+			// Owner label inject-only: an action owns nothing in state.
+			if _, err := composeLocalCreate(composeOwnerNoCheck(ctx), a.pd, dc, nil); err != nil {
 				resp.Diagnostics.AddError("docker_compose_scale: cannot create container", err.Error())
 				return
 			}

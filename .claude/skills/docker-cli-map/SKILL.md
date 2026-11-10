@@ -20,9 +20,10 @@ Source: `tools/climap/commands.json` (hand-maintained) + `tools/parity/paritydat
 
 | CLI | Use instead | Arguments | Notes |
 |---|---|---|---|
-| `docker run` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | `image`, `name`, `command`, `env`, `ports`, `mounts`, `restart`, `must_run` | One-off `docker run --rm` jobs: a docker_container with `must_run = false`, or a docker_exec action in an existing container. |
-| `docker create` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | `must_run` | `must_run = false` creates without keeping it running. |
-| `docker start / docker stop` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md)<br>[`action.docker_container_start`](../terraform-provider-docker/reference/action.docker_container_start.md)<br>[`action.docker_container_stop`](../terraform-provider-docker/reference/action.docker_container_stop.md) | `must_run`, `container_id`, `container_id`, `signal`, `timeout` | `must_run` is the desired state; the actions start or stop a container once without changing configuration. |
+| `docker run` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | `image`, `name`, `command`, `env`, `ports`, `mounts`, `restart`, `state` | A long-running `docker run -d` is a docker_container (`state = "running"`, the default). A one-shot run kept for inspection is a docker_container with `state = "exited"`; run-and-remove is the docker_container_run action (`docker run --rm`). |
+| `docker run --rm` | [`action.docker_container_run`](../terraform-provider-docker/reference/action.docker_container_run.md) | `image`, `command`, `env`, `remove`, `timeout`, `expected_exit_codes`, `result_path` | Creates, starts, waits for the exit, captures exit_code / stdout / stderr, then removes the container. For a one-shot container kept in state use docker_container with `state = "exited"`. |
+| `docker create` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | `state` | `state = "created"` creates the container and never starts it. |
+| `docker start / docker stop` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md)<br>[`action.docker_container_start`](../terraform-provider-docker/reference/action.docker_container_start.md)<br>[`action.docker_container_stop`](../terraform-provider-docker/reference/action.docker_container_stop.md) | `state`, `container_id`, `container_id`, `signal`, `timeout` | `state` is the desired state (`running` starts a stopped container in place; `created` never starts it); the actions start or stop a container once without changing configuration. |
 | `docker restart` | [`action.docker_container_restart`](../terraform-provider-docker/reference/action.docker_container_restart.md) | `container_id`, `timeout` | For Swarm services use the docker_service_force_update action. |
 | `docker rm` | [`docker_container`](../terraform-provider-docker/reference/docker_container.md) | - | Remove the resource from configuration, or `terraform destroy -target=docker_container.x`. |
 | `docker exec` | [`action.docker_exec`](../terraform-provider-docker/reference/action.docker_exec.md)<br>[`ephemeral.docker_exec_output`](../terraform-provider-docker/reference/ephemeral.docker_exec_output.md) | `container_id`, `service_id`, `command`, `env`, `user`, `workdir`, `detach`, `tty`, `container_id`, `command` | Use the ephemeral resource when the command's stdout feeds other configuration. |
@@ -277,6 +278,7 @@ Every type in `tools/parity/paritydata`: its status against kreuzwerker/docker v
 | action | `docker_container_pause` | provider-only | `docker pause / docker unpause` |
 | action | `docker_container_prune` | provider-only | `docker container prune` |
 | action | `docker_container_restart` | provider-only | `docker restart` |
+| action | `docker_container_run` | provider-only | `docker run --rm` |
 | action | `docker_container_start` | provider-only | `docker start / docker stop` |
 | action | `docker_container_stop` | provider-only | `docker start / docker stop` |
 | action | `docker_container_unpause` | provider-only | `docker pause / docker unpause` |

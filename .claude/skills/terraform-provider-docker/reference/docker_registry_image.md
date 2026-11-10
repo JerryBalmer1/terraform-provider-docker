@@ -22,6 +22,7 @@ Pushes an image that exists on the provider's daemon (typically a `docker_image`
 | `insecure_skip_verify` | `bool` | optional, computed |  |  | Skip TLS verification when the provider itself talks to the registry (only for the delete on destroy; pushes go through the daemon and follow its insecure-registries setting). Default `false`. |
 | `keep_remotely` | `bool` | optional, computed |  |  | When false (default), destroy deletes the manifest from the registry through the Registry HTTP API v2 (`DELETE /v2/<repo>/manifests/<digest>`, the registry must allow deletes). If that fails the resource is removed from state with a warning. When true, the image is left in the registry. |
 | `name` | `string` | required | yes |  | Local image reference to push, including registry host and tag (e.g. `registry.example.com/team/app:1.2`; no tag means `latest`). The image must already exist on the daemon under this name. Forces replacement. |
+| `platform` | `string` | optional | yes |  | Push only this platform of a multi-platform image, `os[/arch[/variant]]` (ImagePush `platform`, like `docker push --platform`): the registry then gets that single platform-specific manifest instead of the index. Default: the whole image. Forces replacement. Needs Engine API >= 1.46. |
 | `platforms` | `list(string)` | computed |  |  | Platforms in the pushed manifest as `os/arch[/variant]`. |
 | `push_retries` | `number` | optional, computed |  |  | How many times to retry a failed push, with exponential backoff (1s, 2s, 4s, ... capped at 30s). Default `3`. |
 | `triggers` | `map(string)` | optional | yes |  | Arbitrary string map; any change pushes the image again. Forces replacement. |
@@ -84,6 +85,12 @@ resource "docker_registry_image" "app" {
 
 output "app_digest" {
   value = docker_registry_image.app.image_digest_ref
+}
+
+# Push only the linux/arm64 variant of a multi-platform image (Engine API 1.46+).
+resource "docker_registry_image" "app_arm64" {
+  name     = "registry.example.com/team/app-arm64:1.0"
+  platform = "linux/arm64"
 }
 ```
 

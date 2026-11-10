@@ -99,3 +99,17 @@ resource "docker_image" "web" {
     }
   }
 }
+
+# Multi-platform: several platforms build one image index (like
+# `docker buildx build --platform linux/amd64,linux/arm64`). The daemon must
+# use the containerd image store to hold an index; the provider checks this
+# before building. id and digest are the index digest.
+resource "docker_image" "multi" {
+  name = "registry.example.com/team/app:1.4.0-multi"
+
+  build {
+    context   = "${path.module}/app"
+    builder   = "buildkit"
+    platforms = ["linux/amd64", "linux/arm64"]
+  }
+}

@@ -17,7 +17,7 @@ into HCL with `go run ./tools/compose2stack` (worked example 2); after that the
 generated `.tf` is the source of truth.
 
 This build registers 17 resources, 54 data sources,
-51 actions, 4 ephemeral resources, 8 list resources
+52 actions, 4 ephemeral resources, 8 list resources
 and 4 provider functions. Per-type argument tables are in
 [reference/](reference/) and are generated from the provider schema, so they are
 authoritative over anything written here.
@@ -91,6 +91,7 @@ Registered types not mapped to a layer yet.
 
 - Resources: none registered in this build
 - Data sources: none registered in this build
+- Actions: [`docker_container_run`](reference/action.docker_container_run.md)
 - Functions: [`provider::docker::compose_env`](reference/function.compose_env.md), [`provider::docker::image_ref`](reference/function.image_ref.md), [`provider::docker::parse_image_ref`](reference/function.parse_image_ref.md), [`provider::docker::port_spec`](reference/function.port_spec.md)
 
 Layer 2 primitives also work inside a Swarm: `docker_network` with
@@ -145,27 +146,39 @@ object (some are conditional; the description says when).
 | `docker_buildx_builder` | `buildkitd_config` | Path of a local `buildkitd.toml` (`--buildkitd-config`), read at apply and copied to `/etc/buildkit/buildkitd.toml` in the container. |
 | `docker_buildx_builder` | `buildkitd_config_content` | Content of `buildkitd.toml`, copied like `buildkitd_config`. |
 | `docker_buildx_builder` | `buildkitd_flags` | Flags for buildkitd (`--buildkitd-flags`), whitespace-separated with no shell quoting, e.g. `"--debug --allow-insecure-entitlement=security.insecure"`. |
-| `docker_buildx_builder` | `driver` | Builder driver. |
+| `docker_buildx_builder` | `driver` | Builder driver: `docker-container` (default), a BuildKit container on the provider's daemon, or `remote`, a BuildKit daemon run elsewhere and reached at `endpoint` (TLS in the `remote` block). |
+| `docker_buildx_builder` | `endpoint` | BuildKit address of the builder, for `buildctl --addr` and `docker_image.build.builder`. |
 | `docker_buildx_builder` | `name` | Builder name, as for `docker buildx create --name`; pass it to `docker_image.build.builder`. |
 | `docker_buildx_builder` | `node` | Node name (`--node`); the node container is `buildx_buildkit_<node>`. |
 | `docker_buildx_builder` | `platform` | Platforms this node is pinned to (`--platform`), listed first in `platforms`. |
 | `docker_buildx_builder` | `tcp_port` | Host port on which BuildKit is also served over TCP: buildkitd listens on `tcp://0.0.0.0:1234` in the container and the port is published on this host port. |
 | `docker_buildx_builder` | `docker_container` (block) | Settings for the BuildKit container (`--driver-opt`). |
+| `docker_buildx_builder` | `remote` (block) | TLS settings of a `remote` driver builder (`--driver-opt cacert=,cert=,key=,servername=`). |
 | `docker_compose` | `mode` | Deployment target: `local` (default) or `swarm`. |
 | `docker_compose` | `name` | The compose project name (compose-spec top-level `name`, CLI `--project-name`), used to name and label every object. |
 | `docker_config` | `data` | Config content, base64-encoded (use `base64encode()`); it must decode. |
 | `docker_config` | `data_wo_version` | Version of `data_wo`. |
 | `docker_config` | `name` | Config name, unique in the Swarm. |
+| `docker_config` | `templating` | Templating driver (`Spec.Templating`): the config content is a template the driver expands per task, e.g. `name = "golang"` for Go templates such as `{{ .Node.Hostname }}` or `{{ env "VAR" }}`. |
+| `docker_container` | `annotations` | Arbitrary non-identifying metadata passed to the OCI runtime when the container starts (`HostConfig.Annotations`, `docker run --annotation`). |
 | `docker_container` | `auto_remove` | Remove the container when its process exits (`HostConfig.AutoRemove`, `docker run --rm`); Terraform then plans a new one. |
+| `docker_container` | `blkio_weight` | Block IO weight, relative to other containers, 10 to 1000 (`HostConfig.BlkioWeight`). |
 | `docker_container` | `cap_add` | Linux capabilities to add, e.g. `NET_ADMIN` (`HostConfig.CapAdd`). |
 | `docker_container` | `cap_drop` | Linux capabilities to drop, e.g. `ALL` (`HostConfig.CapDrop`). |
+| `docker_container` | `cgroup` | Cgroup the container joins (`HostConfig.Cgroup`), e.g. `container:<name\|id>`. |
 | `docker_container` | `cgroup_parent` | Parent cgroup of the container (`HostConfig.CgroupParent`). |
 | `docker_container` | `cgroupns_mode` | Cgroup namespace mode (`HostConfig.CgroupnsMode`): `private` or `host`. |
 | `docker_container` | `command` | Command (`CMD`) override. |
+| `docker_container` | `console_size` | Initial console size as `[height, width]` (`HostConfig.ConsoleSize`); used with `tty = true`. |
+| `docker_container` | `cpu_count` | Number of usable CPUs (`HostConfig.CpuCount`). |
+| `docker_container` | `cpu_percent` | Usable percentage of the available CPUs (`HostConfig.CpuPercent`). |
 | `docker_container` | `cpu_period` | CPU CFS period in microseconds (`HostConfig.CpuPeriod`). |
 | `docker_container` | `cpu_quota` | CPU CFS quota in microseconds per `cpu_period` (`HostConfig.CpuQuota`). |
+| `docker_container` | `cpu_realtime_period` | CPU real-time period in microseconds (`HostConfig.CpuRealtimePeriod`). |
+| `docker_container` | `cpu_realtime_runtime` | CPU real-time runtime in microseconds (`HostConfig.CpuRealtimeRuntime`). |
 | `docker_container` | `cpu_shares` | Relative CPU weight (default 1024 in the daemon). |
 | `docker_container` | `cpuset_cpus` | CPUs the container may use, e.g. `0-2` or `0,1` (`HostConfig.CpusetCpus`). |
+| `docker_container` | `cpuset_mems` | Memory nodes (NUMA) the container may use, e.g. `0-3` or `0,1` (`HostConfig.CpusetMems`). |
 | `docker_container` | `device_cgroup_rules` | Rules added to the device cgroup, e.g. `c 1:3 mr` (`HostConfig.DeviceCgroupRules`). |
 | `docker_container` | `dns` | DNS server IPs for the container's resolver (`HostConfig.Dns`). |
 | `docker_container` | `dns_options` | Resolver options, e.g. `ndots:2` (`HostConfig.DnsOptions`). |
@@ -179,20 +192,32 @@ object (some are conditional; the description says when).
 | `docker_container` | `hostname` | Container hostname (`Config.Hostname`). |
 | `docker_container` | `image` | Image reference to run, e.g. `nginx:1.27` or a `docker_image` resource's `name`. |
 | `docker_container` | `init` | Run an init process inside the container that forwards signals and reaps processes (`HostConfig.Init`, `docker run --init`). |
+| `docker_container` | `io_maximum_bandwidth` | Maximum IO in bytes per second for the container's system drive (`HostConfig.IOMaximumBandwidth`). |
+| `docker_container` | `io_maximum_iops` | Maximum IO operations per second for the container's system drive (`HostConfig.IOMaximumIOps`). |
 | `docker_container` | `ipc_mode` | IPC namespace (`HostConfig.IpcMode`): `none`, `private`, `shareable`, `host` or `container:<name\|id>`. |
+| `docker_container` | `isolation` | Isolation technology (`HostConfig.Isolation`): `default`, `process` or `hyperv`. |
 | `docker_container` | `labels` | Container labels. |
+| `docker_container` | `links` | Legacy container links, each `<name\|id>[:<alias>]` (`HostConfig.Links`, `docker run --link`). |
+| `docker_container` | `masked_paths` | Paths masked inside the container (`HostConfig.MaskedPaths`); setting it replaces the daemon's default list. |
 | `docker_container` | `memory` | Memory limit in bytes. |
 | `docker_container` | `memory_reservation` | Memory soft limit in bytes (`HostConfig.MemoryReservation`). |
+| `docker_container` | `memory_swappiness` | Memory swappiness, 0 to 100 (`HostConfig.MemorySwappiness`). |
 | `docker_container` | `nano_cpus` | CPU quota in units of 1e-9 CPUs (`1500000000` = 1.5 CPUs). |
+| `docker_container` | `network_disabled` | Disable networking for the container (`Config.NetworkDisabled`). |
 | `docker_container` | `network_mode` | Network mode (`HostConfig.NetworkMode`): `bridge`, `host`, `none`, `container:<name\|id>` or a network name. |
+| `docker_container` | `oom_kill_disable` | Disable the OOM killer for the container (`HostConfig.OomKillDisable`); set `memory` with it. |
+| `docker_container` | `oom_score_adj` | OOM killer score adjustment, -1000 to 1000 (`HostConfig.OomScoreAdj`). |
 | `docker_container` | `pid_mode` | PID namespace (`HostConfig.PidMode`): `host` or `container:<name\|id>`. |
 | `docker_container` | `platform` | Platform of the image to run, `os[/arch[/variant]]`, e.g. `linux/arm64` (the create `platform` parameter). |
 | `docker_container` | `privileged` | Run the container privileged. |
 | `docker_container` | `publish_all_ports` | Publish every exposed port on a random host port (`HostConfig.PublishAllPorts`, `docker run -P`). |
 | `docker_container` | `read_only` | Mount the container's root filesystem read-only (`docker run --read-only`); use `mounts` (e.g. tmpfs) for writable paths. |
+| `docker_container` | `readonly_paths` | Paths made read-only inside the container (`HostConfig.ReadonlyPaths`); setting it replaces the daemon's default list. |
 | `docker_container` | `runtime` | OCI runtime, e.g. `runc` or `nvidia` (`HostConfig.Runtime`). |
 | `docker_container` | `security_opt` | Security options (`HostConfig.SecurityOpt`), e.g. `no-new-privileges:true`, `apparmor=unconfined`, `seccomp=unconfined`, `label=disable`. |
+| `docker_container` | `shell` | Shell the daemon runs `CMD-SHELL` healthchecks with (`Config.Shell`), e.g. `["/bin/bash", "-c"]`. |
 | `docker_container` | `shm_size` | Size of `/dev/shm` in bytes (`HostConfig.ShmSize`). |
+| `docker_container` | `state` | Lifecycle the provider keeps the container in, named after Docker's `State.Status`: `running` (default: started at create, and started again in place when found stopped), `created` (created only, never started by the provider; found running, the plan warns and changes nothing) or `exited` (a one-shot run: created, started and waited for until it exits, within `wait_timeout`; an exit code outside `expected_exit_codes` fails the apply, and a later refresh never runs it again). |
 | `docker_container` | `stdin_open` | Keep stdin open (`docker run -i`); with `tty` this keeps shells such as `sh` from exiting immediately. |
 | `docker_container` | `stop_signal` | Signal sent to stop the container, e.g. `SIGTERM` or `SIGQUIT`. |
 | `docker_container` | `stop_timeout` | Seconds to wait after the stop signal before killing the container. |
@@ -200,14 +225,19 @@ object (some are conditional; the description says when).
 | `docker_container` | `sysctls` | Namespaced kernel parameters, e.g. `{ "net.core.somaxconn" = "1024" }`. |
 | `docker_container` | `tmpfs` | tmpfs mounts keyed by container path, values are mount options such as `rw,size=64m` (`HostConfig.Tmpfs`, `docker run --tmpfs`). |
 | `docker_container` | `tty` | Allocate a pseudo-TTY (`docker run -t`). |
+| `docker_container` | `umask` | Initial umask of the container's processes (entrypoint, exec processes and healthchecks) as an octal string, e.g. `"0027"` (`HostConfig.Umask`). |
 | `docker_container` | `user` | User (and optionally `:group`) to run as. |
 | `docker_container` | `userns_mode` | User namespace mode (`HostConfig.UsernsMode`), e.g. `host`. |
+| `docker_container` | `uts_mode` | UTS namespace (`HostConfig.UTSMode`), e.g. `host`. |
+| `docker_container` | `volume_driver` | Volume driver for the volumes this container creates through `HostConfig.Binds` (`HostConfig.VolumeDriver`); `mounts` entries take their driver from `volume_options.driver_config`. |
+| `docker_container` | `volumes` | Container paths that get an anonymous volume (`Config.Volumes`, like `docker run -v /data`). |
 | `docker_container` | `volumes_from` | Mount the volumes of other containers, `<name\|id>[:ro\|:rw]` (`HostConfig.VolumesFrom`). |
 | `docker_container` | `working_dir` | Working directory. |
 | `docker_container` | `blkio_device_read_bps` (block) | Per-device limit in bytes per second (`HostConfig.BlkioDeviceReadBps`). |
 | `docker_container` | `blkio_device_read_iops` (block) | Per-device limit in IO operations per second (`HostConfig.BlkioDeviceReadIOps`). |
 | `docker_container` | `blkio_device_write_bps` (block) | Per-device limit in bytes per second (`HostConfig.BlkioDeviceWriteBps`). |
 | `docker_container` | `blkio_device_write_iops` (block) | Per-device limit in IO operations per second (`HostConfig.BlkioDeviceWriteIOps`). |
+| `docker_container` | `blkio_weight_device` (block) | Per-device block IO weight (`HostConfig.BlkioWeightDevice`). |
 | `docker_container` | `device_requests` (block) | Device requests to device drivers (`HostConfig.DeviceRequests`), e.g. GPUs from a driver other than the one `gpus` uses. |
 | `docker_container` | `devices` (block) | Host devices mapped into the container (`HostConfig.Devices`, like `docker run --device`). |
 | `docker_container` | `files` (block) | Files written into the container with `PutContainerArchive` after create and before start (like `docker cp`). |
@@ -224,7 +254,7 @@ object (some are conditional; the description says when).
 | `docker_image` | `build.additional_contexts` | BuildKit only. |
 | `docker_image` | `build.args` | Build arguments (`--build-arg`). |
 | `docker_image` | `build.attestations` | BuildKit only. |
-| `docker_image` | `build.builder` | Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit) or the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`). |
+| `docker_image` | `build.builder` | Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit), the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`) or a BuildKit address (`tcp://`, `unix://`, `docker-container://`, e.g. a remote-driver builder's endpoint). |
 | `docker_image` | `build.cache_from` | BuildKit only. |
 | `docker_image` | `build.cache_to` | BuildKit only. |
 | `docker_image` | `build.cgroup_parent` | Classic builder only. |
@@ -266,7 +296,10 @@ object (some are conditional; the description says when).
 | `docker_image` | `build.secrets.id` | Secret ID referenced by `RUN --mount=type=secret,id=...`. |
 | `docker_image` | `build.secrets.src` | Path of a file holding the secret (max 500 KiB). |
 | `docker_network` | `attachable` | Let standalone containers attach to an `overlay` network. |
+| `docker_network` | `config_from` | Name of the config-only network that provides this network's configuration (`ConfigFrom.Network`), e.g. for a swarm-scoped `macvlan` network. |
+| `docker_network` | `config_only` | Create a config-only network (`ConfigOnly`): a placeholder holding IPAM and driver options for other networks' `config_from`; containers cannot attach to it. |
 | `docker_network` | `driver` | Network driver: `bridge` (default), `overlay` (Swarm manager only), `macvlan`, `ipvlan`, or a plugin. |
+| `docker_network` | `enable_ipv4` | Enable IPv4 on the network (`EnableIPv4`); `false` disables IPv4 IPAM (only for networks that support it). |
 | `docker_network` | `enable_ipv6` | Enable IPv6 on the network (`EnableIPv6`). |
 | `docker_network` | `ingress` | Create the Swarm routing-mesh (ingress) network. |
 | `docker_network` | `internal` | Restrict external access to the network. |
@@ -275,26 +308,32 @@ object (some are conditional; the description says when).
 | `docker_network` | `labels` | Network labels. |
 | `docker_network` | `name` | Network name. |
 | `docker_network` | `options` | Driver options, e.g. `{ "com.docker.network.bridge.name" = "br-app" }`. |
+| `docker_network` | `scope` | Level at which the network exists (`Scope`): `local` (this host) or `swarm` (cluster-wide; `global` is also accepted by plugins). |
 | `docker_network` | `ipam_config` (block) | Static IPAM pools. |
 | `docker_node` | `node_id` | The node to manage: ID, unique ID prefix, hostname or node name (resolved to the node ID, see `id`). |
 | `docker_plugin` | `alias` | Local name of the plugin (`docker plugin install --alias`), used by volume and network drivers. |
 | `docker_plugin` | `name` | Plugin reference to install from a registry, e.g. `vieux/sshfs:latest` or `ghcr.io/org/plugin:1.0` (`registry_auth` credentials apply). |
 | `docker_registry_image` | `name` | Local image reference to push, including registry host and tag (e.g. `registry.example.com/team/app:1.2`; no tag means `latest`). |
+| `docker_registry_image` | `platform` | Push only this platform of a multi-platform image, `os[/arch[/variant]]` (ImagePush `platform`, like `docker push --platform`): the registry then gets that single platform-specific manifest instead of the index. |
 | `docker_registry_image` | `triggers` | Arbitrary string map; any change pushes the image again. |
 | `docker_registry_manifest_list` | `name` | Reference the index is pushed under, with registry and tag, e.g. `registry.example.com/team/app:1.2` (no tag means `latest`; a digest is not allowed). |
 | `docker_secret` | `data` | Secret content, base64-encoded (use `base64encode()`); it must decode. |
 | `docker_secret` | `data_wo_version` | Version of `data_wo`. |
+| `docker_secret` | `driver` | Secret store driver (`Spec.Driver`): a secret driver plugin that provides the value, so `data` and `data_wo` may be omitted. |
 | `docker_secret` | `name` | Secret name, unique in the Swarm. |
+| `docker_secret` | `templating` | Templating driver (`Spec.Templating`): the secret content is a template the driver expands per task, e.g. `name = "golang"` for Go templates such as `{{ .Service.Name }}`. |
 | `docker_service` | `mode` | `replicated` (default; runs `replicas` tasks), `global` (one task per eligible node), `replicated_job` (runs `total_completions` tasks to completion, `max_concurrent` at a time) or `global_job` (one run-to-completion task per eligible node). |
 | `docker_service` | `name` | Service name. |
 | `docker_stack` | `name` | Stack namespace. |
 | `docker_swarm_init` | `advertise_addr` | Address advertised to other nodes, as `<ip\|interface>[:port]`, e.g. `10.0.0.5` or `eth0:2377`. |
+| `docker_swarm_init` | `data_path_addr` | Address or interface for data-path (overlay VXLAN) traffic, `<ip\|interface>` without a port (`DataPathAddr`, `docker swarm init --data-path-addr`); separates it from management traffic. |
 | `docker_swarm_init` | `data_path_port` | UDP port for VXLAN data-path traffic. |
 | `docker_swarm_init` | `default_addr_pool` | CIDR pools that overlay network subnets are allocated from, e.g. `["10.20.0.0/16"]`. |
 | `docker_swarm_init` | `force_new_cluster` | Force a new single-manager cluster from the current state of this node (disaster recovery). |
 | `docker_swarm_init` | `listen_addr` | Address for inter-manager communication, `<ip\|interface>[:port]`. |
 | `docker_swarm_init` | `subnet_size` | Prefix length of each subnet carved from `default_addr_pool`. |
 | `docker_swarm_node` | `advertise_addr` | Address the node advertises, `<ip\|interface>[:port]`. |
+| `docker_swarm_node` | `data_path_addr` | Address or interface the node uses for data-path (overlay VXLAN) traffic, `<ip\|interface>` without a port (`DataPathAddr`, `docker swarm join --data-path-addr`). |
 | `docker_swarm_node` | `host` | Docker endpoint of the JOINING node, e.g. `tcp://10.0.0.6:2376` or `ssh://admin@10.0.0.6` (with an optional `ssh` block for credentials). |
 | `docker_swarm_node` | `join_token` | Worker or manager join token, e.g. `docker_swarm_init.this.worker_join_token`. |
 | `docker_swarm_node` | `listen_addr` | Listen address for swarm traffic on the node. |
@@ -414,6 +453,7 @@ Registered in this build:
 - [`action.docker_container_pause`](reference/action.docker_container_pause.md): Freezes all processes of a running container, like `docker container pause` (the cgroup freezer).
 - [`action.docker_container_prune`](reference/action.docker_container_prune.md): Removes stopped containers, like `docker container prune`, and reports what it removed and the space reclaimed.
 - [`action.docker_container_restart`](reference/action.docker_container_restart.md): Restarts a container, like `docker container restart`: a stop (signal, grace period, SIGKILL) followed by a start.
+- [`action.docker_container_run`](reference/action.docker_container_run.md): Runs a one-shot container to completion, like `docker run --rm`: creates it (pulling the image when missing), starts it, waits until it exits within `timeout`, reads its exit code and output, then removes it (`remove`, default `true`).
 - [`action.docker_container_start`](reference/action.docker_container_start.md): Starts a stopped or created container, like `docker container start`.
 - [`action.docker_container_stop`](reference/action.docker_container_stop.md): Stops a running container, like `docker container stop`: it sends the stop signal, waits for the grace period and then sends SIGKILL.
 - [`action.docker_container_unpause`](reference/action.docker_container_unpause.md): Resumes the processes of a paused container, like `docker container unpause`.
@@ -716,9 +756,8 @@ secrets:
     file: ./db_password.txt
 ```
 
-Step 2, convert it (from the provider repository; `make compose2stack
-IN=docker-compose.yml OUT=stack.tf MODE=swarm` and `Invoke-Build
-Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm` run the same):
+Step 2, convert it (from the provider repository; `Invoke-Build Compose2Stack -In
+docker-compose.yml -Out stack.tf -Mode swarm` runs the same):
 
 ```shell
 go run ./tools/compose2stack -in docker-compose.yml -out stack.tf -mode swarm
@@ -850,7 +889,7 @@ before choosing argument names.
 - [`docker_buildx_builder`](reference/docker_buildx_builder.md): A BuildKit builder run by the daemon as a `docker-container` driver node, the same container and state volume `docker buildx create --driver docker-container --bootstrap` makes, created through the Engine API without the buildx CLI.
 - [`docker_compose`](reference/docker_compose.md): A Docker Compose project applied through the Engine API, with no compose CLI plugin involved.
 - [`docker_config`](reference/docker_config.md): A Swarm config: a non-secret blob mounted into service tasks as a file.
-- [`docker_container`](reference/docker_container.md): A single-host Docker container, created with `ContainerCreate`, attached to its networks and started.
+- [`docker_container`](reference/docker_container.md): A single-host Docker container, created with `ContainerCreate`, attached to its networks and, per `state`, started (`running`, the default), left created (`created`) or run once to completion (`exited`).
 - [`docker_image`](reference/docker_image.md): A Docker image on the provider's daemon, pulled from its registry or built from a local context.
 - [`docker_network`](reference/docker_network.md): A Docker network (`NetworkCreate`): a local `bridge`/`macvlan`/`ipvlan` network, or a Swarm-scoped `overlay` network when the daemon is a Swarm manager.
 - [`docker_node`](reference/docker_node.md): Manages the labels, availability and role of a swarm node that has already joined, like `docker node update`, through the provider's Docker host (which must be a manager).
@@ -943,6 +982,7 @@ before choosing argument names.
 - [`action.docker_container_pause`](reference/action.docker_container_pause.md): Freezes all processes of a running container, like `docker container pause` (the cgroup freezer).
 - [`action.docker_container_prune`](reference/action.docker_container_prune.md): Removes stopped containers, like `docker container prune`, and reports what it removed and the space reclaimed.
 - [`action.docker_container_restart`](reference/action.docker_container_restart.md): Restarts a container, like `docker container restart`: a stop (signal, grace period, SIGKILL) followed by a start.
+- [`action.docker_container_run`](reference/action.docker_container_run.md): Runs a one-shot container to completion, like `docker run --rm`: creates it (pulling the image when missing), starts it, waits until it exits within `timeout`, reads its exit code and output, then removes it (`remove`, default `true`).
 - [`action.docker_container_start`](reference/action.docker_container_start.md): Starts a stopped or created container, like `docker container start`.
 - [`action.docker_container_stop`](reference/action.docker_container_stop.md): Stops a running container, like `docker container stop`: it sends the stop signal, waits for the grace period and then sends SIGKILL.
 - [`action.docker_container_unpause`](reference/action.docker_container_unpause.md): Resumes the processes of a paused container, like `docker container unpause`.

@@ -161,7 +161,7 @@ func TestE2EConfigRenders(t *testing.T) {
 }
 
 // TestAccE2EImageToService runs the whole chain against the dind harness in
-// test/harness (make e2e).
+// test/harness (Invoke-Build E2E).
 func TestAccE2EImageToService(t *testing.T) {
 	testAccPreCheck(t)
 	p := e2eParams{
