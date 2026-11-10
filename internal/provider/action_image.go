@@ -83,7 +83,8 @@ func (a *imageImportAction) Schema(_ context.Context, _ action.SchemaRequest, re
 		MarkdownDescription: "Creates an image from a filesystem tarball, like `docker import`. " +
 			"The source is a local tar file (streamed by the provider) or an `http(s)://` URL (fetched by the daemon). " +
 			"The image is not tracked in state; manage its lifetime yourself. The result object holds `id`, `image_ref` and " +
-			"`result.image` (size, created, architecture, os and variant of the new image).",
+			"`result.image` (size, created, architecture, os and variant of the new image). With the provider's `owner` set, the " +
+			"image gets the owner label (an extra `LABEL` change).",
 		Attributes: map[string]schema.Attribute{
 			"source": schema.StringAttribute{
 				Required:            true,
@@ -146,7 +147,7 @@ func (a *imageImportAction) Invoke(ctx context.Context, req action.InvokeRequest
 	rc, err := c.ImageImport(ctx, is, ref, client.ImageImportOptions{
 		Tag:      tag,
 		Message:  m.Message.ValueString(),
-		Changes:  changes,
+		Changes:  rOwnerLabelChanges(a.pd, changes),
 		Platform: platformFromString(m.Platform.ValueString()),
 	})
 	if err != nil {
@@ -199,6 +200,7 @@ type imageLoadAction struct{ actBase }
 type imageLoadActionModel struct {
 	Input      types.String `tfsdk:"input"`
 	Platform   types.String `tfsdk:"platform"`
+	Quiet      types.Bool   `tfsdk:"quiet"`
 	ResultPath types.String `tfsdk:"result_path"`
 }
 
@@ -216,7 +218,12 @@ func (a *imageLoadAction) Schema(_ context.Context, _ action.SchemaRequest, resp
 				Required:            true,
 				MarkdownDescription: "Local path of the image archive (optionally gzip/bzip2/xz compressed), like `docker load --input`. `~` expands to the home directory.",
 			},
-			"platform":    imgPlatformAttr("docker load"),
+			"platform": imgPlatformAttr("docker load"),
+			"quiet": schema.BoolAttribute{
+				Optional: true,
+				MarkdownDescription: "Suppress progress details during the load (`quiet`, like `docker load --quiet`). Default `true`; " +
+					"with `false` the daemon's per-layer progress is forwarded as action progress messages.",
+			},
 			"result_path": actResultPathAttribute(),
 		},
 	}
@@ -251,7 +258,7 @@ func (a *imageLoadAction) Invoke(ctx context.Context, req action.InvokeRequest, 
 	if fi, err := f.Stat(); err == nil {
 		size = fi.Size()
 	}
-	opts := []client.ImageLoadOption{client.ImageLoadWithQuiet(true)}
+	opts := []client.ImageLoadOption{client.ImageLoadWithQuiet(actBool(m.Quiet, true))}
 	if pl := m.Platform.ValueString(); pl != "" {
 		opts = append(opts, client.ImageLoadWithPlatforms(platformFromString(pl)))
 	}

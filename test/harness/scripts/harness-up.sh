@@ -161,6 +161,19 @@ wait_daemon worker3 -H tcp://127.0.0.1:12379
 wait_daemon worker4 -H tcp://127.0.0.1:12381
 wait_daemon tlsnode -H tcp://127.0.0.1:12378 --tlsverify --tlscacert "${TLS_CA}" --tlscert "${TLS_CERT}" --tlskey "${TLS_KEY}"
 wait_http registry http://127.0.0.1:12380/v2/
+# The self-signed TLS registry: best effort, only its one test needs it.
+TLS_REGISTRY=""
+for i in $(seq 1 30); do
+  if curl -kfsS -o /dev/null https://127.0.0.1:12382/v2/ 2>/dev/null; then
+    TLS_REGISTRY="127.0.0.1:12382"
+    echo "tlsregistry ready at https://${TLS_REGISTRY}/v2/"
+    break
+  fi
+  sleep 2
+done
+if [ -z "${TLS_REGISTRY}" ]; then
+  echo "WARNING: tlsregistry did not answer over HTTPS; TestAccRegistryImageDataInsecureSkipVerify will skip." >&2
+fi
 
 mgr() { docker -H "${MGR_HOST}" "$@"; }
 
@@ -243,6 +256,7 @@ fi
   echo "export TF_ACC_TLS_CERT=\"${TLS_CERT}\""
   echo "export TF_ACC_TLS_KEY=\"${TLS_KEY}\""
   echo "export TF_ACC_TLS_CERT_PATH=\"$(native_path "${TLS_DIR}")\""
+  if [ -n "${TLS_REGISTRY}" ]; then echo "export TF_ACC_TLS_REGISTRY=\"${TLS_REGISTRY}\""; fi
   echo "export TF_ACC_GPU_NODE_LABEL=\"gpu=nvidia\""
   echo "export TF_ACC_HARNESS_COMPOSE=\"$(native_path "${COMPOSE_FILE}")\""
   echo "export TF_ACC_COMPOSE_CLI=\"$(native_path "$(command -v docker)")\""

@@ -9,6 +9,7 @@ package provider
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,17 +21,10 @@ import (
 	"time"
 )
 
-// p3RegistryCreds returns the registry_auth username/password for domain.
+// p3RegistryCreds returns the username/password for domain (registryCredentialFor).
 func (pd *providerData) p3RegistryCreds(domain string) (string, string) {
-	if pd == nil {
-		return "", ""
-	}
-	for _, c := range pd.RegistryAuth {
-		if normalizeRegistry(c.Address) == normalizeRegistry(domain) {
-			return c.Username, c.Password
-		}
-	}
-	return "", ""
+	c, _ := pd.registryCredentialFor(context.Background(), domain)
+	return c.Username, c.Password
 }
 
 // p3Registry talks to one registry (and, for data calls, one repository).
@@ -95,7 +89,7 @@ func (r *p3Registry) send(ctx context.Context, p string, accept []string) (*http
 		return resp, nil
 	}
 	var netErr net.Error
-	if registryImageIsLocal(r.host) && (errors.As(err, &netErr) || strings.Contains(err.Error(), "HTTP response to HTTPS client")) {
+	if registryImageIsLocal(r.host) && !regIsTLSVerifyError(err) && (errors.As(err, &netErr) || strings.Contains(err.Error(), "HTTP response to HTTPS client")) {
 		if resp, err2 := do("http://" + r.host); err2 == nil {
 			r.base = "http://" + r.host
 			r.regNoteAPIVersion(resp)
@@ -103,6 +97,17 @@ func (r *p3Registry) send(ctx context.Context, p string, accept []string) (*http
 		}
 	}
 	return nil, err
+}
+
+// regIsTLSVerifyError reports a failed certificate verification. Such a
+// registry does speak TLS, so falling back to plain http would only hide
+// the certificate error behind an "HTTP request to an HTTPS server" reply.
+func regIsTLSVerifyError(err error) bool {
+	var cv *tls.CertificateVerificationError
+	var ua x509.UnknownAuthorityError
+	var he x509.HostnameError
+	var ci x509.CertificateInvalidError
+	return errors.As(err, &cv) || errors.As(err, &ua) || errors.As(err, &he) || errors.As(err, &ci)
 }
 
 // get GETs p (a /v2/... path or an absolute URL on the same registry),

@@ -1,8 +1,8 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-  Bring up the dind harness (manager + 4 workers, registry:2, Hub mirror, TLS
-  daemon), seed the registry and write test/harness/.env.
+  Bring up the dind harness (manager + 4 workers, registry:2, TLS registry,
+  Hub mirror, TLS daemon), seed the registry and write test/harness/.env.
 
 .DESCRIPTION
   PowerShell equivalent of harness-up.sh. Uses the same docker-compose.yml and
@@ -70,6 +70,7 @@ $HarnessEnv = [ordered]@{
     TF_ACC_TLS_CERT          = ConvertTo-SlashPath (Join-Path $TlsDir 'cert.pem')
     TF_ACC_TLS_KEY           = ConvertTo-SlashPath (Join-Path $TlsDir 'key.pem')
     TF_ACC_TLS_CERT_PATH     = ConvertTo-SlashPath $TlsDir
+    TF_ACC_TLS_REGISTRY      = '127.0.0.1:12382'
     TF_ACC_GPU_NODE_LABEL    = 'gpu=nvidia'
     TF_ACC_HARNESS_COMPOSE   = ConvertTo-SlashPath $ComposeFile
     TF_ACC_COMPOSE_CLI       = ConvertTo-SlashPath ((Get-Command docker -ErrorAction SilentlyContinue).Source)
@@ -253,6 +254,21 @@ Wait-HarnessDaemon -Name worker4 -DockerArgs @('-H', $HarnessEnv.DOCKER_WORKER4_
 Wait-HarnessDaemon -Name tlsnode -DockerArgs @('-H', $HarnessEnv.TF_ACC_TLS_HOST, '--tlsverify',
     '--tlscacert', $HarnessEnv.TF_ACC_TLS_CA, '--tlscert', $HarnessEnv.TF_ACC_TLS_CERT, '--tlskey', $HarnessEnv.TF_ACC_TLS_KEY)
 Wait-HarnessHttp -Name registry -Url "http://$($HarnessEnv.TF_ACC_REGISTRY)/v2/"
+# The self-signed TLS registry: best effort, only its one test needs it.
+$tlsRegistryUp = $false
+for ($i = 1; $i -le 30 -and -not $tlsRegistryUp; $i++) {
+    try {
+        $tlsRegistryUp = (Invoke-WebRequest -Uri "https://$($HarnessEnv.TF_ACC_TLS_REGISTRY)/v2/" -UseBasicParsing -SkipCertificateCheck -TimeoutSec 5).StatusCode -eq 200
+    } catch {
+        Start-Sleep -Seconds 2
+    }
+}
+if ($tlsRegistryUp) {
+    Write-Host "tlsregistry ready at https://$($HarnessEnv.TF_ACC_TLS_REGISTRY)/v2/"
+} else {
+    Write-Warning 'harness-up: tlsregistry did not answer over HTTPS; TestAccRegistryImageDataInsecureSkipVerify will skip.'
+    $HarnessEnv.Remove('TF_ACC_TLS_REGISTRY')
+}
 
 # ---------------------------------------------------------------------------
 # Docker CLI against the harness manager; returns @{ Exit; Out }.

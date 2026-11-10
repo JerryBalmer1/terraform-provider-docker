@@ -21,5 +21,14 @@ action "docker_image_commit" "snapshot" {
     message      = "snapshot taken by Terraform"
     changes      = ["LABEL snapshot=true"]
     result_path  = "${path.module}/out/commit-result.json"
+
+    # Optional: the image configuration as the commit body (ContainerConfig).
+    # Unset fields such as env, labels and cmd fall back to the container's.
+    config = {
+      cmd         = ["sh"]
+      env         = ["SNAPSHOT=1"]
+      working_dir = "/"
+      healthcheck = { test = ["CMD", "true"], interval = "30s" }
+    }
   }
 }

@@ -1,0 +1,16 @@
+{
+  "about": "Pass 5.3 Lane R: manual field coverage for the image, tag, registry and image action items. Each entry below is a query parameter or body the moby client fills from a positional argument (container ID, reference, reader), which tools/fieldcov cannot see as a struct field write.",
+  "fields": {
+    "engine:ImageCommit?container": {"item": "engine:image-commit", "attr": "container_id"},
+    "engine:ImageCommit?repo": {"item": "engine:image-commit", "attr": "reference"},
+    "engine:ImageCommit?tag": {"item": "engine:image-commit", "attr": "reference"},
+    "engine:ImageCreate?fromImage": {"item": "engine:image", "attr": "name"},
+    "engine:ImageCreate?fromSrc": {"item": "engine:image-import", "attr": "source"},
+    "engine:ImageCreate?repo": {"item": "engine:image-import", "attr": "repository"},
+    "engine:ImageCreate#body": {"item": "engine:image-import", "attr": "source"},
+    "engine:ImageLoad#body": {"item": "engine:image-load", "attr": "input"},
+    "engine:ImagePush?tag": {"item": "engine:registry-image", "attr": "name"},
+    "engine:ImageTag?repo": {"item": "engine:tag", "attr": "target_image"},
+    "engine:ImageTag?tag": {"item": "engine:tag", "attr": "target_image"}
+  }
+}

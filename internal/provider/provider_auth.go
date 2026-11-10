@@ -1,20 +1,34 @@
 package provider
 
-// registry_auth resolution: explicit username/password, DOCKER_REGISTRY_USER /
-// DOCKER_REGISTRY_PASS, and docker config.json files (auths, credsStore,
-// credHelpers) read with docker/cli's config and credentials packages.
+// Registry credential resolution. Precedence for one registry:
 //
-// Credential helpers (docker-credential-<name>) are external programs run by
-// docker/cli's credentials package. That is the provider's one documented
-// exception to "nothing shells out", and it only happens when the provider
-// sets allow_credential_helpers = true.
+//  1. a registry_auth block for it: username + password / password_wo, then
+//     DOCKER_REGISTRY_USER / DOCKER_REGISTRY_PASS, then the block's docker
+//     config (config_file_content, config_file, else the default config);
+//  2. no block: the default docker config (DOCKER_CONFIG, else
+//     ~/.docker/config.json), see dockerConfigAuth;
+//  3. nothing: anonymous.
+//
+// Inside a docker config the lookup order is the docker CLI's:
+// credHelpers[registry], then credsStore, then auths.
+//
+// Credential helpers (docker-credential-<name>) are external programs, run by
+// docker/cli's credentials package (docker-credential-helpers/client) over
+// the credential-helper protocol: `docker-credential-<name> get` with the
+// server URL on stdin, JSON {"ServerURL","Username","Secret"} on stdout, and
+// "credentials not found in native keychain" meaning no entry. That is the
+// provider's one documented exception to "nothing shells out", and it only
+// happens when the provider sets allow_credential_helpers = true and a docker
+// config names the helper.
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/configfile"
@@ -22,6 +36,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // dockerHubAuthKey is the key Docker Hub credentials are stored under.
@@ -222,4 +237,71 @@ func credentialFromConfigFile(file, address string) (string, string, error) {
 		return "", "", fmt.Errorf("%s: %w", file, err)
 	}
 	return c.Username, c.Password, nil
+}
+
+// dockerConfigAuth resolves credentials for registries that no
+// registry_auth block names, from the default docker config
+// (DOCKER_CONFIG, else ~/.docker/config.json), the way the docker CLI does:
+// credHelpers[registry], then credsStore (both only with
+// allow_credential_helpers), then auths. The file is read on first use and
+// each registry's answer is cached for the provider's lifetime. Anything
+// that does not produce a credential (no file, no entry, a helper that is
+// not allowed or fails) means anonymous access, never an error.
+type dockerConfigAuth struct {
+	getenv       func(string) string
+	allowHelpers bool
+
+	mu     sync.Mutex
+	loaded bool
+	cf     *configfile.ConfigFile
+	byHost map[string]*registryCredential
+}
+
+func newDockerConfigAuth(getenv func(string) string, allowHelpers bool) *dockerConfigAuth {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	return &dockerConfigAuth{getenv: getenv, allowHelpers: allowHelpers, byHost: map[string]*registryCredential{}}
+}
+
+// lookup returns the credential for host, if the default config has one.
+func (d *dockerConfigAuth) lookup(ctx context.Context, host string) (registryCredential, bool) {
+	if d == nil {
+		return registryCredential{}, false
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	key := normalizeRegistry(host)
+	if c, ok := d.byHost[key]; ok {
+		if c == nil {
+			return registryCredential{}, false
+		}
+		return *c, true
+	}
+	if !d.loaded {
+		d.loaded = true
+		if file := defaultDockerConfigFile(d.getenv); file != "" {
+			if _, err := os.Stat(file); err == nil {
+				cf, err := loadDockerConfigFile(file)
+				if err != nil {
+					tflog.Warn(ctx, "cannot read the default docker config for registry credentials",
+						map[string]any{"file": file, "error": err.Error()})
+				}
+				d.cf = cf
+			}
+		}
+	}
+	if d.cf == nil {
+		d.byHost[key] = nil
+		return registryCredential{}, false
+	}
+	c, err := credentialFromDockerConfig(d.cf, host, d.allowHelpers)
+	if err != nil {
+		tflog.Debug(ctx, "no registry credential in the default docker config; using anonymous access",
+			map[string]any{"registry": host, "reason": err.Error()})
+		d.byHost[key] = nil
+		return registryCredential{}, false
+	}
+	d.byHost[key] = &c
+	return c, true
 }

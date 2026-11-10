@@ -51,6 +51,7 @@ type registryImageResourceModel struct {
 	Triggers           types.Map    `tfsdk:"triggers"`
 	PushRetries        types.Int64  `tfsdk:"push_retries"`
 	InsecureSkipVerify types.Bool   `tfsdk:"insecure_skip_verify"`
+	Platform           types.String `tfsdk:"platform"`
 	Digest             types.String `tfsdk:"digest"`
 	ImageRef           types.String `tfsdk:"image_ref"`
 	ImageDigestRef     types.String `tfsdk:"image_digest_ref"`
@@ -106,6 +107,13 @@ func (r *registryImageResource) Schema(_ context.Context, _ resource.SchemaReque
 				MarkdownDescription: "Skip TLS verification when the provider itself talks to the registry (only for the delete on destroy; " +
 					"pushes go through the daemon and follow its insecure-registries setting). Default `false`.",
 			},
+			"platform": schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "Push only this platform of a multi-platform image, `os[/arch[/variant]]` (ImagePush `platform`, like " +
+					"`docker push --platform`): the registry then gets that single platform-specific manifest instead of the index. " +
+					"Default: the whole image. Forces replacement." + apiSince("1.46"),
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
 			"digest": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Manifest (or index) digest (`sha256:...`) of the pushed image in the registry (DistributionInspect `Descriptor.digest`).",
@@ -135,6 +143,9 @@ func (r *registryImageResource) Schema(_ context.Context, _ resource.SchemaReque
 // (only keep_remotely, push_retries and insecure_skip_verify change in
 // place; nothing is pushed).
 func (r *registryImageResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if !req.Plan.Raw.IsNull() {
+		r.pd.gateAPISince(ctx, "docker_registry_image", req.Config, &resp.Diagnostics)
+	}
 	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
 		return
 	}
@@ -259,7 +270,7 @@ func (r *registryImageResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 	digest, err := registryImagePushWithRetry(ctx, int(plan.PushRetries.ValueInt64()), func(ctx context.Context) (io.ReadCloser, error) {
-		return r.pd.Client.ImagePush(ctx, name, client.ImagePushOptions{RegistryAuth: auth})
+		return r.pd.Client.ImagePush(ctx, name, regPushOptions(auth, plan.Platform.ValueString()))
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Image push failed", fmt.Sprintf("%s: %v", name, err))
@@ -279,6 +290,17 @@ func (r *registryImageResource) Create(ctx context.Context, req resource.CreateR
 		plan.contractSetNull()
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// regPushOptions is the ImagePush request: auth, plus the platform to push
+// when platform ("os[/arch[/variant]]") is set.
+func regPushOptions(auth, platform string) client.ImagePushOptions {
+	opts := client.ImagePushOptions{RegistryAuth: auth}
+	if platform != "" {
+		p := platformFromString(platform)
+		opts.Platform = &p
+	}
+	return opts
 }
 
 // registryImageNotFound reports registry/daemon "no such manifest" errors.

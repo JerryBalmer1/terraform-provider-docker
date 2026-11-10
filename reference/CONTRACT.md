@@ -201,6 +201,95 @@ Outputs that are not Engine responses are outside this rule: rendered text (`doc
 `image_config_json`, `provenance_json`, `sbom_json`, `tags_json`), buildx/BuildKit metadata (`metadata_json`,
 `bake_json`, the buildx builder/history/disk-usage views) and CLI views (`projects_json`, `stacks_json`).
 
+## External programs and registry credentials
+
+The provider runs exactly one kind of external program: a docker credential helper, `docker-credential-<name>`
+(found on `PATH`), and only when both hold:
+
+1. the provider sets `allow_credential_helpers = true` (default `false`; CLAUDE.md standing rule), and
+2. a docker `config.json` the provider reads names the helper, in `credHelpers` (per registry) or `credsStore`.
+
+It speaks the credential-helper protocol (docker-credential-helpers `client`, called through docker/cli's
+`cli/config/credentials` native store): `docker-credential-<name> get`, the registry server URL on stdin, and JSON
+`{"ServerURL", "Username", "Secret"}` on stdout; a `Username` of `<token>` makes `Secret` an identity token, and the
+"credentials not found" answer means no entry. Nothing else is ever started: no docker CLI, no compose plugin, no ssh
+binary (SSH is pure Go). Covered by TestCredentialHelperProtocolR and TestDockerConfigAuthDefaultR
+(internal/provider/provider_auth_r_test.go), which build a fake helper from `internal/provider/testdata/credhelper`.
+
+Credential precedence for one registry (first match wins):
+
+| # | source | notes |
+|---|---|---|
+| 1 | a `registry_auth` block for the registry: `username` + `password` / `password_wo` | |
+| 2 | the same block: `DOCKER_REGISTRY_USER` / `DOCKER_REGISTRY_PASS` | only when the block names no config file |
+| 3 | the same block: its docker config (`config_file_content`, `config_file`, else the default config) | lookup order below; an unresolved block is an error |
+| 4 | no block: the default docker config (`DOCKER_CONFIG`, a directory or a file, else `~/.docker/config.json`) | lookup order below; read on first use, cached per registry; anything unresolved is anonymous, never an error |
+| 5 | anonymous | |
+
+Inside a docker config the order is the docker CLI's: `credHelpers[<registry>]`, then `credsStore` (both run a helper,
+so both need `allow_credential_helpers`), then `auths`. A helper that answers "credentials not found" (or fails), or a
+helper the gate does not allow, falls back to the `auths` entry for the registry when there is one. Docker Hub is
+looked up under `https://index.docker.io/v1/`, other registries under their bare `host[:port]`.
+
+Registry reads by the provider itself (`docker_registry_image` delete, `data.docker_registry_image_manifests`,
+`data.docker_registry_image_tags`, `docker_registry_token`, and `data.docker_registry_image` with
+`insecure_skip_verify` set) use the same resolution (username and password only). `insecure_skip_verify = true` on
+those types turns TLS certificate verification off for that direct read; `false` verifies against the system roots
+and reports the certificate error instead of falling back to plain http. Unset on `data.docker_registry_image`, the
+read goes through the daemon (`GET /distribution/<name>/json`), which follows its own `insecure-registries`.
+
+## Owner label
+
+The provider argument `owner` (Pass 5.3) names the Terraform configuration that manages the objects this provider creates. Unset (the default), nothing is labelled and nothing is checked. Set, every object the types below create carries the label `io.terraform.provider.owner=<owner>`. The lists are code: `ownerLabelledTypes`, `ownerInjectOnlyActions`, `ownerLabelExclusions` and `ownerNoObjectActions` in internal/provider/owner_label.go, and `TestOwnerLabelCoverage` fails when a registered resource or action is in none of them, so a new type cannot silently miss the label.
+
+### Resources: inject, conflict check, adopt
+
+Create fails with an error naming both owners when an object of the same name already exists and carries a different owner label. Managing an object whose label names another owner (after `terraform import`, for example) needs `adopt = true` on the resource; without it the plan fails. The label is stripped from the user-facing `labels` attribute, so it never shows as drift.
+
+| Type | Objects labelled |
+|---|---|
+| `docker_container` | container labels |
+| `docker_network` | network labels |
+| `docker_volume` | volume labels |
+| `docker_image` | build labels (a pulled image cannot be labelled) |
+| `docker_buildx_builder` | the builder container's labels |
+| `docker_secret` | secret spec labels |
+| `docker_config` | config spec labels |
+| `docker_service` | service spec labels |
+| `docker_stack` | labels on the stack's services, networks, secrets and configs |
+| `docker_swarm_init` | swarm spec labels |
+| `docker_swarm_node` | node spec labels of the joined node: two states managing one node collide here |
+| `docker_compose` | labels on the project's containers, networks and volumes |
+
+### Actions: inject only
+
+An action owns nothing in state, so there is nothing for it to collide with: these actions add the label to what they create (for forensics only) and run no conflict check and take no `adopt`. With `owner` unset they add nothing.
+
+| Type | Objects labelled |
+|---|---|
+| `docker_container_run` | the run container's labels |
+| `docker_image_commit` | the committed image's config labels |
+| `docker_image_import` | the imported image's labels (a LABEL change) |
+| `docker_compose_run` | the one-off container's labels |
+| `docker_buildx_bake` | every bake-produced image, through the build's labels |
+| `docker_compose_build` | the built service images (compose build labels path, compose_local_apply.go) |
+| `docker_compose_commit` | the committed image (a LABEL change, like docker_image_commit) |
+| `docker_compose_scale` | the containers it adds (composeLocalWire; no conflict check) |
+
+### Excluded types
+
+These types create or manage Docker objects but deliberately carry no owner label. Every other registered action creates no labellable object at all (it acts on existing objects, removes objects, or writes a tar file or to a registry); `ownerNoObjectActions` lists them.
+
+| Type | Reason |
+|---|---|
+| `docker_image_load` | loads images from a tar exactly as saved; the Engine API has no way to add labels on load |
+| `docker_node` | manages an existing node's spec and creates nothing; the node was created by its join |
+| `docker_plugin` | plugins have no labels in the Engine API |
+| `docker_plugin_create` | plugins have no labels in the Engine API |
+| `docker_tag` | a tag is a name on an existing image, not an object with labels |
+| `docker_registry_image` | pushes to a registry; registry manifests carry no Docker labels |
+| `docker_registry_manifest_list` | a registry manifest list carries no Docker labels |
+
 ## Known differences from upstream defaults
 
 Where an argument has the same name as an upstream flag but a different default, by decision:

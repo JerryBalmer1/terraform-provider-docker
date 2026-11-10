@@ -63,6 +63,7 @@ type providerModel struct {
 	DisableDockerDaemonCheck types.Bool          `tfsdk:"disable_docker_daemon_check"`
 	AllowCredentialHelpers   types.Bool          `tfsdk:"allow_credential_helpers"`
 	MinAPIVersion            types.String        `tfsdk:"min_api_version"`
+	Owner                    types.String        `tfsdk:"owner"`
 	TLS                      *tlsModel           `tfsdk:"tls"`
 	SSH                      *sshModel           `tfsdk:"ssh"`
 	RegistryAuth             []registryAuthModel `tfsdk:"registry_auth"`
@@ -93,7 +94,10 @@ type providerData struct {
 	Client       *client.Client
 	Endpoint     endpointConfig
 	RegistryAuth []registryCredential
-	Version      string
+	// configAuth answers for registries no registry_auth block names, from
+	// the default docker config (provider_auth.go); nil in test fixtures.
+	configAuth *dockerConfigAuth
+	Version    string
 	// MinAPIVersion is min_api_version (default DefaultMinAPIVersion); ""
 	// (test fixtures) means no floor.
 	MinAPIVersion string
@@ -101,6 +105,10 @@ type providerData struct {
 	// apiMu guards apiVersion, the negotiated version APIVersion caches.
 	apiMu      sync.Mutex
 	apiVersion string
+
+	// Owner is the provider's `owner` argument ("" = no owner labels or
+	// checks); see owner_label.go.
+	Owner string
 
 	// serverVersion caches GET /version Version for the
 	// docker_server_version contract output (contract_version.go).
@@ -136,7 +144,12 @@ func (p *dockerProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 		MarkdownDescription: "Owns the whole Docker chain through the Docker Engine API: image build and push, " +
 			"single-host networks, volumes and containers, Swarm init and node join, and Swarm secrets, configs, services and stacks. " +
 			"Compose files are parsed in-process (docker_compose) and never handed to the compose plugin; no docker CLI is involved; SSH hosts are reached in pure Go. The one external program the provider " +
-			"can run is a docker credential helper, and only with `allow_credential_helpers = true`.\n\n" +
+			"can run is a docker credential helper (`docker-credential-<name>`, over the credential-helper protocol), only when a docker " +
+			"`config.json` names it and only with `allow_credential_helpers = true`.\n\n" +
+			"Registry credential precedence, per registry: a `registry_auth` block for it (its `username`/`password`, then " +
+			"`DOCKER_REGISTRY_USER`/`DOCKER_REGISTRY_PASS`, then its docker config); with no block, the default docker config " +
+			"(`DOCKER_CONFIG`, else `~/.docker/config.json`); else anonymous. Inside a docker config: `credHelpers[<registry>]`, then " +
+			"`credsStore` (both need `allow_credential_helpers`), then `auths`.\n\n" +
 			"Endpoint precedence: `host`, then the `ssh` block's `host`, then `context`, then `DOCKER_HOST`, then `DOCKER_CONTEXT`, " +
 			"then `currentContext` in the docker `config.json`, then `" + defaultDockerHost + "`.",
 		Attributes: map[string]schema.Attribute{
@@ -179,11 +192,22 @@ func (p *dockerProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 					"from the first operation that asks for the version. A pinned `api_version` below it is rejected. There is no environment " +
 					"variable: the docker CLI has no API floor setting to mirror.",
 			},
+			"owner": schema.StringAttribute{
+				Optional:   true,
+				Validators: []validator.String{stringvalidator.LengthBetween(1, 256)},
+				MarkdownDescription: "Ownership label value. When set, every object the provider creates gets the label `" + ownerLabelKey +
+					"=<owner>`; creating an object whose name is taken by an object carrying a different owner label fails; and " +
+					"managing (for example importing) an object owned by someone else needs `adopt = true` on that resource. " +
+					"Unset (default): no labels and no checks.",
+			},
 			"allow_credential_helpers": schema.BoolAttribute{
 				Optional: true,
-				MarkdownDescription: "Let `registry_auth` run the docker credential helpers (`docker-credential-<name>`) named by " +
-					"`credsStore` / `credHelpers` in a docker `config.json`. Default `false`: the provider never starts another program, " +
-					"and a registry whose credentials only live in a helper is an error naming this attribute. This is the provider's one " +
+				MarkdownDescription: "Let the provider run the docker credential helpers (`docker-credential-<name>`, found on `PATH`) named by " +
+					"`credHelpers` / `credsStore` in a docker `config.json`, for `registry_auth` blocks and for registries without one. " +
+					"The helper is called as `docker-credential-<name> get` with the registry on stdin and answers JSON " +
+					"(`ServerURL`, `Username`, `Secret`) on stdout; \"credentials not found\" falls back to `auths`. Default `false`: the " +
+					"provider never starts another program, a `registry_auth` block whose credentials only live in a helper is an error " +
+					"naming this attribute, and a registry without a block is accessed anonymously. This is the provider's one " +
 					"documented exception to running nothing external.",
 			},
 		},
@@ -191,7 +215,8 @@ func (p *dockerProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 			"tls": tlsBlockSchema(),
 			"ssh": sshProviderBlockSchema(),
 			"registry_auth": schema.ListNestedBlock{
-				MarkdownDescription: "Credentials for registries, used for pulls and pushes. Sources, first match wins: `username` with " +
+				MarkdownDescription: "Credentials for registries, used for pulls and pushes. A registry without a block gets the default docker config's " +
+					"credentials (`DOCKER_CONFIG`, else `~/.docker/config.json`), or none. Sources in a block, first match wins: `username` with " +
 					"`password`/`password_wo`; `DOCKER_REGISTRY_USER`/`DOCKER_REGISTRY_PASS` (when no config file is named); " +
 					"`config_file_content`; `config_file`; the default config (`DOCKER_CONFIG`, a directory or a file, else " +
 					"`~/.docker/config.json`). In a config file, `credHelpers` and `credsStore` are honored like the docker CLI " +
@@ -383,7 +408,13 @@ func (p *dockerProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 	tflog.Debug(ctx, "docker provider configured", map[string]any{"host": ep.Host, "context": ep.Context, "ssh": ep.SSH != nil,
 		"min_api_version": minAPI, "api_version": negotiated})
-	pd := &providerData{Client: c, Endpoint: ep, RegistryAuth: creds, Version: p.version, MinAPIVersion: minAPI, apiVersion: negotiated}
+	if m.Owner.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(path.Root("owner"), "Unknown docker provider argument",
+			"owner is not known until apply. Set it to a literal.")
+		return
+	}
+	pd := &providerData{Client: c, Endpoint: ep, RegistryAuth: creds, Version: p.version, MinAPIVersion: minAPI, apiVersion: negotiated,
+		Owner: m.Owner.ValueString(), configAuth: newDockerConfigAuth(os.Getenv, allowHelpers)}
 	resp.ResourceData = pd
 	resp.DataSourceData = pd
 	resp.EphemeralResourceData = pd

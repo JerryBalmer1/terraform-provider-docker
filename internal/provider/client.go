@@ -105,6 +105,8 @@ func finishDockerClient(ep endpointConfig, opts []client.Opt) (*client.Client, e
 		}
 		opts = append(opts, client.WithHTTPRequestHook(apiFloorHook(host, ep.MinAPIVersion)))
 	}
+	// One tflog entry per Engine API call (api_log.go).
+	opts = append(opts, apiLogOpts()...)
 	return client.NewClientWithOpts(opts...)
 }
 
@@ -227,12 +229,26 @@ func (pd *providerData) registryAuthConfigFor(imageRef string) (registry.AuthCon
 	if err != nil {
 		return registry.AuthConfig{}, false, fmt.Errorf("parsing image reference %q: %w", imageRef, err)
 	}
+	c, ok := pd.registryCredentialFor(context.Background(), host)
+	if !ok {
+		return registry.AuthConfig{}, false, nil
+	}
+	return registry.AuthConfig{Username: c.Username, Password: c.Password, IdentityToken: c.IdentityToken, ServerAddress: c.Address}, true, nil
+}
+
+// registryCredentialFor returns the credential for a registry host: the
+// matching registry_auth entry, else the default docker config's (when the
+// provider was configured), else none (anonymous).
+func (pd *providerData) registryCredentialFor(ctx context.Context, host string) (registryCredential, bool) {
+	if pd == nil {
+		return registryCredential{}, false
+	}
 	for _, c := range pd.RegistryAuth {
 		if normalizeRegistry(c.Address) == normalizeRegistry(host) {
-			return registry.AuthConfig{Username: c.Username, Password: c.Password, IdentityToken: c.IdentityToken, ServerAddress: c.Address}, true, nil
+			return c, true
 		}
 	}
-	return registry.AuthConfig{}, false, nil
+	return pd.configAuth.lookup(ctx, host)
 }
 
 // ---------------------------------------------------------------------------

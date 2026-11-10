@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -10,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (
@@ -59,8 +62,13 @@ func (d *registryImageDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			},
 			"insecure_skip_verify": schema.BoolAttribute{
 				Optional: true,
-				MarkdownDescription: "Accepted for configurations migrated from other providers; it has no effect. " +
-					"The read goes through the daemon, which follows its own `insecure-registries` setting.",
+				MarkdownDescription: "Read the registry directly instead of through the daemon, with TLS certificate verification off " +
+					"(`true`) or on (`false`). Set either way, the provider itself calls the Registry HTTP API v2 " +
+					"(`GET /v2/<repo>/manifests/<ref>`, plus the image config blob of a single-platform manifest) with the " +
+					"`registry_auth` username and password, and fills the same outputs from the response. `true` accepts a " +
+					"self-signed or otherwise unverifiable certificate; `false` verifies it against the system roots and fails " +
+					"with the certificate error. Unset (default): the daemon reads the registry (`GET /distribution/<name>/json`) " +
+					"and follows its own `insecure-registries` setting.",
 			},
 			"id":               str("`<name>@<digest>`, the reference as given pinned to the digest."),
 			"digest":           str("Manifest (or manifest list / index) digest, `sha256:...` (DistributionInspect `Descriptor.digest`)."),
@@ -94,16 +102,22 @@ func (d *registryImageDataSource) Read(ctx context.Context, req datasource.ReadR
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !d.pd.gateItemAPI(ctx, regImageDataItem, &resp.Diagnostics) {
-		return
-	}
 	name := m.Name.ValueString()
 	auth, err := d.pd.registryAuthFor(name)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("name"), "Invalid image reference", err.Error())
 		return
 	}
-	di, err := d.pd.Client.DistributionInspect(ctx, name, client.DistributionInspectOptions{EncodedRegistryAuth: auth})
+	var di client.DistributionInspectResult
+	if insecure, ok := knownBool(m.InsecureSkipVerify); ok {
+		di.DistributionInspect, err = regDirectDistributionInspect(ctx, d.pd, name, insecure)
+	} else {
+		// Through the daemon: GET /distribution needs Engine API 1.30.
+		if !d.pd.gateItemAPI(ctx, regImageDataItem, &resp.Diagnostics) {
+			return
+		}
+		di, err = d.pd.Client.DistributionInspect(ctx, name, client.DistributionInspectOptions{EncodedRegistryAuth: auth})
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot read image digest from registry", fmt.Sprintf("%s: %v", name, err))
 		return
@@ -128,6 +142,59 @@ func (d *registryImageDataSource) Read(ctx context.Context, req datasource.ReadR
 	resp.Diagnostics.Append(m.contractFill(ctx, d.pd, fill)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
+
+// regDirectDistributionInspect reads name straight from its registry
+// (Registry HTTP API v2, TLS verification off when insecure) and returns
+// what the daemon's GET /distribution/<name>/json would: the top manifest's
+// descriptor and the platforms of an index's entries, or of a single
+// manifest's image config.
+func regDirectDistributionInspect(ctx context.Context, pd *providerData, name string, insecure bool) (registry.DistributionInspect, error) {
+	p, err := parseImageRef(name)
+	if err != nil {
+		return registry.DistributionInspect{}, err
+	}
+	ref := p.Digest
+	if ref == "" {
+		ref = p.Tag
+	}
+	if ref == "" {
+		ref = "latest"
+	}
+	r := newP3Registry(pd, p.Registry, p.Repository, insecure)
+	in, err := regInspect(ctx, r, ref, true)
+	if err != nil {
+		return registry.DistributionInspect{}, err
+	}
+	top := in.Top
+	if !regDigestPattern.MatchString(top.Digest) {
+		return registry.DistributionInspect{}, fmt.Errorf("registry digest %q is not a sha256 digest", top.Digest)
+	}
+	var out registry.DistributionInspect
+	// Descriptor.Digest is a go-digest type; decoding fills it without a
+	// direct dependency on that module.
+	desc, _ := json.Marshal(map[string]any{"mediaType": top.MediaType, "digest": top.Digest, "size": len(top.Body)})
+	if err := json.Unmarshal(desc, &out.Descriptor); err != nil {
+		return registry.DistributionInspect{}, err
+	}
+	if top.isIndex() {
+		for _, e := range top.Doc.Manifests {
+			pl := ocispec.Platform{}
+			if e.Platform != nil {
+				pl = *e.Platform
+			}
+			out.Platforms = append(out.Platforms, pl)
+		}
+	} else if in.SingleCfg != nil {
+		var pl ocispec.Platform
+		if json.Unmarshal(in.SingleCfg, &pl) == nil && (pl.OS != "" || pl.Architecture != "") {
+			out.Platforms = append(out.Platforms, pl)
+		}
+	}
+	return out, nil
+}
+
+// regDigestPattern matches a sha256 content digest.
+var regDigestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
 // regRefValues is regRefs as framework values.
 func regRefValues(name, digest string) (types.String, types.String) {

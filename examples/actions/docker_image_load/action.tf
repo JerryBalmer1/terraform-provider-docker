@@ -14,6 +14,7 @@ resource "terraform_data" "bundle" {
 action "docker_image_load" "bundle" {
   config {
     input       = "${path.module}/images.tar"
+    quiet       = false # forward per-layer progress as action progress
     result_path = "${path.module}/out/load-result.json"
   }
 }

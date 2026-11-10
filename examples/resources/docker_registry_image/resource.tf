@@ -18,3 +18,9 @@ resource "docker_registry_image" "app" {
 output "app_digest" {
   value = docker_registry_image.app.image_digest_ref
 }
+
+# Push only the linux/arm64 variant of a multi-platform image (Engine API 1.46+).
+resource "docker_registry_image" "app_arm64" {
+  name     = "registry.example.com/team/app-arm64:1.0"
+  platform = "linux/arm64"
+}
