@@ -7,10 +7,13 @@
     which picks up this *.build.ps1 file automatically:
 
         Invoke-Build ?                  # list tasks with their synopses
-        Invoke-Build                    # default task: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck
+        Invoke-Build                    # default task: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage
         Invoke-Build Test
         Invoke-Build Build, Vet, GenSkillCheck
         Invoke-Build Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm
+        Invoke-Build PreRelease         # every pre-release gate, one summary table (build/prerelease.tasks.ps1)
+        Invoke-Build DriftCheck         # upstream drift vs reference/SOURCES.md
+        Invoke-Build ReleaseCheck       # release matrix + cross-compiles; Release: local goreleaser snapshot
 
     Install once: Install-Module InvokeBuild -Scope CurrentUser
 
@@ -19,7 +22,7 @@
 
     This script is the only build entry point: CI (.github/workflows/ci.yml) installs InvokeBuild and runs
     these same tasks under pwsh on Linux, in this order: the default task, Check, ParityCheck + GuideCheck,
-    ApiWatchCheck, then E2E. There is no Makefile.
+    ReleaseCheck, ApiWatchCheck, then E2E. There is no Makefile.
 
 .PARAMETER Go
     Go command (default $env:GO, else 'go').
@@ -469,6 +472,32 @@ task FieldCoverage {
 task FieldMap {
     requires -Variable GoExe
     exec { & $GoExe run ./tools/fieldcov -write }
+}
+
+# Synopsis: Regenerate reference/_gen/deferred.json (everything knowingly not done) and print totals by kind plus the items added or removed since the committed version.
+task DeferredReport {
+    requires -Variable GoExe, GitExe
+    $base = Join-Path ([System.IO.Path]::GetTempPath()) "tpd-deferred-base-$PID.json"
+    # The committed version is the baseline; before the first commit of deferred.json there is none (empty file).
+    $old = & $GitExe show 'HEAD:reference/_gen/deferred.json' 2>$null
+    if ($LASTEXITCODE) { $old = '' }
+    [System.IO.File]::WriteAllText($base, ($old -join "`n"))
+    $global:LASTEXITCODE = 0
+    try { exec { & $GoExe run ./tools/deferred -write -base $base } }
+    finally { Remove-Item -LiteralPath $base -ErrorAction Ignore }
+}
+
+# Synopsis: Fail if reference/_gen/deferred.json is stale (go run ./tools/deferred).
+task DeferredCheck {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/deferred } -ErrorMessage 'reference/_gen/deferred.json is stale. Run Invoke-Build DeferredReport.'
+}
+
+# ---------------------------------------------------------------------------- task files
+# Release tasks (Release) and pre-release tasks (DriftCheck, PreRelease) live in their own files, dot-sourced here so
+# they share this script's variables and helpers.
+foreach ($taskFile in 'build/release.tasks.ps1', 'build/prerelease.tasks.ps1') {
+    . (Join-Path $BuildRoot $taskFile)
 }
 
 # Synopsis: Default (and CI's first step): Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage.
