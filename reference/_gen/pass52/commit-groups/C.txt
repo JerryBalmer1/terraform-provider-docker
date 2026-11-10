@@ -1,0 +1,8 @@
+internal/provider/c_compose_refs.go
+internal/provider/compose_local.go
+internal/provider/compose_local_apply.go
+internal/provider/compose_parity_acc_c_test.go
+internal/provider/compose_refs_c_test.go
+reference/CONTRACT.md
+reference/_gen/pass52/lane-C.files
+reference/_gen/pass52/lane-C.md
