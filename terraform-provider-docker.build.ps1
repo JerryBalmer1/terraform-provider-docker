@@ -7,7 +7,7 @@
     which picks up this *.build.ps1 file automatically:
 
         Invoke-Build ?                  # list tasks with their synopses
-        Invoke-Build                    # default task: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck
+        Invoke-Build                    # default task: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck
         Invoke-Build Test
         Invoke-Build Build, Vet, GenSkillCheck
         Invoke-Build Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm
@@ -17,13 +17,15 @@
     Tools are resolved from PATH when the script loads. A task failing with
     "Missing variable 'GoExe'" (or GitExe, GofmtExe, PythonExe) means that tool is not on PATH.
 
-    The GNUmakefile mirrors these tasks for Linux/macOS/CI.
+    This script is the only build entry point: CI (.github/workflows/ci.yml) installs InvokeBuild and runs
+    these same tasks under pwsh on Linux, in this order: the default task, Check, ParityCheck + GuideCheck,
+    ApiWatchCheck, then E2E. There is no Makefile.
 
 .PARAMETER Go
     Go command (default $env:GO, else 'go').
 
 .PARAMETER Python
-    Python 3 command for the Inventory task (default 'python').
+    Python 3 command for the Inventory tasks (default 'python', falling back to 'python3' when 'python' is not on PATH).
 
 .PARAMETER In
     Compose2Stack: compose file to read, relative to the repo root (default docker-compose.yml).
@@ -59,11 +61,13 @@ $GoExe = Resolve-Tool $Go
 $GofmtExe = Resolve-Tool 'gofmt'
 $GitExe = Resolve-Tool 'git'
 $PythonExe = Resolve-Tool $Python
+# Linux runners (GitHub ubuntu images) ship python3 without a `python` alias.
+if (-not $PythonExe -and $Python -eq 'python') { $PythonExe = Resolve-Tool 'python3' }
 
 $TfPluginDocs = 'github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs'
 $Harness = Join-Path $BuildRoot 'test/harness/Invoke-E2E.ps1'
 # Every acceptance test that needs DOCKER_HOST to be a swarm manager: -Run of the swarm pass, -Skip of the plain one.
-$SwarmAccRegex = 'TestAcc(Service|Stack|Secret|DockerConfig|SwarmTokens|SwarmDataSources|Node_|Nodes_|NodeResource|SwarmNode|ComposeSwarm|ListSecret|P3SwarmList|ObjClusterVolume|Action(SwarmRotateTokens|NodeDrainActivate|ServiceScaleForceUpdateRollback|NodePromoteDemote|SwarmRotateCA|SwarmUnlockKey))'
+$SwarmAccRegex = 'TestAcc(OwnerLabelSwarm|Service|Stack|Secret|DockerConfig|SwarmTokens|SwarmDataSources|Node_|Nodes_|NodeResource|SwarmNode|ComposeSwarm|ListSecret|P3SwarmList|ObjClusterVolume|Action(SwarmRotateTokens|NodeDrainActivate|ServiceScaleForceUpdateRollback|NodePromoteDemote|SwarmRotateCA|SwarmUnlockKey))'
 
 $RefDir = Join-Path $BuildRoot 'reference'
 $InventoryFiles = 'reference/inventory.json', 'reference/INVENTORY.md'
@@ -166,7 +170,7 @@ task Test {
     Invoke-GoTestNoAcc './...'
 }
 
-# Synopsis: Unit tests of tools/ only (parity, apiwatch, compose2stack, genskill).
+# Synopsis: Unit tests of tools/ only (parity, apiwatch, compose2stack, genskill, doccounts, ...).
 task Tools {
     requires -Variable GoExe
     Invoke-GoTestNoAcc './tools/...'
@@ -267,10 +271,34 @@ task Parity {
     exec { & $GoExe run ./tools/parity }
 }
 
+# Synopsis: kreuzwerker parity as CI runs it: Parity, plus fail when a type marked missing has no [BLOCKED] line in BUILD_REPORT.md.
+task ParityCheck {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/parity -check BUILD_REPORT.md } -ErrorMessage 'Parity gap (gap: rows above), or a missing type without a [BLOCKED] line in BUILD_REPORT.md.'
+}
+
 # Synopsis: Pinned Engine API spec vs the newest published (go run ./tools/apiwatch).
 task ApiWatch {
     requires -Variable GoExe
     exec { & $GoExe run ./tools/apiwatch }
+}
+
+# Synopsis: apiwatch -check (CI): fail when a newer Engine API spec is published than tools/apiwatch/pinned.json (needs the network).
+task ApiWatchCheck {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/apiwatch -check } -ErrorMessage 'A newer Engine API spec is published (or the probe failed): see .claude/skills/engine-api-watch/SKILL.md.'
+}
+
+# Synopsis: Rewrite the generated type-count blocks in CLAUDE.md and README.md from internal/provider/registry_gen.go (tools/doccounts).
+task DocCounts {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/doccounts -write }
+}
+
+# Synopsis: Fail if a type count, a short type list or a backticked docker_* name in CLAUDE.md / README.md disagrees with registry_gen.go.
+task DocCountsCheck {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/doccounts } -ErrorMessage 'CLAUDE.md / README.md disagree with internal/provider/registry_gen.go. Run Invoke-Build DocCounts (after RegistryGen) and fix any hand-written count or name it lists.'
 }
 
 # Synopsis: Convert a compose file to HCL once: -In <file> -Out <file> -Mode swarm|local.
@@ -423,5 +451,26 @@ task ContractCheck {
     exec { & $GoExe run ./tools/contractgen -check } -ErrorMessage 'contract_gen.go is stale. Run Invoke-Build Inventory, ContractGen.'
 }
 
-# Synopsis: Default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck.
-task . Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck
+# FieldCoverage mode: 'report' lists the unmapped upstream fields and exits 0; 'enforce' fails on any gap,
+# invalid reference/_gen/fieldmap.d entry or stale reference/_gen/fieldmap.json.
+$FieldCoverageMode = 'enforce'
+
+# Synopsis: Field-level coverage: every writable Engine API / compose-spec / bake field is mapped, skipped or partial (go run ./tools/fieldcov).
+task FieldCoverage {
+    requires -Variable GoExe
+    if ($FieldCoverageMode -eq 'enforce') {
+        exec { & $GoExe run ./tools/fieldcov -enforce } -ErrorMessage 'fieldcov: unmapped fields, a bad fieldmap.d entry, or a stale fieldmap.json (go run ./tools/fieldcov -write).'
+    } else {
+        exec { & $GoExe run ./tools/fieldcov }
+    }
+}
+
+# Synopsis: Regenerate reference/_gen/fieldmap.json from the upstream specs, the provider and reference/_gen/fieldmap.d.
+task FieldMap {
+    requires -Variable GoExe
+    exec { & $GoExe run ./tools/fieldcov -write }
+}
+
+# Synopsis: Default (and CI's first step): Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage.
+# FieldCoverage runs in enforce mode (Pass 5.3): any unmapped writable upstream field fails the default task.
+task . Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage

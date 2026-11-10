@@ -17,12 +17,20 @@ Four layers, in dependency order:
 4. **Swarm workload**: `docker_secret`, `docker_config`, `docker_service`,
    `docker_stack`, `docker_compose` (swarm mode).
 
-Six Terraform kinds:
-- resources and data sources;
-- actions (`docker_exec`, the prune / save / load / import actions, the node and service actions);
-- ephemeral resources (`docker_swarm_tokens`, `docker_registry_token`, `docker_exec_output`);
-- provider functions (`parse_image_ref`, `image_ref`, `compose_env`, `port_spec`);
-- list resources for `terraform query`, one per managed type with identity.
+Six Terraform kinds: resources and data sources; actions (`docker_exec`, the prune / save / load / import actions,
+the node and service actions); ephemeral resources; provider functions; list resources for `terraform query`, one per
+managed type with identity. The counts and short lists below are generated from `internal/provider/registry_gen.go`
+(`Invoke-Build DocCounts`); `DocCountsCheck`, in the default task, fails when they, any other "<n> <kind>" count in
+this file or README.md, or a backticked `docker_*` name that is not registered disagree with the registry.
+
+<!-- doccounts:begin (generated from internal/provider/registry_gen.go by go run ./tools/doccounts -write; Invoke-Build DocCountsCheck fails on drift) -->
+Registered: 17 resources, 54 data sources, 52 actions, 4 ephemeral resources, 4 provider functions, 8 list resources.
+
+- resources (17): `docker_buildx_builder`, `docker_compose`, `docker_config`, `docker_container`, `docker_image`, `docker_network`, `docker_node`, `docker_plugin`, `docker_registry_image`, `docker_registry_manifest_list`, `docker_secret`, `docker_service`, `docker_stack`, `docker_swarm_init`, `docker_swarm_node`, `docker_tag`, `docker_volume`
+- ephemeral resources (4): `docker_exec_output`, `docker_registry_login`, `docker_registry_token`, `docker_swarm_tokens`
+- provider functions (4): `compose_env`, `image_ref`, `parse_image_ref`, `port_spec`
+- list resources (8): `docker_config`, `docker_container`, `docker_image`, `docker_network`, `docker_secret`, `docker_service`, `docker_swarm_node`, `docker_volume`
+<!-- doccounts:end -->
 
 Actions and list resources need Terraform >= 1.14, write-only `*_wo` arguments >= 1.11, and ephemeral resources >= 1.10.
 README_resources.md (generated) lists every type by layer.
@@ -36,6 +44,8 @@ README_resources.md (generated) lists every type by layer.
 - `tools/parity/`: kreuzwerker/docker v4.6.0 types and attributes vs ours. Types: `tools/parity/paritydata` (hand-maintained). Attributes: every kreuzwerker attribute (`paritydata/kreuzwerker_v4.6.0_attrs.json`) must appear in `reference/_gen/renames.json`, mapped or dropped with a reason; a `gap:` row fails, `won't implement:` passes. `-check BUILD_REPORT.md` also fails on a missing type with no `[BLOCKED]` line. `-guide` regenerates `templates/guides/migrating-from-kreuzwerker.md.tmpl` (Invoke-Build Guide / GuideCheck).
 - `tools/apiwatch/`: diffs the pinned Docker Engine API spec (`pinned.json` + `spec/`) against the newest published one, mapped to provider types.
 - `tools/climap/commands.json`: the hand-maintained docker CLI command list behind the docker-cli-map skill.
+- `tools/fieldcov/`: the field-level coverage gate. Every writable leaf field of the Engine API swagger (write operations the inventory maps to a resource, action or ephemeral resource), the compose-spec definitions and the bake target attributes is mapped to a provider attribute (auto-detected from the code and the schema), or carries a reasoned skip or partial in `reference/_gen/fieldmap.d/<lane>.json`. `reference/_gen/fieldmap.json` is generated (`Invoke-Build FieldMap`); `FieldCoverage` (default task) fails on any gap.
+- `tools/doccounts/`: generates and checks the type counts in CLAUDE.md and README.md against `registry_gen.go` (`Invoke-Build DocCounts` / `DocCountsCheck`).
 - `test/harness/`: the dind swarm harness (manager, worker1-3, TLS node, registry:2, Docker Hub mirror). `Invoke-E2E.ps1` is the only entry point for acceptance runs.
 - `examples/`, `templates/`, `docs/`: tfplugindocs inputs and output. `docs/` is generated; don't hand-edit it.
 - `.claude/skills/`: agent skills (see the end of this file).
@@ -48,7 +58,7 @@ README_resources.md (generated) lists every type by layer.
   - Location: `C:\__Code\tpd-wt\lane<X>`, detached at HEAD plus the Lane 0 changes copied in.
   - Lanes never share files. Each lane owns an explicit file list, and cross-lane needs are logged as TODO lines with the exact change.
   - The orchestrator merges by copying each lane's owned files back into the main tree. Diff with CRs ignored, because the checkout uses autocrlf.
-- **Acceptance runs go through `test/harness/Invoke-E2E.ps1`** (or `Invoke-Build TestAcc`, which wraps it), never against the Docker Desktop daemon directly.
+- **Acceptance runs go through `test/harness/Invoke-E2E.ps1`** (or `Invoke-Build TestAcc`, which wraps it), never against the Docker Desktop daemon directly. The one exception is the npipe smoke test (see Build and test).
   - Only one lane or agent runs the harness at a time.
   - Swarm-manager tests need the `-SwarmInit` pass; see `$SwarmAccRegex` in terraform-provider-docker.build.ps1.
 - **BUILD_REPORT.md is append-only.** Each pass gets a `## Pass N` section: a log, then a summary.
@@ -62,7 +72,9 @@ README_resources.md (generated) lists every type by layer.
   - an example under `examples/` in the tfplugindocs layout;
   - a MarkdownDescription whose first sentence stands alone (genskill reads it);
   - a row in `tools/parity/paritydata`;
-  - if it replaces a CLI command, an entry in `tools/climap/commands.json`.
+  - if it replaces a CLI command, an entry in `tools/climap/commands.json`;
+  - field coverage: its writable upstream fields mapped, skipped or partial (`Invoke-Build FieldCoverage`);
+  - if it creates labellable Docker objects, an owner-label entry in `internal/provider/owner_label.go` (`TestOwnerLabelCoverage` fails otherwise; see reference/CONTRACT.md "Owner label").
 - **PARTIAL(pass5) markers** record a registered type whose documented sub-feature is absent or a no-op:
   - Format: `// PARTIAL(pass5) <item id> <note>`, next to the code that lacks the feature. The item id is `layer:name` from `reference/inventory.json`; the note is required and names what is missing.
   - Not for placeholders: an unimplemented type is `// STUB(pass5) <item id>` (nothing after the id). Its status is `missing`, which fails InventoryValidate (validate.py S1; allowed-violations.txt cannot excuse it).
@@ -81,7 +93,7 @@ Linux and macOS, so the same tasks work there (the harness script `Invoke-E2E.ps
 
 ```
 Invoke-Build ?                   # list tasks
-Invoke-Build                     # default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck
+Invoke-Build                     # default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage
 Invoke-Build ContractGen         # regenerate internal/provider/contract_gen.go (outputs contract) from the inventory
 Invoke-Build RegistryGen         # regenerate internal/provider/registry_gen.go from reference/inventory.json
 Invoke-Build StubReport          # list STUB(pass5) stubs (fail) and PARTIAL(pass5) sub-feature gaps (listed)
@@ -92,9 +104,12 @@ Invoke-Build Docs                # GenSkill, then tfplugindocs generate + valida
 Invoke-Build Check               # gofmt, vet, genskill -check/-strict, tfplugindocs validate
 Invoke-Build TestAcc             # dind harness: plain pass, then -SwarmInit pass (TF_ACC=1)
 Invoke-Build E2E                 # dind harness: TestAccE2E only
-Invoke-Build Parity              # kreuzwerker parity: types + every attribute vs reference/_gen/renames.json
+Invoke-Build Parity              # kreuzwerker parity: types + every attribute vs reference/_gen/renames.json (ParityCheck: + BUILD_REPORT.md [BLOCKED] lines, as CI)
 Invoke-Build Guide               # regenerate the migration guide template from renames.json (GuideCheck: fail if stale)
-Invoke-Build ApiWatch            # Engine API drift vs tools/apiwatch/pinned.json
+Invoke-Build FieldCoverage       # every writable Engine API / compose-spec / bake field mapped, skipped or partial (enforce mode)
+Invoke-Build FieldMap            # regenerate reference/_gen/fieldmap.json from the specs, the provider and reference/_gen/fieldmap.d
+Invoke-Build ApiWatch            # Engine API drift vs tools/apiwatch/pinned.json (ApiWatchCheck: fail on a newer spec, as CI)
+Invoke-Build DocCounts           # regenerate the type counts in CLAUDE.md / README.md (DocCountsCheck: fail on drift)
 Invoke-Build Inventory           # reference/inventory.json + INVENTORY.md from reference/_gen/fragments (InventoryCheck: diff must be empty)
 Invoke-Build InventoryValidate   # outputs contract and status: a missing item fails, partials are listed
 Invoke-Build ReferenceVerify     # re-hash reference/upstream against the SHAs pinned in reference/SOURCES.md
@@ -103,7 +118,8 @@ Invoke-Build Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm
 
 Nobody hand-edits `reference/inventory.json` or `INVENTORY.md`: edit `reference/_gen/fragments/*.json`, then `Invoke-Build Inventory`.
 
-- CI (`.github/workflows/ci.yml`) still calls the GNUmakefile (`make build`, `test`, `check`, `e2e`), then `go run ./tools/parity -check BUILD_REPORT.md` and `go run ./tools/apiwatch -check`. The GNUmakefile is a subset with no Inventory, Registry, Contract or Guide tasks, and its `testacc` target runs straight against DOCKER_HOST: don't use it for acceptance runs.
+- Invoke-Build is the only entry point; there is no Makefile. CI (`.github/workflows/ci.yml`, ubuntu, pwsh) installs InvokeBuild and runs, in order: `Invoke-Build` (the default task), `Invoke-Build Check`, `Invoke-Build ParityCheck, GuideCheck`, `Invoke-Build ApiWatchCheck`, then `Invoke-Build E2E` (dind harness through `Invoke-E2E.ps1`). Run the same tasks locally to reproduce a CI failure.
+- The one acceptance test that talks to Docker Desktop directly is `TestAccNpipeSmoke` (`internal/provider/i_npipe_acc_test.go`): Windows only, gated by `TF_ACC_NPIPE=1`, it creates and removes only `tfacc-npipe-*` objects. Run it by hand: `TF_ACC=1 TF_ACC_NPIPE=1 go test -run TestAccNpipeSmoke ./internal/provider -timeout 15m -count=1`.
 - Acceptance tests by hand go through the harness script, one run at a time. Add `-SwarmInit` for the swarm-manager tests and `-KeepUp` to leave the harness up:
 
 ```

@@ -1,0 +1,12 @@
+.claude/skills/engine-api-watch/SKILL.md
+.github/workflows/ci.yml
+CLAUDE.md
+GNUmakefile
+README.md
+internal/provider/i_npipe_acc_test.go
+reference/_gen/pass53/lane-I.files
+reference/_gen/pass53/lane-I.md
+terraform-provider-docker.build.ps1
+tools/doccounts/doccounts.go
+tools/doccounts/doccounts_test.go
+tools/doccounts/main.go

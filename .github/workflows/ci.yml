@@ -1,7 +1,9 @@
-# Build, unit tests and every static check (gofmt, vet, skill / README_resources.md drift,
-# genskill -strict, tfplugindocs validate), the kreuzwerker parity check, then the dind
-# end-to-end run (required once test/harness/CI_GREEN_RUNS >= 2). No secrets needed.
-# On Windows the same steps are Invoke-Build Build, Test, Check.
+# Invoke-Build (terraform-provider-docker.build.ps1) is the only entry point, locally and here: every
+# step below is an Invoke-Build task, so `Invoke-Build <same tasks>` on any machine reproduces CI.
+# Check job, in order: the default task (Build, Vet, Test and the generated-content checks), Check
+# (gofmt, vet, genskill -check/-strict, tfplugindocs validate), ParityCheck + GuideCheck, ApiWatchCheck.
+# Then the dind end-to-end run through test/harness/Invoke-E2E.ps1 (Invoke-Build E2E), required once
+# test/harness/CI_GREEN_RUNS >= 2. No secrets needed.
 name: CI
 
 on:
@@ -11,6 +13,10 @@ on:
 
 permissions:
   contents: read
+
+env:
+  # Pinned Invoke-Build module version (PowerShell Gallery).
+  INVOKE_BUILD_VERSION: 5.14.23
 
 jobs:
   check:
@@ -49,30 +55,41 @@ jobs:
         with:
           terraform_wrapper: false
 
-      - name: make build
-        run: make build
+      # pwsh (PowerShell 7) and python3 ship on the GitHub ubuntu runners; the build script
+      # falls back to python3 when `python` is not on PATH (Inventory, InventoryValidate).
+      - name: Install InvokeBuild
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module InvokeBuild -RequiredVersion $env:INVOKE_BUILD_VERSION -Scope CurrentUser -Force
+          Get-Module -ListAvailable InvokeBuild | Select-Object Name, Version
 
-      - name: go vet
-        run: go vet ./...
+      # Default task: Build, Vet, Test (unit, -short, TF_ACC unset), GenSkillCheck, InventoryCheck,
+      # InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck. A task added to the default
+      # list in terraform-provider-docker.build.ps1 runs here without a workflow change.
+      - name: Invoke-Build (default task)
+        shell: pwsh
+        run: Invoke-Build
 
-      - name: make test
-        run: make test
+      # gofmt, vet, genskill -check (.claude/skills, docker-cli-map, README_resources.md),
+      # genskill -strict, tfplugindocs validate. Runs every step, then lists the failures.
+      - name: Invoke-Build Check
+        shell: pwsh
+        run: Invoke-Build Check
 
-      # gofmt, vet, genskill -check (.claude/skills, docker-cli-map, README_resources.md), genskill -strict,
-      # tfplugindocs validate.
-      - name: make check
-        run: make check
+      # kreuzwerker/docker v4.6.0 parity: types and every attribute against reference/_gen/renames.json;
+      # fails when a type marked missing has no [BLOCKED] line naming it in BUILD_REPORT.md. GuideCheck:
+      # the migration guide template matches renames.json.
+      - name: Invoke-Build ParityCheck, GuideCheck
+        shell: pwsh
+        run: Invoke-Build ParityCheck, GuideCheck
 
-      # kreuzwerker/docker v4.6.0 parity table; fails when a type marked missing in
-      # tools/parity/parity.go has no [BLOCKED] line naming it in BUILD_REPORT.md.
-      - name: parity
-        run: go run ./tools/parity -check BUILD_REPORT.md
-
-      # Docker Engine API drift: fails when the newest published spec (docs.docker.com,
-      # probed upward from the pinned version) differs from tools/apiwatch/pinned.json.
-      # Fix: go run ./tools/apiwatch -todo, file the lines in BUILD_REPORT.md, then -update.
-      - name: apiwatch
-        run: go run ./tools/apiwatch -check
+      # Docker Engine API drift: fails when the newest published spec (docs.docker.com, probed upward
+      # from the pinned version) differs from tools/apiwatch/pinned.json. Last, because it is the only
+      # step that needs the network. Fix: see .claude/skills/engine-api-watch/SKILL.md.
+      - name: Invoke-Build ApiWatchCheck
+        shell: pwsh
+        run: Invoke-Build ApiWatchCheck
 
   e2e:
     runs-on: ubuntu-latest
@@ -92,12 +109,17 @@ jobs:
         with:
           terraform_wrapper: false
 
-      # Brings up the dind manager + two workers (test/harness), runs TestAccE2E, tears down.
-      - name: make e2e
+      - name: Install InvokeBuild
+        shell: pwsh
         run: |
-          set -o pipefail
-          mkdir -p test/harness/out
-          make e2e 2>&1 | tee test/harness/out/e2e.log
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module InvokeBuild -RequiredVersion $env:INVOKE_BUILD_VERSION -Scope CurrentUser -Force
+
+      # test/harness/Invoke-E2E.ps1 (PowerShell 7): harness up (dind manager + workers, registry),
+      # TestAccE2E with TF_ACC=1, output tee'd to test/harness/last-e2e.log, harness down.
+      - name: Invoke-Build E2E
+        shell: pwsh
+        run: Invoke-Build E2E
 
       - name: upload e2e output
         if: always()

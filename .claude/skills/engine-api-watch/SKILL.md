@@ -23,15 +23,15 @@ of the spec bytes, and the byte-exact copy under `tools/apiwatch/spec/`.
 - **Whenever a Docker version comes up**: a user mentions Docker Engine /
   Desktop / moby X, `docker version` on the harness or Desktop shows a newer
   API than pinned, go.mod bumps github.com/docker/docker or
-  github.com/moby/moby/*, or CI's `apiwatch` step fails.
-- Not needed for passes that only touch docs or tests, unless CI's apiwatch
-  step is red.
+  github.com/moby/moby/*, or CI's `Invoke-Build ApiWatchCheck` step fails.
+- Not needed for passes that only touch docs or tests, unless CI's
+  ApiWatchCheck step is red.
 
 ## How to run it
 
 ```
-Invoke-Build ApiWatch                        # or: make apiwatch / go run ./tools/apiwatch
-go run ./tools/apiwatch -check               # what CI runs; exit 1 = newer spec published
+Invoke-Build ApiWatch                        # or: go run ./tools/apiwatch
+Invoke-Build ApiWatchCheck                   # what CI runs (go run ./tools/apiwatch -check); exit 1 = newer spec published
 go run ./tools/apiwatch -from 1.51 -to 1.56  # any two versions (both downloaded)
 go run ./tools/apiwatch -todo -tag P5-0      # the same diff as BUILD_REPORT.md lines
 go run ./tools/apiwatch -update              # re-pin the newest (or -to X) version
