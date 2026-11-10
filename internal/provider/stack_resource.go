@@ -33,6 +33,7 @@ var (
 	_ resource.Resource                = (*stackResource)(nil)
 	_ resource.ResourceWithConfigure   = (*stackResource)(nil)
 	_ resource.ResourceWithImportState = (*stackResource)(nil)
+	_ resource.ResourceWithModifyPlan  = (*stackResource)(nil)
 )
 
 // stackRemoveTimeout bounds waits for removed services' tasks to go and for
@@ -68,6 +69,7 @@ type stackResourceModel struct {
 	Volumes  []stackVolumeModel  `tfsdk:"volume"`
 	Secrets  []stackBlobModel    `tfsdk:"secret"`
 	Configs  []stackBlobModel    `tfsdk:"config"`
+	Adopt    types.Bool          `tfsdk:"adopt"`
 }
 
 type stackNetworkModel struct {
@@ -128,6 +130,7 @@ func (r *stackResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			"name": schema.StringAttribute{Required: true,
 				MarkdownDescription: "Stack namespace. Forces replacement.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"adopt": ownerAdoptAttribute(),
 		},
 		Blocks: map[string]schema.Block{
 			"service": schema.ListNestedBlock{
@@ -539,6 +542,13 @@ func (r *stackResource) apply(ctx context.Context, plan, prior *stackResourceMod
 		diags.AddError("Cannot list stack objects", err.Error())
 		return diags
 	}
+	if prior.Name.IsNull() && r.pd.Owner != "" {
+		// Creating: the namespace must not hold another owner's objects.
+		if err := ownerCreateCheck(r.pd, "stack", stack, stackOwnerLabels(ex, r.pd.Owner)); err != nil {
+			diags.AddError("Cannot create stack", err.Error())
+			return diags
+		}
+	}
 	existsN, existsS, existsC := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for k := range ex.networks {
 		existsN[k] = true
@@ -616,7 +626,7 @@ func (r *stackResource) apply(ctx context.Context, plan, prior *stackResourceMod
 	}
 
 	// 3. Create networks, secrets, configs.
-	nsLabels := map[string]string{labelManagedBy: labelManagedByValue, labelStackNamespace: stack}
+	nsLabels := r.pd.ownerInject(map[string]string{labelManagedBy: labelManagedByValue, labelStackNamespace: stack})
 	toCreate := func(p stackObjPlan) map[string]bool {
 		m := map[string]bool{}
 		for _, n := range append(append([]string{}, p.Create...), p.Replace...) {
@@ -704,7 +714,8 @@ func (r *stackResource) apply(ctx context.Context, plan, prior *stackResourceMod
 		s := &plan.Services[i]
 		short := s.Name.ValueString()
 		existing, exists := ex.services[short]
-		if exists && !create[short] && !volsChanged && reflect.DeepEqual(*s, priorSvc[short]) && len(replaced) == 0 {
+		ownerOK := r.pd.Owner == "" || ownerOf(existing.Spec.Labels) == r.pd.Owner
+		if exists && !create[short] && !volsChanged && reflect.DeepEqual(*s, priorSvc[short]) && len(replaced) == 0 && ownerOK {
 			continue // unchanged
 		}
 		spec, d := svcExpand(ctx, s, lk, svcExpandOpts{FullName: prefix + short, Namespace: stack})
@@ -712,6 +723,7 @@ func (r *stackResource) apply(ctx context.Context, plan, prior *stackResourceMod
 		if diags.HasError() {
 			return diags
 		}
+		spec.Labels = r.pd.ownerInject(spec.Labels)
 		stackRewriteMounts(&spec, stack, vols)
 		if exists && !create[short] {
 			if err := svcUpdate(ctx, r.pd, existing.ID, spec); err != nil {
@@ -808,7 +820,7 @@ func stackVolumeNames(v []stackVolumeModel) []string {
 
 // refresh reflects the daemon's stack objects into m (m doubles as the
 // prior). It returns false when nothing of a non-empty stack is left.
-func (r *stackResource) refresh(ctx context.Context, m *stackResourceModel, diags *diag.Diagnostics) bool {
+func (r *stackResource) refresh(ctx context.Context, m *stackResourceModel, diags *diag.Diagnostics, priv privateSetter) bool {
 	c := r.pd.Client
 	stack := m.Name.ValueString()
 	ex, err := stackListExisting(ctx, c, stack)
@@ -819,6 +831,9 @@ func (r *stackResource) refresh(ctx context.Context, m *stackResourceModel, diag
 	hadObjects := len(m.Services)+len(m.Networks)+len(m.Secrets)+len(m.Configs) > 0
 	if ex.empty() && hadObjects {
 		return false
+	}
+	if priv != nil {
+		diags.Append(ownerRecord(ctx, priv, stackOwnerLabels(ex, r.pd.Owner))...)
 	}
 	lk, err := svcLoadLookup(ctx, c, stack+"_")
 	if err != nil {
@@ -866,7 +881,7 @@ func (r *stackResource) refresh(ctx context.Context, m *stackResourceModel, diag
 			Driver:     types.StringValue(n.Driver),
 			Attachable: types.BoolValue(n.Attachable),
 			Internal:   types.BoolValue(n.Internal),
-			Labels:     svcMapValue(p.Labels, userLabels(n.Labels, true)),
+			Labels:     svcMapValue(p.Labels, ownerStrip(userLabels(n.Labels, true))),
 			Options:    svcMapValue(p.Options, opts),
 		}
 	}
@@ -914,7 +929,7 @@ func stackFlattenBlobs(prior []stackBlobModel, labels map[string]map[string]stri
 			continue
 		}
 		seen[short] = true
-		out = append(out, stackBlobModel{Name: p.Name, Data: p.Data, Labels: svcMapValue(p.Labels, userLabels(l, true))})
+		out = append(out, stackBlobModel{Name: p.Name, Data: p.Data, Labels: svcMapValue(p.Labels, ownerStrip(userLabels(l, true)))})
 	}
 	for _, short := range stackSortedKeys(labels) {
 		if seen[short] {
@@ -924,7 +939,7 @@ func stackFlattenBlobs(prior []stackBlobModel, labels map[string]map[string]stri
 		if v, ok := data[short]; ok {
 			d = types.StringValue(v)
 		}
-		out = append(out, stackBlobModel{Name: types.StringValue(short), Data: d, Labels: svcMapValue(types.MapNull(types.StringType), userLabels(labels[short], true))})
+		out = append(out, stackBlobModel{Name: types.StringValue(short), Data: d, Labels: svcMapValue(types.MapNull(types.StringType), ownerStrip(userLabels(labels[short], true)))})
 	}
 	return out
 }
@@ -955,7 +970,7 @@ func (r *stackResource) Create(ctx context.Context, req resource.CreateRequest, 
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 		return
 	}
-	r.refresh(ctx, &plan, &resp.Diagnostics)
+	r.refresh(ctx, &plan, &resp.Diagnostics, swarmPriv(resp.Private))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -965,7 +980,7 @@ func (r *stackResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !r.refresh(ctx, &state, &resp.Diagnostics) {
+	if !r.refresh(ctx, &state, &resp.Diagnostics, swarmPriv(resp.Private)) {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -987,8 +1002,28 @@ func (r *stackResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	r.refresh(ctx, &plan, &resp.Diagnostics)
+	r.refresh(ctx, &plan, &resp.Diagnostics, swarmPriv(resp.Private))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// ModifyPlan checks the Engine API version of the configured service
+// attributes and the owner label of an existing stack's objects.
+func (r *stackResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	r.pd.gateAPISince(ctx, "docker_stack", req.Config, &resp.Diagnostics)
+	if req.State.Raw.IsNull() {
+		return
+	}
+	var name types.String
+	var adopt types.Bool
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("name"), &name)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("adopt"), &adopt)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(ownerPlanCheck(ctx, r.pd, req.Private, "stack", name.ValueString(), adopt)...)
 }
 
 func (r *stackResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

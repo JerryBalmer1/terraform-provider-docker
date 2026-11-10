@@ -23,6 +23,7 @@ var (
 	_ resource.ResourceWithIdentity    = (*dockerConfigResource)(nil)
 
 	_ resource.ResourceWithConfigValidators = (*dockerConfigResource)(nil)
+	_ resource.ResourceWithModifyPlan       = (*dockerConfigResource)(nil)
 )
 
 // NewConfigResource returns the docker_config resource.
@@ -33,13 +34,15 @@ type dockerConfigResource struct {
 }
 
 type dockerConfigResourceModel struct {
-	ID            types.String `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	Data          types.String `tfsdk:"data"`
-	DataWO        types.String `tfsdk:"data_wo"`
-	DataWOVersion types.Int64  `tfsdk:"data_wo_version"`
-	Labels        types.Map    `tfsdk:"labels"`
-	VersionIndex  types.Int64  `tfsdk:"version_index"`
+	ID            types.String      `tfsdk:"id"`
+	Name          types.String      `tfsdk:"name"`
+	Data          types.String      `tfsdk:"data"`
+	DataWO        types.String      `tfsdk:"data_wo"`
+	DataWOVersion types.Int64       `tfsdk:"data_wo_version"`
+	Labels        types.Map         `tfsdk:"labels"`
+	VersionIndex  types.Int64       `tfsdk:"version_index"`
+	Templating    *swarmDriverModel `tfsdk:"templating"`
+	Adopt         types.Bool        `tfsdk:"adopt"`
 	contractSwarmConfig
 }
 
@@ -81,6 +84,9 @@ func (r *dockerConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 			},
 			"version_index": schema.Int64Attribute{Computed: true,
 				MarkdownDescription: "The config object's `Version.Index`; it changes when the labels are updated."},
+			"templating": swarmDriverAttribute("Templating driver (`Spec.Templating`): the config content is a template the driver "+
+				"expands per task, e.g. `name = \"golang\"` for Go templates such as `{{ .Node.Hostname }}` or `{{ env \"VAR\" }}`.", "1.37"),
+			"adopt": ownerAdoptAttribute(),
 		},
 	}
 	contractAddResourceAttributes(resp.Schema.Attributes, "swarm:config")
@@ -98,6 +104,24 @@ func (r *dockerConfigResource) ConfigValidators(context.Context) []resource.Conf
 	return secretDataConfigValidators()
 }
 
+// ModifyPlan checks the Engine API version of the configured attributes and
+// the owner label of an existing config.
+func (r *dockerConfigResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	r.pd.gateAPISince(ctx, "docker_config", req.Config, &resp.Diagnostics)
+	if req.State.Raw.IsNull() {
+		return
+	}
+	var plan dockerConfigResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(ownerPlanCheck(ctx, r.pd, req.Private, "config", plan.Name.ValueString(), plan.Adopt)...)
+}
+
 func (r *dockerConfigResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan dockerConfigResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -108,12 +132,20 @@ func (r *dockerConfigResource) Create(ctx context.Context, req resource.CreateRe
 	if !ok {
 		return
 	}
+	if err := swarmOwnerCreateCheck(ctx, r.pd, "config", plan.Name.ValueString()); err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("name"), "Cannot create config", err.Error())
+		return
+	}
 	spec := swarm.ConfigSpec{
 		Annotations: swarm.Annotations{
-			Name:   plan.Name.ValueString(),
-			Labels: mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue}),
+			Name: plan.Name.ValueString(),
+			Labels: r.pd.ownerInject(mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics),
+				map[string]string{labelManagedBy: labelManagedByValue})),
 		},
 		Data: data,
+	}
+	if t := plan.Templating; t != nil {
+		spec.Templating = &swarm.Driver{Name: t.Name.ValueString(), Options: stringMapFrom(ctx, t.Options, &resp.Diagnostics)}
 	}
 	out, err := r.pd.Client.ConfigCreate(ctx, client.ConfigCreateOptions{Spec: spec})
 	if err != nil {
@@ -126,11 +158,11 @@ func (r *dockerConfigResource) Create(ctx context.Context, req resource.CreateRe
 	plan.contractSetNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, out.ID)...)
-	r.read(ctx, &plan, &resp.Diagnostics, nil)
+	r.read(ctx, &plan, &resp.Diagnostics, nil, swarmPriv(resp.Private))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *dockerConfigResource) read(ctx context.Context, m *dockerConfigResourceModel, diags *diag.Diagnostics, gone *bool) {
+func (r *dockerConfigResource) read(ctx context.Context, m *dockerConfigResourceModel, diags *diag.Diagnostics, gone *bool, priv privateSetter) {
 	sRes, err := r.pd.Client.ConfigInspect(ctx, m.ID.ValueString(), client.ConfigInspectOptions{})
 	if err != nil {
 		if isNotFound(err) && gone != nil {
@@ -143,7 +175,11 @@ func (r *dockerConfigResource) read(ctx context.Context, m *dockerConfigResource
 	s := sRes.Config
 	m.ID = types.StringValue(s.ID)
 	m.Name = types.StringValue(s.Spec.Name)
-	m.Labels = svcMapValue(m.Labels, userLabels(s.Spec.Labels, false))
+	m.Labels = svcMapValue(m.Labels, ownerStrip(userLabels(s.Spec.Labels, false)))
+	m.Templating = swarmDriverValue(m.Templating, s.Spec.Templating)
+	if priv != nil {
+		diags.Append(ownerRecord(ctx, priv, s.Spec.Labels)...)
+	}
 	// The daemon does return config data, but import keeps the contract of
 	// docker_secret: data stays whatever state holds. Fill it when state has
 	// none (import) so plans after import are clean. A config created from
@@ -162,7 +198,7 @@ func (r *dockerConfigResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 	gone := false
-	r.read(ctx, &state, &resp.Diagnostics, &gone)
+	r.read(ctx, &state, &resp.Diagnostics, &gone, swarmPriv(resp.Private))
 	if gone {
 		resp.State.RemoveResource(ctx)
 		return
@@ -184,7 +220,7 @@ func (r *dockerConfigResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 	plan.ID = state.ID
-	labels := mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue})
+	labels := r.pd.ownerInject(mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue}))
 	err := swarmRetryConflict(ctx, func(ctx context.Context) error {
 		res, err := r.pd.Client.ConfigInspect(ctx, plan.ID.ValueString(), client.ConfigInspectOptions{})
 		if err != nil {
@@ -201,7 +237,7 @@ func (r *dockerConfigResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 	plan.DataWO = types.StringNull()
-	r.read(ctx, &plan, &resp.Diagnostics, nil)
+	r.read(ctx, &plan, &resp.Diagnostics, nil, swarmPriv(resp.Private))
 	if resp.Diagnostics.HasError() {
 		return
 	}

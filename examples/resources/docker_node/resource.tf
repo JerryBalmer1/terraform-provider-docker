@@ -4,6 +4,7 @@
 # swarm with its current labels, availability and role.
 resource "docker_node" "worker1" {
   node_id      = "worker1" # node ID or hostname
+  name         = "edge-worker-1"
   availability = "active"
   labels = {
     zone = "a"

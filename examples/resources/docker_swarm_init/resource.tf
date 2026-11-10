@@ -2,6 +2,8 @@ resource "docker_swarm_init" "this" {
   advertise_addr    = "10.0.0.5"
   default_addr_pool = ["10.20.0.0/16"]
   subnet_size       = 24
+  # Overlay (VXLAN) traffic on a separate interface.
+  data_path_addr = "10.1.0.5"
 
   # `docker swarm update` settings, changed in place.
   labels = {

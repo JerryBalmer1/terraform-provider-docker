@@ -31,6 +31,7 @@ var (
 	_ resource.Resource                = (*swarmInitResource)(nil)
 	_ resource.ResourceWithConfigure   = (*swarmInitResource)(nil)
 	_ resource.ResourceWithImportState = (*swarmInitResource)(nil)
+	_ resource.ResourceWithModifyPlan  = (*swarmInitResource)(nil)
 )
 
 // NewSwarmInitResource returns the docker_swarm_init resource.
@@ -44,6 +45,8 @@ type swarmInitModel struct {
 	ID               types.String `tfsdk:"id"`
 	AdvertiseAddr    types.String `tfsdk:"advertise_addr"`
 	ListenAddr       types.String `tfsdk:"listen_addr"`
+	DataPathAddr     types.String `tfsdk:"data_path_addr"`
+	Adopt            types.Bool   `tfsdk:"adopt"`
 	DefaultAddrPool  types.List   `tfsdk:"default_addr_pool"`
 	SubnetSize       types.Int64  `tfsdk:"subnet_size"`
 	DataPathPort     types.Int64  `tfsdk:"data_path_port"`
@@ -93,6 +96,13 @@ func (r *swarmInitResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				MarkdownDescription: "Address for inter-manager communication, `<ip|interface>[:port]`. Default `" + swarmDefaultListenAddr + "`. " +
 					"Changing this forces a new resource.",
 			},
+			"data_path_addr": schema.StringAttribute{
+				Optional: true, PlanModifiers: replaceStr,
+				MarkdownDescription: "Address or interface for data-path (overlay VXLAN) traffic, `<ip|interface>` without a port " +
+					"(`DataPathAddr`, `docker swarm init --data-path-addr`); separates it from management traffic. Unset uses " +
+					"`advertise_addr`. The daemon does not report it back, so the configured value is kept. Forces replacement.",
+			},
+			"adopt": ownerAdoptAttribute(),
 			"default_addr_pool": schema.ListAttribute{
 				ElementType: types.StringType, Optional: true, Computed: true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown(), listplanmodifier.RequiresReplace()},
@@ -166,6 +176,7 @@ func swarmInitBuildRequest(ctx context.Context, m swarmInitModel, diags *diag.Di
 	req := client.SwarmInitOptions{
 		ListenAddr:    m.ListenAddr.ValueString(),
 		AdvertiseAddr: m.AdvertiseAddr.ValueString(),
+		DataPathAddr:  m.DataPathAddr.ValueString(),
 	}
 	if req.ListenAddr == "" {
 		req.ListenAddr = swarmDefaultListenAddr
@@ -273,6 +284,15 @@ func (r *swarmInitResource) Create(ctx context.Context, req resource.CreateReque
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	if r.pd.Owner != "" {
+		// Already a manager of a swarm owned by someone else: say so rather
+		// than the daemon's "already part of a swarm".
+		if err := swarmInitOwnerCreateCheck(ctx, r.pd); err != nil {
+			resp.Diagnostics.AddError("Cannot initialize swarm", err.Error())
+			return
+		}
+		swarmApplySpecOwner(ctx, plan, r.pd.Owner, &initReq.Spec, &resp.Diagnostics)
+	}
 	if _, err := r.pd.Client.SwarmInit(ctx, initReq); err != nil {
 		resp.Diagnostics.AddError("Cannot initialize swarm", err.Error())
 		return
@@ -286,6 +306,7 @@ func (r *swarmInitResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.AddError("Cannot read swarm after init", err.Error())
 		return
 	}
+	resp.Diagnostics.Append(ownerRecord(ctx, swarmPriv(resp.Private), sw.Spec.Labels)...)
 	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, swarmContractInput(*sw))...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -311,6 +332,7 @@ func (r *swarmInitResource) Read(ctx context.Context, req resource.ReadRequest, 
 		resp.State.RemoveResource(ctx)
 		return
 	}
+	resp.Diagnostics.Append(ownerRecord(ctx, swarmPriv(resp.Private), sw.Spec.Labels)...)
 	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, swarmContractInput(*sw))...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -330,7 +352,7 @@ func (r *swarmInitResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 	sw := swRes.Swarm
 	spec := sw.Spec
-	changed := swarmApplySpec(ctx, plan, &spec, &resp.Diagnostics)
+	changed := swarmApplySpecOwner(ctx, plan, r.pd.Owner, &spec, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -353,8 +375,29 @@ func (r *swarmInitResource) Update(ctx context.Context, req resource.UpdateReque
 		resp.Diagnostics.AddError("Cannot read swarm after update", err.Error())
 		return
 	}
+	resp.Diagnostics.Append(ownerRecord(ctx, swarmPriv(resp.Private), swNow.Spec.Labels)...)
 	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, swarmContractInput(*swNow))...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// ModifyPlan checks the Engine API version of the configured attributes and
+// the owner label of the existing swarm.
+func (r *swarmInitResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	r.pd.gateAPISince(ctx, "docker_swarm_init", req.Config, &resp.Diagnostics)
+	if req.State.Raw.IsNull() {
+		return
+	}
+	var id types.String
+	var adopt types.Bool
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("id"), &id)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("adopt"), &adopt)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(ownerPlanCheck(ctx, r.pd, req.Private, "swarm", id.ValueString(), adopt)...)
 }
 
 func (r *swarmInitResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

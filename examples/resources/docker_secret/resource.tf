@@ -22,3 +22,10 @@ resource "docker_secret" "api_key" {
   data_wo         = base64encode("replace-with-an-ephemeral-value")
   data_wo_version = 1
 }
+
+# A templated secret: the golang templating driver expands it per task.
+resource "docker_secret" "per_task" {
+  name       = "per_task_id"
+  data       = base64encode("{{ .Service.Name }}-{{ .Task.Slot }}")
+  templating = { name = "golang" }
+}

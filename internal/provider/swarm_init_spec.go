@@ -8,12 +8,15 @@ package provider
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/moby/moby/api/types/swarm"
@@ -34,7 +37,16 @@ type swarmDispatcherModel struct {
 }
 
 type swarmCAConfigModel struct {
-	NodeCertExpiry types.String `tfsdk:"node_cert_expiry"`
+	NodeCertExpiry types.String           `tfsdk:"node_cert_expiry"`
+	ExternalCAs    []swarmExternalCAModel `tfsdk:"external_cas"`
+}
+
+// swarmExternalCAModel is one CAConfig.ExternalCAs entry.
+type swarmExternalCAModel struct {
+	Protocol types.String `tfsdk:"protocol"`
+	URL      types.String `tfsdk:"url"`
+	Options  types.Map    `tfsdk:"options"`
+	CACert   types.String `tfsdk:"ca_cert"`
 }
 
 // swarmInitSpecAttributes are the spec attributes of docker_swarm_init.
@@ -69,6 +81,20 @@ func swarmInitSpecAttributes() map[string]schema.Attribute {
 			Attributes: map[string]schema.Attribute{
 				"node_cert_expiry": schema.StringAttribute{Optional: true, Validators: dur,
 					MarkdownDescription: "Validity of node certificates, as a Go duration such as `2160h` (`NodeCertExpiry`, `--cert-expiry`)."},
+				"external_cas": schema.ListNestedAttribute{Optional: true,
+					MarkdownDescription: "External certificate authorities that sign node certificates (`ExternalCAs`, `docker swarm init " +
+						"--external-ca`). When set, the swarm gets exactly this list; unset leaves it as it is.",
+					NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+						"protocol": schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("cfssl"),
+							Validators:          []validator.String{stringvalidator.OneOf("cfssl")},
+							MarkdownDescription: "Protocol of the CA, only `cfssl` (the default) (`Protocol`)."},
+						"url": schema.StringAttribute{Required: true, MarkdownDescription: "URL of the CA's signing endpoint (`URL`)."},
+						"options": schema.MapAttribute{ElementType: types.StringType, Optional: true,
+							MarkdownDescription: "Protocol-specific options for the CA (`Options`)."},
+						"ca_cert": schema.StringAttribute{Optional: true,
+							MarkdownDescription: "PEM root CA certificate the external CA signs with; unset means the swarm's current root CA (`CACert`)."},
+					}},
+				},
 			}},
 	}
 }
@@ -89,6 +115,12 @@ func swarmParseDur(v types.String, attr string, diags *diag.Diagnostics) (time.D
 // swarmApplySpec applies the configured spec settings of m to spec and
 // reports whether anything changed.
 func swarmApplySpec(ctx context.Context, m swarmInitModel, spec *swarm.Spec, diags *diag.Diagnostics) bool {
+	return swarmApplySpecOwner(ctx, m, "", spec, diags)
+}
+
+// swarmApplySpecOwner is swarmApplySpec that also keeps the owner label
+// (io.terraform.provider.owner=owner) on the swarm when owner is set.
+func swarmApplySpecOwner(ctx context.Context, m swarmInitModel, owner string, spec *swarm.Spec, diags *diag.Diagnostics) bool {
 	changed := false
 	setI := func(v types.Int64, cur *uint64) {
 		if n, ok := knownInt64(v); ok && uint64(n) != *cur {
@@ -126,15 +158,53 @@ func swarmApplySpec(ctx context.Context, m swarmInitModel, spec *swarm.Spec, dia
 			spec.CAConfig.NodeCertExpiry = v
 			changed = true
 		}
+		if c.ExternalCAs != nil {
+			var want []*swarm.ExternalCA
+			for _, e := range c.ExternalCAs {
+				want = append(want, &swarm.ExternalCA{
+					Protocol: swarm.ExternalCAProtocol(svcStrOr(e.Protocol, string(swarm.ExternalCAProtocolCFSSL))),
+					URL:      e.URL.ValueString(),
+					Options:  stringMapFrom(ctx, e.Options, diags),
+					CACert:   e.CACert.ValueString(),
+				})
+			}
+			if !swarmExternalCAsEqual(spec.CAConfig.ExternalCAs, want) {
+				spec.CAConfig.ExternalCAs = want
+				changed = true
+			}
+		}
 	}
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
 		want := stringMapFrom(ctx, m.Labels, diags)
+		if owner != "" {
+			want = mergeLabels(want, map[string]string{ownerLabelKey: owner})
+		}
 		if !swarmStringMapsEqual(spec.Labels, want) {
 			spec.Labels = want
 			changed = true
 		}
+	} else if owner != "" && ownerOf(spec.Labels) != owner {
+		spec.Labels = mergeLabels(spec.Labels, map[string]string{ownerLabelKey: owner})
+		changed = true
 	}
 	return changed
+}
+
+// swarmExternalCAsEqual compares two ExternalCAs lists in order. A wanted
+// entry without a CA certificate matches any daemon certificate (the daemon
+// may fill in the current root).
+func swarmExternalCAsEqual(have, want []*swarm.ExternalCA) bool {
+	if len(have) != len(want) {
+		return false
+	}
+	for i := range have {
+		h, w := have[i], want[i]
+		if !strings.EqualFold(string(h.Protocol), string(w.Protocol)) || h.URL != w.URL || !swarmStringMapsEqual(h.Options, w.Options) ||
+			(w.CACert != "" && h.CACert != w.CACert) {
+			return false
+		}
+	}
+	return true
 }
 
 // swarmFlattenSpec reads the daemon's spec into the configured blocks of
@@ -173,6 +243,29 @@ func swarmFlattenSpec(m *swarmInitModel, spec swarm.Spec) {
 	}
 	if c := m.CAConfig; c != nil {
 		c.NodeCertExpiry = durVal(c.NodeCertExpiry, spec.CAConfig.NodeCertExpiry)
+		if c.ExternalCAs != nil {
+			prior := c.ExternalCAs
+			out := []swarmExternalCAModel{}
+			for i, e := range spec.CAConfig.ExternalCAs {
+				var p swarmExternalCAModel
+				if i < len(prior) {
+					p = prior[i]
+				}
+				// The daemon may report the root it signs with; it is only
+				// shown when the configuration set one.
+				cert := types.StringNull()
+				if svcPriorSet(p.CACert) {
+					cert = types.StringValue(e.CACert)
+				}
+				out = append(out, swarmExternalCAModel{
+					Protocol: types.StringValue(strings.ToLower(string(e.Protocol))),
+					URL:      types.StringValue(e.URL),
+					Options:  svcMapValue(p.Options, e.Options),
+					CACert:   cert,
+				})
+			}
+			c.ExternalCAs = out
+		}
 	}
-	m.Labels = stringMapValue(spec.Labels, false)
+	m.Labels = stringMapValue(ownerStrip(spec.Labels), false)
 }

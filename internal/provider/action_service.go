@@ -74,6 +74,16 @@ func actServiceUpdate(ctx context.Context, pd *providerData, ref string, rollbac
 		if rollback {
 			opts.Rollback = "previous"
 		}
+		if opts.EncodedRegistryAuth == "" {
+			// No credentials for the image: let the daemon reuse the ones
+			// stored with the spec the tasks will run, the previous spec on
+			// a rollback (registryAuthFrom=previous-spec), else the current
+			// one (spec), as `docker service update` does.
+			opts.RegistryAuthFrom = swarm.RegistryAuthFromSpec
+			if rollback && svc.PreviousSpec != nil {
+				opts.RegistryAuthFrom = swarm.RegistryAuthFromPreviousSpec
+			}
+		}
 		opts.Version, opts.Spec = svc.Version, svc.Spec
 		out, err := c.ServiceUpdate(ctx, id, opts)
 		if err == nil {

@@ -185,8 +185,28 @@ func svcExpandP5(ctx context.Context, m *svcSpecModel, spec *swarm.ServiceSpec, 
 			pr.SELinuxContext = &swarm.SELinuxContext{Disable: s.Disable.ValueBool(), User: s.User.ValueString(),
 				Role: s.Role.ValueString(), Type: s.Type.ValueString(), Level: s.Level.ValueString()}
 		}
+		if s := p.Seccomp; s != nil {
+			pr.Seccomp = &swarm.SeccompOpts{Mode: swarm.SeccompMode(s.Mode.ValueString()), Profile: []byte(s.Profile.ValueString())}
+			if len(pr.Seccomp.Profile) == 0 {
+				pr.Seccomp.Profile = nil
+			}
+			if pr.Seccomp.Profile != nil && pr.Seccomp.Mode != swarm.SeccompModeCustom {
+				diags.AddError("Invalid privileges.seccomp", `profile is only used with mode = "custom"`)
+			}
+			if pr.Seccomp.Profile == nil && pr.Seccomp.Mode == swarm.SeccompModeCustom {
+				diags.AddError("Invalid privileges.seccomp", `mode = "custom" needs profile`)
+			}
+		}
+		if a := p.AppArmor; a != nil {
+			pr.AppArmor = &swarm.AppArmorOpts{Mode: swarm.AppArmorMode(a.Mode.ValueString())}
+		}
+		pr.NoNewPrivileges = p.NoNewPrivileges.ValueBool()
 		cs.Privileges = pr
 	}
+	// Pass 5.3: tty, open_stdin, oom_score_adj.
+	cs.TTY = m.TTY.ValueBool()
+	cs.OpenStdin = m.OpenStdin.ValueBool()
+	cs.OomScoreAdj = m.OomScoreAdj.ValueInt64()
 }
 
 // svcFlattenP5 maps the Pass 5 container/task attributes onto m.
@@ -200,6 +220,9 @@ func svcFlattenP5(spec swarm.ServiceSpec, cs *swarm.ContainerSpec, prior svcSpec
 	m.ReadOnly = svcBoolValue(prior.ReadOnly, cs.ReadOnly)
 	m.StopSignal = svcStrValue(prior.StopSignal, cs.StopSignal, "")
 	m.Runtime = svcStrValue(prior.Runtime, string(spec.TaskTemplate.Runtime), "container")
+	m.TTY = svcBoolValue(prior.TTY, cs.TTY)
+	m.OpenStdin = svcBoolValue(prior.OpenStdin, cs.OpenStdin)
+	m.OomScoreAdj = svcIntValue(prior.OomScoreAdj, cs.OomScoreAdj)
 	m.Privileges = nil
 	pr := cs.Privileges
 	if pr == nil {
@@ -230,7 +253,24 @@ func svcFlattenP5(spec swarm.ServiceSpec, cs *swarm.ContainerSpec, prior svcSpec
 			Type: svcStrValue(ps.Type, s.Type, ""), Level: svcStrValue(ps.Level, s.Level, ""),
 		}
 	}
-	if prior.Privileges != nil || out.CredentialSpec != nil || out.SELinuxContext != nil {
+	if s := pr.Seccomp; s != nil && (p.Seccomp != nil || (s.Mode != "" && s.Mode != swarm.SeccompModeDefault) || len(s.Profile) > 0) {
+		ps := p.Seccomp
+		if ps == nil {
+			ps = &svcSeccompModel{}
+		}
+		out.Seccomp = &svcSeccompModel{Mode: svcStrValue(ps.Mode, string(s.Mode), string(swarm.SeccompModeDefault)),
+			Profile: svcStrValue(ps.Profile, string(s.Profile), "")}
+	}
+	if a := pr.AppArmor; a != nil && (p.AppArmor != nil || (a.Mode != "" && a.Mode != swarm.AppArmorModeDefault)) {
+		pa := p.AppArmor
+		if pa == nil {
+			pa = &svcAppArmorModel{}
+		}
+		out.AppArmor = &svcAppArmorModel{Mode: svcStrValue(pa.Mode, string(a.Mode), string(swarm.AppArmorModeDefault))}
+	}
+	out.NoNewPrivileges = svcBoolValue(p.NoNewPrivileges, pr.NoNewPrivileges)
+	if prior.Privileges != nil || out.CredentialSpec != nil || out.SELinuxContext != nil || out.Seccomp != nil || out.AppArmor != nil ||
+		pr.NoNewPrivileges {
 		m.Privileges = out
 	}
 }
@@ -262,7 +302,7 @@ func svcExpandMount(ctx context.Context, i int, mm svcMountModel, diags *diag.Di
 		if known, ok := knownString(mm.Type); ok && known != string(mount.TypeBind) {
 			wrong("bind_options", "bind")
 		}
-		mt.BindOptions = &mount.BindOptions{Propagation: mount.Propagation(b.Propagation.ValueString())}
+		mt.BindOptions = &mount.BindOptions{Propagation: mount.Propagation(b.Propagation.ValueString()), NonRecursive: b.NonRecursive.ValueBool()}
 	}
 	if t := mm.TmpfsOptions; t != nil {
 		if known, ok := knownString(mm.Type); ok && known != string(mount.TypeTmpfs) {
@@ -272,6 +312,7 @@ func svcExpandMount(ctx context.Context, i int, mm svcMountModel, diags *diag.Di
 		if v, ok := knownInt64(t.Mode); ok {
 			mt.TmpfsOptions.Mode = os.FileMode(v)
 		}
+		mt.TmpfsOptions.Options = svcTmpfsOptionsFrom(ctx, i, t.Options, diags)
 	}
 	if v := mm.VolumeOptions; v != nil {
 		if known, ok := knownString(mm.Type); ok && known != string(mount.TypeVolume) {
@@ -302,19 +343,21 @@ func svcFlattenMount(mt mount.Mount, p svcMountModel) svcMountModel {
 		Target:   types.StringValue(mt.Target),
 		ReadOnly: types.BoolValue(mt.ReadOnly),
 	}
-	if b := mt.BindOptions; b != nil && (p.BindOptions != nil || b.Propagation != "") {
+	if b := mt.BindOptions; b != nil && (p.BindOptions != nil || (b.Propagation != "" && b.Propagation != mount.PropagationRPrivate) || b.NonRecursive) {
 		pb := p.BindOptions
 		if pb == nil {
 			pb = &svcBindOptionsModel{}
 		}
-		mm.BindOptions = &svcBindOptionsModel{Propagation: svcStrValue(pb.Propagation, string(b.Propagation), "")}
+		mm.BindOptions = &svcBindOptionsModel{Propagation: svcStrValue(pb.Propagation, string(b.Propagation), string(mount.PropagationRPrivate)),
+			NonRecursive: svcBoolValue(pb.NonRecursive, b.NonRecursive)}
 	}
-	if t := mt.TmpfsOptions; t != nil && (p.TmpfsOptions != nil || t.SizeBytes != 0 || t.Mode != 0) {
+	if t := mt.TmpfsOptions; t != nil && (p.TmpfsOptions != nil || t.SizeBytes != 0 || t.Mode != 0 || len(t.Options) > 0) {
 		pt := p.TmpfsOptions
 		if pt == nil {
 			pt = &svcTmpfsOptionsModel{}
 		}
-		mm.TmpfsOptions = &svcTmpfsOptionsModel{SizeBytes: svcIntValue(pt.SizeBytes, t.SizeBytes), Mode: svcIntValue(pt.Mode, int64(t.Mode))}
+		mm.TmpfsOptions = &svcTmpfsOptionsModel{SizeBytes: svcIntValue(pt.SizeBytes, t.SizeBytes), Mode: svcIntValue(pt.Mode, int64(t.Mode)),
+			Options: svcTmpfsOptionsValue(pt.Options, t.Options)}
 	}
 	if v := mt.VolumeOptions; v != nil && (p.VolumeOptions != nil || v.NoCopy || len(v.Labels) > 0 || v.DriverConfig != nil) {
 		pv := p.VolumeOptions
@@ -373,4 +416,43 @@ func svcFlattenReservation(p *svcReservationModel, l swarm.Resources) *svcReserv
 		out.GenericResources = append(out.GenericResources, r)
 	}
 	return out
+}
+
+// svcTmpfsOptionsType is the element type of mounts.tmpfs_options.options.
+var svcTmpfsOptionsType = types.ListType{ElemType: types.StringType}
+
+// svcTmpfsOptionsFrom decodes mounts[i].tmpfs_options.options: each entry is
+// a flag ([name]) or a key/value pair ([name, value]).
+func svcTmpfsOptionsFrom(ctx context.Context, i int, v types.List, diags *diag.Diagnostics) [][]string {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	var rows []types.List
+	diags.Append(v.ElementsAs(ctx, &rows, false)...)
+	var out [][]string
+	for j, r := range rows {
+		e := stringListFrom(ctx, r, diags)
+		if len(e) != 1 && len(e) != 2 {
+			diags.AddError("Invalid mounts entry", fmt.Sprintf("mounts[%d].tmpfs_options.options[%d]: want [flag] or [key, value], got %d elements", i, j, len(e)))
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
+// svcTmpfsOptionsValue is the daemon's tmpfs options as a list of lists
+// (null when empty and unset before).
+func svcTmpfsOptionsValue(prior types.List, in [][]string) types.List {
+	if len(in) == 0 {
+		if svcPriorSet(prior) && len(prior.Elements()) == 0 {
+			return types.ListValueMust(svcTmpfsOptionsType, []attr.Value{})
+		}
+		return types.ListNull(svcTmpfsOptionsType)
+	}
+	rows := make([]attr.Value, 0, len(in))
+	for _, r := range in {
+		rows = append(rows, stringListValue(r, false))
+	}
+	return types.ListValueMust(svcTmpfsOptionsType, rows)
 }

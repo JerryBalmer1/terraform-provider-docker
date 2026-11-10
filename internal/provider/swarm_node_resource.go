@@ -24,6 +24,7 @@ var (
 	_ resource.ResourceWithConfigure   = (*swarmNodeResource)(nil)
 	_ resource.ResourceWithImportState = (*swarmNodeResource)(nil)
 	_ resource.ResourceWithIdentity    = (*swarmNodeResource)(nil)
+	_ resource.ResourceWithModifyPlan  = (*swarmNodeResource)(nil)
 )
 
 // swarmNodeImportedKey is the private-state key set by ImportState. While it
@@ -49,6 +50,8 @@ type swarmNodeModel struct {
 	ManagerAddress types.String `tfsdk:"manager_address"`
 	AdvertiseAddr  types.String `tfsdk:"advertise_addr"`
 	ListenAddr     types.String `tfsdk:"listen_addr"`
+	DataPathAddr   types.String `tfsdk:"data_path_addr"`
+	Adopt          types.Bool   `tfsdk:"adopt"`
 	Availability   types.String `tfsdk:"availability"`
 	Role           types.String `tfsdk:"role"`
 	Labels         types.Map    `tfsdk:"labels"`
@@ -150,6 +153,13 @@ func (r *swarmNodeResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Optional: true, Computed: true, Default: stringdefault.StaticString(swarmDefaultListenAddr), PlanModifiers: replace,
 				MarkdownDescription: "Listen address for swarm traffic on the node. Default `" + swarmDefaultListenAddr + "`. Changing this forces a new resource.",
 			},
+			"data_path_addr": schema.StringAttribute{
+				Optional: true, PlanModifiers: replace,
+				MarkdownDescription: "Address or interface the node uses for data-path (overlay VXLAN) traffic, `<ip|interface>` without a " +
+					"port (`DataPathAddr`, `docker swarm join --data-path-addr`). Unset uses `advertise_addr`. Not reported back by the " +
+					"daemon, so the configured value is kept. Forces replacement (except to fill it in after import).",
+			},
+			"adopt": ownerAdoptAttribute(),
 			"availability": schema.StringAttribute{
 				Optional: true, Computed: true, Default: stringdefault.StaticString(string(swarm.NodeAvailabilityActive)),
 				Validators:          []validator.String{stringvalidator.OneOf(swarmValidAvailabilities...)},
@@ -195,6 +205,17 @@ func swarmNodeEndpoint(m swarmNodeModel, userAgent string) endpointConfig {
 	return ep
 }
 
+// swarmNodeChangeOwner is swarmNodeChange plus the owner label (when owner
+// is set) in the node labels.
+func swarmNodeChangeOwner(ctx context.Context, m swarmNodeModel, owner string, diags *diag.Diagnostics) swarmNodeSpecChange {
+	ch := swarmNodeChange(ctx, m, diags)
+	if owner != "" && ch.Labels != nil {
+		l := mergeLabels(*ch.Labels, map[string]string{ownerLabelKey: owner})
+		ch.Labels = &l
+	}
+	return ch
+}
+
 // swarmNodeChange turns the plan into the node spec change applied through
 // the manager.
 func swarmNodeChange(ctx context.Context, m swarmNodeModel, diags *diag.Diagnostics) swarmNodeSpecChange {
@@ -224,7 +245,7 @@ func swarmNodeFlatten(m *swarmNodeModel, n swarm.Node) {
 	m.Hostname = types.StringValue(n.Description.Hostname)
 	m.Availability = types.StringValue(string(n.Spec.Availability))
 	m.Role = types.StringValue(string(n.Spec.Role))
-	m.Labels = swarmLabelsValue(m.Labels, n.Spec.Labels)
+	m.Labels = swarmLabelsValue(m.Labels, ownerStrip(n.Spec.Labels))
 	m.Name = types.StringValue(swarmNodeName(n))
 	m.Addr = types.StringValue(n.Status.Addr)
 	m.VersionIndex = swarmVersionIndex(n.Version)
@@ -304,8 +325,13 @@ func (r *swarmNodeResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 	defer nc.Close()
+	if err := swarmNodeOwnerCreateCheck(ctx, r.pd, nc); err != nil {
+		resp.Diagnostics.AddError("Cannot join node to swarm", err.Error())
+		return
+	}
 	joinReq := swarmBuildJoinRequest(plan.ManagerAddress.ValueString(), plan.JoinToken.ValueString(),
 		plan.AdvertiseAddr.ValueString(), plan.ListenAddr.ValueString())
+	joinReq.DataPathAddr = plan.DataPathAddr.ValueString()
 	nodeID, err := swarmJoinNode(ctx, nc, r.pd.Client, joinReq, swarmJoinTimeout)
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot join node to swarm", err.Error())
@@ -314,7 +340,7 @@ func (r *swarmNodeResource) Create(ctx context.Context, req resource.CreateReque
 	// Record the node right away so a failure below leaves it tracked.
 	plan.ID = types.StringValue(nodeID)
 	plan.NodeID = types.StringValue(nodeID)
-	change := swarmNodeChange(ctx, plan, &resp.Diagnostics)
+	change := swarmNodeChangeOwner(ctx, plan, r.pd.Owner, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -333,6 +359,7 @@ func (r *swarmNodeResource) Create(ctx context.Context, req resource.CreateReque
 	}
 	n := nRes.Node
 	swarmNodeFlatten(&plan, n)
+	resp.Diagnostics.Append(ownerRecord(ctx, swarmPriv(resp.Private), n.Spec.Labels)...)
 	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, swarmInspectInput(nRes.Raw, n))...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
@@ -355,6 +382,7 @@ func (r *swarmNodeResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 	swarmNodeFlatten(&state, n)
+	resp.Diagnostics.Append(ownerRecord(ctx, swarmPriv(resp.Private), n.Spec.Labels)...)
 	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, swarmInspectInput(nRes.Raw, n))...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)
@@ -369,7 +397,7 @@ func (r *swarmNodeResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 	plan.ID = state.ID
 	plan.NodeID = state.ID
-	change := swarmNodeChange(ctx, plan, &resp.Diagnostics)
+	change := swarmNodeChangeOwner(ctx, plan, r.pd.Owner, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -384,11 +412,28 @@ func (r *swarmNodeResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 	n := nRes.Node
 	swarmNodeFlatten(&plan, n)
+	resp.Diagnostics.Append(ownerRecord(ctx, swarmPriv(resp.Private), n.Spec.Labels)...)
 	resp.Diagnostics.Append(plan.contractFill(ctx, r.pd, swarmInspectInput(nRes.Raw, n))...)
 	// Config is now complete; later changes to host etc. replace the node.
 	resp.Diagnostics.Append(resp.Private.SetKey(ctx, swarmNodeImportedKey, nil)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
+}
+
+// ModifyPlan checks the owner label of a node already in state (import, or
+// another configuration took it over).
+func (r *swarmNodeResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() {
+		return
+	}
+	var id types.String
+	var adopt types.Bool
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("id"), &id)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("adopt"), &adopt)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(ownerPlanCheck(ctx, r.pd, req.Private, "node", id.ValueString(), adopt)...)
 }
 
 func (r *swarmNodeResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

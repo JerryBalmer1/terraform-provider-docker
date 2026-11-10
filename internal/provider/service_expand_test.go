@@ -44,7 +44,7 @@ func svcTestModel() svcSpecModel {
 				VolumeOptions: &svcVolumeOptionsModel{NoCopy: types.BoolValue(true), Labels: types.MapNull(types.StringType),
 					DriverConfig: &svcDriverConfigModel{Name: str("local"), Options: stringMapValue(map[string]string{"type": "nfs"}, false)}}},
 			{Type: str("tmpfs"), Source: types.StringNull(), Target: str("/tmp"), ReadOnly: types.BoolValue(true),
-				TmpfsOptions: &svcTmpfsOptionsModel{SizeBytes: i64(1 << 20), Mode: i64(0o700)}},
+				TmpfsOptions: &svcTmpfsOptionsModel{SizeBytes: i64(1 << 20), Mode: i64(0o700), Options: types.ListNull(svcTmpfsOptionsType)}},
 			{Type: str("bind"), Source: str("/srv/data"), Target: str("/srv"), ReadOnly: types.BoolValue(false),
 				BindOptions: &svcBindOptionsModel{Propagation: str("rslave")}},
 		},

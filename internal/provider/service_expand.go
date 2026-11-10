@@ -209,10 +209,14 @@ func svcExpand(ctx context.Context, m *svcSpecModel, lk *svcLookup, o svcExpandO
 		if file == "" {
 			file = svcDefaultFileName(ref, id, name)
 		}
-		cs.Configs = append(cs.Configs, &swarm.ConfigReference{
-			ConfigID: id, ConfigName: name,
-			File: &swarm.ConfigReferenceFileTarget{Name: file, UID: svcStrOr(s.UID, "0"), GID: svcStrOr(s.GID, "0"), Mode: svcFileMode(s.Mode)},
-		})
+		cref := &swarm.ConfigReference{ConfigID: id, ConfigName: name}
+		if s.Runtime.ValueBool() {
+			// A runtime target is not mounted: no file, no file_name/uid/gid/mode.
+			cref.Runtime = &swarm.ConfigReferenceRuntimeTarget{}
+		} else {
+			cref.File = &swarm.ConfigReferenceFileTarget{Name: file, UID: svcStrOr(s.UID, "0"), GID: svcStrOr(s.GID, "0"), Mode: svcFileMode(s.Mode)}
+		}
+		cs.Configs = append(cs.Configs, cref)
 	}
 
 	// Endpoint
@@ -270,7 +274,13 @@ func svcExpand(ctx context.Context, m *svcSpecModel, lk *svcLookup, o svcExpandO
 	if r := m.Resources; r != nil {
 		rr := &swarm.ResourceRequirements{}
 		if l := r.Limits; l != nil {
-			rr.Limits = &swarm.Limit{NanoCPUs: l.NanoCPUs.ValueInt64(), MemoryBytes: l.MemoryBytes.ValueInt64()}
+			rr.Limits = &swarm.Limit{NanoCPUs: l.NanoCPUs.ValueInt64(), MemoryBytes: l.MemoryBytes.ValueInt64(), Pids: l.Pids.ValueInt64()}
+		}
+		if v, ok := knownInt64(r.SwapBytes); ok {
+			rr.SwapBytes = &v
+		}
+		if v, ok := knownInt64(r.MemorySwappiness); ok {
+			rr.MemorySwappiness = &v
 		}
 		if l := r.Reservations; l != nil {
 			rr.Reservations = &swarm.Resources{NanoCPUs: l.NanoCPUs.ValueInt64(), MemoryBytes: l.MemoryBytes.ValueInt64(),
@@ -285,6 +295,7 @@ func svcExpand(ctx context.Context, m *svcSpecModel, lk *svcLookup, o svcExpandO
 		hc.Interval = svcDur(h.Interval, "healthcheck.interval", &diags)
 		hc.Timeout = svcDur(h.Timeout, "healthcheck.timeout", &diags)
 		hc.StartPeriod = svcDur(h.StartPeriod, "healthcheck.start_period", &diags)
+		hc.StartInterval = svcDur(h.StartInterval, "healthcheck.start_interval", &diags)
 		hc.Retries = int(h.Retries.ValueInt64())
 		cs.Healthcheck = hc
 	}
@@ -395,7 +406,7 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 	if o.ShortName != "" {
 		m.Name = types.StringValue(o.ShortName)
 	}
-	m.Labels = svcMapValue(prior.Labels, userLabels(spec.Labels, o.StripStack))
+	m.Labels = svcMapValue(prior.Labels, ownerStrip(userLabels(spec.Labels, o.StripStack)))
 
 	svcFlattenMode(spec, prior, &m)
 
@@ -457,14 +468,28 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 		if f == nil {
 			f = &swarm.ConfigReferenceFileTarget{}
 		}
-		m.Configs = append(m.Configs, svcConfigRefModel{
+		cm := svcConfigRefModel{
 			ConfigID:   types.StringValue(ref),
 			ConfigName: svcOptionalKeep(p.ConfigName, s.ConfigName),
 			FileName:   svcStrValue(p.FileName, f.Name, svcDefaultFileName(ref, s.ConfigID, s.ConfigName)),
 			UID:        types.StringValue(f.UID),
 			GID:        types.StringValue(f.GID),
 			Mode:       types.Int64Value(int64(f.Mode)),
-		})
+			Runtime:    svcBoolValue(p.Runtime, s.Runtime != nil),
+		}
+		if s.Runtime != nil {
+			// No file target: keep the configured (defaulted) file values.
+			cm.FileName = p.FileName
+			if !svcPriorSet(p.FileName) {
+				cm.FileName = types.StringNull()
+			}
+			cm.UID, cm.GID = svcStrOrValue(p.UID, "0"), svcStrOrValue(p.GID, "0")
+			cm.Mode = p.Mode
+			if !svcPriorSet(p.Mode) {
+				cm.Mode = types.Int64Value(svcDefaultSecretMode)
+			}
+		}
+		m.Configs = append(m.Configs, cm)
 	}
 
 	// Endpoint
@@ -537,14 +562,19 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 		if p == nil {
 			p = &svcResourcesModel{}
 		}
-		res := &svcResourcesModel{}
-		if l := rr.Limits; l != nil && (p.Limits != nil || l.NanoCPUs != 0 || l.MemoryBytes != 0) {
+		res := &svcResourcesModel{SwapBytes: svcIntPtrValue(rr.SwapBytes), MemorySwappiness: svcIntPtrValue(rr.MemorySwappiness)}
+		if l := rr.Limits; l != nil && (p.Limits != nil || l.NanoCPUs != 0 || l.MemoryBytes != 0 || l.Pids != 0) {
 			res.Limits = svcFlattenAmount(p.Limits, l.NanoCPUs, l.MemoryBytes)
+			pp := types.Int64Null()
+			if p.Limits != nil {
+				pp = p.Limits.Pids
+			}
+			res.Limits.Pids = svcIntValue(pp, l.Pids)
 		}
 		if l := rr.Reservations; l != nil && (p.Reservations != nil || l.NanoCPUs != 0 || l.MemoryBytes != 0 || len(l.GenericResources) > 0) {
 			res.Reservations = svcFlattenReservation(p.Reservations, *l)
 		}
-		if prior.Resources != nil || res.Limits != nil || res.Reservations != nil {
+		if prior.Resources != nil || res.Limits != nil || res.Reservations != nil || !res.SwapBytes.IsNull() || !res.MemorySwappiness.IsNull() {
 			m.Resources = res
 		}
 	}
@@ -555,11 +585,12 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 			p = &svcHealthModel{Test: types.ListNull(types.StringType)}
 		}
 		m.Healthcheck = &svcHealthModel{
-			Test:        svcListValue(p.Test, hc.Test),
-			Interval:    svcDurValue(p.Interval, hc.Interval),
-			Timeout:     svcDurValue(p.Timeout, hc.Timeout),
-			StartPeriod: svcDurValue(p.StartPeriod, hc.StartPeriod),
-			Retries:     svcIntValue(p.Retries, int64(hc.Retries)),
+			Test:          svcListValue(p.Test, hc.Test),
+			Interval:      svcDurValue(p.Interval, hc.Interval),
+			Timeout:       svcDurValue(p.Timeout, hc.Timeout),
+			StartPeriod:   svcDurValue(p.StartPeriod, hc.StartPeriod),
+			StartInterval: svcDurValue(p.StartInterval, hc.StartInterval),
+			Retries:       svcIntValue(p.Retries, int64(hc.Retries)),
 		}
 	}
 
@@ -677,6 +708,23 @@ func svcOptionalKeep(prior types.String, v string) types.String {
 		return types.StringValue(v)
 	}
 	return types.StringNull()
+}
+
+// svcIntPtrValue returns *v, or null when v is nil (the daemon omits an
+// unset pointer field).
+func svcIntPtrValue(v *int64) types.Int64 {
+	if v == nil {
+		return types.Int64Null()
+	}
+	return types.Int64Value(*v)
+}
+
+// svcStrOrValue returns prior when set, otherwise def.
+func svcStrOrValue(prior types.String, def string) types.String {
+	if svcPriorSet(prior) {
+		return prior
+	}
+	return types.StringValue(def)
 }
 
 // svcIntValue returns v, or null when prior is unset and v is 0.

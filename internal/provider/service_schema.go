@@ -3,6 +3,7 @@ package provider
 // Schema and model shared by docker_service and docker_stack's service block.
 
 import (
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -64,13 +65,32 @@ type svcSpecModel struct {
 	StopSignal types.String        `tfsdk:"stop_signal"`
 	Runtime    types.String        `tfsdk:"runtime"`
 	Privileges *svcPrivilegesModel `tfsdk:"privileges"`
+
+	// Pass 5.3 additions (field-gaps/S.json; upstream ContainerSpec names).
+	TTY         types.Bool  `tfsdk:"tty"`
+	OpenStdin   types.Bool  `tfsdk:"open_stdin"`
+	OomScoreAdj types.Int64 `tfsdk:"oom_score_adj"`
 }
 
 // svcPrivilegesModel is ContainerSpec.Privileges (credential spec and
 // SELinux context).
 type svcPrivilegesModel struct {
-	CredentialSpec *svcCredentialSpecModel `tfsdk:"credential_spec"`
-	SELinuxContext *svcSELinuxContextModel `tfsdk:"selinux_context"`
+	CredentialSpec  *svcCredentialSpecModel `tfsdk:"credential_spec"`
+	SELinuxContext  *svcSELinuxContextModel `tfsdk:"selinux_context"`
+	Seccomp         *svcSeccompModel        `tfsdk:"seccomp"`
+	AppArmor        *svcAppArmorModel       `tfsdk:"app_armor"`
+	NoNewPrivileges types.Bool              `tfsdk:"no_new_privileges"`
+}
+
+// svcSeccompModel is Privileges.Seccomp.
+type svcSeccompModel struct {
+	Mode    types.String `tfsdk:"mode"`
+	Profile types.String `tfsdk:"profile"`
+}
+
+// svcAppArmorModel is Privileges.AppArmor.
+type svcAppArmorModel struct {
+	Mode types.String `tfsdk:"mode"`
 }
 
 type svcCredentialSpecModel struct {
@@ -124,13 +144,15 @@ type svcMountModel struct {
 
 // svcBindOptionsModel is Mount.BindOptions.
 type svcBindOptionsModel struct {
-	Propagation types.String `tfsdk:"propagation"`
+	Propagation  types.String `tfsdk:"propagation"`
+	NonRecursive types.Bool   `tfsdk:"non_recursive"`
 }
 
 // svcTmpfsOptionsModel is Mount.TmpfsOptions.
 type svcTmpfsOptionsModel struct {
 	SizeBytes types.Int64 `tfsdk:"size_bytes"`
 	Mode      types.Int64 `tfsdk:"mode"`
+	Options   types.List  `tfsdk:"options"`
 }
 
 // svcVolumeOptionsModel is Mount.VolumeOptions.
@@ -175,6 +197,7 @@ type svcConfigRefModel struct {
 	UID        types.String `tfsdk:"uid"`
 	GID        types.String `tfsdk:"gid"`
 	Mode       types.Int64  `tfsdk:"mode"`
+	Runtime    types.Bool   `tfsdk:"runtime"`
 }
 
 type svcUpdateModel struct {
@@ -207,8 +230,10 @@ type svcPlatformModel struct {
 }
 
 type svcResourcesModel struct {
-	Limits       *svcResourceAmountModel `tfsdk:"limits"`
-	Reservations *svcReservationModel    `tfsdk:"reservations"`
+	Limits           *svcResourceAmountModel `tfsdk:"limits"`
+	Reservations     *svcReservationModel    `tfsdk:"reservations"`
+	SwapBytes        types.Int64             `tfsdk:"swap_bytes"`
+	MemorySwappiness types.Int64             `tfsdk:"memory_swappiness"`
 }
 
 // svcReservationModel is Resources.Reservations: an amount plus generic
@@ -239,14 +264,16 @@ type svcDiscreteResourceModel struct {
 type svcResourceAmountModel struct {
 	NanoCPUs    types.Int64 `tfsdk:"nano_cpus"`
 	MemoryBytes types.Int64 `tfsdk:"memory_bytes"`
+	Pids        types.Int64 `tfsdk:"pids"`
 }
 
 type svcHealthModel struct {
-	Test        types.List   `tfsdk:"test"`
-	Interval    types.String `tfsdk:"interval"`
-	Timeout     types.String `tfsdk:"timeout"`
-	StartPeriod types.String `tfsdk:"start_period"`
-	Retries     types.Int64  `tfsdk:"retries"`
+	Test          types.List   `tfsdk:"test"`
+	Interval      types.String `tfsdk:"interval"`
+	Timeout       types.String `tfsdk:"timeout"`
+	StartPeriod   types.String `tfsdk:"start_period"`
+	StartInterval types.String `tfsdk:"start_interval"`
+	Retries       types.Int64  `tfsdk:"retries"`
 }
 
 type svcLoggingModel struct {
@@ -367,6 +394,14 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 			Validators: []validator.String{stringvalidator.OneOf("container", "plugin", "attachment")},
 			MarkdownDescription: "Runtime of the tasks (`TaskTemplate.Runtime`). Only `container` (the default) is useful here: this type always " +
 				"sends a `ContainerSpec`, and the `plugin` and `attachment` runtimes need a plugin or network-attachment spec instead. Updated in place."},
+		"tty": schema.BoolAttribute{Optional: true,
+			MarkdownDescription: "Allocate a pseudo-TTY for the task containers (`ContainerSpec.TTY`, `docker service create --tty`). Updated in place."},
+		"open_stdin": schema.BoolAttribute{Optional: true,
+			MarkdownDescription: "Keep the task containers' standard input open (`ContainerSpec.OpenStdin`). Updated in place."},
+		"oom_score_adj": schema.Int64Attribute{Optional: true,
+			Validators: []validator.Int64{int64validator.Between(-1000, 1000)},
+			MarkdownDescription: "OOM killer score adjustment of the task containers, -1000 to 1000 (`ContainerSpec.OomScoreAdj`, " +
+				"`docker service create --oom-score-adj`). Updated in place." + apiSince("1.46")},
 		"labels": schema.MapAttribute{ElementType: types.StringType, Optional: true,
 			MarkdownDescription: "Labels on the service object."},
 		"container_labels": schema.MapAttribute{ElementType: types.StringType, Optional: true,
@@ -394,6 +429,29 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 						"level":   schema.StringAttribute{Optional: true, MarkdownDescription: "SELinux level label (`Level`)."},
 					},
 				},
+				"seccomp": schema.SingleNestedBlock{
+					MarkdownDescription: "Seccomp filtering of the task containers (`Seccomp`)." + apiSince("1.44"),
+					Attributes: map[string]schema.Attribute{
+						"mode": schema.StringAttribute{Optional: true,
+							Validators:          []validator.String{stringvalidator.OneOf("default", "unconfined", "custom")},
+							MarkdownDescription: "`default` (the daemon's profile), `unconfined` (no filtering) or `custom` (the JSON in `profile`) (`Mode`)."},
+						"profile": schema.StringAttribute{Optional: true,
+							MarkdownDescription: "Seccomp profile JSON, used with `mode = \"custom\"` (`Profile`); e.g. `file(\"seccomp.json\")`."},
+					},
+				},
+				"app_armor": schema.SingleNestedBlock{
+					MarkdownDescription: "AppArmor confinement of the task containers (`AppArmor`); custom profiles are not supported by Swarm." + apiSince("1.44"),
+					Attributes: map[string]schema.Attribute{
+						"mode": schema.StringAttribute{Optional: true,
+							Validators:          []validator.String{stringvalidator.OneOf("default", "disabled")},
+							MarkdownDescription: "`default` (the daemon's profile) or `disabled` (`Mode`)."},
+					},
+				},
+			},
+			Attributes: map[string]schema.Attribute{
+				"no_new_privileges": schema.BoolAttribute{Optional: true,
+					MarkdownDescription: "Set the no_new_privs bit, so task processes cannot gain privileges (setuid, file capabilities) " +
+						"(`NoNewPrivileges`)." + apiSince("1.44")},
 			},
 		},
 		"dns_config": schema.SingleNestedBlock{
@@ -429,6 +487,8 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 						"propagation": schema.StringAttribute{Optional: true,
 							Validators:          []validator.String{stringvalidator.OneOf("private", "rprivate", "shared", "rshared", "slave", "rslave")},
 							MarkdownDescription: "Bind propagation: `private`, `rprivate`, `shared`, `rshared`, `slave` or `rslave` (`Propagation`)."},
+						"non_recursive": schema.BoolAttribute{Optional: true,
+							MarkdownDescription: "Do not bind-mount submounts of the source recursively (`NonRecursive`, `bind-nonrecursive`)." + apiSince("1.41")},
 					},
 				},
 				"tmpfs_options": schema.SingleNestedBlock{
@@ -436,6 +496,9 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 					Attributes: map[string]schema.Attribute{
 						"size_bytes": schema.Int64Attribute{Optional: true, MarkdownDescription: "Size of the tmpfs in bytes (`SizeBytes`); unset is unlimited."},
 						"mode":       schema.Int64Attribute{Optional: true, MarkdownDescription: "Permission bits of the tmpfs as a decimal number, e.g. `448` for `0700` (`Mode`)."},
+						"options": schema.ListAttribute{ElementType: types.ListType{ElemType: types.StringType}, Optional: true,
+							MarkdownDescription: "Extra tmpfs mount options (`Options`): each entry is a one-element list for a flag, e.g. " +
+								"`[\"exec\"]`, or a two-element key/value list, e.g. `[\"nr_inodes\", \"1000\"]`." + apiSince("1.46")},
 					},
 				},
 				"volume_options": schema.SingleNestedBlock{
@@ -482,7 +545,7 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 			},
 		},
 		"secrets":         svcFileRefBlock("secret"),
-		"configs":         svcFileRefBlock("config"),
+		"configs":         svcConfigRefBlock(),
 		"update_config":   svcUpdateBlock("How a changed service rolls out to its tasks."),
 		"rollback_config": svcUpdateBlock("How a failed update rolls back."),
 		"restart_policy": schema.SingleNestedBlock{
@@ -518,8 +581,17 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 		},
 		"resources": schema.SingleNestedBlock{
 			MarkdownDescription: "CPU and memory limits and reservations per task.",
+			Attributes: map[string]schema.Attribute{
+				"swap_bytes": schema.Int64Attribute{Optional: true,
+					MarkdownDescription: "Swap per task in bytes, only together with `limits.memory_bytes` (`SwapBytes`); `-1` is unlimited swap. " +
+						"Unset: twice the memory limit." + apiSince("1.52")},
+				"memory_swappiness": schema.Int64Attribute{Optional: true,
+					Validators: []validator.Int64{int64validator.Between(-1, 100)},
+					MarkdownDescription: "Memory swappiness of the task containers, 0 to 100 (`MemorySwappiness`); `-1` unsets a previous value. " +
+						"Unset: the OS default." + apiSince("1.52")},
+			},
 			Blocks: map[string]schema.Block{
-				"limits":       svcResourceAmountBlock("Hard limits."),
+				"limits":       svcLimitsBlock(),
 				"reservations": svcReservationBlock(),
 			},
 		},
@@ -531,7 +603,9 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 				"interval":     schema.StringAttribute{Optional: true, MarkdownDescription: "Time between checks (Go duration).", Validators: []validator.String{svcDurationValidator()}},
 				"timeout":      schema.StringAttribute{Optional: true, MarkdownDescription: "Time before a check counts as hung (Go duration).", Validators: []validator.String{svcDurationValidator()}},
 				"start_period": schema.StringAttribute{Optional: true, MarkdownDescription: "Start-up grace period (Go duration).", Validators: []validator.String{svcDurationValidator()}},
-				"retries":      schema.Int64Attribute{Optional: true, MarkdownDescription: "Consecutive failures before unhealthy."},
+				"start_interval": schema.StringAttribute{Optional: true, Validators: []validator.String{svcDurationValidator()},
+					MarkdownDescription: "Time between checks during the start period (Go duration, `StartInterval`)." + apiSince("1.44")},
+				"retries": schema.Int64Attribute{Optional: true, MarkdownDescription: "Consecutive failures before unhealthy."},
 			},
 		},
 		"logging": schema.SingleNestedBlock{
@@ -628,6 +702,25 @@ func svcReservationBlock() schema.SingleNestedBlock {
 			}},
 		},
 	}
+	return b
+}
+
+// svcLimitsBlock is resources.limits: an amount plus the pids limit.
+func svcLimitsBlock() schema.SingleNestedBlock {
+	b := svcResourceAmountBlock("Hard limits.")
+	b.Attributes["pids"] = schema.Int64Attribute{Optional: true, Validators: []validator.Int64{int64validator.AtLeast(0)},
+		MarkdownDescription: "Maximum number of processes per task container (`Pids`); 0 or unset is unlimited." + apiSince("1.41")}
+	return b
+}
+
+// svcConfigRefBlock is the configs block: the file reference block plus
+// the runtime target.
+func svcConfigRefBlock() schema.ListNestedBlock {
+	b := svcFileRefBlock("config")
+	b.NestedObject.Attributes["runtime"] = schema.BoolAttribute{Optional: true,
+		MarkdownDescription: "Reference the config as a runtime target instead of a file (`ConfigReference.Runtime`): it is not " +
+			"mounted, the runtime uses it, e.g. the config named in `privileges.credential_spec.config`. `file_name`, `uid`, " +
+			"`gid` and `mode` are then not sent." + apiSince("1.40")}
 	return b
 }
 

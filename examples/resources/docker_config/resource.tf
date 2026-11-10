@@ -21,3 +21,10 @@ resource "docker_config" "app" {
   data_wo         = base64encode("debug = false\n")
   data_wo_version = 1
 }
+
+# A templated config, expanded per task by the golang templating driver.
+resource "docker_config" "node_banner" {
+  name       = "node-banner.txt"
+  data       = base64encode("running on {{ .Node.Hostname }}")
+  templating = { name = "golang" }
+}

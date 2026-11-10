@@ -74,6 +74,8 @@ type swarmNodeSpecChange struct {
 	Availability *swarm.NodeAvailability
 	Role         *swarm.NodeRole
 	Labels       *map[string]string
+	// Name is NodeSpec.Name (docker_node `name`); nil leaves it alone.
+	Name *string
 }
 
 // swarmApplyNodeSpec returns a copy of spec with change applied, and whether
@@ -89,10 +91,23 @@ func swarmApplyNodeSpec(spec swarm.NodeSpec, change swarmNodeSpecChange) (swarm.
 		out.Role = *change.Role
 		changed = true
 	}
+	if change.Name != nil && out.Name != *change.Name {
+		out.Name = *change.Name
+		changed = true
+	}
 	if change.Labels != nil {
 		want := *change.Labels
 		if want == nil {
 			want = map[string]string{}
+		}
+		// A label set that does not mention the owner label keeps the node's
+		// current one: docker_node's `labels` must not strip the owner label
+		// docker_swarm_node put there (Pass 5.3 Lane Z). docker_swarm_node
+		// injects its own value, which wins.
+		if cur, ok := out.Labels[ownerLabelKey]; ok {
+			if _, set := want[ownerLabelKey]; !set {
+				want = mergeLabels(want, map[string]string{ownerLabelKey: cur})
+			}
 		}
 		if !swarmStringMapsEqual(out.Labels, want) {
 			out.Labels = mergeLabels(want)

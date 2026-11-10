@@ -59,8 +59,10 @@ func (r *nodeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			MarkdownDescription: "The node to manage: ID, unique ID prefix, hostname or node name (resolved to the node ID, see `id`). " +
 				"Forces replacement."},
-		"id":       schema.StringAttribute{Computed: true, PlanModifiers: keep, MarkdownDescription: "Full node ID. This is the import ID (a hostname works too)."},
-		"name":     schema.StringAttribute{Computed: true, PlanModifiers: keep, MarkdownDescription: "Node name (`Spec.Name`), else the hostname."},
+		"id": schema.StringAttribute{Computed: true, PlanModifiers: keep, MarkdownDescription: "Full node ID. This is the import ID (a hostname works too)."},
+		"name": schema.StringAttribute{Optional: true, Computed: true, PlanModifiers: keep,
+			MarkdownDescription: "Node name (`Spec.Name`), else the hostname. Set it to name the node (`NodeSpec.Name`); unset leaves " +
+				"the node's name as it is. Updated in place (NodeUpdate)."},
 		"hostname": schema.StringAttribute{Computed: true, PlanModifiers: keep, MarkdownDescription: "Hostname the node reports (`Description.Hostname`)."},
 		"addr":     schema.StringAttribute{Computed: true, PlanModifiers: keep, MarkdownDescription: "IP address the node is reached at (`Status.Addr`)."},
 		"version_index": schema.Int64Attribute{Computed: true,
@@ -103,6 +105,9 @@ func nodeResourceChange(ctx context.Context, m nodeResourceModel, diags *diag.Di
 		ro := swarm.NodeRole(v)
 		ch.Role = &ro
 	}
+	if v, ok := knownString(m.Name); ok && v != "" {
+		ch.Name = &v
+	}
 	if !m.Labels.IsUnknown() && !m.Labels.IsNull() {
 		l := stringMapFrom(ctx, m.Labels, diags)
 		if l == nil {
@@ -139,7 +144,7 @@ func (r *nodeResource) refresh(ctx context.Context, m *nodeResourceModel, diags 
 	m.VersionIndex = swarmVersionIndex(n.Version)
 	m.Availability = types.StringValue(string(n.Spec.Availability))
 	m.Role = types.StringValue(string(n.Spec.Role))
-	m.Labels = swarmLabelsValue(m.Labels, n.Spec.Labels)
+	m.Labels = swarmLabelsValue(m.Labels, ownerStrip(n.Spec.Labels))
 	if m.NodeID.IsNull() || m.NodeID.IsUnknown() {
 		m.NodeID = types.StringValue(n.ID)
 	}
@@ -148,8 +153,12 @@ func (r *nodeResource) refresh(ctx context.Context, m *nodeResourceModel, diags 
 }
 
 // apply resolves the node and sends the plan's change.
-func (r *nodeResource) apply(ctx context.Context, m *nodeResourceModel, id string, diags *diag.Diagnostics) {
-	change := nodeResourceChange(ctx, *m, diags)
+// cfgName is `name` from the configuration: a name only computed from the
+// hostname is never sent as NodeSpec.Name.
+func (r *nodeResource) apply(ctx context.Context, m *nodeResourceModel, id string, cfgName types.String, diags *diag.Diagnostics) {
+	sent := *m
+	sent.Name = cfgName
+	change := nodeResourceChange(ctx, sent, diags)
 	if diags.HasError() {
 		return
 	}
@@ -175,7 +184,9 @@ func (r *nodeResource) Create(ctx context.Context, req resource.CreateRequest, r
 			"The node must already be part of the swarm (join it with docker_swarm_node): "+err.Error())
 		return
 	}
-	r.apply(ctx, &plan, id, &resp.Diagnostics)
+	var cfgName types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("name"), &cfgName)...)
+	r.apply(ctx, &plan, id, cfgName, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -205,7 +216,9 @@ func (r *nodeResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	r.apply(ctx, &plan, state.ID.ValueString(), &resp.Diagnostics)
+	var cfgName types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("name"), &cfgName)...)
+	r.apply(ctx, &plan, state.ID.ValueString(), cfgName, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}

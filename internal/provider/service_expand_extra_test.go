@@ -206,7 +206,7 @@ func TestServiceNetworksMapRoundTrip(t *testing.T) {
 
 func TestServiceMountOptionTypeMismatch(t *testing.T) {
 	m := svcTestModel()
-	m.Mounts[0].TmpfsOptions = &svcTmpfsOptionsModel{SizeBytes: types.Int64Value(1), Mode: types.Int64Null()}
+	m.Mounts[0].TmpfsOptions = &svcTmpfsOptionsModel{SizeBytes: types.Int64Value(1), Mode: types.Int64Null(), Options: types.ListNull(svcTmpfsOptionsType)}
 	m.Resources.Reservations.GenericResources = append(m.Resources.Reservations.GenericResources, svcGenericResourceModel{})
 	m.Privileges.CredentialSpec = &svcCredentialSpecModel{File: types.StringValue("a.json"), Registry: types.StringValue("r"), Config: types.StringNull()}
 	_, diags := svcExpand(context.Background(), &m, svcTestLookup(), svcExpandOpts{})

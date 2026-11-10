@@ -113,14 +113,22 @@ resource "docker_service" "web" {
     limits {
       nano_cpus    = 500000000
       memory_bytes = 268435456
+      pids         = 256
     }
   }
 
+  # Hardening: no privilege escalation through setuid binaries.
+  privileges {
+    no_new_privileges = true
+  }
+
   healthcheck {
-    test     = ["CMD", "wget", "-q", "-O-", "http://localhost/"]
-    interval = "30s"
-    timeout  = "5s"
-    retries  = 3
+    test           = ["CMD", "wget", "-q", "-O-", "http://localhost/"]
+    interval       = "30s"
+    timeout        = "5s"
+    retries        = 3
+    start_period   = "1m"
+    start_interval = "5s" # check more often while starting
   }
 
   logging {

@@ -19,6 +19,7 @@ var (
 	_ resource.ResourceWithConfigure   = (*serviceResource)(nil)
 	_ resource.ResourceWithImportState = (*serviceResource)(nil)
 	_ resource.ResourceWithIdentity    = (*serviceResource)(nil)
+	_ resource.ResourceWithModifyPlan  = (*serviceResource)(nil)
 )
 
 // NewServiceResource returns the docker_service resource.
@@ -32,6 +33,7 @@ type serviceResourceModel struct {
 	ID             types.String `tfsdk:"id"`
 	VersionIndex   types.Int64  `tfsdk:"version_index"`
 	ImageDigestRef types.String `tfsdk:"image_digest_ref"`
+	Adopt          types.Bool   `tfsdk:"adopt"`
 	svcSpecModel
 	contractSwarmService
 
@@ -70,6 +72,7 @@ func (r *serviceResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 		MarkdownDescription: "The service object's `Version.Index`; it changes on every update of the service."}
 	attrs["image_digest_ref"] = schema.StringAttribute{Computed: true,
 		MarkdownDescription: "Image the tasks run, pinned by digest (`repo@sha256:...`), from the daemon's digest pin; null when the daemon did not pin one."}
+	attrs["adopt"] = ownerAdoptAttribute()
 	contractAddResourceAttributes(attrs, "swarm:service")
 	deployAttrs := contractResourceAttributes("compose:service-deploy")
 	for _, n := range svcDeployOutputs {
@@ -94,6 +97,26 @@ func (r *serviceResource) IdentitySchema(_ context.Context, _ resource.IdentityS
 	resp.IdentitySchema = listIDIdentitySchema()
 }
 
+// ModifyPlan checks the Engine API version of the configured attributes and
+// the owner label of an existing service.
+func (r *serviceResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	r.pd.gateAPISince(ctx, "docker_service", req.Config, &resp.Diagnostics)
+	if req.State.Raw.IsNull() {
+		return
+	}
+	var name types.String
+	var adopt types.Bool
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("name"), &name)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("adopt"), &adopt)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(ownerPlanCheck(ctx, r.pd, req.Private, "service", name.ValueString(), adopt)...)
+}
+
 func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan serviceResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -110,6 +133,11 @@ func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	if err := swarmOwnerCreateCheck(ctx, r.pd, "service", spec.Name); err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("name"), "Cannot create service", err.Error())
+		return
+	}
+	spec.Labels = r.pd.ownerInject(spec.Labels)
 	auth, err := r.pd.registryAuthFor(spec.TaskTemplate.ContainerSpec.Image)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("image"), "Cannot resolve registry auth", err.Error())
@@ -133,14 +161,15 @@ func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest
 		resp.Diagnostics.AddError("Service did not converge", err.Error())
 		return
 	}
-	r.refresh(ctx, &plan, lk, &resp.Diagnostics)
+	r.refresh(ctx, &plan, lk, &resp.Diagnostics, swarmPriv(resp.Private))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
 
 // refresh replaces m with the daemon's view, keeping m's spellings. It
-// returns false when the service no longer exists.
-func (r *serviceResource) refresh(ctx context.Context, m *serviceResourceModel, lk *svcLookup, diags *diag.Diagnostics) bool {
+// returns false when the service no longer exists. priv (when not nil)
+// records the live owner label.
+func (r *serviceResource) refresh(ctx context.Context, m *serviceResourceModel, lk *svcLookup, diags *diag.Diagnostics, priv privateSetter) bool {
 	svcRes, err := r.pd.Client.ServiceInspect(ctx, m.ID.ValueString(), client.ServiceInspectOptions{})
 	if err != nil {
 		if isNotFound(err) {
@@ -158,6 +187,9 @@ func (r *serviceResource) refresh(ctx context.Context, m *serviceResourceModel, 
 	}
 	m.ID = types.StringValue(svc.ID)
 	m.svcSpecModel = svcFlatten(svc.Spec, m.svcSpecModel, lk, svcFlattenOpts{})
+	if priv != nil {
+		diags.Append(ownerRecord(ctx, priv, svc.Spec.Labels)...)
+	}
 	m.VersionIndex = swarmVersionIndex(svc.Version)
 	m.ImageDigestRef = types.StringNull()
 	if cs := svc.Spec.TaskTemplate.ContainerSpec; cs != nil {
@@ -181,7 +213,7 @@ func (r *serviceResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !r.refresh(ctx, &state, nil, &resp.Diagnostics) {
+	if !r.refresh(ctx, &state, nil, &resp.Diagnostics, swarmPriv(resp.Private)) {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -210,6 +242,7 @@ func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	spec.Labels = r.pd.ownerInject(spec.Labels)
 	if err := svcUpdateKeepForce(ctx, r.pd, state.ID.ValueString(), spec, !containerKnown(plan.ForceUpdate)); err != nil {
 		resp.Diagnostics.AddError("Cannot update service", err.Error())
 		return
@@ -218,7 +251,7 @@ func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest
 		resp.Diagnostics.AddError("Service did not converge", err.Error())
 		return
 	}
-	r.refresh(ctx, &plan, lk, &resp.Diagnostics)
+	r.refresh(ctx, &plan, lk, &resp.Diagnostics, swarmPriv(resp.Private))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
 }
@@ -244,7 +277,14 @@ func svcUpdateKeepForce(ctx context.Context, pd *providerData, id string, spec s
 	if keepForce {
 		spec.TaskTemplate.ForceUpdate = cur.Spec.TaskTemplate.ForceUpdate
 	}
-	_, err = pd.Client.ServiceUpdate(ctx, id, client.ServiceUpdateOptions{Version: cur.Version, Spec: spec, EncodedRegistryAuth: auth, QueryRegistry: true})
+	opts := client.ServiceUpdateOptions{Version: cur.Version, Spec: spec, EncodedRegistryAuth: auth, QueryRegistry: true}
+	if auth == "" {
+		// No credentials for this image: keep the ones stored with the
+		// current spec, as `docker service update` does without
+		// --with-registry-auth (registryAuthFrom=spec).
+		opts.RegistryAuthFrom = swarm.RegistryAuthFromSpec
+	}
+	_, err = pd.Client.ServiceUpdate(ctx, id, opts)
 	return err
 }
 

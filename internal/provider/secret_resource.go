@@ -27,6 +27,7 @@ var (
 	_ resource.ResourceWithImportState      = (*secretResource)(nil)
 	_ resource.ResourceWithIdentity         = (*secretResource)(nil)
 	_ resource.ResourceWithConfigValidators = (*secretResource)(nil)
+	_ resource.ResourceWithModifyPlan       = (*secretResource)(nil)
 )
 
 // NewSecretResource returns the docker_secret resource.
@@ -37,13 +38,16 @@ type secretResource struct {
 }
 
 type secretResourceModel struct {
-	ID            types.String `tfsdk:"id"`
-	Name          types.String `tfsdk:"name"`
-	Data          types.String `tfsdk:"data"`
-	DataWO        types.String `tfsdk:"data_wo"`
-	DataWOVersion types.Int64  `tfsdk:"data_wo_version"`
-	Labels        types.Map    `tfsdk:"labels"`
-	VersionIndex  types.Int64  `tfsdk:"version_index"`
+	ID            types.String      `tfsdk:"id"`
+	Name          types.String      `tfsdk:"name"`
+	Data          types.String      `tfsdk:"data"`
+	DataWO        types.String      `tfsdk:"data_wo"`
+	DataWOVersion types.Int64       `tfsdk:"data_wo_version"`
+	Labels        types.Map         `tfsdk:"labels"`
+	VersionIndex  types.Int64       `tfsdk:"version_index"`
+	Driver        *swarmDriverModel `tfsdk:"driver"`
+	Templating    *swarmDriverModel `tfsdk:"templating"`
+	Adopt         types.Bool        `tfsdk:"adopt"`
 	contractSwarmSecret
 }
 
@@ -73,7 +77,7 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Sensitive: true,
 				MarkdownDescription: "Secret content, base64-encoded (use `base64encode()`); it must decode. The daemon never " +
 					"returns secret data, so it is kept from state on refresh and ignored on import. Changing this forces a new resource. " +
-					"Exactly one of `data` and `data_wo` is required.",
+					"Exactly one of `data` and `data_wo` is required, unless `driver` provides the value.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Validators:    []validator.String{secretBase64Validator{}},
 			},
@@ -86,6 +90,11 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			},
 			"version_index": schema.Int64Attribute{Computed: true,
 				MarkdownDescription: "The secret object's `Version.Index`; it changes when the labels are updated."},
+			"driver": swarmDriverAttribute("Secret store driver (`Spec.Driver`): a secret driver plugin that provides the value, so `data` "+
+				"and `data_wo` may be omitted.", ""),
+			"templating": swarmDriverAttribute("Templating driver (`Spec.Templating`): the secret content is a template the driver "+
+				"expands per task, e.g. `name = \"golang\"` for Go templates such as `{{ .Service.Name }}`.", "1.37"),
+			"adopt": ownerAdoptAttribute(),
 		},
 	}
 	contractAddResourceAttributes(resp.Schema.Attributes, "swarm:secret")
@@ -100,7 +109,25 @@ func (r *secretResource) IdentitySchema(_ context.Context, _ resource.IdentitySc
 }
 
 func (r *secretResource) ConfigValidators(context.Context) []resource.ConfigValidator {
-	return secretDataConfigValidators()
+	return secretDriverDataConfigValidators()
+}
+
+// ModifyPlan checks the Engine API version of the configured attributes and
+// the owner label of an existing secret.
+func (r *secretResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	r.pd.gateAPISince(ctx, "docker_secret", req.Config, &resp.Diagnostics)
+	if req.State.Raw.IsNull() {
+		return
+	}
+	var plan secretResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(ownerPlanCheck(ctx, r.pd, req.Private, "secret", plan.Name.ValueString(), plan.Adopt)...)
 }
 
 func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -112,16 +139,39 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	if r.pd != nil && !r.pd.gateItemAPI(ctx, "swarm:secret", &resp.Diagnostics) {
 		return
 	}
-	data, ok := secretPayload(ctx, req.Config, plan.Data, &resp.Diagnostics)
-	if !ok {
+	var data []byte
+	if plan.Driver == nil || !plan.Data.IsNull() {
+		var ok bool
+		if data, ok = secretPayload(ctx, req.Config, plan.Data, &resp.Diagnostics); !ok {
+			return
+		}
+	} else {
+		var wo types.String
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("data_wo"), &wo)...)
+		if !wo.IsNull() {
+			var ok bool
+			if data, ok = secretPayload(ctx, req.Config, plan.Data, &resp.Diagnostics); !ok {
+				return
+			}
+		}
+	}
+	if err := swarmOwnerCreateCheck(ctx, r.pd, "secret", plan.Name.ValueString()); err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("name"), "Cannot create secret", err.Error())
 		return
 	}
 	spec := swarm.SecretSpec{
 		Annotations: swarm.Annotations{
-			Name:   plan.Name.ValueString(),
-			Labels: mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue}),
+			Name: plan.Name.ValueString(),
+			Labels: r.pd.ownerInject(mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics),
+				map[string]string{labelManagedBy: labelManagedByValue})),
 		},
 		Data: data,
+	}
+	if d := plan.Driver; d != nil {
+		spec.Driver = &swarm.Driver{Name: d.Name.ValueString(), Options: stringMapFrom(ctx, d.Options, &resp.Diagnostics)}
+	}
+	if t := plan.Templating; t != nil {
+		spec.Templating = &swarm.Driver{Name: t.Name.ValueString(), Options: stringMapFrom(ctx, t.Options, &resp.Diagnostics)}
 	}
 	out, err := r.pd.Client.SecretCreate(ctx, client.SecretCreateOptions{Spec: spec})
 	if err != nil {
@@ -134,13 +184,13 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 	plan.contractSetNull()
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, out.ID)...)
-	r.read(ctx, &plan, &resp.Diagnostics, nil)
+	r.read(ctx, &plan, &resp.Diagnostics, nil, swarmPriv(resp.Private))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 // read refreshes m from the daemon; it reports gone=true when the secret no
 // longer exists.
-func (r *secretResource) read(ctx context.Context, m *secretResourceModel, diags *diag.Diagnostics, gone *bool) {
+func (r *secretResource) read(ctx context.Context, m *secretResourceModel, diags *diag.Diagnostics, gone *bool, priv privateSetter) {
 	sRes, err := r.pd.Client.SecretInspect(ctx, m.ID.ValueString(), client.SecretInspectOptions{})
 	if err != nil {
 		if isNotFound(err) && gone != nil {
@@ -153,8 +203,13 @@ func (r *secretResource) read(ctx context.Context, m *secretResourceModel, diags
 	s := sRes.Secret
 	m.ID = types.StringValue(s.ID)
 	m.Name = types.StringValue(s.Spec.Name)
-	m.Labels = svcMapValue(m.Labels, userLabels(s.Spec.Labels, false))
+	m.Labels = svcMapValue(m.Labels, ownerStrip(userLabels(s.Spec.Labels, false)))
 	m.VersionIndex = swarmVersionIndex(s.Version)
+	m.Driver = swarmDriverValue(m.Driver, s.Spec.Driver)
+	m.Templating = swarmDriverValue(m.Templating, s.Spec.Templating)
+	if priv != nil {
+		diags.Append(ownerRecord(ctx, priv, s.Spec.Labels)...)
+	}
 	// Data is never returned by the daemon: keep the state value.
 	diags.Append(m.contractFill(ctx, r.pd, swarmInspectInput(sRes.Raw, s))...)
 }
@@ -166,7 +221,7 @@ func (r *secretResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 	gone := false
-	r.read(ctx, &state, &resp.Diagnostics, &gone)
+	r.read(ctx, &state, &resp.Diagnostics, &gone, swarmPriv(resp.Private))
 	if gone {
 		resp.State.RemoveResource(ctx)
 		return
@@ -188,7 +243,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 	plan.ID = state.ID
-	labels := mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue})
+	labels := r.pd.ownerInject(mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue}))
 	err := swarmRetryConflict(ctx, func(ctx context.Context) error {
 		res, err := r.pd.Client.SecretInspect(ctx, plan.ID.ValueString(), client.SecretInspectOptions{})
 		if err != nil {
@@ -205,7 +260,7 @@ func (r *secretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 	plan.DataWO = types.StringNull()
-	r.read(ctx, &plan, &resp.Diagnostics, nil)
+	r.read(ctx, &plan, &resp.Diagnostics, nil, swarmPriv(resp.Private))
 	if resp.Diagnostics.HasError() {
 		return
 	}
