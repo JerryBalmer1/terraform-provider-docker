@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/versions"
 )
 
 const defaultDockerHost = "unix:///var/run/docker.sock"
@@ -151,7 +152,14 @@ func (p *dockerProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 			"(`DOCKER_CONFIG`, else `~/.docker/config.json`); else anonymous. Inside a docker config: `credHelpers[<registry>]`, then " +
 			"`credsStore` (both need `allow_credential_helpers`), then `auths`.\n\n" +
 			"Endpoint precedence: `host`, then the `ssh` block's `host`, then `context`, then `DOCKER_HOST`, then `DOCKER_CONTEXT`, " +
-			"then `currentContext` in the docker `config.json`, then `" + defaultDockerHost + "`.",
+			"then `currentContext` in the docker `config.json`, then `" + defaultDockerHost + "`.\n\n" +
+			"Daemon check: unless `disable_docker_daemon_check = true`, Configure pings the daemon once (`GET /_ping`, " +
+			daemonCheckTimeout.String() + " timeout). A daemon that does not answer is a *warning*, never an error, so validate and plan " +
+			"work offline; the warning says which of these it was: not reachable (naming the host and where it came from: `host`, the " +
+			"`ssh` block, a Docker context, `DOCKER_HOST` or the built-in default), permission denied on the unix socket or Windows " +
+			"named pipe, or a TLS failure (with the TLS settings in effect). A daemon whose Engine API is below `min_api_version` is " +
+			"an *error* naming both versions. The ping is skipped while a `tls` or `ssh` value (or `disable_docker_daemon_check`) is " +
+			"unknown until apply.",
 		Attributes: map[string]schema.Attribute{
 			"host": schema.StringAttribute{
 				Optional: true,
@@ -179,9 +187,11 @@ func (p *dockerProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				Optional: true,
 				MarkdownDescription: "Skip the daemon reachability check. When `false` (default), Configure pings the daemon " +
 					"(`GET /_ping`, " + daemonCheckTimeout.String() + " timeout, plus `ssh.connect_timeout` for SSH hosts) and reports a " +
-					"*warning* if it does not answer; it never fails validate or plan. The client itself is lazy either way: no other " +
-					"daemon call happens until a resource or data source needs one. Set `true` to skip the ping (no delay when the " +
-					"daemon is expected to be absent at plan time).",
+					"*warning* if it does not answer, classified as not reachable, permission denied (unix socket or named pipe) or TLS " +
+					"failure, naming the host, where it came from and the TLS settings in effect; it never fails validate or plan. A " +
+					"daemon below `min_api_version` is an error. The ping is skipped while a `tls` or `ssh` value is unknown until apply. " +
+					"The client itself is lazy either way: no other daemon call happens until a resource or data source needs one. Set " +
+					"`true` to skip the ping (no delay when the daemon is expected to be absent at plan time).",
 			},
 			"min_api_version": schema.StringAttribute{
 				Optional: true,
@@ -302,19 +312,33 @@ func resolveEndpoint(m providerModel, getenv func(string) string, diags *diag.Di
 		sshBlockHost = knownStr(m.SSH.Host)
 	}
 	ep := endpointConfig{APIVersion: api}
+	switch {
+	case host != "":
+		ep.HostSource = hostSourceArgument
+	case sshBlockHost != "":
+		ep.HostSource = hostSourceSSHBlock
+	}
 
 	var dc *dockerContextEndpoint
 	if host == "" && sshBlockHost == "" {
+		ctxFrom := "the provider's `context` argument"
 		// An explicit context beats DOCKER_HOST, except "default", which
 		// is the DOCKER_HOST-or-default-socket context.
 		if ctxName == "" || ctxName == "default" {
-			host = getenv("DOCKER_HOST")
+			if host = getenv("DOCKER_HOST"); host != "" {
+				ep.HostSource = hostSourceEnv
+			}
 		}
 		if host == "" && ctxName == "" {
 			ctxName = getenv("DOCKER_CONTEXT")
+			ctxFrom = "the DOCKER_CONTEXT environment variable"
 			if ctxName == "" {
 				ctxName = currentDockerContext(dockerConfigDir(getenv))
+				ctxFrom = "`currentContext` in " + filepath.Join(dockerConfigDir(getenv), "config.json")
 			}
+		}
+		if host == "" && ctxName != "" && ctxName != "default" {
+			ep.HostSource = fmt.Sprintf("Docker context %q (named by %s)", ctxName, ctxFrom)
 		}
 		if host == "" {
 			var err error
@@ -330,6 +354,7 @@ func resolveEndpoint(m providerModel, getenv func(string) string, diags *diag.Di
 	}
 	if host == "" && sshBlockHost == "" {
 		host = defaultDockerHost
+		ep.HostSource = hostSourceDefault
 	}
 	ep.Host = host
 
@@ -338,16 +363,20 @@ func resolveEndpoint(m providerModel, getenv func(string) string, diags *diag.Di
 		ep.CA = knownStr(m.TLS.CA)
 		ep.Cert = knownStr(m.TLS.Cert)
 		ep.Key = knownStr(m.TLS.Key)
+		ep.TLSSource = tlsSourceBlock
 	case certPath != "":
 		dir := expandHome(certPath)
 		ep.CA = filepath.Join(dir, "ca.pem")
 		ep.Cert = filepath.Join(dir, "cert.pem")
 		ep.Key = filepath.Join(dir, "key.pem")
+		ep.TLSSource = "`cert_path` " + dir
 	case dc != nil:
 		ep.CA, ep.Cert, ep.Key = string(dc.CA), string(dc.Cert), string(dc.Key)
 		ep.SkipTLSVerify = dc.SkipTLSVerify
+		ep.TLSSource = fmt.Sprintf("Docker context %q", dc.Name)
 	case getenv("DOCKER_TLS_VERIFY") != "" && getenv("DOCKER_CERT_PATH") != "":
 		dir := getenv("DOCKER_CERT_PATH")
+		ep.TLSSource = "DOCKER_TLS_VERIFY + DOCKER_CERT_PATH " + dir
 		ep.CA = filepath.Join(dir, "ca.pem")
 		ep.Cert = filepath.Join(dir, "cert.pem")
 		ep.Key = filepath.Join(dir, "key.pem")
@@ -400,7 +429,12 @@ func (p *dockerProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// With the check disabled no ping happens here; the floor then applies
 	// on the first pd.APIVersion call.
 	negotiated := ""
-	if !m.DisableDockerDaemonCheck.ValueBool() {
+	switch {
+	case endpointHasUnknown(m):
+		// Unknown tls / ssh values (or an unknown disable flag) mean the
+		// ping would test another endpoint than the one apply will use.
+		tflog.Info(ctx, "docker daemon check skipped: provider configuration has values not known until apply")
+	case !m.DisableDockerDaemonCheck.ValueBool():
 		negotiated = checkDockerDaemon(ctx, c, ep, minAPI, &resp.Diagnostics)
 		if resp.Diagnostics.HasError() {
 			return
@@ -473,18 +507,45 @@ func checkDockerDaemon(ctx context.Context, c *client.Client, ep endpointConfig,
 	}
 	pctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	if _, err := c.Ping(pctx, client.PingOptions{NegotiateAPIVersion: true}); err != nil {
-		diags.AddWarning("Docker daemon not reachable",
-			fmt.Sprintf("Pinging %s failed: %v\n\nPlanning continues; operations that need the daemon will fail until it is reachable. "+
-				"Set disable_docker_daemon_check = true to skip this check.", ep.Host, err))
+	ping, err := c.Ping(pctx, client.PingOptions{NegotiateAPIVersion: true})
+	if err != nil {
+		// The daemon answered, but with an API version the client cannot
+		// negotiate down to (below client.MinAPIVersion): too old, not
+		// unreachable.
+		if ping.APIVersion != "" && apiVersionPattern.MatchString(ping.APIVersion) && versions.LessThan(ping.APIVersion, client.MinAPIVersion) {
+			f := floor
+			if f == "" || versions.LessThan(f, client.MinAPIVersion) {
+				f = client.MinAPIVersion
+			}
+			diags.AddAttributeError(path.Root("min_api_version"), "Docker daemon too old",
+				fmt.Sprintf("%v.\n\nThe daemon at %s (from %s) reports Engine API %s; min_api_version is %s, and this provider's client "+
+					"cannot speak any Engine API older than %s.", checkAPIFloor(ep.Host, ping.APIVersion, f), ep.Host, ep.hostSource(),
+					ping.APIVersion, floorOrUnset(floor), client.MinAPIVersion))
+			return ""
+		}
+		summary, detail := daemonCheckDiagnostic(ep, err)
+		diags.AddWarning(summary, detail)
 		return ""
 	}
 	v := c.ClientVersion()
 	if err := checkAPIFloor(ep.Host, v, floor); err != nil {
-		diags.AddAttributeError(path.Root("min_api_version"), "Docker daemon too old", err.Error())
+		daemonAPI := ping.APIVersion
+		if daemonAPI == "" {
+			daemonAPI = "no version"
+		}
+		diags.AddAttributeError(path.Root("min_api_version"), "Docker daemon too old",
+			fmt.Sprintf("%v.\n\nNegotiated Engine API %s (the daemon reports %s) with the daemon at %s (from %s); min_api_version is %s.",
+				err, v, daemonAPI, ep.Host, ep.hostSource(), floor))
 		return ""
 	}
 	return v
+}
+
+func floorOrUnset(f string) string {
+	if f == "" {
+		return "unset"
+	}
+	return f
 }
 
 // ===== BEGIN REGISTRATIONS =====

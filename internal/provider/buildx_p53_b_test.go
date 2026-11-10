@@ -672,9 +672,12 @@ func b53Config(t *testing.T, sr resource.SchemaResponse, v any) tfsdk.Config {
 // TestAccBuildxP53_multiPlatform builds a two-platform docker_image (a
 // FROM scratch image, so no emulation is needed) and a bake target with a
 // target: context on the harness. On a graph-driver daemon the
-// multi-platform step expects the clear containerd-store error.
+// multi-platform step expects the clear containerd-store error. On the
+// harness it runs on the containerd-store node (TF_ACC_CONTAINERD_HOST), so
+// the multi-platform build runs for real.
 func TestAccBuildxP53_multiPlatform(t *testing.T) {
 	testAccPreCheck(t)
+	p6aUseContainerdNode(t)
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM scratch\nCOPY Dockerfile /Dockerfile\n"), 0o600)
 	os.WriteFile(filepath.Join(dir, "base.Dockerfile"), []byte("FROM "+hAccImage("busybox:1.36")+"\nRUN echo base > /base\n"), 0o600)

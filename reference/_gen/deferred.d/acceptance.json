@@ -1,0 +1,10 @@
+{
+  "about": "Hand-maintained: acceptance tests (or the only test of a feature) that cannot run for real on the dind harness (test/harness). Each row names the test function and its file (tools/deferred fails when the function is missing) and why. Remove a row in the change that makes the test run for real. Read by tools/deferred into reference/_gen/deferred.json (kind acceptance).",
+  "tests": [
+    {
+      "test": "TestAccNpipeSmoke",
+      "file": "internal/provider/i_npipe_acc_test.go",
+      "reason": "Windows named-pipe transport against Docker Desktop; the harness is Linux dind over TCP. Run by hand with TF_ACC_NPIPE=1 (CLAUDE.md Build and test)."
+    }
+  ]
+}

@@ -61,6 +61,7 @@ $HarnessEnv = [ordered]@{
     DOCKER_WORKER2_HOST      = 'tcp://127.0.0.1:12377'
     DOCKER_WORKER3_HOST      = 'tcp://127.0.0.1:12379'
     DOCKER_WORKER4_HOST      = 'tcp://127.0.0.1:12381'
+    TF_ACC_CONTAINERD_HOST   = 'tcp://127.0.0.1:12383'
     E2E_MANAGER_ADDR         = 'manager:2377'
     E2E_ADVERTISE_ADDR       = 'eth0'
     TF_ACC_REGISTRY          = '127.0.0.1:12380'
@@ -251,9 +252,27 @@ Wait-HarnessDaemon -Name worker1 -DockerArgs @('-H', $HarnessEnv.DOCKER_WORKER1_
 Wait-HarnessDaemon -Name worker2 -DockerArgs @('-H', $HarnessEnv.DOCKER_WORKER2_HOST)
 Wait-HarnessDaemon -Name worker3 -DockerArgs @('-H', $HarnessEnv.DOCKER_WORKER3_HOST)
 Wait-HarnessDaemon -Name worker4 -DockerArgs @('-H', $HarnessEnv.DOCKER_WORKER4_HOST)
+Wait-HarnessDaemon -Name cdnode -DockerArgs @('-H', $HarnessEnv.TF_ACC_CONTAINERD_HOST)
 Wait-HarnessDaemon -Name tlsnode -DockerArgs @('-H', $HarnessEnv.TF_ACC_TLS_HOST, '--tlsverify',
     '--tlscacert', $HarnessEnv.TF_ACC_TLS_CA, '--tlscert', $HarnessEnv.TF_ACC_TLS_CERT, '--tlskey', $HarnessEnv.TF_ACC_TLS_KEY)
 Wait-HarnessHttp -Name registry -Url "http://$($HarnessEnv.TF_ACC_REGISTRY)/v2/"
+
+# Engine version, API version and image store of the swarm manager and of
+# cdnode, from the daemons themselves. TF_ACC_CONTAINERD_HOST is exported
+# only when cdnode really runs the containerd image store; the overlay2
+# nodes must not (they opt out of the Engine 29 default in docker-compose.yml).
+foreach ($n in @(@{ Name = 'manager'; Host = $HarnessEnv.DOCKER_HOST }, @{ Name = 'cdnode'; Host = $HarnessEnv.TF_ACC_CONTAINERD_HOST })) {
+    $ver = (& docker -H $n.Host version --format '{{.Server.Version}} API {{.Server.APIVersion}}' 2>&1 | Out-String).Trim()
+    $store = (& docker -H $n.Host info --format '{{.Driver}} {{range .DriverStatus}}{{index . 0}}={{index . 1}} {{end}}' 2>&1 | Out-String).Trim()
+    Write-Host "$($n.Name): Engine $ver, storage $store"
+    if ($n.Name -eq 'manager' -and $store -match 'io\.containerd\.snapshotter') {
+        Write-Warning 'harness-up: the manager runs the containerd image store; the overlay2 graph-driver coverage is gone (check docker-compose.yml).'
+    }
+    if ($n.Name -eq 'cdnode' -and $store -notmatch 'io\.containerd\.snapshotter') {
+        Write-Warning 'harness-up: cdnode does not run the containerd image store; not exporting TF_ACC_CONTAINERD_HOST (the containerd tests skip).'
+        $HarnessEnv.Remove('TF_ACC_CONTAINERD_HOST')
+    }
+}
 # The self-signed TLS registry: best effort, only its one test needs it.
 $tlsRegistryUp = $false
 for ($i = 1; $i -le 30 -and -not $tlsRegistryUp; $i++) {

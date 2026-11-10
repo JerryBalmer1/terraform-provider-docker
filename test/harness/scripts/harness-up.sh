@@ -159,8 +159,28 @@ wait_daemon worker1 -H tcp://127.0.0.1:12376
 wait_daemon worker2 -H tcp://127.0.0.1:12377
 wait_daemon worker3 -H tcp://127.0.0.1:12379
 wait_daemon worker4 -H tcp://127.0.0.1:12381
+wait_daemon cdnode -H tcp://127.0.0.1:12383
 wait_daemon tlsnode -H tcp://127.0.0.1:12378 --tlsverify --tlscacert "${TLS_CA}" --tlscert "${TLS_CERT}" --tlskey "${TLS_KEY}"
 wait_http registry http://127.0.0.1:12380/v2/
+
+# Engine version, API version and image store of the swarm manager and of
+# cdnode, from the daemons themselves. TF_ACC_CONTAINERD_HOST is exported
+# only when cdnode really runs the containerd image store.
+CONTAINERD_HOST=""
+for node in manager=tcp://127.0.0.1:12375 cdnode=tcp://127.0.0.1:12383; do
+  n="${node%%=*}"; h="${node#*=}"
+  ver="$(docker -H "${h}" version --format '{{.Server.Version}} API {{.Server.APIVersion}}' 2>&1 || true)"
+  store="$(docker -H "${h}" info --format '{{.Driver}} {{range .DriverStatus}}{{index . 0}}={{index . 1}} {{end}}' 2>&1 || true)"
+  echo "${n}: Engine ${ver}, storage ${store}"
+  case "${n}:${store}" in
+    manager:*io.containerd.snapshotter*)
+      echo "WARNING: the manager runs the containerd image store; the overlay2 graph-driver coverage is gone (check docker-compose.yml)." >&2 ;;
+    cdnode:*io.containerd.snapshotter*)
+      CONTAINERD_HOST="${h}" ;;
+    cdnode:*)
+      echo "WARNING: cdnode does not run the containerd image store; not exporting TF_ACC_CONTAINERD_HOST (the containerd tests skip)." >&2 ;;
+  esac
+done
 # The self-signed TLS registry: best effort, only its one test needs it.
 TLS_REGISTRY=""
 for i in $(seq 1 30); do
@@ -247,6 +267,7 @@ fi
   echo "export DOCKER_WORKER2_HOST=\"tcp://127.0.0.1:12377\""
   echo "export DOCKER_WORKER3_HOST=\"tcp://127.0.0.1:12379\""
   echo "export DOCKER_WORKER4_HOST=\"tcp://127.0.0.1:12381\""
+  if [ -n "${CONTAINERD_HOST}" ]; then echo "export TF_ACC_CONTAINERD_HOST=\"${CONTAINERD_HOST}\""; fi
   echo "export E2E_MANAGER_ADDR=\"manager:2377\""
   echo "export E2E_ADVERTISE_ADDR=\"eth0\""
   echo "export TF_ACC_REGISTRY=\"127.0.0.1:12380\""

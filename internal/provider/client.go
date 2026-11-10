@@ -41,6 +41,11 @@ type endpointConfig struct {
 	SSH           *sshConfig
 	// Context is the Docker CLI context the endpoint came from ("" if none).
 	Context string
+	// HostSource and TLSSource say where Host and the TLS material came
+	// from (resolveEndpoint; "" elsewhere), for the Configure preflight
+	// diagnostics (preflight.go).
+	HostSource string
+	TLSSource  string
 	// MinAPIVersion is the min_api_version floor ("" = none). When set,
 	// finishDockerClient installs apiFloorHook, so every versioned request
 	// below the floor fails even on paths that never call pd.APIVersion.

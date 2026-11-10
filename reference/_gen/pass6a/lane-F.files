@@ -1,0 +1,17 @@
+internal/provider/buildx_p53_b_test.go
+internal/provider/client.go
+internal/provider/harness_p6a_f_acc_test.go
+internal/provider/img_acc_test.go
+internal/provider/preflight.go
+internal/provider/preflight_test.go
+internal/provider/preflight_windows_test.go
+internal/provider/provider.go
+internal/provider/service_acc_p53_s_test.go
+reference/_gen/deferred.d/acceptance.json
+reference/_gen/pass6a/lane-F.files
+reference/_gen/pass6a/lane-F.md
+test/harness/README.md
+test/harness/docker-compose.yml
+test/harness/scripts/harness-down.ps1
+test/harness/scripts/harness-up.ps1
+test/harness/scripts/harness-up.sh

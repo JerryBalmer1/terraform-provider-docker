@@ -21,7 +21,7 @@ import (
 )
 
 // TestAccServiceP53_containerFields creates a service with every Pass 5.3
-// container / task attribute the harness Engine (API 1.51) supports and
+// container / task attribute the harness Engine supports (API 1.51 when written; 1.56 since Pass 6a) and
 // checks the daemon kept them; the plan after apply must be empty.
 func TestAccServiceP53_containerFields(t *testing.T) {
 	testAccPreCheck(t)
@@ -121,7 +121,8 @@ resource "docker_service" "s" {
 // drops BindOptions.CreateMountpoint / ReadOnlyNonRecursive /
 // ReadOnlyForceRecursive and Mount.Consistency from a service spec, and
 // rejects mounts of type image. When this test fails, the Engine started
-// honoring them: implement the fields.
+// honoring them: implement the fields. Re-run in Pass 6a on Engine 29.9.3
+// (API 1.56): still dropped / rejected.
 func TestAccServiceP53_daemonDropsMountFields(t *testing.T) {
 	testAccPreCheck(t)
 	_ = swarmAccManagerAddr(t)

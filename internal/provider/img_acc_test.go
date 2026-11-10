@@ -4,6 +4,7 @@ package provider
 // only through test/harness/Invoke-E2E.ps1 (plain pass, no swarm needed).
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfversion"
+	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/versions"
 )
 
 // TestAccImageContractOutputs pulls an image and reads it back through the
@@ -120,10 +123,28 @@ data "docker_image_search" "s" {
 }
 
 // TestAccImageAttestations reads attestations; it needs Engine API 1.55 and
-// the containerd image store, otherwise it expects the gate error.
+// the containerd image store. On the harness it runs on the containerd-store
+// node (TF_ACC_CONTAINERD_HOST, Engine 29.9.3, API 1.56). A daemon below
+// API 1.55 gets the gate-error step (TPD_ACC_API_155=1 forces the real
+// path); a 1.55+ daemon on a graph driver skips, since it can store no
+// attestations.
 func TestAccImageAttestations(t *testing.T) {
 	testAccPreCheck(t)
-	if os.Getenv("TPD_ACC_API_155") == "" {
+	p6aUseContainerdNode(t)
+	c := testAccDockerClient(t)
+	ctx := context.Background()
+	sv, err := c.ServerVersion(ctx, client.ServerVersionOptions{})
+	if err != nil {
+		t.Skipf("cannot reach DOCKER_HOST: %v", err)
+	}
+	api155 := os.Getenv("TPD_ACC_API_155") != "" || !versions.LessThan(sv.APIVersion, "1.55")
+	if api155 && os.Getenv("TPD_ACC_API_155") == "" {
+		if ok, drv, err := bkImageStore(ctx, &providerData{Client: c}); err != nil || !ok {
+			t.Skipf("Engine API %s but the %s graph driver (not the containerd image store, err %v); set %s to a containerd-store daemon",
+				sv.APIVersion, drv, err, p6aContainerdHostEnv)
+		}
+	}
+	if !api155 {
 		hAccTest(t, resource.TestCase{
 			ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 			Steps: []resource.TestStep{{
