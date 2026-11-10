@@ -134,3 +134,7 @@ tfplugindocs templates for every kind live in [templates/](templates/)
 `examples/list-resources/<type>/list-resource.tfquery.hcl`.
 
 See [BUILD_REPORT.md](BUILD_REPORT.md) for the current build state.
+
+## Releasing
+
+How releases are built, signed and published to the Terraform Registry: [RELEASING.md](RELEASING.md). A pushed `v*` tag runs `.github/workflows/release.yml` (GoReleaser, GPG-signed SHA256SUMS, cosign keyless bundle, SLSA build provenance); `Invoke-Build PreRelease` runs every gate first.

@@ -5256,7 +5256,7 @@
     },
     "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/CreateMountpoint": {
       "item": "swarm:service",
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails.",
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes.",
       "how": "manual:S",
       "lane": "S"
     },
@@ -5274,19 +5274,19 @@
     },
     "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyForceRecursive": {
       "item": "swarm:service",
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails.",
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes.",
       "how": "manual:S",
       "lane": "S"
     },
     "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyNonRecursive": {
       "item": "swarm:service",
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails.",
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes.",
       "how": "manual:S",
       "lane": "S"
     },
     "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/Consistency": {
       "item": "swarm:service",
-      "skip": "The daemon never converts Mount.Consistency for services (daemon/cluster/convert/container.go:381-433, docker v28.5.2, has no Consistency), and it only ever affected Docker Desktop for Mac osxfs bind mounts (swagger.yaml Mount.Consistency); TestAccServiceP53_daemonDropsMountFields pins it.",
+      "skip": "The daemon never converts Mount.Consistency for services (daemon/cluster/convert/container.go:381-433, docker v28.5.2, has no Consistency), and it only ever affected Docker Desktop for Mac osxfs bind mounts (swagger.yaml Mount.Consistency); TestAccServiceP53_daemonDropsMountFields pins it. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes.",
       "how": "manual:S",
       "lane": "S"
     },
@@ -6077,7 +6077,7 @@
     },
     "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/CreateMountpoint": {
       "item": "swarm:service",
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails.",
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes.",
       "how": "manual:S",
       "lane": "S"
     },
@@ -6095,19 +6095,19 @@
     },
     "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyForceRecursive": {
       "item": "swarm:service",
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails.",
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes.",
       "how": "manual:S",
       "lane": "S"
     },
     "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyNonRecursive": {
       "item": "swarm:service",
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails.",
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes.",
       "how": "manual:S",
       "lane": "S"
     },
     "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/Consistency": {
       "item": "swarm:service",
-      "skip": "The daemon never converts Mount.Consistency for services (daemon/cluster/convert/container.go:381-433, docker v28.5.2, has no Consistency), and it only ever affected Docker Desktop for Mac osxfs bind mounts (swagger.yaml Mount.Consistency); TestAccServiceP53_daemonDropsMountFields pins it.",
+      "skip": "The daemon never converts Mount.Consistency for services (daemon/cluster/convert/container.go:381-433, docker v28.5.2, has no Consistency), and it only ever affected Docker Desktop for Mac osxfs bind mounts (swagger.yaml Mount.Consistency); TestAccServiceP53_daemonDropsMountFields pins it. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes.",
       "how": "manual:S",
       "lane": "S"
     },
@@ -6762,13 +6762,13 @@
     },
     "engine:SwarmInit/Spec/TaskDefaults/LogDriver/Name": {
       "item": "swarm:swarm-init",
-      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; the harness run of TestAccSwarmInitP53_spec with task_defaults read it back as null (P5.3-S log).",
+      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update.",
       "how": "manual:S",
       "lane": "S"
     },
     "engine:SwarmInit/Spec/TaskDefaults/LogDriver/Options": {
       "item": "swarm:swarm-init",
-      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; the harness run of TestAccSwarmInitP53_spec with task_defaults read it back as null (P5.3-S log).",
+      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update.",
       "how": "manual:S",
       "lane": "S"
     },
@@ -6923,13 +6923,13 @@
     },
     "engine:SwarmSpec/TaskDefaults/LogDriver/Name": {
       "item": "swarm:swarm-init",
-      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; the harness run of TestAccSwarmInitP53_spec with task_defaults read it back as null (P5.3-S log).",
+      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update.",
       "how": "manual:S",
       "lane": "S"
     },
     "engine:SwarmSpec/TaskDefaults/LogDriver/Options": {
       "item": "swarm:swarm-init",
-      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; the harness run of TestAccSwarmInitP53_spec with task_defaults read it back as null (P5.3-S log).",
+      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update.",
       "how": "manual:S",
       "lane": "S"
     },

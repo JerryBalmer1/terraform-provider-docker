@@ -84,6 +84,12 @@ jobs:
         shell: pwsh
         run: Invoke-Build ParityCheck, GuideCheck
 
+      # Release config: .goreleaser.yml's target matrix equals $ReleaseTargets (build/release.tasks.ps1) and
+      # every release target cross-compiles, so a broken release build fails here and not on a v* tag.
+      - name: Invoke-Build ReleaseCheck
+        shell: pwsh
+        run: Invoke-Build ReleaseCheck
+
       # Docker Engine API drift: fails when the newest published spec (docs.docker.com, probed upward
       # from the pinned version) differs from tools/apiwatch/pinned.json. Last, because it is the only
       # step that needs the network. Fix: see .claude/skills/engine-api-watch/SKILL.md.

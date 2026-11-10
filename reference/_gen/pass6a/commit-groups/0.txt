@@ -1,0 +1,8 @@
+reference/_gen/deferred.json
+reference/_gen/generators/pass6a/p6a_ownership.py
+reference/_gen/pass5/ownership.json
+reference/_gen/pass6a/lane-0.md
+terraform-provider-docker.build.ps1
+tools/deferred/deferred.go
+tools/deferred/deferred_test.go
+tools/deferred/main.go

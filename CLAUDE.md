@@ -43,10 +43,13 @@ README_resources.md (generated) lists every type by layer.
 - `tools/compose2stack/`: converts a compose file once into `docker_stack` HCL (swarm) or container/network/volume HCL (local).
 - `tools/parity/`: kreuzwerker/docker v4.6.0 types and attributes vs ours. Types: `tools/parity/paritydata` (hand-maintained). Attributes: every kreuzwerker attribute (`paritydata/kreuzwerker_v4.6.0_attrs.json`) must appear in `reference/_gen/renames.json`, mapped or dropped with a reason; a `gap:` row fails, `won't implement:` passes. `-check BUILD_REPORT.md` also fails on a missing type with no `[BLOCKED]` line. `-guide` regenerates `templates/guides/migrating-from-kreuzwerker.md.tmpl` (Invoke-Build Guide / GuideCheck).
 - `tools/apiwatch/`: diffs the pinned Docker Engine API spec (`pinned.json` + `spec/`) against the newest published one, mapped to provider types.
+- `tools/drift/`: upstream drift for every reference/SOURCES.md source (git ls-remote tags, compose-spec main HEAD, docs.docker.com probe). Moved specs are fetched into TEMP and diffed with fieldcov `-swagger` / `-compose-schema` / `-bake-ref` / `-fields-out`; an unmapped new operation or field, or a doc-only release, fails unless listed in `reference/_gen/drift-accepted.json` (Invoke-Build DriftCheck; the weekly `.github/workflows/drift.yml` opens or updates the "Upstream drift" issue). It never changes a pin.
+- `tools/deferred/`: generates `reference/_gen/deferred.json`, everything knowingly not done (fieldmap.d skips and partials, PARTIAL markers, inventory skips, and the acceptance tests in the hand-maintained `reference/_gen/deferred.d/acceptance.json`), each with its reason and source (Invoke-Build DeferredReport / DeferredCheck).
+- `.goreleaser.yml`, `.github/workflows/release.yml`, `build/release.tasks.ps1`, `RELEASING.md`: the release pipeline (tag v* -> GoReleaser, GPG-signed SHA256SUMS, cosign bundle, SLSA provenance). `build/prerelease.tasks.ps1` holds DriftCheck and PreRelease; the build script dot-sources both task files.
 - `tools/climap/commands.json`: the hand-maintained docker CLI command list behind the docker-cli-map skill.
 - `tools/fieldcov/`: the field-level coverage gate. Every writable leaf field of the Engine API swagger (write operations the inventory maps to a resource, action or ephemeral resource), the compose-spec definitions and the bake target attributes is mapped to a provider attribute (auto-detected from the code and the schema), or carries a reasoned skip or partial in `reference/_gen/fieldmap.d/<lane>.json`. `reference/_gen/fieldmap.json` is generated (`Invoke-Build FieldMap`); `FieldCoverage` (default task) fails on any gap.
 - `tools/doccounts/`: generates and checks the type counts in CLAUDE.md and README.md against `registry_gen.go` (`Invoke-Build DocCounts` / `DocCountsCheck`).
-- `test/harness/`: the dind swarm harness (manager, worker1-3, TLS node, registry:2, Docker Hub mirror). `Invoke-E2E.ps1` is the only entry point for acceptance runs.
+- `test/harness/`: the dind swarm harness (Engine 29.9.3, API 1.56: manager, worker1-4, TLS node and containerd-store node cdnode (`TF_ACC_CONTAINERD_HOST`), the others pinned to overlay2; registry:2, Docker Hub mirror). `Invoke-E2E.ps1` is the only entry point for acceptance runs.
 - `examples/`, `templates/`, `docs/`: tfplugindocs inputs and output. `docs/` is generated; don't hand-edit it.
 - `.claude/skills/`: agent skills (see the end of this file).
 - `BUILD_REPORT.md`: the log of every pass.
@@ -109,6 +112,11 @@ Invoke-Build Guide               # regenerate the migration guide template from 
 Invoke-Build FieldCoverage       # every writable Engine API / compose-spec / bake field mapped, skipped or partial (enforce mode)
 Invoke-Build FieldMap            # regenerate reference/_gen/fieldmap.json from the specs, the provider and reference/_gen/fieldmap.d
 Invoke-Build ApiWatch            # Engine API drift vs tools/apiwatch/pinned.json (ApiWatchCheck: fail on a newer spec, as CI)
+Invoke-Build DriftCheck          # upstream drift: newest release of every reference/SOURCES.md source vs its pin, moved specs diffed with fieldcov (needs the network)
+Invoke-Build DeferredReport      # regenerate reference/_gen/deferred.json, totals by kind, items added/removed since HEAD (DeferredCheck: fail if stale)
+Invoke-Build PreRelease          # every gate in $PreReleaseTasks (build/prerelease.tasks.ps1), runs on, one summary table; no tag/push/publish
+Invoke-Build ReleaseCheck        # .goreleaser.yml matrix == $ReleaseTargets (build/release.tasks.ps1), every target cross-compiles (no goreleaser)
+Invoke-Build Release             # local goreleaser snapshot into dist/ (never signs or publishes), then checks every asset
 Invoke-Build DocCounts           # regenerate the type counts in CLAUDE.md / README.md (DocCountsCheck: fail on drift)
 Invoke-Build Inventory           # reference/inventory.json + INVENTORY.md from reference/_gen/fragments (InventoryCheck: diff must be empty)
 Invoke-Build InventoryValidate   # outputs contract and status: a missing item fails, partials are listed
@@ -118,7 +126,7 @@ Invoke-Build Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm
 
 Nobody hand-edits `reference/inventory.json` or `INVENTORY.md`: edit `reference/_gen/fragments/*.json`, then `Invoke-Build Inventory`.
 
-- Invoke-Build is the only entry point; there is no Makefile. CI (`.github/workflows/ci.yml`, ubuntu, pwsh) installs InvokeBuild and runs, in order: `Invoke-Build` (the default task), `Invoke-Build Check`, `Invoke-Build ParityCheck, GuideCheck`, `Invoke-Build ApiWatchCheck`, then `Invoke-Build E2E` (dind harness through `Invoke-E2E.ps1`). Run the same tasks locally to reproduce a CI failure.
+- Invoke-Build is the only entry point; there is no Makefile. CI (`.github/workflows/ci.yml`, ubuntu, pwsh) installs InvokeBuild and runs, in order: `Invoke-Build` (the default task), `Invoke-Build Check`, `Invoke-Build ParityCheck, GuideCheck`, `Invoke-Build ReleaseCheck`, `Invoke-Build ApiWatchCheck`, then `Invoke-Build E2E` (dind harness through `Invoke-E2E.ps1`). Run the same tasks locally to reproduce a CI failure. A weekly workflow (`.github/workflows/drift.yml`) runs `Invoke-Build DriftCheck` and opens or updates the issue "Upstream drift" on failure; `.github/workflows/release.yml` builds, signs and publishes a pushed `v*` tag (RELEASING.md).
 - The one acceptance test that talks to Docker Desktop directly is `TestAccNpipeSmoke` (`internal/provider/i_npipe_acc_test.go`): Windows only, gated by `TF_ACC_NPIPE=1`, it creates and removes only `tfacc-npipe-*` objects. Run it by hand: `TF_ACC=1 TF_ACC_NPIPE=1 go test -run TestAccNpipeSmoke ./internal/provider -timeout 15m -count=1`.
 - Acceptance tests by hand go through the harness script, one run at a time. Add `-SwarmInit` for the swarm-manager tests and `-KeepUp` to leave the harness up:
 

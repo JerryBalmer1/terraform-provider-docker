@@ -109,3 +109,10 @@ endpoints: 1 new, 6 changed, 0 removed; definitions: 31 new, 4 removed; fields: 
 - The pinned version can be ahead of `client_api_version`: the provider still
   works against newer daemons through version negotiation, but new fields
   need the client library (go.mod) bumped before they can be set.
+
+## DriftCheck
+
+`Invoke-Build DriftCheck` (tools/drift, weekly in `.github/workflows/drift.yml`) covers the Engine API too: it
+compares the moby `api/v*` tags and the docs.docker.com spec with the pin and, when the spec moved, maps the new
+operations and writable fields through fieldcov. apiwatch stays the tool for the endpoint-level diff and for
+re-pinning `tools/apiwatch/pinned.json`.

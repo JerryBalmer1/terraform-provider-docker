@@ -1,0 +1,6 @@
+.github/workflows/release.yml
+.goreleaser.yml
+RELEASING.md
+build/release.tasks.ps1
+reference/_gen/pass6a/lane-G.files
+reference/_gen/pass6a/lane-G.md
