@@ -8,6 +8,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -104,6 +105,28 @@ func composeBuildRequest(p *ctypes.Project, svc ctypes.ServiceConfig, image stri
 			req.Secrets = append(req.Secrets, seamBuildSecret{ID: id, Value: string(data)})
 		}
 	}
+	// additional_contexts, entitlements and privileged as compose's bake
+	// path sends them (compose v5.1.4 pkg/compose/build_bake.go:175-181,
+	// :223, :474-483): "service:<x>" names another service's image (built
+	// first by composeBuild), privileged adds the security.insecure
+	// entitlement.
+	for name, v := range b.AdditionalContexts {
+		if dep, ok := strings.CutPrefix(v, ctypes.ServicePrefix); ok {
+			ds, found := p.Services[dep]
+			if !found {
+				return req, fmt.Errorf("service %s build additional_contexts %s: service %s is not enabled", svc.Name, name, dep)
+			}
+			v = "docker-image://" + composeImageName(p.Name, ds)
+		}
+		if req.Contexts == nil {
+			req.Contexts = map[string]string{}
+		}
+		req.Contexts[name] = v
+	}
+	req.Entitlements = append([]string(nil), b.Entitlements...)
+	if b.Privileged && !slices.Contains(req.Entitlements, "security.insecure") {
+		req.Entitlements = append(req.Entitlements, "security.insecure")
+	}
 	if b.Provenance != "" {
 		req.Attestations.Provenance = b.Provenance
 	}
@@ -115,6 +138,37 @@ func composeBuildRequest(p *ctypes.Project, svc ctypes.ServiceConfig, image stri
 
 // composeBuild builds one service and returns the seam result.
 func composeBuild(ctx context.Context, pd *providerData, p *ctypes.Project, svc ctypes.ServiceConfig, progress func(string)) (*seamBuildResult, error) {
+	return composeBuildWithDeps(ctx, pd, p, svc, progress, map[string]bool{})
+}
+
+// composeBuildWithDeps builds the services svc's additional_contexts name
+// ("service:<x>") whose image is missing, then svc.
+func composeBuildWithDeps(ctx context.Context, pd *providerData, p *ctypes.Project, svc ctypes.ServiceConfig, progress func(string), seen map[string]bool) (*seamBuildResult, error) {
+	if seen[svc.Name] {
+		return nil, fmt.Errorf("service %s: additional_contexts form a cycle", svc.Name)
+	}
+	seen[svc.Name] = true
+	if svc.Build != nil {
+		for _, name := range composeSortedKeys(svc.Build.AdditionalContexts) {
+			dep, ok := strings.CutPrefix(svc.Build.AdditionalContexts[name], ctypes.ServicePrefix)
+			if !ok {
+				continue
+			}
+			ds, found := p.Services[dep]
+			if !found || ds.Build == nil {
+				continue
+			}
+			exists, err := composeImageExists(ctx, pd, composeImageName(p.Name, ds))
+			if err != nil {
+				return nil, err
+			}
+			if !exists {
+				if _, err := composeBuildWithDeps(ctx, pd, p, ds, progress, seen); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
 	image := composeImageName(p.Name, svc)
 	req, err := composeBuildRequest(p, svc, image)
 	if err != nil {

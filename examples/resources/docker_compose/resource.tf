@@ -21,6 +21,13 @@ resource "docker_compose" "shop" {
             target: /etc/nginx/conf.d/default.conf
         depends_on:
           db: {condition: service_healthy}
+        # Lifecycle hooks run through the Engine API: post_start / pre_stop
+        # are exec'd in the container (pre_start steps run as init
+        # containers; see the docs).
+        post_start:
+          - command: ["sh", "-c", "nginx -t"]
+        pre_stop:
+          - command: ["nginx", "-s", "quit"]
       db:
         image: postgres:16-alpine
         environment:

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -56,12 +57,28 @@ func composeHashMatches(labels map[string]string, want string) bool {
 }
 
 // composeEndpoint is one network a container joins.
+// composeEndpointIfname is the endpoint driver option interface_name sets
+// (compose v5.1.4 pkg/compose/create.go:383).
+const composeEndpointIfname = "com.docker.network.endpoint.ifname"
+
 type composeEndpoint struct {
 	Key     string   `json:"key"`
 	Name    string   `json:"name"`
 	Aliases []string `json:"aliases,omitempty"`
 	IPv4    string   `json:"ipv4,omitempty"`
 	IPv6    string   `json:"ipv6,omitempty"`
+	// MacAddress is the endpoint's mac_address (the service-level one goes
+	// to the primary network, like compose). Empty is left out of the
+	// spec hash, so containers without one keep their hash.
+	MacAddress string `json:"mac_address,omitempty"`
+	// DriverOpts, GwPriority and LinkLocalIPs are the endpoint's driver_opts
+	// (interface_name joins them as com.docker.network.endpoint.ifname),
+	// gw_priority and link_local_ips, as compose v5.1.4 sends them
+	// (pkg/compose/create.go:382-450 createEndpointSettings). Empty values
+	// are left out of the spec hash, so existing containers keep theirs.
+	DriverOpts   map[string]string `json:"driver_opts,omitempty"`
+	GwPriority   int               `json:"gw_priority,omitempty"`
+	LinkLocalIPs []string          `json:"link_local_ips,omitempty"`
 }
 
 // composeCopy is a file written into a container before it starts (secrets
@@ -72,6 +89,9 @@ type composeCopy struct {
 	UID  int    `json:"uid"`
 	GID  int    `json:"gid"`
 	Mode int64  `json:"mode"`
+	// APIAuth marks use_api_socket's config.json: Data is filled at create
+	// time with the provider's registry credentials (compose_local_k.go).
+	APIAuth bool `json:"api_auth,omitempty"`
 }
 
 type composeLocalNetwork struct {
@@ -115,6 +135,24 @@ type composeLocalContainer struct {
 	// entries at create time (c_compose_refs.go composeEnvUnset). Not part
 	// of Hash, which keeps the pre-Pass 5.2 Config.Env.
 	UnsetEnv []string `json:"-"`
+	// PullEvery is the refresh period of pull_policy daily / weekly /
+	// every_<d> / refresh (0 with PullRefresh: pull every time).
+	PullEvery   time.Duration `json:"-"`
+	PullRefresh bool          `json:"-"`
+	// Lifecycle hooks (compose_hooks.go). Not part of Hash: they are in
+	// com.docker.compose.config-hash, which decides recreation too.
+	PreStart  []composeLocalHook   `json:"-"`
+	PostStart []ctypes.ServiceHook `json:"-"`
+	PreStop   []ctypes.ServiceHook `json:"-"`
+	// SharedPreStart runs the pre_start steps that are not per_replica
+	// (set by composeLocalApply for the first container it creates for a
+	// service with no container kept).
+	SharedPreStart bool `json:"-"`
+	// CLIOnly is the service's com.docker.compose.config-hash when the
+	// service sets something only that hash sees (composeCLIOnlyKeys), ""
+	// otherwise. docker_compose's spec_hash includes it, so such a change
+	// plans an update, which recreates the container (Pass 5.3 D5).
+	CLIOnly string `json:"-"`
 }
 
 // composeLocalBuild is what a container needs to build its image.
@@ -247,26 +285,11 @@ func composeLocalUnsupported(plan *composeLocalPlan, svc ctypes.ServiceConfig) {
 	if svc.Develop != nil {
 		w("develop")
 	}
-	if len(svc.PostStart) > 0 || len(svc.PreStop) > 0 || len(svc.PreStart) > 0 {
-		w("lifecycle hooks (pre_start/post_start/pre_stop)")
-	}
 	if len(svc.Models) > 0 {
 		w("models")
 	}
 	if svc.Provider != nil {
 		w("provider")
-	}
-	if svc.CredentialSpec != nil {
-		w("credential_spec")
-	}
-	if svc.BlkioConfig != nil {
-		w("blkio_config")
-	}
-	if svc.UseAPISocket {
-		w("use_api_socket")
-	}
-	if len(svc.ExternalLinks) > 0 {
-		w("external_links")
 	}
 	if svc.Attach != nil {
 		w("attach")
@@ -280,6 +303,9 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 	if svc.PullPolicy == ctypes.PullPolicyBuild && svc.Build == nil {
 		return nil, fmt.Errorf("pull_policy \"build\" needs a build section")
 	}
+	// use_api_socket rewrites the service before anything is hashed, like
+	// compose (compose_local_k.go composeWithAPISocket).
+	svc = composeWithAPISocket(svc)
 	image := composeImageName(p.Name, svc)
 	composeLocalUnsupported(plan, svc)
 	scale := svc.GetScale()
@@ -342,7 +368,13 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 		StorageOpt:     svc.StorageOpt,
 		Annotations:    map[string]string(svc.Annotations),
 		Init:           svc.Init,
+		Umask:          svc.Umask,
 		PortBindings:   network.PortMap{},
+	}
+	if opt, err := composeCredentialSpecOpt(svc.CredentialSpec); err != nil {
+		return nil, fmt.Errorf("service %s: %w", svc.Name, err)
+	} else if opt != "" {
+		hc.SecurityOpt = append(append([]string(nil), svc.SecurityOpt...), opt)
 	}
 	if len(svc.ExtraHosts) > 0 {
 		hc.ExtraHosts = svc.ExtraHosts.AsList(":")
@@ -370,6 +402,7 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 		return nil, err
 	}
 	composeResources(svc, hc)
+	composeBlkio(svc.BlkioConfig, &hc.Resources)
 	for _, d := range svc.Devices {
 		perms := d.Permissions
 		if perms == "" {
@@ -472,6 +505,10 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 		copies = append(copies, c...)
 	}
 	for _, ref := range svc.Configs {
+		if ref.Source == composeAPISocketSource && svc.UseAPISocket {
+			copies = append(copies, composeCopy{Path: ref.Target, Mode: 0o444, APIAuth: true})
+			continue
+		}
 		obj, ok := p.Configs[ref.Source]
 		if !ok {
 			return nil, fmt.Errorf("config %q is not defined", ref.Source)
@@ -489,6 +526,9 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 
 	// Networks
 	var eps []composeEndpoint
+	if _, err := composeMAC(svc.MacAddress); err != nil {
+		return nil, fmt.Errorf("service %s: %w", svc.Name, err)
+	}
 	if svc.NetworkMode != "" {
 		nm, err := composeServiceRef(p, svc.NetworkMode)
 		if err != nil {
@@ -503,14 +543,50 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 			}
 			ep := composeEndpoint{Key: key, Name: n.Name, Aliases: []string{svc.Name}}
 			if nc := svc.Networks[key]; nc != nil {
+				// use_service_name_alias (default true): false leaves the
+				// service name out of the endpoint's aliases.
+				if nc.UseServiceNameAlias != nil && !*nc.UseServiceNameAlias {
+					ep.Aliases = nil
+				}
 				ep.Aliases = append(ep.Aliases, nc.Aliases...)
 				ep.IPv4, ep.IPv6 = nc.Ipv4Address, nc.Ipv6Address
+				ep.GwPriority = nc.GatewayPriority
+				ep.LinkLocalIPs = slices.Clone(nc.LinkLocalIPs)
+				if len(nc.DriverOpts) > 0 || nc.InterfaceName != "" {
+					ep.DriverOpts = map[string]string{}
+					for k, v := range nc.DriverOpts {
+						ep.DriverOpts[k] = v
+					}
+					if nc.InterfaceName != "" {
+						if prev, ok := ep.DriverOpts[composeEndpointIfname]; ok && prev != nc.InterfaceName {
+							plan.warnf("service %s: networks.%s.interface_name is ignored: driver_opts already sets %s", svc.Name, key, composeEndpointIfname)
+						} else {
+							ep.DriverOpts[composeEndpointIfname] = nc.InterfaceName
+						}
+					}
+				}
+				if _, err := composeMAC(nc.MacAddress); err != nil {
+					return nil, fmt.Errorf("service %s network %s: %w", svc.Name, key, err)
+				}
+				ep.MacAddress = nc.MacAddress
 			}
 			eps = append(eps, ep)
 		}
 		if len(eps) > 0 {
 			hc.NetworkMode = container.NetworkMode(eps[0].Name)
+			// create.go:340-368 prepareContainerMACAddress: the
+			// service-level mac_address goes to the primary network and
+			// must agree with that network's own.
+			if m := svc.MacAddress; m != "" {
+				if eps[0].MacAddress != "" && !strings.EqualFold(eps[0].MacAddress, m) {
+					return nil, fmt.Errorf("service %s: the service-level mac_address should have the same value as network %s", svc.Name, eps[0].Key)
+				}
+				eps[0].MacAddress = m
+			}
 		}
+	}
+	if svc.MacAddress != "" && len(eps) == 0 {
+		plan.warnf("service %s: mac_address is ignored with network_mode %q (it applies to a network endpoint)", svc.Name, svc.NetworkMode)
 	}
 
 	deps := map[string]ctypes.ServiceDependency{}
@@ -529,10 +605,23 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 		return nil, err
 	}
 	unset := composeEnvUnset(svc.Environment)
+	pullEvery, pullRefresh, err := composePullRefresh(svc)
+	if err != nil {
+		return nil, fmt.Errorf("service %s: %w", svc.Name, err)
+	}
+	preStart, err := composeLocalPreStart(p, plan, svc)
+	if err != nil {
+		return nil, fmt.Errorf("service %s: %w", svc.Name, err)
+	}
 	var out []composeLocalContainer
 	for n := 1; n <= scale; n++ {
 		c := *cfg
 		h := *hc
+		links, err := composeLinks(p, svc, n)
+		if err != nil {
+			return nil, fmt.Errorf("service %s: %w", svc.Name, err)
+		}
+		h.Links = links
 		c.Labels = mergeLabels(svc.Labels, svc.CustomLabels, map[string]string{
 			composeLabelProject:    p.Name,
 			composeLabelService:    svc.Name,
@@ -545,6 +634,11 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 			Service: svc.Name, Number: n, Name: composeContainerName(p.Name, svc, n),
 			Config: &c, Host: &h, Networks: eps, Copies: copies, Platform: svc.Platform,
 			Pull: svc.PullPolicy, DependsOn: deps, Refs: refs, UnsetEnv: unset,
+			PullEvery: pullEvery, PullRefresh: pullRefresh,
+			PreStart: preStart, PostStart: svc.PostStart, PreStop: svc.PreStop,
+		}
+		if composeCLIOnlyKeys(svc) {
+			lc.CLIOnly = cliHash
 		}
 		if svc.Build != nil {
 			lc.Build = &composeLocalBuild{Project: p, Service: svc}
@@ -761,12 +855,18 @@ func composeLocalMount(p *ctypes.Project, svc ctypes.ServiceConfig, v ctypes.Ser
 		} else if svc.VolumeDriver != "" {
 			m.VolumeOptions = &mount.VolumeOptions{DriverConfig: &mount.Driver{Name: svc.VolumeDriver}}
 		}
-		if v.Volume != nil && (v.Volume.NoCopy || v.Volume.Subpath != "") {
+		if v.Volume != nil && (v.Volume.NoCopy || v.Volume.Subpath != "" || len(v.Volume.Labels) > 0) {
 			if m.VolumeOptions == nil {
 				m.VolumeOptions = &mount.VolumeOptions{}
 			}
 			m.VolumeOptions.NoCopy = v.Volume.NoCopy
 			m.VolumeOptions.Subpath = v.Volume.Subpath
+			// create.go:1285-1295 buildVolumeOptions: labels of the
+			// volume the mount creates (an anonymous one, or a named
+			// one the daemon creates on first use).
+			if len(v.Volume.Labels) > 0 {
+				m.VolumeOptions.Labels = map[string]string(v.Volume.Labels)
+			}
 		}
 		hc.Mounts = append(hc.Mounts, m)
 	case ctypes.VolumeTypeTmpfs:

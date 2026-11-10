@@ -26,8 +26,10 @@ import (
 	"time"
 
 	ctypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	aschema "github.com/hashicorp/terraform-plugin-framework/action/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/moby/moby/client"
 )
@@ -268,6 +270,13 @@ const (
 	composeManifestMedia   = "application/vnd.oci.image.manifest.v1+json"
 	composeFileAnnotation  = "com.docker.compose.file"
 	composeVersionAnnotate = "com.docker.compose.version"
+	// compose v5.1.4 internal/oci/push.go:40-61: the OCI 1.0 config media
+	// type and the env file layers (`--with-env`).
+	composeEmptyConfig10   = "application/vnd.docker.compose.config.empty.v1+json"
+	composeEnvFileMedia    = "application/vnd.docker.compose.envfile"
+	composeEnvFileAnnotate = "com.docker.compose.envfile"
+	composeOCI10           = "1.0"
+	composeOCI11           = "1.1"
 )
 
 // NewComposePublishAction returns docker_compose_publish.
@@ -277,9 +286,12 @@ type composePublishAction struct{ actBase }
 
 type composePublishModel struct {
 	composeSourceModel
-	Repository         types.String `tfsdk:"repository"`
-	InsecureSkipVerify types.Bool   `tfsdk:"insecure_skip_verify"`
-	ResultPath         types.String `tfsdk:"result_path"`
+	Repository          types.String `tfsdk:"repository"`
+	InsecureSkipVerify  types.Bool   `tfsdk:"insecure_skip_verify"`
+	WithEnv             types.Bool   `tfsdk:"with_env"`
+	ResolveImageDigests types.Bool   `tfsdk:"resolve_image_digests"`
+	OCIVersion          types.String `tfsdk:"oci_version"`
+	ResultPath          types.String `tfsdk:"result_path"`
 }
 
 func (a *composePublishAction) Metadata(_ context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
@@ -291,12 +303,21 @@ func (a *composePublishAction) Schema(_ context.Context, _ action.SchemaRequest,
 		MarkdownDescription: "Publishes a compose application as an OCI artifact, like `docker compose publish`: each compose file " +
 			"becomes a `application/vnd.docker.compose.file+yaml` layer of an OCI manifest with artifact type " +
 			"`application/vnd.docker.compose.project`, pushed with the registry HTTP API v2 (credentials from `registry_auth`). " +
-			"The project is loaded and validated first. Env files are not published.",
+			"The project is loaded and validated first. As in `docker compose publish`, each `env_file` path in the published files is " +
+			"replaced by `<sha256 of the path>.env`; the env files themselves are published only with `with_env`. " +
+			"`--app` (copying the service images into the repository) is not supported.",
 		Attributes: composeActionSource(map[string]aschema.Attribute{
 			"repository": aschema.StringAttribute{Required: true,
 				MarkdownDescription: "Where to publish, `registry/repository:tag` (e.g. `registry.example.com/apps/shop:1.0`)."},
 			"insecure_skip_verify": aschema.BoolAttribute{Optional: true,
 				MarkdownDescription: "Skip TLS verification of the registry. Default `false`. Loopback registries also fall back to plain http."},
+			"with_env": aschema.BoolAttribute{Optional: true,
+				MarkdownDescription: "Publish the services' env files as `application/vnd.docker.compose.envfile` layers (CLI `--with-env`). Default `false`. Env files often hold secrets: check them first."},
+			"resolve_image_digests": aschema.BoolAttribute{Optional: true,
+				MarkdownDescription: "Pin every service image to its registry digest in an extra `image-digests.yaml` layer (CLI `--resolve-image-digests`), resolved through the Engine API's distribution inspect. Default `false`."},
+			"oci_version": aschema.StringAttribute{Optional: true,
+				Validators:          []validator.String{stringvalidator.OneOf(composeOCI10, composeOCI11)},
+				MarkdownDescription: "OCI image specification version of the manifest (CLI `--oci-version`): `1.1` (artifact type, empty config) or `1.0` (no artifact type, config media type `application/vnd.docker.compose.config.empty.v1+json`). Unset: try 1.1 and fall back to 1.0 when the registry rejects the manifest with a non-auth 4xx, like the CLI."},
 			"result_path": actResultPathAttribute(),
 		}),
 	}
@@ -310,10 +331,12 @@ func (a *composePublishAction) ValidateConfig(ctx context.Context, req action.Va
 	}
 }
 
-// composeArtifactFile is one compose file to publish.
+// composeArtifactFile is one layer to publish: a compose file, or an env
+// file (MediaType composeEnvFileMedia).
 type composeArtifactFile struct {
-	Name    string
-	Content []byte
+	Name      string
+	Content   []byte
+	MediaType string
 }
 
 // composeArtifactFiles returns the compose files of the source in order.
@@ -351,21 +374,38 @@ func composeDigest(b []byte) string {
 
 // composeArtifactManifest builds the manifest and the blobs it references.
 func composeArtifactManifest(files []composeArtifactFile) ([]byte, map[string][]byte, []composeDescriptor) {
+	return composeArtifactManifestVersion(files, composeOCI11)
+}
+
+// composeArtifactManifestVersion builds the manifest for an OCI version
+// (compose internal/oci/push.go:156-205 generateManifest): 1.1 has the
+// artifact type and the empty config, 1.0 no artifact type and the compose
+// empty config media type.
+func composeArtifactManifestVersion(files []composeArtifactFile, oci string) ([]byte, map[string][]byte, []composeDescriptor) {
 	empty := []byte("{}")
 	blobs := map[string][]byte{composeDigest(empty): empty}
 	var layers []composeDescriptor
 	for _, f := range files {
 		d := composeDigest(f.Content)
 		blobs[d] = f.Content
-		layers = append(layers, composeDescriptor{MediaType: composeFileMediaType, Digest: d, Size: int64(len(f.Content)),
-			Annotations: map[string]string{composeFileAnnotation: f.Name, composeVersionAnnotate: contractComposeGoVersion}})
+		desc := composeDescriptor{MediaType: composeFileMediaType, Digest: d, Size: int64(len(f.Content)),
+			Annotations: map[string]string{composeFileAnnotation: f.Name, composeVersionAnnotate: contractComposeGoVersion}}
+		if f.MediaType == composeEnvFileMedia {
+			desc.MediaType = composeEnvFileMedia
+			desc.Annotations = map[string]string{composeEnvFileAnnotate: f.Name, composeVersionAnnotate: contractComposeGoVersion}
+		}
+		layers = append(layers, desc)
 	}
 	man := map[string]any{
 		"schemaVersion": 2,
 		"mediaType":     composeManifestMedia,
-		"artifactType":  composeArtifactType,
 		"config":        composeDescriptor{MediaType: composeEmptyMediaType, Digest: composeDigest(empty), Size: int64(len(empty))},
 		"layers":        layers,
+	}
+	if oci == composeOCI10 {
+		man["config"] = composeDescriptor{MediaType: composeEmptyConfig10, Digest: composeDigest(empty), Size: int64(len(empty))}
+	} else {
+		man["artifactType"] = composeArtifactType
 	}
 	b, _ := json.Marshal(man)
 	return b, blobs, layers
@@ -508,7 +548,33 @@ func composeRegistryAuthorize(ctx context.Context, hc *http.Client, challenge, r
 
 // composePublish pushes the artifact and returns the manifest digest.
 func composePublish(ctx context.Context, r *composeRegistry, tag string, files []composeArtifactFile) (string, []composeDescriptor, error) {
-	man, blobs, layers := composeArtifactManifest(files)
+	return composePublishVersion(ctx, r, tag, files, "")
+}
+
+// composeManifestRejected is a manifest push refused with a non-auth 4xx.
+type composeManifestRejected struct{ err error }
+
+func (e composeManifestRejected) Error() string { return e.err.Error() }
+
+// composePublishVersion pushes the artifact as OCI oci ("1.0", "1.1"), or
+// with oci "" as 1.1 falling back to 1.0 when the registry rejects the
+// manifest with a 4xx other than 401/403/407 (compose
+// internal/oci/push.go:99-126 PushManifest, :147-153 isNonAuthClientError).
+func composePublishVersion(ctx context.Context, r *composeRegistry, tag string, files []composeArtifactFile, oci string) (string, []composeDescriptor, error) {
+	try := oci
+	if try == "" {
+		try = composeOCI11
+	}
+	digest, layers, err := composePushManifest(ctx, r, tag, files, try)
+	var rej composeManifestRejected
+	if oci == "" && errors.As(err, &rej) {
+		return composePushManifest(ctx, r, tag, files, composeOCI10)
+	}
+	return digest, layers, err
+}
+
+func composePushManifest(ctx context.Context, r *composeRegistry, tag string, files []composeArtifactFile, oci string) (string, []composeDescriptor, error) {
+	man, blobs, layers := composeArtifactManifestVersion(files, oci)
 	for _, d := range composeSortedKeys(blobs) {
 		if err := r.pushBlob(ctx, d, blobs[d]); err != nil {
 			return "", nil, err
@@ -520,7 +586,15 @@ func composePublish(ctx context.Context, r *composeRegistry, tag string, files [
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
-		return "", nil, composeHTTPError(resp, "pushing manifest")
+		err := composeHTTPError(resp, "pushing manifest")
+		switch resp.StatusCode {
+		case http.StatusUnauthorized, http.StatusForbidden, http.StatusProxyAuthRequired:
+		default:
+			if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+				return "", nil, composeManifestRejected{err}
+			}
+		}
+		return "", nil, err
 	}
 	return composeDigest(man), layers, nil
 }
@@ -538,6 +612,11 @@ func (a *composePublishAction) Invoke(ctx context.Context, req action.InvokeRequ
 	files, err := composeArtifactFiles(m.Content.ValueString(), stringListFrom(ctx, m.Files, &resp.Diagnostics), m.ProjectDirectory.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("docker_compose_publish: cannot read compose files", err.Error())
+		return
+	}
+	files, err = composePublishLayers(ctx, a.pd, p, files, m.WithEnv.ValueBool(), m.ResolveImageDigests.ValueBool())
+	if err != nil {
+		resp.Diagnostics.AddError("docker_compose_publish: cannot prepare the artifact", err.Error())
 		return
 	}
 	ref := m.Repository.ValueString()
@@ -561,11 +640,12 @@ func (a *composePublishAction) Invoke(ctx context.Context, req action.InvokeRequ
 		hc.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, Proxy: http.ProxyFromEnvironment} //nolint:gosec // user opt-in
 	}
 	reg := &composeRegistry{hc: hc, base: "https://" + host, repo: repo, user: user, pass: pass}
-	digest, layers, err := composePublish(ctx, reg, tag, files)
+	oci := m.OCIVersion.ValueString()
+	digest, layers, err := composePublishVersion(ctx, reg, tag, files, oci)
 	var netErr net.Error
 	if err != nil && registryImageIsLocal(host) && (errors.As(err, &netErr) || strings.Contains(err.Error(), "HTTP response to HTTPS client")) {
 		reg.base = "http://" + host
-		digest, layers, err = composePublish(ctx, reg, tag, files)
+		digest, layers, err = composePublishVersion(ctx, reg, tag, files, oci)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError("docker_compose_publish failed", fmt.Sprintf("%s: %v", ref, err))

@@ -153,7 +153,21 @@ func composeLoad(ctx context.Context, in composeInputs) (*ctypes.Project, error)
 	// Like `docker compose up`: networks and volumes no enabled service uses
 	// (e.g. the implicit default network of a profile-disabled service) are
 	// not created.
-	return p.WithoutUnnecessaryResources(), nil
+	pruned := p.WithoutUnnecessaryResources()
+	// compose-go does not count credential_spec.config as a use of the
+	// config; docker stack deploy looks it up in all the project's configs
+	// (docker/cli cli/compose/convert/service.go:330-345), so keep it.
+	for _, svc := range pruned.Services {
+		if cs := svc.CredentialSpec; cs != nil && cs.Config != "" {
+			if c, ok := p.Configs[cs.Config]; ok {
+				if pruned.Configs == nil {
+					pruned.Configs = ctypes.Configs{}
+				}
+				pruned.Configs[cs.Config] = c
+			}
+		}
+	}
+	return pruned, nil
 }
 
 // composeBlobData returns the content of a top-level secret or config.

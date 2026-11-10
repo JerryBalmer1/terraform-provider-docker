@@ -9,12 +9,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/network"
@@ -32,6 +35,14 @@ type composeFakeContainer struct {
 	Nets    map[string]*network.EndpointSettings // by network name
 	Files   map[string]string                    // archive uploads
 	Started int
+	ImageID string
+}
+
+// composeFakeExec is one exec the fake ran (post_start / pre_stop hooks).
+type composeFakeExec struct {
+	Container string // container name
+	Opts      client.ExecCreateOptions
+	Code      int
 }
 
 type composeFakeEngine struct {
@@ -43,6 +54,13 @@ type composeFakeEngine struct {
 	images     map[string]bool
 	pulls      map[string]int
 	creates    map[string]int // ContainerCreate per name
+	// Pass 5.3 Lane K: hooks, image refresh and the order of events.
+	execs    []composeFakeExec
+	execByID map[string]int
+	tagTime  map[string]time.Time // image -> LastTagTime
+	imageIDs map[string]string    // image -> ID (default sha256:bbbb...)
+	nextID   map[string]string    // image -> ID after the next pull
+	events   []string             // "create <name>", "start <name>", "exec <name>", "remove <name>"
 }
 
 func newComposeFakeEngine(t *testing.T) (*composeFakeEngine, string) {
@@ -53,6 +71,10 @@ func newComposeFakeEngine(t *testing.T) (*composeFakeEngine, string) {
 		images:     map[string]bool{},
 		pulls:      map[string]int{},
 		creates:    map[string]int{},
+		execByID:   map[string]int{},
+		tagTime:    map[string]time.Time{},
+		imageIDs:   map[string]string{},
+		nextID:     map[string]string{},
 	}
 	// Pre-existing objects a project may reference as external.
 	f.networks["ext0000000000000001"] = &network.Summary{ID: "ext0000000000000001", Name: "shared", Driver: "bridge", Scope: "local"}
@@ -124,6 +146,11 @@ func (f *composeFakeEngine) handle(w http.ResponseWriter, r *http.Request) {
 		ref = composeFakeImageRef(ref)
 		f.images[ref] = true
 		f.pulls[ref]++
+		f.tagTime[ref] = time.Now()
+		if id := f.nextID[ref]; id != "" {
+			f.imageIDs[ref] = id
+			delete(f.nextID, ref)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"Pulled"}` + "\n"))
 	case strings.HasPrefix(p, "/images/") && strings.HasSuffix(p, "/json"):
@@ -132,14 +159,60 @@ func (f *composeFakeEngine) handle(w http.ResponseWriter, r *http.Request) {
 			svcFakeErr(w, 404, "No such image: "+ref)
 			return
 		}
-		svcFakeJSON(w, 200, image.InspectResponse{ID: "sha256:" + strings.Repeat("b", 64), RepoTags: []string{ref}})
+		ref = composeFakeImageRef(ref)
+		svcFakeJSON(w, 200, image.InspectResponse{ID: f.imageID(ref), RepoTags: []string{ref},
+			Metadata: image.Metadata{LastTagTime: f.tagTime[ref]}})
+	case strings.HasPrefix(p, "/exec/"):
+		f.handleExec(w, r, strings.Split(strings.TrimPrefix(p, "/exec/"), "/"))
 	default:
 		svcFakeErr(w, 404, "compose fake engine: no route "+r.Method+" "+p)
 	}
 }
 
+// imageID is the fake image store's ID for ref.
+func (f *composeFakeEngine) imageID(ref string) string {
+	if id := f.imageIDs[ref]; id != "" {
+		return id
+	}
+	return "sha256:" + strings.Repeat("b", 64)
+}
+
+// handleExec serves POST /exec/{id}/start (attached: a hijacked stream
+// that closes at once) and GET /exec/{id}/json. A command containing
+// "fail" exits 3.
+func (f *composeFakeEngine) handleExec(w http.ResponseWriter, r *http.Request, parts []string) {
+	i, ok := f.execByID[parts[0]]
+	if !ok || len(parts) != 2 {
+		svcFakeErr(w, 404, "No such exec instance")
+		return
+	}
+	switch parts[1] {
+	case "start":
+		_, _ = io.Copy(io.Discard, r.Body)
+		conn, buf, err := w.(http.Hijacker).Hijack()
+		if err != nil {
+			return
+		}
+		fmt.Fprint(buf, "HTTP/1.1 101 UPGRADED\r\nContent-Type: application/vnd.docker.multiplexed-stream\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
+		if f.execs[i].Code != 0 {
+			_, _ = newTestStdWriter(buf, stdcopy.Stderr).Write([]byte("hook failed\n"))
+		}
+		_ = buf.Flush()
+		if tc, ok := conn.(*net.TCPConn); ok {
+			_ = tc.CloseWrite()
+			_ = tc.SetReadDeadline(time.Now().Add(2 * time.Second))
+			_, _ = io.Copy(io.Discard, tc)
+		}
+		conn.Close()
+	case "json":
+		svcFakeJSON(w, 200, map[string]any{"ID": parts[0], "Running": false, "ExitCode": f.execs[i].Code})
+	default:
+		svcFakeErr(w, 404, "exec route")
+	}
+}
+
 func (f *composeFakeEngine) summary(c *composeFakeContainer) container.Summary {
-	s := container.Summary{ID: c.ID, Names: []string{"/" + c.Name}, Image: c.Config.Image, Labels: c.Config.Labels,
+	s := container.Summary{ID: c.ID, Names: []string{"/" + c.Name}, Image: c.Config.Image, ImageID: c.ImageID, Labels: c.Config.Labels,
 		State: container.ContainerState(c.State), NetworkSettings: &container.NetworkSettingsSummary{Networks: c.Nets}}
 	switch c.State {
 	case "running":
@@ -177,7 +250,9 @@ func (f *composeFakeEngine) handleContainers(w http.ResponseWriter, r *http.Requ
 			svcFakeErr(w, 404, "No such image: "+req.Image)
 			return
 		}
-		c := &composeFakeContainer{ID: f.id("c"), Name: name, Config: *req.Config, State: "created", Nets: map[string]*network.EndpointSettings{}, Files: map[string]string{}}
+		c := &composeFakeContainer{ID: f.id("c"), Name: name, Config: *req.Config, State: "created", Nets: map[string]*network.EndpointSettings{}, Files: map[string]string{},
+			ImageID: f.imageID(composeFakeImageRef(req.Image))}
+		f.events = append(f.events, "create "+name)
 		if req.HostConfig != nil {
 			c.Host = *req.HostConfig
 		}
@@ -220,7 +295,41 @@ func (f *composeFakeEngine) handleContainers(w http.ResponseWriter, r *http.Requ
 		}
 		c.State = "running"
 		c.Started++
+		f.events = append(f.events, "start "+c.Name)
 		w.WriteHeader(204)
+	case len(parts) == 2 && parts[1] == "exec" && r.Method == http.MethodPost:
+		c := f.findContainer(parts[0])
+		if c == nil {
+			svcFakeErr(w, 404, "No such container")
+			return
+		}
+		var opts client.ExecCreateOptions
+		_ = json.NewDecoder(r.Body).Decode(&opts)
+		code := 0
+		if strings.Contains(strings.Join(opts.Cmd, " "), "fail") {
+			code = 3
+		}
+		id := f.id("e")
+		f.execByID[id] = len(f.execs)
+		f.execs = append(f.execs, composeFakeExec{Container: c.Name, Opts: opts, Code: code})
+		f.events = append(f.events, "exec "+c.Name+" "+strings.Join(opts.Cmd, " "))
+		svcFakeJSON(w, 201, container.ExecCreateResponse{ID: id})
+	case len(parts) == 2 && parts[1] == "wait" && r.Method == http.MethodPost:
+		c := f.findContainer(parts[0])
+		if c == nil {
+			svcFakeErr(w, 404, "No such container")
+			return
+		}
+		code := 0
+		if strings.Contains(strings.Join(c.Config.Cmd, " "), "fail") {
+			code = 1
+		}
+		c.Exit = code
+		svcFakeJSON(w, 200, container.WaitResponse{StatusCode: int64(code)})
+	case len(parts) == 2 && parts[1] == "logs":
+		w.Header().Set("Content-Type", "application/vnd.docker.multiplexed-stream")
+		w.WriteHeader(200)
+		_, _ = newTestStdWriter(w, stdcopy.Stdout).Write([]byte("step output\n"))
 	case len(parts) == 2 && parts[1] == "archive" && r.Method == http.MethodPut:
 		c := f.findContainer(parts[0])
 		if c == nil {
@@ -252,6 +361,7 @@ func (f *composeFakeEngine) handleContainers(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		delete(f.containers, c.ID)
+		f.events = append(f.events, "remove "+c.Name)
 		w.WriteHeader(204)
 	default:
 		svcFakeErr(w, 404, "compose fake engine: containers route "+r.Method+" "+strings.Join(parts, "/"))

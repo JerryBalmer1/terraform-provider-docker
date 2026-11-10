@@ -192,6 +192,27 @@ func composeLocalRefsCurrent(dc composeLocalContainer, got map[string]string, ex
 	return got[composeLabelConfigHash] == want
 }
 
+// composeLocalConfigHashCurrent is docker compose's mustRecreate test
+// (pkg/compose/convergence.go:326-338: the container's
+// com.docker.compose.config-hash label against ServiceHash of the expected
+// service) for every container that carries the spec-hash label: with
+// references against the hash resolved on the live target IDs
+// (composeLocalRefsCurrent), otherwise against the planned label. So a
+// change only the CLI hash sees (an environment entry with no value, a
+// hook, env_file / label_file paths, ...) recreates the container, as it
+// does with `docker compose up` (Pass 5.3 D5). Containers without the
+// spec-hash label (made before Pass 5, or by the CLI) are judged by
+// composeHashMatches alone, as before.
+func composeLocalConfigHashCurrent(dc composeLocalContainer, got map[string]string, ex composeLocalExisting, replaced map[string]bool) bool {
+	if dc.Refs != nil {
+		return composeLocalRefsCurrent(dc, got, ex, replaced)
+	}
+	if _, ok := got[composeLabelSpecHash]; !ok {
+		return true
+	}
+	return got[composeLabelConfigHash] == dc.Config.Labels[composeLabelConfigHash]
+}
+
 // composeLocalExistingID looks a container ID up by name in ex.
 func composeLocalExistingID(ex composeLocalExisting) func(string) (string, bool) {
 	return func(name string) (string, bool) {

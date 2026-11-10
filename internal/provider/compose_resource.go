@@ -85,6 +85,7 @@ type composeResourceModel struct {
 	NetworkNames     types.Map    `tfsdk:"network_names"`
 	ContainerNames   types.Map    `tfsdk:"container_names"`
 	ImageRefs        types.Map    `tfsdk:"image_refs"`
+	Adopt            types.Bool   `tfsdk:"adopt"`
 }
 
 var composeServicesType = types.MapType{ElemType: types.ListType{ElemType: types.StringType}}
@@ -111,6 +112,10 @@ func (r *composeResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"Terraform owns the whole project and an orphan is drift. Destroy removes " +
 			"everything labelled with the project. In local mode a service with a `build:` section is built through BuildKit " +
 			"when its image is missing (always with `pull_policy: build`) and tagged `image` or `<project>-<service>`. " +
+			"Service lifecycle hooks run in local mode as compose runs them: `pre_start` steps as init containers before the " +
+			"service container starts, `post_start` and `pre_stop` commands exec'd in the container. A change that only " +
+			"`com.docker.compose.config-hash` sees (an environment entry with no value, a hook, `env_file` paths) recreates " +
+			"the container, like `docker compose up`. " +
 			"A project that defines `jobs` plans with a warning: jobs are not run yet (use the `docker_compose_run` action). " +
 			"The whole normalized project is exposed as `compose_yaml` (what `docker compose config` prints) and the structured `project`.",
 		Attributes: map[string]schema.Attribute{
@@ -171,6 +176,7 @@ func (r *composeResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				MarkdownDescription: "Map of network key to the Engine network name (`<project>_<key>` unless `name:` is set), external networks included."},
 			"container_names": schema.MapAttribute{ElementType: types.ListType{ElemType: types.StringType}, Computed: true,
 				MarkdownDescription: "Map of service name to its container names (`<project>-<service>-<n>` or `container_name`); in swarm mode the Swarm service name."},
+			"adopt": ownerAdoptAttribute(),
 			"image_refs": schema.MapAttribute{ElementType: types.StringType, Computed: true,
 				MarkdownDescription: "Map of service name to the image reference it runs after interpolation (`image`, or `<project>-<service>` for a build-only service)."},
 		},
@@ -245,7 +251,12 @@ func composeBuildDesired(ctx context.Context, m *composeResourceModel) (*compose
 		return nil, err
 	}
 	d := &composeDesired{Project: p}
-	type obj struct{ Kind, Name, Hash string }
+	type obj struct {
+		Kind, Name, Hash string
+		// CLI is set only for services with settings the object hash does
+		// not see (Pass 5.3 D5/D6), so other projects keep their spec_hash.
+		CLI string `json:",omitempty"`
+	}
 	var objs []obj
 	mode := m.Mode.ValueString()
 	if mode == "" {
@@ -257,16 +268,16 @@ func composeBuildDesired(ctx context.Context, m *composeResourceModel) (*compose
 		}
 		d.Swarm.KeepOrphans = composeKeepOrphans(m)
 		for _, n := range d.Swarm.Networks {
-			objs = append(objs, obj{"network", n.Name, n.Hash})
+			objs = append(objs, obj{"network", n.Name, n.Hash, ""})
 		}
 		for _, b := range d.Swarm.Secrets {
-			objs = append(objs, obj{"secret", b.Name, b.Hash})
+			objs = append(objs, obj{"secret", b.Name, b.Hash, ""})
 		}
 		for _, b := range d.Swarm.Configs {
-			objs = append(objs, obj{"config", b.Name, b.Hash})
+			objs = append(objs, obj{"config", b.Name, b.Hash, ""})
 		}
 		for _, s := range d.Swarm.Services {
-			objs = append(objs, obj{"service", s.Name, s.Hash})
+			objs = append(objs, obj{"service", s.Name, s.Hash, s.CLIOnly})
 		}
 	} else {
 		if d.Local, err = composeLocalExpand(p); err != nil {
@@ -274,13 +285,13 @@ func composeBuildDesired(ctx context.Context, m *composeResourceModel) (*compose
 		}
 		d.Local.KeepOrphans = composeKeepOrphans(m)
 		for _, n := range d.Local.Networks {
-			objs = append(objs, obj{"network", n.Name, n.Hash})
+			objs = append(objs, obj{"network", n.Name, n.Hash, ""})
 		}
 		for _, v := range d.Local.Volumes {
-			objs = append(objs, obj{"volume", v.Name, v.Hash})
+			objs = append(objs, obj{"volume", v.Name, v.Hash, ""})
 		}
 		for _, c := range d.Local.Containers {
-			objs = append(objs, obj{"container", c.Name, c.Hash})
+			objs = append(objs, obj{"container", c.Name, c.Hash, c.CLIOnly})
 		}
 	}
 	d.Hash = composeHash(struct {
@@ -445,6 +456,9 @@ func (r *composeResource) ModifyPlan(ctx context.Context, req resource.ModifyPla
 		resp.Diagnostics.AddWarning("Compose jobs are not run", w)
 	}
 	plan.SpecHash = types.StringValue(d.Hash)
+	if state != nil {
+		resp.Diagnostics.Append(ownerPlanCheck(ctx, r.pd, req.Private, "compose project", d.Project.Name, plan.Adopt)...)
+	}
 	if state != nil && !state.Name.IsNull() && state.Name.ValueString() != d.Project.Name {
 		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("name"))
 	}
@@ -474,11 +488,35 @@ func composeTimeout(m *composeResourceModel) (time.Duration, error) {
 	return parseDurationOr(m.WaitTimeout.ValueString(), 2*time.Minute)
 }
 
-func (r *composeResource) apply(ctx context.Context, m *composeResourceModel, diags *diag.Diagnostics) {
+func (r *composeResource) apply(ctx context.Context, m *composeResourceModel, create bool, diags *diag.Diagnostics) {
 	d, err := composeBuildDesired(ctx, m)
 	if err != nil {
 		diags.AddError("Invalid compose project", err.Error())
 		return
+	}
+	if create && r.pd.Owner != "" {
+		// A project whose objects another configuration owns is not taken
+		// over by a create (import it with adopt = true instead).
+		var sets []map[string]string
+		if d.Swarm != nil {
+			ex, err := composeSwarmList(ctx, r.pd, d.Project.Name)
+			if err != nil {
+				diags.AddError("Cannot list compose project", err.Error())
+				return
+			}
+			sets = composeSwarmLabelSets(ex)
+		} else {
+			ex, err := composeLocalList(ctx, r.pd, d.Project.Name)
+			if err != nil {
+				diags.AddError("Cannot list compose project", err.Error())
+				return
+			}
+			sets = composeLocalLabelSets(ex)
+		}
+		if err := composeOwnerCreateCheck(r.pd, d.Project.Name, sets); err != nil {
+			diags.AddError("Compose project owned by another configuration", err.Error())
+			return
+		}
 	}
 	timeout, err := composeTimeout(m)
 	if err != nil {
@@ -510,7 +548,9 @@ func composeSwarmBlobIDs[T interface{ swarm.Secret | swarm.Config }](ns string, 
 // checkDrift it also re-parses the configuration in m and replaces
 // spec_hash when the daemon no longer matches. It returns false when the
 // project has no objects left.
-func (r *composeResource) refresh(ctx context.Context, m *composeResourceModel, checkDrift bool, diags *diag.Diagnostics) bool {
+//
+// priv (nil: not recorded) receives the project's owner label.
+func (r *composeResource) refresh(ctx context.Context, m *composeResourceModel, checkDrift bool, priv privateSetter, diags *diag.Diagnostics) bool {
 	name := m.Name.ValueString()
 	var d *composeDesired
 	if checkDrift && (!m.Content.IsNull() || !m.Files.IsNull()) {
@@ -537,6 +577,9 @@ func (r *composeResource) refresh(ctx context.Context, m *composeResourceModel, 
 			drift = composeSwarmDrift(sp, ex)
 		}
 		svcs, nets, vols = composeSwarmIDs(sp, name, ex)
+		if priv != nil {
+			diags.Append(composeOwnerRecord(ctx, r.pd, priv, composeSwarmLabelSets(ex))...)
+		}
 		m.Secrets = stringMapValue(composeSwarmBlobIDs(name, ex.secrets, func(s swarm.Secret) string { return s.ID }), false)
 		m.Configs = stringMapValue(composeSwarmBlobIDs(name, ex.configs, func(c swarm.Config) string { return c.ID }), false)
 	} else {
@@ -548,8 +591,12 @@ func (r *composeResource) refresh(ctx context.Context, m *composeResourceModel, 
 		empty = ex.empty()
 		if d != nil {
 			drift = composeLocalDrift(d.Local, ex)
+			drift = append(drift, composeLocalPullDrift(ctx, r.pd, d.Local, ex, time.Now())...)
 		}
 		svcs, nets, vols = composeLocalIDs(ex)
+		if priv != nil {
+			diags.Append(composeOwnerRecord(ctx, r.pd, priv, composeLocalLabelSets(ex))...)
+		}
 	}
 	if empty && checkDrift {
 		return false
@@ -584,10 +631,10 @@ func (r *composeResource) Create(ctx context.Context, req resource.CreateRequest
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	r.apply(ctx, &plan, &resp.Diagnostics)
+	r.apply(ctx, &plan, true, &resp.Diagnostics)
 	failed := resp.Diagnostics.HasError()
 	var rd diag.Diagnostics
-	r.refresh(ctx, &plan, false, &rd)
+	r.refresh(ctx, &plan, false, resp.Private, &rd)
 	if !failed {
 		resp.Diagnostics.Append(rd...)
 	}
@@ -601,7 +648,7 @@ func (r *composeResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	if !r.refresh(ctx, &state, true, &resp.Diagnostics) {
+	if !r.refresh(ctx, &state, true, resp.Private, &resp.Diagnostics) {
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -617,11 +664,11 @@ func (r *composeResource) Update(ctx context.Context, req resource.UpdateRequest
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	r.apply(ctx, &plan, &resp.Diagnostics)
+	r.apply(ctx, &plan, false, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	r.refresh(ctx, &plan, false, &resp.Diagnostics)
+	r.refresh(ctx, &plan, false, resp.Private, &resp.Diagnostics)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -637,7 +684,17 @@ func (r *composeResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if state.Mode.ValueString() == composeModeSwarm {
 		err = composeSwarmDestroy(ctx, r.pd, name, state.KeepVolumes.ValueBool(), warn)
 	} else {
-		err = composeLocalDestroy(ctx, r.pd, name, state.KeepVolumes.ValueBool())
+		// The configuration in state gives the pre_stop hooks to run; a
+		// project that no longer parses is removed without them.
+		var plan *composeLocalPlan
+		if !state.Content.IsNull() || !state.Files.IsNull() {
+			if d, err := composeBuildDesired(ctx, &state); err == nil {
+				plan = d.Local
+			} else {
+				warn("pre_stop hooks not run", fmt.Sprintf("parsing the project failed: %v", err))
+			}
+		}
+		err = composeLocalDestroy(ctx, r.pd, name, state.KeepVolumes.ValueBool(), plan)
 	}
 	if err != nil {
 		resp.Diagnostics.AddError("Cannot remove compose project", fmt.Sprintf("%s: %v", name, err))

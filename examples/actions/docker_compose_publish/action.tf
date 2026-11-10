@@ -25,5 +25,10 @@ action "docker_compose_publish" "this" {
     name       = "shop"
     content    = docker_compose.shop.content
     repository = "registry.example.com/apps/shop:1.0"
+
+    # Pin every image to its digest in an extra image-digests.yaml layer,
+    # and push an OCI 1.0 manifest for registries without artifact types.
+    resolve_image_digests = true
+    oci_version           = "1.0"
   }
 }

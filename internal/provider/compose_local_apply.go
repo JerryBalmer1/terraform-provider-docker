@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"net/netip"
 	"path"
 	"sort"
 	"strings"
@@ -163,6 +165,10 @@ func composeLocalDrift(plan *composeLocalPlan, ex composeLocalExisting) []string
 				continue
 			}
 		}
+		if c.Refs == nil && !composeLocalConfigHashCurrent(c, got.Labels, ex, nil) {
+			out = append(out, fmt.Sprintf("container %s differs from the configuration (com.docker.compose.config-hash)", c.Name))
+			continue
+		}
 		if d := composeLocalStateDrift(got, c.Host.RestartPolicy.Name); d != "" {
 			out = append(out, fmt.Sprintf("container %s %s", c.Name, d))
 		}
@@ -229,6 +235,10 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 	}
 	recreatedSvc := map[string]bool{}
 	replaced := map[string]bool{} // container names created or recreated
+	refreshed, err := composeLocalPullRefresh(ctx, pd, plan, ex, time.Now())
+	if err != nil {
+		return err
+	}
 	for _, dc := range plan.Containers {
 		got, ok := ex.containers[dc.Name]
 		if !ok {
@@ -236,7 +246,7 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 			replaced[dc.Name] = true
 			continue
 		}
-		recreate := !composeHashMatches(got.Labels, dc.Hash)
+		recreate := !composeHashMatches(got.Labels, dc.Hash) || refreshed[dc.Name]
 		if got.NetworkSettings != nil {
 			for netName := range got.NetworkSettings.Networks {
 				if replacedNet[netName] {
@@ -249,10 +259,10 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 				recreate = true
 			}
 		}
-		// service:<x> / volumes_from: a new target container, or a
-		// config-hash resolved against another one, recreates it (compose
-		// mustRecreate on the resolved service, c_compose_refs.go).
-		if !recreate && !composeLocalRefsCurrent(dc, got.Labels, ex, replaced) {
+		// com.docker.compose.config-hash, like compose mustRecreate (Pass
+		// 5.3 D5); with service:<x> / volumes_from references, a new target
+		// container or a hash resolved against another one (c_compose_refs.go).
+		if !recreate && !composeLocalConfigHashCurrent(dc, got.Labels, ex, replaced) {
 			recreate = true
 		}
 		if recreate {
@@ -262,6 +272,13 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 		}
 	}
 	for _, name := range composeSortedKeys(remove) {
+		// pre_stop hooks of the service (none for orphans, whose service
+		// is gone: compose passes no service for them either).
+		if dc := desired[name]; dc != nil {
+			if err := composeRunPreStop(ctx, pd, ex.containers[name], dc.PreStop); err != nil {
+				return err
+			}
+		}
 		if _, err := c.ContainerRemove(ctx, ex.containers[name].ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil && !isNotFound(err) {
 			return fmt.Errorf("removing container %s: %w", name, err)
 		}
@@ -294,7 +311,12 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 		if _, ok := netIDs[n.Name]; ok {
 			continue
 		}
-		resp, err := c.NetworkCreate(ctx, n.Name, n.Create)
+		if err := composeOwnerCheckNetwork(ctx, pd, n.Name); err != nil {
+			return err
+		}
+		opts := n.Create
+		opts.Labels = pd.ownerInject(opts.Labels)
+		resp, err := c.NetworkCreate(ctx, n.Name, opts)
 		if err != nil {
 			return fmt.Errorf("creating network %s: %w", n.Name, err)
 		}
@@ -312,12 +334,26 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 			}
 			continue
 		}
-		if _, err := c.VolumeCreate(ctx, v.Create); err != nil {
+		if err := composeOwnerCheckVolume(ctx, pd, v.Name); err != nil {
+			return err
+		}
+		opts := v.Create
+		opts.Labels = pd.ownerInject(opts.Labels)
+		if _, err := c.VolumeCreate(ctx, opts); err != nil {
 			return fmt.Errorf("creating volume %s: %w", v.Name, err)
 		}
 	}
 
-	// Containers in dependency order.
+	// Containers in dependency order. A service's shared pre_start steps
+	// run before the first container created for it, unless one of its
+	// containers is kept (compose_hooks.go).
+	kept := map[string]bool{}
+	for _, dc := range plan.Containers {
+		if _, ok := ex.containers[dc.Name]; ok && !remove[dc.Name] {
+			kept[dc.Service] = true
+		}
+	}
+	sharedDone := map[string]bool{}
 	ids := map[string][]string{} // service -> container IDs
 	for _, dc := range plan.Containers {
 		for dep, d := range dc.DependsOn {
@@ -336,8 +372,17 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 				if _, err := c.ContainerStart(ctx, got.ID, client.ContainerStartOptions{}); err != nil {
 					return fmt.Errorf("starting container %s: %w", dc.Name, err)
 				}
+				// compose runs post_start for every container it starts
+				// (convergence.go:905-931 startService).
+				if err := composeRunExecHooks(ctx, pd, got.ID, dc.Name, "post_start", dc.PostStart); err != nil {
+					return err
+				}
 			}
 			continue
+		}
+		if !kept[dc.Service] && !sharedDone[dc.Service] {
+			dc.SharedPreStart = true
+			sharedDone[dc.Service] = true
 		}
 		id, err := composeLocalCreate(ctx, pd, dc, netIDs)
 		if err != nil {
@@ -415,8 +460,34 @@ func composePull(ctx context.Context, pd *providerData, ref, platform string) er
 	}
 }
 
+// composeLocalCreate creates and starts one container like `docker compose
+// up`: create (composeLocalCreateOnly), the pre_start steps, start, then
+// the post_start hooks (compose_hooks.go).
 func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalContainer, netIDs map[string]string) (string, error) {
+	id, err := composeLocalCreateOnly(ctx, pd, dc, netIDs)
+	if err != nil {
+		return id, err
+	}
+	if err := composeRunPreStart(ctx, pd, dc, id, netIDs); err != nil {
+		return id, err
+	}
+	if _, err := pd.Client.ContainerStart(ctx, id, client.ContainerStartOptions{}); err != nil {
+		return id, fmt.Errorf("starting container %s: %w", dc.Name, err)
+	}
+	if err := composeRunExecHooks(ctx, pd, id, dc.Name, "post_start", dc.PostStart); err != nil {
+		return id, err
+	}
+	return id, nil
+}
+
+// composeLocalCreateOnly gets dc's image (build, pull per pull_policy),
+// creates the container, connects its extra networks and copies its
+// secrets and configs in. It does not start it.
+func composeLocalCreateOnly(ctx context.Context, pd *providerData, dc composeLocalContainer, netIDs map[string]string) (string, error) {
 	c := pd.Client
+	if err := composeCheckAPI(ctx, pd, dc); err != nil {
+		return "", err
+	}
 	built := false
 	if dc.Build != nil {
 		exists, err := composeImageExists(ctx, pd, dc.Config.Image)
@@ -437,6 +508,16 @@ func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalCo
 		if err := composePull(ctx, pd, dc.Config.Image, dc.Platform); err != nil {
 			return "", fmt.Errorf("pulling %s: %w", dc.Config.Image, err)
 		}
+	case dc.PullRefresh:
+		due, err := composeRefreshDue(ctx, pd, dc.Config.Image, dc.PullEvery, time.Now())
+		if err != nil {
+			return "", fmt.Errorf("inspecting image %s: %w", dc.Config.Image, err)
+		}
+		if due {
+			if err := composePull(ctx, pd, dc.Config.Image, dc.Platform); err != nil {
+				return "", fmt.Errorf("pulling %s: %w", dc.Config.Image, err)
+			}
+		}
 	default:
 		if err := containerEnsureImage(ctx, pd, dc.Config.Image); err != nil {
 			return "", fmt.Errorf("pulling %s: %w", dc.Config.Image, err)
@@ -449,10 +530,17 @@ func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalCo
 		}
 	}
 	dc = composeLocalWire(ctx, pd, dc)
+	// One-off containers (docker_compose_run, pre_start steps) are
+	// owner-labelled inject-only: an action owns nothing in state.
+	if !strings.EqualFold(dc.Config.Labels[composeLabelOneoff], "true") && composeOwnerChecks(ctx) {
+		if err := composeOwnerCheckContainer(ctx, pd, dc.Name); err != nil {
+			return "", err
+		}
+	}
 	var netCfg *network.NetworkingConfig
 	if len(dc.Networks) > 0 {
 		ep := dc.Networks[0]
-		es, err := containerEndpointSettings(ep.Aliases, ep.IPv4, ep.IPv6)
+		es, err := composeEndpointSettings(ep, dc.Host.Links)
 		if err != nil {
 			return "", fmt.Errorf("container %s network %s: %w", dc.Name, ep.Name, err)
 		}
@@ -467,7 +555,7 @@ func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalCo
 		if id == "" {
 			id = ep.Name
 		}
-		es, err := containerEndpointSettings(ep.Aliases, ep.IPv4, ep.IPv6)
+		es, err := composeEndpointSettings(ep, dc.Host.Links)
 		if err != nil {
 			return resp.ID, fmt.Errorf("container %s network %s: %w", dc.Name, ep.Name, err)
 		}
@@ -476,7 +564,14 @@ func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalCo
 		}
 	}
 	if len(dc.Copies) > 0 {
-		tr, err := composeTar(dc.Copies)
+		copies := make([]composeCopy, len(dc.Copies))
+		for i, cp := range dc.Copies {
+			if cp.APIAuth {
+				cp.Data = composeAPISocketAuth(pd)
+			}
+			copies[i] = cp
+		}
+		tr, err := composeTar(copies)
 		if err != nil {
 			return resp.ID, err
 		}
@@ -484,10 +579,39 @@ func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalCo
 			return resp.ID, fmt.Errorf("copying secrets/configs into %s: %w", dc.Name, err)
 		}
 	}
-	if _, err := c.ContainerStart(ctx, resp.ID, client.ContainerStartOptions{}); err != nil {
-		return resp.ID, fmt.Errorf("starting container %s: %w", dc.Name, err)
-	}
 	return resp.ID, nil
+}
+
+// composeEndpointSettings is one endpoint of a compose container: aliases,
+// static addresses, mac_address and the legacy links (compose sends the
+// links on every endpoint, create.go:441-454 createEndpointSettings).
+func composeEndpointSettings(ep composeEndpoint, links []string) (*network.EndpointSettings, error) {
+	es, err := containerEndpointSettings(ep.Aliases, ep.IPv4, ep.IPv6)
+	if err != nil {
+		return nil, err
+	}
+	if es.MacAddress, err = composeMAC(ep.MacAddress); err != nil {
+		return nil, err
+	}
+	es.Links = links
+	es.GwPriority = ep.GwPriority
+	if len(ep.DriverOpts) > 0 {
+		es.DriverOpts = maps.Clone(ep.DriverOpts)
+	}
+	for _, ll := range ep.LinkLocalIPs {
+		if ll == "" {
+			continue
+		}
+		a, err := netip.ParseAddr(ll)
+		if err != nil {
+			return nil, fmt.Errorf("invalid link-local IP %q: %w", ll, err)
+		}
+		if es.IPAMConfig == nil {
+			es.IPAMConfig = &network.EndpointIPAMConfig{}
+		}
+		es.IPAMConfig.LinkLocalIPs = append(es.IPAMConfig.LinkLocalIPs, a)
+	}
+	return es, nil
 }
 
 // composeLabelImage is the image ID label `docker compose` puts on every
@@ -522,6 +646,9 @@ func composeLocalWire(ctx context.Context, pd *providerData, dc composeLocalCont
 	for k, v := range dc.Config.Labels {
 		cfg.Labels[k] = v
 	}
+	// The owner label is not part of the service, so neither
+	// com.docker.compose.config-hash nor the spec hash sees it.
+	cfg.Labels = pd.ownerInject(cfg.Labels)
 	if insp, err := pd.Client.ImageInspect(ctx, dc.Config.Image); err == nil && insp.ID != "" {
 		cfg.Labels[composeLabelImage] = insp.ID
 	}
@@ -654,13 +781,22 @@ func composeWaitDependency(ctx context.Context, pd *providerData, svc string, id
 }
 
 // composeLocalDestroy removes every object labelled with the project.
-func composeLocalDestroy(ctx context.Context, pd *providerData, project string, keepVolumes bool) error {
+// The pre_stop hooks of plan's services (nil: none, e.g. the configuration
+// cannot be parsed) run before their containers are removed.
+func composeLocalDestroy(ctx context.Context, pd *providerData, project string, keepVolumes bool, plan *composeLocalPlan) error {
 	c := pd.Client
 	ex, err := composeLocalList(ctx, pd, project)
 	if err != nil {
 		return err
 	}
 	var errs []error
+	hooks := composeHooksByService(plan)
+	for _, name := range composeSortedKeys(ex.containers) {
+		s := ex.containers[name]
+		if err := composeRunPreStop(ctx, pd, s, hooks[s.Labels[composeLabelService]]); err != nil {
+			errs = append(errs, err)
+		}
+	}
 	for _, name := range composeSortedKeys(ex.containers) {
 		if _, err := c.ContainerRemove(ctx, ex.containers[name].ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil && !isNotFound(err) {
 			errs = append(errs, fmt.Errorf("removing container %s: %w", name, err))

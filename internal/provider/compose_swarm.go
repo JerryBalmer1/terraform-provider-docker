@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +38,11 @@ type composeSwarmBlob struct {
 	Data      []byte
 	Labels    map[string]string
 	Hash      string
+	// Driver (secrets) and Templating are SecretSpec/ConfigSpec.Driver and
+	// .Templating, as docker stack deploy sends them (docker/cli
+	// cli/compose/convert/compose.go:105-160).
+	Driver     *swarm.Driver
+	Templating *swarm.Driver
 }
 
 type composeSwarmService struct {
@@ -47,6 +53,9 @@ type composeSwarmService struct {
 	Spec swarm.ServiceSpec
 	Mode string
 	Hash string
+	// CLIOnly digests the environment sent when it has entries with no
+	// value (D6): they are not in Hash, so spec_hash carries them.
+	CLIOnly string
 }
 
 type composeSwarmPlan struct {
@@ -116,16 +125,31 @@ func composeSwarmExpand(p *ctypes.Project) (*composeSwarmPlan, error) {
 			o := objs[key]
 			b := composeSwarmBlob{Key: key, Name: o.Name, External: bool(o.External)}
 			if !b.External {
-				data, _, err := composeBlobData(o, p.Environment)
-				if err != nil {
-					return nil, fmt.Errorf("%s %s: %w", kind, key, err)
+				// docker/cli compose.go:113-118: a secret with a driver
+				// sends no data (the driver provides it; compose-go still
+				// requires file or environment, loader/validate.go:242-248);
+				// configs have no driver (compose.go:139-160 ignores it).
+				if kind == "secret" && o.Driver != "" {
+					b.Driver = &swarm.Driver{Name: o.Driver, Options: map[string]string(o.DriverOpts)}
+				} else {
+					data, _, err := composeBlobData(o, p.Environment)
+					if err != nil {
+						return nil, fmt.Errorf("%s %s: %w", kind, key, err)
+					}
+					b.Data = data
 				}
-				if o.Driver != "" || o.TemplateDriver != "" {
-					plan.warnf("%s %s: driver and template_driver are not supported and are ignored", kind, key)
+				if kind == "config" && o.Driver != "" {
+					plan.warnf("config %s: driver is ignored (only secrets have a driver; docker stack deploy ignores it too)", key)
 				}
-				b.Data = data
+				if o.TemplateDriver != "" {
+					b.Templating = &swarm.Driver{Name: o.TemplateDriver}
+				}
 				b.Labels = mergeLabels(o.Labels, nsLabels)
-				b.Hash = composeHash([]any{composeSha(data), b.Labels})
+				if b.Driver == nil && b.Templating == nil {
+					b.Hash = composeHash([]any{composeSha(b.Data), b.Labels})
+				} else {
+					b.Hash = composeHash([]any{composeSha(b.Data), b.Labels, b.Driver, b.Templating})
+				}
 				b.Labels[composeLabelConfigHash] = b.Hash
 			}
 			out = append(out, b)
@@ -203,6 +227,18 @@ func composeSwarmUnsupported(plan *composeSwarmPlan, svc ctypes.ServiceConfig) {
 	}
 	if svc.Develop != nil {
 		w("develop")
+	}
+	if svc.BlkioConfig != nil {
+		w("blkio_config")
+	}
+	if svc.Umask != nil {
+		w("umask")
+	}
+	if svc.UseAPISocket {
+		w("use_api_socket")
+	}
+	if svc.MacAddress != "" {
+		w("mac_address")
 	}
 	if len(svc.Tmpfs) > 0 {
 		w("tmpfs (use a volume of type tmpfs)")
@@ -345,6 +381,9 @@ func composeSwarmServiceSpec(p *ctypes.Project, plan *composeSwarmPlan, svc ctyp
 			File:       &swarm.ConfigReferenceFileTarget{Name: ft.Name, UID: ft.UID, GID: ft.GID, Mode: ft.Mode},
 			ConfigName: obj.Name,
 		})
+	}
+	if err := composeSwarmCredentialSpec(p, svc, cs); err != nil {
+		return out, fmt.Errorf("service %s: %w", svc.Name, err)
 	}
 
 	spec := swarm.ServiceSpec{
@@ -520,6 +559,17 @@ func composeSwarmServiceSpec(p *ctypes.Project, plan *composeSwarmPlan, svc ctyp
 	out.Spec = spec
 	out.Hash = composeHash(spec)
 	out.Spec.Labels[composeLabelConfigHash] = out.Hash
+	// Pass 5.3 D6: entries with no value are sent as a bare "KEY", like
+	// docker stack deploy (docker/cli v29.9.3 cli/compose/convert/service.go
+	// :614-626 convertEnvironment); the daemon then unsets KEY. The hash
+	// keeps the frozen KEY=VALUE list (TestComposeHashCompat), and
+	// composeSwarmServiceDrift compares the environment itself.
+	if unset := composeEnvUnset(svc.Environment); len(unset) > 0 {
+		cs2 := *cs
+		cs2.Env = composeEnvWithUnset(cs.Env, unset)
+		out.Spec.TaskTemplate.ContainerSpec = &cs2
+		out.CLIOnly = composeHash(cs2.Env)
+	}
 	return out, nil
 }
 
@@ -587,6 +637,9 @@ func composeSwarmServiceDrift(want composeSwarmService, got swarm.Service) strin
 	}
 	if svcModeOf(got.Spec) != want.Mode {
 		return "has a different mode"
+	}
+	if cs := got.Spec.TaskTemplate.ContainerSpec; !slices.Equal(composeSortedEnv(cs.Env), composeSortedEnv(want.Spec.TaskTemplate.ContainerSpec.Env)) {
+		return "has a different environment"
 	}
 	if r := want.Spec.Mode.Replicated; r != nil && got.Spec.Mode.Replicated != nil && got.Spec.Mode.Replicated.Replicas != nil &&
 		*got.Spec.Mode.Replicated.Replicas != *r.Replicas {
@@ -702,6 +755,19 @@ func composeSwarmResolve(spec *swarm.ServiceSpec, lk *svcLookup) error {
 	}
 	cs2 := *cs
 	cs2.Secrets, cs2.Configs = secs, cfgs
+	if pr := cs.Privileges; pr != nil && pr.CredentialSpec != nil && pr.CredentialSpec.Config != "" {
+		// docker/cli service.go:680-715 convertCredentialSpec: the
+		// credential spec names the runtime config by ID.
+		p2 := *pr
+		cr := *pr.CredentialSpec
+		for _, c := range cfgs {
+			if c.Runtime != nil && c.ConfigName == cr.Config {
+				cr.Config = c.ConfigID
+			}
+		}
+		p2.CredentialSpec = &cr
+		cs2.Privileges = &p2
+	}
 	if len(secs) == 0 {
 		cs2.Secrets = nil
 	}
@@ -836,7 +902,9 @@ func composeSwarmApply(ctx context.Context, pd *providerData, plan *composeSwarm
 		if !createN[n.Name] {
 			continue
 		}
-		if _, err := c.NetworkCreate(ctx, n.Name, n.Create); err != nil {
+		opts := n.Create
+		opts.Labels = pd.ownerInject(opts.Labels)
+		if _, err := c.NetworkCreate(ctx, n.Name, opts); err != nil {
 			return fmt.Errorf("creating network %s: %w", n.Name, err)
 		}
 	}
@@ -844,7 +912,7 @@ func composeSwarmApply(ctx context.Context, pd *providerData, plan *composeSwarm
 		if !createS[b.Name] {
 			continue
 		}
-		if _, err := c.SecretCreate(ctx, client.SecretCreateOptions{Spec: swarm.SecretSpec{Annotations: swarm.Annotations{Name: b.Name, Labels: b.Labels}, Data: b.Data}}); err != nil {
+		if _, err := c.SecretCreate(ctx, client.SecretCreateOptions{Spec: swarm.SecretSpec{Annotations: swarm.Annotations{Name: b.Name, Labels: pd.ownerInject(b.Labels)}, Data: b.Data, Driver: b.Driver, Templating: b.Templating}}); err != nil {
 			return fmt.Errorf("creating secret %s: %w", b.Name, err)
 		}
 	}
@@ -852,7 +920,7 @@ func composeSwarmApply(ctx context.Context, pd *providerData, plan *composeSwarm
 		if !createC[b.Name] {
 			continue
 		}
-		if _, err := c.ConfigCreate(ctx, client.ConfigCreateOptions{Spec: swarm.ConfigSpec{Annotations: swarm.Annotations{Name: b.Name, Labels: b.Labels}, Data: b.Data}}); err != nil {
+		if _, err := c.ConfigCreate(ctx, client.ConfigCreateOptions{Spec: swarm.ConfigSpec{Annotations: swarm.Annotations{Name: b.Name, Labels: pd.ownerInject(b.Labels)}, Data: b.Data, Templating: b.Templating}}); err != nil {
 			return fmt.Errorf("creating config %s: %w", b.Name, err)
 		}
 	}
@@ -867,7 +935,7 @@ func composeSwarmApply(ctx context.Context, pd *providerData, plan *composeSwarm
 	}
 	var touched []string
 	for _, s := range plan.Services {
-		spec := s.Spec
+		spec := composeSwarmOwnerSpec(pd, s.Spec)
 		if err := composeSwarmResolve(&spec, lk); err != nil {
 			return fmt.Errorf("service %s: %w", s.Name, err)
 		}
