@@ -157,6 +157,12 @@ func composeLocalDrift(plan *composeLocalPlan, ex composeLocalExisting) []string
 			out = append(out, fmt.Sprintf("container %s differs from the configuration", c.Name))
 			continue
 		}
+		if c.Refs != nil && !composeLocalRefsCurrent(c, got.Labels, ex, nil) {
+			if _, err := c.Refs.resolve(composeLocalExistingID(ex)); err == nil {
+				out = append(out, fmt.Sprintf("container %s was created for a container of %s that has been replaced", c.Name, strings.Join(c.Refs.names(), ", ")))
+				continue
+			}
+		}
 		if d := composeLocalStateDrift(got, c.Host.RestartPolicy.Name); d != "" {
 			out = append(out, fmt.Sprintf("container %s %s", c.Name, d))
 		}
@@ -222,10 +228,12 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 		}
 	}
 	recreatedSvc := map[string]bool{}
+	replaced := map[string]bool{} // container names created or recreated
 	for _, dc := range plan.Containers {
 		got, ok := ex.containers[dc.Name]
 		if !ok {
 			recreatedSvc[dc.Service] = true
+			replaced[dc.Name] = true
 			continue
 		}
 		recreate := !composeHashMatches(got.Labels, dc.Hash)
@@ -241,9 +249,16 @@ func composeLocalApply(ctx context.Context, pd *providerData, plan *composeLocal
 				recreate = true
 			}
 		}
+		// service:<x> / volumes_from: a new target container, or a
+		// config-hash resolved against another one, recreates it (compose
+		// mustRecreate on the resolved service, c_compose_refs.go).
+		if !recreate && !composeLocalRefsCurrent(dc, got.Labels, ex, replaced) {
+			recreate = true
+		}
 		if recreate {
 			remove[dc.Name] = true
 			recreatedSvc[dc.Service] = true
+			replaced[dc.Name] = true
 		}
 	}
 	for _, name := range composeSortedKeys(remove) {
@@ -427,6 +442,12 @@ func composeLocalCreate(ctx context.Context, pd *providerData, dc composeLocalCo
 			return "", fmt.Errorf("pulling %s: %w", dc.Config.Image, err)
 		}
 	}
+	if dc.Refs != nil {
+		var err error
+		if dc, err = composeLocalResolveRefs(ctx, pd, dc); err != nil {
+			return "", err
+		}
+	}
 	dc = composeLocalWire(ctx, pd, dc)
 	var netCfg *network.NetworkingConfig
 	if len(dc.Networks) > 0 {
@@ -475,12 +496,16 @@ const composeLabelImage = "com.docker.compose.image"
 
 // composeLabelDependsOn lists a container's dependencies as
 // "<service>:<condition>:<restart>", comma-separated, like `docker compose`
-// (api.DependenciesLabel; compose writes them in map order, sorted here).
+// (api.DependenciesLabel). compose v5.1.4 writes them in Go map order
+// (pkg/compose/create.go:510-513 prepareLabels ranges over
+// service.DependsOn), which differs from run to run; docker_compose sorts
+// them so the label is deterministic.
 const composeLabelDependsOn = "com.docker.compose.depends_on"
 
 // composeLocalWire turns a planned container into what `docker compose up`
 // sends to the Engine. The plan (and its pinned spec hash) keeps the
 // provider's own form; only the create request differs:
+//   - environment keys with no value are added as bare "KEY" entries;
 //   - the label com.docker.compose.image holds the image ID, read once the
 //     image is present, and com.docker.compose.depends_on the dependencies;
 //   - every network endpoint gets the container name as its first alias
@@ -492,6 +517,7 @@ const composeLabelDependsOn = "com.docker.compose.depends_on"
 // dc's maps and slices are copied, never changed in place.
 func composeLocalWire(ctx context.Context, pd *providerData, dc composeLocalContainer) composeLocalContainer {
 	cfg := *dc.Config
+	cfg.Env = composeEnvWithUnset(dc.Config.Env, dc.UnsetEnv)
 	cfg.Labels = make(map[string]string, len(dc.Config.Labels)+1)
 	for k, v := range dc.Config.Labels {
 		cfg.Labels[k] = v
@@ -699,4 +725,32 @@ func composeLocalIDs(ex composeLocalExisting) (map[string][]string, map[string]s
 		vols[key] = v.Name
 	}
 	return svcs, nets, vols
+}
+
+// composeLocalResolveRefs points dc's service references at the live
+// containers: the create request gets their IDs and the config-hash label
+// the hash of the resolved service, as docker compose computes it
+// (c_compose_refs.go). dc's maps and slices are copied, never changed.
+func composeLocalResolveRefs(ctx context.Context, pd *providerData, dc composeLocalContainer) (composeLocalContainer, error) {
+	ids := map[string]string{}
+	for _, name := range dc.Refs.names() {
+		insp, err := pd.Client.ContainerInspect(ctx, name, client.ContainerInspectOptions{})
+		if err != nil {
+			return dc, fmt.Errorf("container %s refers to container %s: %w", dc.Name, name, err)
+		}
+		ids[name] = insp.Container.ID
+	}
+	hash, err := dc.Refs.configHash(func(n string) (string, bool) { id, ok := ids[n]; return id, ok })
+	if err != nil {
+		return dc, fmt.Errorf("container %s: %w", dc.Name, err)
+	}
+	cfg := *dc.Config
+	cfg.Labels = make(map[string]string, len(dc.Config.Labels))
+	for k, v := range dc.Config.Labels {
+		cfg.Labels[k] = v
+	}
+	cfg.Labels[composeLabelConfigHash] = hash
+	dc.Config = &cfg
+	dc.Host = dc.Refs.host(dc.Host, ids)
+	return dc, nil
 }

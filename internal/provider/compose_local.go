@@ -107,6 +107,14 @@ type composeLocalContainer struct {
 	// DependsOn are the enabled services this one depends on.
 	DependsOn map[string]ctypes.ServiceDependency
 	Hash      string
+	// Refs are the service's references to other services' containers
+	// (nil: none), resolved to container IDs at create time
+	// (c_compose_refs.go). Not part of Hash.
+	Refs *composeLocalRefs `json:"-"`
+	// UnsetEnv are the environment keys with no value, sent as bare "KEY"
+	// entries at create time (c_compose_refs.go composeEnvUnset). Not part
+	// of Hash, which keeps the pre-Pass 5.2 Config.Env.
+	UnsetEnv []string `json:"-"`
 }
 
 // composeLocalBuild is what a container needs to build its image.
@@ -398,14 +406,12 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 		hc.Tmpfs[target] = opts
 	}
 	for _, vf := range svc.VolumesFrom {
-		src, mode, _ := strings.Cut(vf, ":")
-		if c, ok := strings.CutPrefix(src, ctypes.ContainerPrefix); ok {
-			src = c
+		var src, mode string
+		if c, ok := strings.CutPrefix(vf, ctypes.ContainerPrefix); ok {
 			// "container:<name>[:mode]"
-			if name, m, ok := strings.Cut(c, ":"); ok {
-				src, mode = name, m
-			}
+			src, mode, _ = strings.Cut(c, ":")
 		} else {
+			src, mode, _ = strings.Cut(vf, ":")
 			dep, ok := p.Services[src]
 			if !ok {
 				return nil, fmt.Errorf("volumes_from %q: service not enabled", vf)
@@ -518,6 +524,11 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 	if err != nil {
 		return nil, fmt.Errorf("config hash: %w", err)
 	}
+	refs, err := composeLocalRefsFor(p, svc)
+	if err != nil {
+		return nil, err
+	}
+	unset := composeEnvUnset(svc.Environment)
 	var out []composeLocalContainer
 	for n := 1; n <= scale; n++ {
 		c := *cfg
@@ -533,7 +544,7 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 		lc := composeLocalContainer{
 			Service: svc.Name, Number: n, Name: composeContainerName(p.Name, svc, n),
 			Config: &c, Host: &h, Networks: eps, Copies: copies, Platform: svc.Platform,
-			Pull: svc.PullPolicy, DependsOn: deps,
+			Pull: svc.PullPolicy, DependsOn: deps, Refs: refs, UnsetEnv: unset,
 		}
 		if svc.Build != nil {
 			lc.Build = &composeLocalBuild{Project: p, Service: svc}
@@ -545,6 +556,8 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 			Copies   []composeCopy
 			Platform string
 		}{composeHashConfig{lc.Config}, lc.Host, lc.Networks, lc.Copies, lc.Platform})
+		// With references, composeLocalCreate replaces this with the hash
+		// of the resolved service (c_compose_refs.go).
 		c.Labels[composeLabelConfigHash] = cliHash
 		if len(p.ComposeFiles) > 0 {
 			c.Labels[composeLabelConfigFiles] = strings.Join(p.ComposeFiles, ",")
@@ -563,7 +576,10 @@ func composeProto(p string) string {
 }
 
 // composeEnvList renders environment as sorted KEY=VALUE; unresolved
-// variables (nil values) are dropped like `docker compose` does.
+// variables (nil values) are left out. It feeds the spec hashes (local
+// containers, swarm services), so its output is frozen: local mode adds the
+// unresolved keys as bare "KEY" entries at create time, like docker compose
+// (c_compose_refs.go composeEnvUnset).
 func composeEnvList(env ctypes.MappingWithEquals) []string {
 	var out []string
 	for _, k := range composeSortedKeys(env) {

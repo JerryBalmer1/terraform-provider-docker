@@ -4,7 +4,19 @@ package provider
 // harness daemon, once with the real `docker compose` CLI and once with
 // docker_compose (local mode), and diffs what each created: containers,
 // networks, volumes, their labels and com.docker.compose.config-hash
-// values. Any difference fails.
+// values. Any difference fails, except the entries of
+// composeParityKnownDiffs (each one documented in reference/CONTRACT.md,
+// "Known differences from upstream"); an entry that no longer matches a
+// difference in the cases it names fails too (stale).
+//
+// Two fields are compared through a normalisation, not literally:
+//   - com.docker.compose.depends_on is a set: compose v5.1.4 writes it in Go
+//     map order (composeParitySetLabels);
+//   - com.docker.compose.config-hash of a container with service references
+//     (service:<x>, volumes_from) hashes the target's container ID, which
+//     differs between the two runs: each side's label must equal the hash
+//     of the service resolved against that side's own IDs, and is then
+//     compared as "<resolved ...>" (composeParitySnapshot).
 //
 // The provider never shells out; this TEST runs the CLI (os/exec in this
 // _test.go file only) against DOCKER_HOST from test/harness/.env. It needs
@@ -26,6 +38,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -143,8 +156,90 @@ func composeParityExampleCases(t *testing.T) []composeParityCase {
 // composeParityObject is one created object, reduced to what is compared.
 type composeParityObject map[string]string
 
-// composeParitySnapshot lists everything labelled with project.
-func composeParitySnapshot(ctx context.Context, c *client.Client, project string) (map[string]composeParityObject, error) {
+// composeParitySetLabels are labels whose value is a comma-separated set.
+// com.docker.compose.depends_on: docker compose v5.1.4 builds it by ranging
+// over the service.DependsOn map (pkg/compose/create.go:510-513,
+// composeService.prepareLabels: `for s, d := range service.DependsOn`), so
+// its order is Go's random map order, different per container and per run;
+// docker_compose sorts it. Only the set of entries is compared.
+var composeParitySetLabels = []string{"label " + composeLabelDependsOn}
+
+// composeParitySetEqual compares two comma-separated sets.
+func composeParitySetEqual(a, b string) bool {
+	as, bs := strings.Split(a, ","), strings.Split(b, ",")
+	sort.Strings(as)
+	sort.Strings(bs)
+	return strings.Join(as, ",") == strings.Join(bs, ",")
+}
+
+// composeParityKnownDiff is one documented, accepted difference between the
+// CLI and docker_compose. Match must be as narrow as the difference.
+type composeParityKnownDiff struct {
+	Field  string   // the snapshot field
+	Cases  []string // sub-cases where it must occur (stale check)
+	Reason string
+	Source string // the upstream code that produces the CLI's value
+	Match  func(cli, prov string) bool
+}
+
+// composeParityKnownDiffs: reference/CONTRACT.md "Known differences from
+// upstream" lists the same entries. Keep this table to that list.
+var composeParityKnownDiffs = []composeParityKnownDiff{{
+	Field: "volumes_from",
+	Cases: []string{"unit_expand"},
+	Reason: `volumes_from "<service>:ro" / "container:<c>:ro": docker compose drops the access mode and sends the bare container ` +
+		`(the volumes are mounted read-write); docker_compose keeps ":ro" / ":rw" as the compose spec documents it`,
+	Source: "docker/compose v5.1.4 pkg/compose/convergence.go:285-303 resolveVolumeFrom (service.VolumesFrom[i] = spec[1] / " +
+		"dependencies.sorted()[0].ID), sent as-is by pkg/compose/create.go:309",
+	Match: composeParityModeSuffixOnly,
+}}
+
+// composeParityModeSuffixOnly reports whether prov is cli with an access
+// mode (":ro" or ":rw") added to one or more entries, and nothing else.
+func composeParityModeSuffixOnly(cli, prov string) bool {
+	cs, ps := strings.Split(cli, "; "), strings.Split(prov, "; ")
+	if len(cs) != len(ps) || cli == prov {
+		return false
+	}
+	for i := range cs {
+		if ps[i] != cs[i] && ps[i] != cs[i]+":ro" && ps[i] != cs[i]+":rw" {
+			return false
+		}
+	}
+	return true
+}
+
+// composeParityDifference is one field (or object) that differs.
+type composeParityDifference struct {
+	Object, Field, CLI, Prov string
+	Missing                  string // set when the object exists on one side only
+}
+
+func (d composeParityDifference) String() string {
+	if d.Missing != "" {
+		return d.Object + ": " + d.Missing
+	}
+	return fmt.Sprintf("%s %s:\n    cli:      %q\n    provider: %q", d.Object, d.Field, d.CLI, d.Prov)
+}
+
+// known returns the index of the composeParityKnownDiffs entry d matches,
+// or -1.
+func (d composeParityDifference) known() int {
+	if d.Missing != "" {
+		return -1
+	}
+	for i, k := range composeParityKnownDiffs {
+		if k.Field == d.Field && k.Match(d.CLI, d.Prov) {
+			return i
+		}
+	}
+	return -1
+}
+
+// composeParitySnapshot lists everything labelled with project. refs are
+// the planned references by container name (composeParityRefs), used to
+// check a referencing container's config-hash against its own IDs.
+func composeParitySnapshot(ctx context.Context, c *client.Client, project string, refs map[string]*composeLocalRefs) (map[string]composeParityObject, error) {
 	f := client.Filters{}.Add("label", composeLabelProject+"="+project)
 	out := map[string]composeParityObject{}
 	labels := func(o composeParityObject, l map[string]string) {
@@ -173,6 +268,14 @@ func composeParitySnapshot(ctx context.Context, c *client.Client, project string
 		}
 		return v
 	}
+	byName := func(n string) (string, bool) {
+		for id, name := range names {
+			if name == n {
+				return id, true
+			}
+		}
+		return "", false
+	}
 	for _, s := range cs.Items {
 		insp, err := c.ContainerInspect(ctx, s.ID, client.ContainerInspectOptions{})
 		if err != nil {
@@ -181,6 +284,12 @@ func composeParitySnapshot(ctx context.Context, c *client.Client, project string
 		ci := insp.Container
 		o := composeParityObject{"image": ci.Config.Image}
 		labels(o, ci.Config.Labels)
+		if r := refs[strings.TrimPrefix(ci.Name, "/")]; r != nil {
+			k := "label " + composeLabelConfigHash
+			if want, err := r.configHash(byName); err == nil && o[k] == want {
+				o[k] = "<resolved against " + strings.Join(r.names(), ", ") + ">"
+			}
+		}
 		env := append([]string(nil), ci.Config.Env...)
 		sort.Strings(env)
 		o["env"] = strings.Join(env, "\n")
@@ -253,9 +362,19 @@ func composeParitySnapshot(ctx context.Context, c *client.Client, project string
 }
 
 // composeParityDiff lists every difference between the CLI's objects and
-// the provider's.
+// the provider's, as text.
 func composeParityDiff(cli, prov map[string]composeParityObject) []string {
 	var out []string
+	for _, d := range composeParityDiffs(cli, prov) {
+		out = append(out, d.String())
+	}
+	return out
+}
+
+// composeParityDiffs lists every difference between the CLI's objects and
+// the provider's.
+func composeParityDiffs(cli, prov map[string]composeParityObject) []composeParityDifference {
+	var out []composeParityDifference
 	keys := map[string]bool{}
 	for k := range cli {
 		keys[k] = true
@@ -268,10 +387,10 @@ func composeParityDiff(cli, prov map[string]composeParityObject) []string {
 		b, inProv := prov[k]
 		switch {
 		case !inProv:
-			out = append(out, k+": created by the CLI, not by docker_compose")
+			out = append(out, composeParityDifference{Object: k, Missing: "created by the CLI, not by docker_compose"})
 			continue
 		case !inCLI:
-			out = append(out, k+": created by docker_compose, not by the CLI")
+			out = append(out, composeParityDifference{Object: k, Missing: "created by docker_compose, not by the CLI"})
 			continue
 		}
 		fields := map[string]bool{}
@@ -283,9 +402,13 @@ func composeParityDiff(cli, prov map[string]composeParityObject) []string {
 		}
 		for _, f := range composeSortedKeys(fields) {
 			// The project directory and file paths are the same on both sides.
-			if a[f] != b[f] {
-				out = append(out, fmt.Sprintf("%s %s:\n    cli:      %q\n    provider: %q", k, f, a[f], b[f]))
+			if a[f] == b[f] {
+				continue
 			}
+			if slices.Contains(composeParitySetLabels, f) && composeParitySetEqual(a[f], b[f]) {
+				continue
+			}
+			out = append(out, composeParityDifference{Object: k, Field: f, CLI: a[f], Prov: b[f]})
 		}
 	}
 	return out
@@ -346,6 +469,12 @@ func TestAccComposeParity(t *testing.T) {
 		t.Skipf("%s compose version failed (no compose v2 plugin?): %v: %s", bin, err, out)
 	}
 	c := testAccDockerClient(t)
+	// known[i][case]: composeParityKnownDiffs[i] matched in that case.
+	known := make([]map[string]bool, len(composeParityKnownDiffs))
+	for i := range known {
+		known[i] = map[string]bool{}
+	}
+	ran := map[string]bool{} // cases compared to the end
 	for _, tc := range composeParityCases(t) {
 		t.Run(tc.Name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -383,7 +512,8 @@ func TestAccComposeParity(t *testing.T) {
 				down()
 				t.Skipf("docker compose up failed, so there is no reference to compare with: %v\n%s", err, out)
 			}
-			cli, err := composeParitySnapshot(cctx, c, tc.Project)
+			refs := composeParityRefs(t, dir, tc)
+			cli, err := composeParitySnapshot(cctx, c, tc.Project, refs)
 			down()
 			if err != nil {
 				t.Fatal(err)
@@ -397,7 +527,7 @@ func TestAccComposeParity(t *testing.T) {
 					Config: composeParityHCL(dir, tc),
 					Check: func(*terraform.State) error {
 						var err error
-						prov, err = composeParitySnapshot(cctx, c, tc.Project)
+						prov, err = composeParitySnapshot(cctx, c, tc.Project, refs)
 						return err
 					},
 				}},
@@ -405,11 +535,50 @@ func TestAccComposeParity(t *testing.T) {
 			if prov == nil {
 				t.Fatal("docker_compose did not create the project (see the step error above)")
 			}
-			for _, d := range composeParityDiff(cli, prov) {
+			for _, d := range composeParityDiffs(cli, prov) {
+				if i := d.known(); i >= 0 {
+					known[i][tc.Name] = true
+					t.Logf("known difference (reference/CONTRACT.md, Known differences from upstream): %s\n    reason: %s\n    source: %s",
+						d, composeParityKnownDiffs[i].Reason, composeParityKnownDiffs[i].Source)
+					continue
+				}
 				t.Error(d)
 			}
+			ran[tc.Name] = true
 		})
 	}
+	for i, k := range composeParityKnownDiffs {
+		for _, name := range k.Cases {
+			if ran[name] && !known[i][name] {
+				t.Errorf("stale known difference %s (%s): no longer observed in %s; remove it here and in reference/CONTRACT.md", k.Field, k.Reason, name)
+			}
+		}
+	}
+}
+
+// composeParityRefs loads tc the way the docker_compose step does (files,
+// project_directory, env, profiles) and returns each planned container's
+// service references by container name.
+func composeParityRefs(t *testing.T, dir string, tc composeParityCase) map[string]*composeLocalRefs {
+	t.Helper()
+	p, err := composeLoad(context.Background(), composeInputs{
+		Files: []string{filepath.Join(dir, composeContentFilename)}, WorkingDir: dir,
+		ProjectName: tc.Project, Env: tc.Env, Profiles: tc.Profiles,
+	})
+	if err != nil {
+		t.Fatalf("loading %s: %v", tc.Source, err)
+	}
+	plan, err := composeLocalExpand(p)
+	if err != nil {
+		t.Fatalf("expanding %s: %v", tc.Source, err)
+	}
+	out := map[string]*composeLocalRefs{}
+	for _, dc := range plan.Containers {
+		if dc.Refs != nil {
+			out[dc.Name] = dc.Refs
+		}
+	}
+	return out
 }
 
 // TestComposeParityDiffC checks the comparison itself (no daemon).
@@ -433,6 +602,48 @@ func TestComposeParityDiffC(t *testing.T) {
 	if !composeParityIgnored("com.docker.compose.version") || composeParityIgnored(composeLabelConfigHash) {
 		t.Error("ignored labels")
 	}
+
+	// depends_on is compared as a set: the same entries in another order
+	// are equal, a different set is not.
+	dep := "label " + composeLabelDependsOn
+	a := map[string]composeParityObject{"container w": {dep: "db:service_healthy:false,cache:service_started:false"}}
+	b := map[string]composeParityObject{"container w": {dep: "cache:service_started:false,db:service_healthy:false"}}
+	if d := composeParityDiff(a, b); len(d) != 0 {
+		t.Errorf("depends_on order is a difference: %q", d)
+	}
+	b["container w"][dep] = "cache:service_started:false,db:service_started:false"
+	if d := composeParityDiff(a, b); len(d) != 1 || !strings.Contains(d[0], composeLabelDependsOn) {
+		t.Errorf("depends_on set change not reported: %q", d)
+	}
+	// Other labels stay order-sensitive.
+	if d := composeParityDiff(map[string]composeParityObject{"x": {"label l": "a,b"}}, map[string]composeParityObject{"x": {"label l": "b,a"}}); len(d) != 1 {
+		t.Errorf("plain label compared as a set: %q", d)
+	}
+
+	// The allowlist: one entry, the volumes_from access mode suffix only.
+	if len(composeParityKnownDiffs) != 1 || composeParityKnownDiffs[0].Field != "volumes_from" {
+		t.Fatalf("known differences %+v", composeParityKnownDiffs)
+	}
+	for _, tc := range []struct {
+		cli, prov string
+		known     bool
+	}{
+		{"<proj-web-1>", "<proj-web-1>:ro", true},
+		{"<proj-web-1>; other", "<proj-web-1>:ro; other:rw", true},
+		{"<proj-web-1>", "<proj-web-1>", false},           // not a difference
+		{"<proj-web-1>", "proj-web-1:ro", false},          // a name, not the container
+		{"<proj-web-1>", "<proj-web-2>:ro", false},        // another container
+		{"<proj-web-1>", "<proj-web-1>:z", false},         // not an access mode
+		{"<proj-web-1>", "<proj-web-1>:ro; extra", false}, // an extra entry
+	} {
+		d := composeParityDifference{Object: "container proj-sidecar-1", Field: "volumes_from", CLI: tc.cli, Prov: tc.prov}
+		if got := d.known() >= 0; got != tc.known {
+			t.Errorf("%q vs %q: known %v, want %v", tc.cli, tc.prov, got, tc.known)
+		}
+	}
+	if (composeParityDifference{Object: "container x", Field: "network_mode", CLI: "a", Prov: "a:ro"}).known() >= 0 {
+		t.Error("the allowlist matches another field")
+	}
 	cases := composeParityCases(t)
 	if len(cases) < len(composeHashCompatFixtures)+1 {
 		t.Errorf("%d parity cases", len(cases))
@@ -440,6 +651,20 @@ func TestComposeParityDiffC(t *testing.T) {
 	for _, c := range cases {
 		if c.Project == "" || c.Content == "" {
 			t.Errorf("case %s: empty project or content", c.Name)
+		}
+	}
+	// unit_expand's sidecar has references (the parity run normalises its
+	// config-hash through them).
+	dir := t.TempDir()
+	for _, c := range cases {
+		if c.Name != "unit_expand" {
+			continue
+		}
+		if err := os.WriteFile(filepath.Join(dir, composeContentFilename), []byte(c.Content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if r := composeParityRefs(t, dir, c)["proj-sidecar-1"]; r == nil || r.Targets["web"] != "proj-web-1" {
+			t.Errorf("unit_expand sidecar refs %+v", r)
 		}
 	}
 }
