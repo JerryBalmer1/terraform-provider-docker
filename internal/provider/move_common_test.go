@@ -250,7 +250,8 @@ func TestKwIsSource(t *testing.T) {
 	for addr, want := range map[string]bool{
 		"registry.terraform.io/kreuzwerker/docker":  true,
 		"Registry.Terraform.IO/Kreuzwerker/Docker":  true,
-		"mirror.example.com/kreuzwerker/docker":     true,
+		"mirror.example.com/kreuzwerker/docker":     false,
+		"kreuzwerker/docker":                        false,
 		"registry.terraform.io/jerrybalmer1/docker": false,
 		"registry.terraform.io/kreuzwerker/dockerx": false,
 		"": false,

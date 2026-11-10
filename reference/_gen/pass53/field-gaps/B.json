@@ -1,0 +1,91 @@
+{
+  "about": "Pass 5.3 Lane 0: the fields go run ./tools/fieldcov found unmapped on items lane B owns. Close each one in reference/_gen/fieldmap.d/B.json (attr after implementing it under the upstream name, or skip / partial with a real reason), or by implementing it so auto-mapping finds it.",
+  "count": 9,
+  "gaps": [
+    {
+      "pointer": "engine:ImageBuild#body",
+      "item": "buildx:build",
+      "ops": [
+        "ImageBuild"
+      ],
+      "context": "ImageBuild",
+      "type": "string",
+      "doc": "A tar archive compressed with one of the following algorithms: identity (no compression), gzip, bzip2, xz."
+    },
+    {
+      "pointer": "engine:ImageBuild?t",
+      "item": "buildx:build",
+      "ops": [
+        "ImageBuild"
+      ],
+      "context": "ImageBuild",
+      "type": "string",
+      "doc": "A name and optional tag to apply to the image in the `name:tag` format."
+    },
+    {
+      "pointer": "engine:ImageBuild?remote",
+      "item": "buildx:build",
+      "ops": [
+        "ImageBuild"
+      ],
+      "context": "ImageBuild",
+      "type": "string",
+      "doc": "A Git repository URI or HTTP/HTTPS context URI."
+    },
+    {
+      "pointer": "engine:ImageBuild?q",
+      "item": "buildx:build",
+      "ops": [
+        "ImageBuild"
+      ],
+      "context": "ImageBuild",
+      "type": "boolean",
+      "doc": "Suppress verbose build output."
+    },
+    {
+      "pointer": "engine:ImageBuild?pull",
+      "item": "buildx:build",
+      "ops": [
+        "ImageBuild"
+      ],
+      "context": "ImageBuild",
+      "type": "string",
+      "doc": "Attempt to pull the image even if an older image exists locally."
+    },
+    {
+      "pointer": "engine:ImageBuild?rm",
+      "item": "buildx:build",
+      "ops": [
+        "ImageBuild"
+      ],
+      "context": "ImageBuild",
+      "type": "boolean",
+      "doc": "Remove intermediate containers after a successful build."
+    },
+    {
+      "pointer": "engine:ImageBuild?forcerm",
+      "item": "buildx:build",
+      "ops": [
+        "ImageBuild"
+      ],
+      "context": "ImageBuild",
+      "type": "boolean",
+      "doc": "Always remove intermediate containers, even upon failure."
+    },
+    {
+      "pointer": "bake:target/matrix",
+      "item": "buildx:bake",
+      "context": "target",
+      "type": "map",
+      "doc": "Define a set of variables that forks a target into multiple targets."
+    },
+    {
+      "pointer": "bake:target/name",
+      "item": "buildx:bake",
+      "context": "target",
+      "type": "string",
+      "doc": "Override the target name when using a matrix."
+    }
+  ],
+  "lane": "B"
+}

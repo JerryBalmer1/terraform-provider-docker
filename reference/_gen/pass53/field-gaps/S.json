@@ -1,0 +1,867 @@
+{
+  "about": "Pass 5.3 Lane 0: the fields go run ./tools/fieldcov found unmapped on items lane S owns. Close each one in reference/_gen/fieldmap.d/S.json (attr after implementing it under the upstream name, or skip / partial with a real reason), or by implementing it so auto-mapping finds it.",
+  "count": 87,
+  "gaps": [
+    {
+      "pointer": "engine:ConfigCreate/Templating/Name",
+      "item": "swarm:config",
+      "ops": [
+        "ConfigCreate"
+      ],
+      "context": "Driver",
+      "type": "string",
+      "doc": "Name of the driver."
+    },
+    {
+      "pointer": "engine:ConfigCreate/Templating/Options",
+      "item": "swarm:config",
+      "ops": [
+        "ConfigCreate"
+      ],
+      "context": "Driver",
+      "type": "object",
+      "doc": "Key/value map of driver-specific options."
+    },
+    {
+      "pointer": "engine:ConfigSpec/Templating/Name",
+      "item": "swarm:config",
+      "ops": [
+        "ConfigUpdate"
+      ],
+      "context": "Driver",
+      "type": "string",
+      "doc": "Name of the driver."
+    },
+    {
+      "pointer": "engine:ConfigSpec/Templating/Options",
+      "item": "swarm:config",
+      "ops": [
+        "ConfigUpdate"
+      ],
+      "context": "Driver",
+      "type": "object",
+      "doc": "Key/value map of driver-specific options."
+    },
+    {
+      "pointer": "engine:NodeSpec/Name",
+      "item": "swarm:node",
+      "ops": [
+        "NodeUpdate"
+      ],
+      "context": "NodeSpec",
+      "type": "string",
+      "doc": "Name for the node."
+    },
+    {
+      "pointer": "engine:SecretCreate/Driver/Name",
+      "item": "swarm:secret",
+      "ops": [
+        "SecretCreate"
+      ],
+      "context": "Driver",
+      "type": "string",
+      "doc": "Name of the driver."
+    },
+    {
+      "pointer": "engine:SecretCreate/Driver/Options",
+      "item": "swarm:secret",
+      "ops": [
+        "SecretCreate"
+      ],
+      "context": "Driver",
+      "type": "object",
+      "doc": "Key/value map of driver-specific options."
+    },
+    {
+      "pointer": "engine:SecretCreate/Templating/Name",
+      "item": "swarm:secret",
+      "ops": [
+        "SecretCreate"
+      ],
+      "context": "Driver",
+      "type": "string",
+      "doc": "Name of the driver."
+    },
+    {
+      "pointer": "engine:SecretCreate/Templating/Options",
+      "item": "swarm:secret",
+      "ops": [
+        "SecretCreate"
+      ],
+      "context": "Driver",
+      "type": "object",
+      "doc": "Key/value map of driver-specific options."
+    },
+    {
+      "pointer": "engine:SecretSpec/Driver/Name",
+      "item": "swarm:secret",
+      "ops": [
+        "SecretUpdate"
+      ],
+      "context": "Driver",
+      "type": "string",
+      "doc": "Name of the driver."
+    },
+    {
+      "pointer": "engine:SecretSpec/Driver/Options",
+      "item": "swarm:secret",
+      "ops": [
+        "SecretUpdate"
+      ],
+      "context": "Driver",
+      "type": "object",
+      "doc": "Key/value map of driver-specific options."
+    },
+    {
+      "pointer": "engine:SecretSpec/Templating/Name",
+      "item": "swarm:secret",
+      "ops": [
+        "SecretUpdate"
+      ],
+      "context": "Driver",
+      "type": "string",
+      "doc": "Name of the driver."
+    },
+    {
+      "pointer": "engine:SecretSpec/Templating/Options",
+      "item": "swarm:secret",
+      "ops": [
+        "SecretUpdate"
+      ],
+      "context": "Driver",
+      "type": "object",
+      "doc": "Key/value map of driver-specific options."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Configs/[]/Runtime",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.ContainerSpec.Configs",
+      "type": "object",
+      "doc": "Runtime represents a target that is not mounted into the container but is used by the task \u003cp\u003e\u003cbr /\u003e\u003cp\u003e \u003e **Note**: `Configs.File` and `Configs.Runtime` are mutually \u003e exclusive"
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Healthcheck/StartInterval",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "HealthConfig",
+      "type": "integer",
+      "doc": "The time to wait between checks in nanoseconds during the start period."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/CreateMountpoint",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Create mount point on host if missing"
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/NonRecursive",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Disable recursive bind mount."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyForceRecursive",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Raise an error if the mount cannot be made recursively read-only."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyNonRecursive",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Make the mount non-recursively read-only, but still leave the mount recursive (unless NonRecursive is set to `true` in conjunction)."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/Consistency",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "Mount",
+      "type": "string",
+      "doc": "The consistency requirement for the mount: `default`, `consistent`, `cached`, or `delegated`."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/ImageOptions/Subpath",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "Mount.ImageOptions",
+      "type": "string",
+      "doc": "Source path inside the image."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/TmpfsOptions/Options",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "Mount.TmpfsOptions",
+      "type": "array",
+      "doc": "The options to be passed to the tmpfs mount."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/OomScoreAdj",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.ContainerSpec",
+      "type": "integer",
+      "doc": "An integer value containing the score given to the container in order to tune OOM killer preferences."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/OpenStdin",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.ContainerSpec",
+      "type": "boolean",
+      "doc": "Open `stdin`"
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Privileges/AppArmor/Mode",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.ContainerSpec.Privileges.AppArmor",
+      "type": "string"
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Privileges/NoNewPrivileges",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.ContainerSpec.Privileges",
+      "type": "boolean",
+      "doc": "Configuration of the no_new_privs bit in the container"
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Privileges/Seccomp/Mode",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.ContainerSpec.Privileges.Seccomp",
+      "type": "string"
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/Privileges/Seccomp/Profile",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.ContainerSpec.Privileges.Seccomp",
+      "type": "string",
+      "doc": "The custom seccomp profile as a json object"
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/ContainerSpec/TTY",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.ContainerSpec",
+      "type": "boolean",
+      "doc": "Whether a pseudo-TTY should be allocated."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/NetworkAttachmentSpec/ContainerID",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.NetworkAttachmentSpec",
+      "type": "string",
+      "doc": "ID of the container represented by this task"
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/PluginSpec/Disabled",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.PluginSpec",
+      "type": "boolean",
+      "doc": "Disable the plugin once scheduled."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/PluginSpec/Name",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.PluginSpec",
+      "type": "string",
+      "doc": "The name or 'alias' to use for the plugin."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Description",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "PluginPrivilege",
+      "type": "string"
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Name",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "PluginPrivilege",
+      "type": "string"
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Value",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "PluginPrivilege",
+      "type": "array"
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/PluginSpec/Remote",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.PluginSpec",
+      "type": "string",
+      "doc": "The plugin image reference to use."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/Resources/Limits/Pids",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "Limit",
+      "type": "integer",
+      "doc": "Limits the maximum number of PIDs in the container."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/Resources/MemorySwappiness",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.Resources",
+      "type": "integer",
+      "doc": "Tune the service's containers' memory swappiness (0 to 100)."
+    },
+    {
+      "pointer": "engine:ServiceCreate/TaskTemplate/Resources/SwapBytes",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceCreate"
+      ],
+      "context": "TaskSpec.Resources",
+      "type": "integer",
+      "doc": "Amount of swap in bytes - can only be used together with a memory limit."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Configs/[]/Runtime",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.ContainerSpec.Configs",
+      "type": "object",
+      "doc": "Runtime represents a target that is not mounted into the container but is used by the task \u003cp\u003e\u003cbr /\u003e\u003cp\u003e \u003e **Note**: `Configs.File` and `Configs.Runtime` are mutually \u003e exclusive"
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Healthcheck/StartInterval",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "HealthConfig",
+      "type": "integer",
+      "doc": "The time to wait between checks in nanoseconds during the start period."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/CreateMountpoint",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Create mount point on host if missing"
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/NonRecursive",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Disable recursive bind mount."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyForceRecursive",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Raise an error if the mount cannot be made recursively read-only."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyNonRecursive",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Make the mount non-recursively read-only, but still leave the mount recursive (unless NonRecursive is set to `true` in conjunction)."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/Consistency",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "Mount",
+      "type": "string",
+      "doc": "The consistency requirement for the mount: `default`, `consistent`, `cached`, or `delegated`."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/ImageOptions/Subpath",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "Mount.ImageOptions",
+      "type": "string",
+      "doc": "Source path inside the image."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/TmpfsOptions/Options",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "Mount.TmpfsOptions",
+      "type": "array",
+      "doc": "The options to be passed to the tmpfs mount."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/OomScoreAdj",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.ContainerSpec",
+      "type": "integer",
+      "doc": "An integer value containing the score given to the container in order to tune OOM killer preferences."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/OpenStdin",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.ContainerSpec",
+      "type": "boolean",
+      "doc": "Open `stdin`"
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Privileges/AppArmor/Mode",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.ContainerSpec.Privileges.AppArmor",
+      "type": "string"
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Privileges/NoNewPrivileges",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.ContainerSpec.Privileges",
+      "type": "boolean",
+      "doc": "Configuration of the no_new_privs bit in the container"
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Privileges/Seccomp/Mode",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.ContainerSpec.Privileges.Seccomp",
+      "type": "string"
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Privileges/Seccomp/Profile",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.ContainerSpec.Privileges.Seccomp",
+      "type": "string",
+      "doc": "The custom seccomp profile as a json object"
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/ContainerSpec/TTY",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.ContainerSpec",
+      "type": "boolean",
+      "doc": "Whether a pseudo-TTY should be allocated."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/NetworkAttachmentSpec/ContainerID",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.NetworkAttachmentSpec",
+      "type": "string",
+      "doc": "ID of the container represented by this task"
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/PluginSpec/Disabled",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.PluginSpec",
+      "type": "boolean",
+      "doc": "Disable the plugin once scheduled."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/PluginSpec/Name",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.PluginSpec",
+      "type": "string",
+      "doc": "The name or 'alias' to use for the plugin."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Description",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "PluginPrivilege",
+      "type": "string"
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Name",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "PluginPrivilege",
+      "type": "string"
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Value",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "PluginPrivilege",
+      "type": "array"
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/PluginSpec/Remote",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.PluginSpec",
+      "type": "string",
+      "doc": "The plugin image reference to use."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/Resources/Limits/Pids",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "Limit",
+      "type": "integer",
+      "doc": "Limits the maximum number of PIDs in the container."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/Resources/MemorySwappiness",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.Resources",
+      "type": "integer",
+      "doc": "Tune the service's containers' memory swappiness (0 to 100)."
+    },
+    {
+      "pointer": "engine:ServiceUpdate/TaskTemplate/Resources/SwapBytes",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "TaskSpec.Resources",
+      "type": "integer",
+      "doc": "Amount of swap in bytes - can only be used together with a memory limit."
+    },
+    {
+      "pointer": "engine:ServiceUpdate?registryAuthFrom",
+      "item": "swarm:service",
+      "ops": [
+        "ServiceUpdate"
+      ],
+      "context": "ServiceUpdate",
+      "type": "string",
+      "doc": "If the `X-Registry-Auth` header is not specified, this parameter indicates where to find registry authorization credentials."
+    },
+    {
+      "pointer": "engine:SwarmInit/DataPathAddr",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmInit"
+      ],
+      "context": "SwarmInit",
+      "type": "string",
+      "doc": "Address or interface to use for data path traffic (format: `\u003cip|interface\u003e`), for example, `192.168.1.1`, or an interface, like `eth0`."
+    },
+    {
+      "pointer": "engine:SwarmInit/Spec/CAConfig/ExternalCAs/[]/CACert",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmInit"
+      ],
+      "context": "SwarmSpec.CAConfig.ExternalCAs",
+      "type": "string",
+      "doc": "The root CA certificate (in PEM format) this external CA uses to issue TLS certificates (assumed to be to the current swarm root CA certificate if not provided)."
+    },
+    {
+      "pointer": "engine:SwarmInit/Spec/CAConfig/ExternalCAs/[]/Options",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmInit"
+      ],
+      "context": "SwarmSpec.CAConfig.ExternalCAs",
+      "type": "object",
+      "doc": "An object with key/value pairs that are interpreted as protocol-specific options for the external CA driver."
+    },
+    {
+      "pointer": "engine:SwarmInit/Spec/CAConfig/ExternalCAs/[]/Protocol",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmInit"
+      ],
+      "context": "SwarmSpec.CAConfig.ExternalCAs",
+      "type": "string",
+      "doc": "Protocol for communication with the external CA (currently only `cfssl` is supported)."
+    },
+    {
+      "pointer": "engine:SwarmInit/Spec/CAConfig/ExternalCAs/[]/URL",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmInit"
+      ],
+      "context": "SwarmSpec.CAConfig.ExternalCAs",
+      "type": "string",
+      "doc": "URL where certificate signing requests should be sent."
+    },
+    {
+      "pointer": "engine:SwarmInit/Spec/Labels",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmInit"
+      ],
+      "context": "SwarmSpec",
+      "type": "object",
+      "doc": "User-defined key/value metadata."
+    },
+    {
+      "pointer": "engine:SwarmInit/Spec/Name",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmInit"
+      ],
+      "context": "SwarmSpec",
+      "type": "string",
+      "doc": "Name of the swarm."
+    },
+    {
+      "pointer": "engine:SwarmInit/Spec/Raft/ElectionTick",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmInit"
+      ],
+      "context": "SwarmSpec.Raft",
+      "type": "integer",
+      "doc": "The number of ticks that a follower will wait for a message from the leader before becoming a candidate and starting an election."
+    },
+    {
+      "pointer": "engine:SwarmInit/Spec/Raft/HeartbeatTick",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmInit"
+      ],
+      "context": "SwarmSpec.Raft",
+      "type": "integer",
+      "doc": "The number of ticks between heartbeats."
+    },
+    {
+      "pointer": "engine:SwarmInit/Spec/TaskDefaults/LogDriver/Name",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmInit"
+      ],
+      "context": "SwarmSpec.TaskDefaults.LogDriver",
+      "type": "string",
+      "doc": "The log driver to use as a default for new tasks."
+    },
+    {
+      "pointer": "engine:SwarmInit/Spec/TaskDefaults/LogDriver/Options",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmInit"
+      ],
+      "context": "SwarmSpec.TaskDefaults.LogDriver",
+      "type": "object",
+      "doc": "Driver-specific options for the selected log driver, specified as key/value pairs."
+    },
+    {
+      "pointer": "engine:SwarmJoin/DataPathAddr",
+      "item": "swarm:swarm-node",
+      "ops": [
+        "SwarmJoin"
+      ],
+      "context": "SwarmJoin",
+      "type": "string",
+      "doc": "Address or interface to use for data path traffic (format: `\u003cip|interface\u003e`), for example, `192.168.1.1`, or an interface, like `eth0`."
+    },
+    {
+      "pointer": "engine:SwarmSpec/CAConfig/ExternalCAs/[]/CACert",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmUpdate"
+      ],
+      "context": "SwarmSpec.CAConfig.ExternalCAs",
+      "type": "string",
+      "doc": "The root CA certificate (in PEM format) this external CA uses to issue TLS certificates (assumed to be to the current swarm root CA certificate if not provided)."
+    },
+    {
+      "pointer": "engine:SwarmSpec/CAConfig/ExternalCAs/[]/Options",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmUpdate"
+      ],
+      "context": "SwarmSpec.CAConfig.ExternalCAs",
+      "type": "object",
+      "doc": "An object with key/value pairs that are interpreted as protocol-specific options for the external CA driver."
+    },
+    {
+      "pointer": "engine:SwarmSpec/CAConfig/ExternalCAs/[]/Protocol",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmUpdate"
+      ],
+      "context": "SwarmSpec.CAConfig.ExternalCAs",
+      "type": "string",
+      "doc": "Protocol for communication with the external CA (currently only `cfssl` is supported)."
+    },
+    {
+      "pointer": "engine:SwarmSpec/CAConfig/ExternalCAs/[]/URL",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmUpdate"
+      ],
+      "context": "SwarmSpec.CAConfig.ExternalCAs",
+      "type": "string",
+      "doc": "URL where certificate signing requests should be sent."
+    },
+    {
+      "pointer": "engine:SwarmSpec/Name",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmUpdate"
+      ],
+      "context": "SwarmSpec",
+      "type": "string",
+      "doc": "Name of the swarm."
+    },
+    {
+      "pointer": "engine:SwarmSpec/Raft/ElectionTick",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmUpdate"
+      ],
+      "context": "SwarmSpec.Raft",
+      "type": "integer",
+      "doc": "The number of ticks that a follower will wait for a message from the leader before becoming a candidate and starting an election."
+    },
+    {
+      "pointer": "engine:SwarmSpec/Raft/HeartbeatTick",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmUpdate"
+      ],
+      "context": "SwarmSpec.Raft",
+      "type": "integer",
+      "doc": "The number of ticks between heartbeats."
+    },
+    {
+      "pointer": "engine:SwarmSpec/TaskDefaults/LogDriver/Name",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmUpdate"
+      ],
+      "context": "SwarmSpec.TaskDefaults.LogDriver",
+      "type": "string",
+      "doc": "The log driver to use as a default for new tasks."
+    },
+    {
+      "pointer": "engine:SwarmSpec/TaskDefaults/LogDriver/Options",
+      "item": "swarm:swarm-init",
+      "ops": [
+        "SwarmUpdate"
+      ],
+      "context": "SwarmSpec.TaskDefaults.LogDriver",
+      "type": "object",
+      "doc": "Driver-specific options for the selected log driver, specified as key/value pairs."
+    }
+  ],
+  "lane": "S"
+}

@@ -1,0 +1,958 @@
+{
+  "about": "Pass 5.3 Lane 0: the fields go run ./tools/fieldcov found unmapped on items lane A owns. Close each one in reference/_gen/fieldmap.d/A.json (attr after implementing it under the upstream name, or skip / partial with a real reason), or by implementing it so auto-mapping finds it.",
+  "count": 96,
+  "gaps": [
+    {
+      "pointer": "engine:ContainerCreate/ArgsEscaped",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Command is already escaped (Windows only)"
+    },
+    {
+      "pointer": "engine:ContainerCreate/AttachStderr",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Whether to attach to `stderr`."
+    },
+    {
+      "pointer": "engine:ContainerCreate/AttachStdin",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Whether to attach to `stdin`."
+    },
+    {
+      "pointer": "engine:ContainerCreate/AttachStdout",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Whether to attach to `stdout`."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Annotations",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "object",
+      "doc": "Arbitrary non-identifying metadata attached to container and provided to the runtime when the container is started."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/BlkioWeight",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "Block IO weight (relative weight)."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/BlkioWeightDevice/[]/Path",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources.BlkioWeightDevice",
+      "type": "string"
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/BlkioWeightDevice/[]/Weight",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources.BlkioWeightDevice",
+      "type": "integer"
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Cgroup",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "string",
+      "doc": "Cgroup to use for the container."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/ConsoleSize",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "array",
+      "doc": "Initial console size, as an `[height, width]` array."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/ContainerIDFile",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "string",
+      "doc": "Path to a file where the container ID is written"
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/CpuCount",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "The number of usable CPUs (Windows only)."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/CpuPercent",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "The usable percentage of the available CPUs (Windows only)."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/CpuRealtimePeriod",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "The length of a CPU real-time period in microseconds."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/CpuRealtimeRuntime",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "The length of a CPU real-time runtime in microseconds."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/CpusetMems",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources",
+      "type": "string",
+      "doc": "Memory nodes (MEMs) in which to allow execution (0-3, 0,1)."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/IOMaximumBandwidth",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "Maximum IO in bytes per second for the container system drive (Windows only)."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/IOMaximumIOps",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "Maximum IOps for the container system drive (Windows only)"
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Isolation",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "string",
+      "doc": "Isolation technology of the container."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Links",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "array",
+      "doc": "A list of links for the container in the form `container_name:alias`."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/MaskedPaths",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "array",
+      "doc": "The list of paths to be masked inside the container (this overrides the default set of paths)."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/MemorySwappiness",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "Tune a container's memory swappiness behavior."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Mounts/[]/BindOptions/CreateMountpoint",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Create mount point on host if missing"
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Mounts/[]/BindOptions/NonRecursive",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Disable recursive bind mount."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Mounts/[]/BindOptions/ReadOnlyForceRecursive",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Raise an error if the mount cannot be made recursively read-only."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Mounts/[]/BindOptions/ReadOnlyNonRecursive",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Mount.BindOptions",
+      "type": "boolean",
+      "doc": "Make the mount non-recursively read-only, but still leave the mount recursive (unless NonRecursive is set to `true` in conjunction)."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Mounts/[]/Consistency",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Mount",
+      "type": "string",
+      "doc": "The consistency requirement for the mount: `default`, `consistent`, `cached`, or `delegated`."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Mounts/[]/ImageOptions/Subpath",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Mount.ImageOptions",
+      "type": "string",
+      "doc": "Source path inside the image."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Mounts/[]/TmpfsOptions/Options",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Mount.TmpfsOptions",
+      "type": "array",
+      "doc": "The options to be passed to the tmpfs mount."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/OomKillDisable",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources",
+      "type": "boolean",
+      "doc": "Disable OOM Killer for the container."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/OomScoreAdj",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "integer",
+      "doc": "An integer value containing the score given to the container in order to tune OOM killer preferences."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/PidsLimit",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "Tune a container's PIDs limit."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/ReadonlyPaths",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "array",
+      "doc": "The list of paths to be set as read-only inside the container (this overrides the default set of paths)."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/UTSMode",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "string",
+      "doc": "UTS namespace to use for the container."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/Umask",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "integer",
+      "doc": "Set the initial umask for a Unix container."
+    },
+    {
+      "pointer": "engine:ContainerCreate/HostConfig/VolumeDriver",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "HostConfig",
+      "type": "string",
+      "doc": "Driver that this container uses to mount volumes."
+    },
+    {
+      "pointer": "engine:ContainerCreate/NetworkDisabled",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Disable networking for the container."
+    },
+    {
+      "pointer": "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/DNSNames",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "EndpointSettings",
+      "type": "array",
+      "doc": "List of all DNS names an endpoint has on a specific network."
+    },
+    {
+      "pointer": "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/EndpointID",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "Unique ID for the service endpoint in a Sandbox."
+    },
+    {
+      "pointer": "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/Gateway",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "Gateway address for this network."
+    },
+    {
+      "pointer": "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/GlobalIPv6Address",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "Global IPv6 address."
+    },
+    {
+      "pointer": "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/GlobalIPv6PrefixLen",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "EndpointSettings",
+      "type": "integer",
+      "doc": "Mask length of the global IPv6 address."
+    },
+    {
+      "pointer": "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/IPAddress",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "IPv4 address."
+    },
+    {
+      "pointer": "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/IPPrefixLen",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "EndpointSettings",
+      "type": "integer",
+      "doc": "Mask length of the IPv4 address."
+    },
+    {
+      "pointer": "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/IPv6Gateway",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "IPv6 gateway address."
+    },
+    {
+      "pointer": "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/Links",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "EndpointSettings",
+      "type": "array"
+    },
+    {
+      "pointer": "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/NetworkID",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "Unique ID of the network."
+    },
+    {
+      "pointer": "engine:ContainerCreate/OnBuild",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "ContainerConfig",
+      "type": "array",
+      "doc": "`ONBUILD` metadata that were defined in the image's `Dockerfile`."
+    },
+    {
+      "pointer": "engine:ContainerCreate/Shell",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "ContainerConfig",
+      "type": "array",
+      "doc": "Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell."
+    },
+    {
+      "pointer": "engine:ContainerCreate/StdinOnce",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Close `stdin` after one attached client disconnects"
+    },
+    {
+      "pointer": "engine:ContainerCreate/Volumes",
+      "item": "engine:container",
+      "ops": [
+        "ContainerCreate"
+      ],
+      "context": "ContainerConfig",
+      "type": "object",
+      "doc": "An object mapping mount point paths inside the container to empty objects."
+    },
+    {
+      "pointer": "engine:ContainerExec/AttachStdin",
+      "item": "engine:exec",
+      "ops": [
+        "ContainerExec"
+      ],
+      "context": "ContainerExec",
+      "type": "boolean",
+      "doc": "Attach to `stdin` of the exec command."
+    },
+    {
+      "pointer": "engine:ContainerExec/ConsoleSize",
+      "item": "engine:exec",
+      "ops": [
+        "ContainerExec"
+      ],
+      "context": "ContainerExec",
+      "type": "array",
+      "doc": "Initial console size, as an `[height, width]` array."
+    },
+    {
+      "pointer": "engine:ContainerExec/DetachKeys",
+      "item": "engine:exec",
+      "ops": [
+        "ContainerExec"
+      ],
+      "context": "ContainerExec",
+      "type": "string",
+      "doc": "Override the key sequence for detaching a container."
+    },
+    {
+      "pointer": "engine:ContainerRestart?t",
+      "item": "engine:container-restart",
+      "ops": [
+        "ContainerRestart"
+      ],
+      "context": "ContainerRestart",
+      "type": "integer",
+      "doc": "Number of seconds to wait before killing the container"
+    },
+    {
+      "pointer": "engine:ContainerStart?detachKeys",
+      "item": "engine:container",
+      "ops": [
+        "ContainerStart"
+      ],
+      "context": "ContainerStart",
+      "type": "string",
+      "doc": "Override the key sequence for detaching a container."
+    },
+    {
+      "pointer": "engine:ContainerStop?t",
+      "item": "engine:container-stop",
+      "ops": [
+        "ContainerStop"
+      ],
+      "context": "ContainerStop",
+      "type": "integer",
+      "doc": "Number of seconds to wait before killing the container"
+    },
+    {
+      "pointer": "engine:ContainerUpdate/BlkioWeight",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "Block IO weight (relative weight)."
+    },
+    {
+      "pointer": "engine:ContainerUpdate/BlkioWeightDevice/[]/Path",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources.BlkioWeightDevice",
+      "type": "string"
+    },
+    {
+      "pointer": "engine:ContainerUpdate/BlkioWeightDevice/[]/Weight",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources.BlkioWeightDevice",
+      "type": "integer"
+    },
+    {
+      "pointer": "engine:ContainerUpdate/CpuCount",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "The number of usable CPUs (Windows only)."
+    },
+    {
+      "pointer": "engine:ContainerUpdate/CpuPercent",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "The usable percentage of the available CPUs (Windows only)."
+    },
+    {
+      "pointer": "engine:ContainerUpdate/CpuRealtimePeriod",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "The length of a CPU real-time period in microseconds."
+    },
+    {
+      "pointer": "engine:ContainerUpdate/CpuRealtimeRuntime",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "The length of a CPU real-time runtime in microseconds."
+    },
+    {
+      "pointer": "engine:ContainerUpdate/CpusetMems",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources",
+      "type": "string",
+      "doc": "Memory nodes (MEMs) in which to allow execution (0-3, 0,1)."
+    },
+    {
+      "pointer": "engine:ContainerUpdate/IOMaximumBandwidth",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "Maximum IO in bytes per second for the container system drive (Windows only)."
+    },
+    {
+      "pointer": "engine:ContainerUpdate/IOMaximumIOps",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "Maximum IOps for the container system drive (Windows only)"
+    },
+    {
+      "pointer": "engine:ContainerUpdate/MemorySwappiness",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "Tune a container's memory swappiness behavior."
+    },
+    {
+      "pointer": "engine:ContainerUpdate/OomKillDisable",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources",
+      "type": "boolean",
+      "doc": "Disable OOM Killer for the container."
+    },
+    {
+      "pointer": "engine:ContainerUpdate/PidsLimit",
+      "item": "engine:container",
+      "ops": [
+        "ContainerUpdate"
+      ],
+      "context": "Resources",
+      "type": "integer",
+      "doc": "Tune a container's PIDs limit."
+    },
+    {
+      "pointer": "engine:ExecStart/ConsoleSize",
+      "item": "engine:exec",
+      "ops": [
+        "ExecStart"
+      ],
+      "context": "ExecStart",
+      "type": "array",
+      "doc": "Initial console size, as an `[height, width]` array."
+    },
+    {
+      "pointer": "engine:NetworkConnectRequest/EndpointConfig/DNSNames",
+      "item": "engine:container",
+      "ops": [
+        "NetworkConnect"
+      ],
+      "context": "EndpointSettings",
+      "type": "array",
+      "doc": "List of all DNS names an endpoint has on a specific network."
+    },
+    {
+      "pointer": "engine:NetworkConnectRequest/EndpointConfig/EndpointID",
+      "item": "engine:container",
+      "ops": [
+        "NetworkConnect"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "Unique ID for the service endpoint in a Sandbox."
+    },
+    {
+      "pointer": "engine:NetworkConnectRequest/EndpointConfig/Gateway",
+      "item": "engine:container",
+      "ops": [
+        "NetworkConnect"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "Gateway address for this network."
+    },
+    {
+      "pointer": "engine:NetworkConnectRequest/EndpointConfig/GlobalIPv6Address",
+      "item": "engine:container",
+      "ops": [
+        "NetworkConnect"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "Global IPv6 address."
+    },
+    {
+      "pointer": "engine:NetworkConnectRequest/EndpointConfig/GlobalIPv6PrefixLen",
+      "item": "engine:container",
+      "ops": [
+        "NetworkConnect"
+      ],
+      "context": "EndpointSettings",
+      "type": "integer",
+      "doc": "Mask length of the global IPv6 address."
+    },
+    {
+      "pointer": "engine:NetworkConnectRequest/EndpointConfig/IPAddress",
+      "item": "engine:container",
+      "ops": [
+        "NetworkConnect"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "IPv4 address."
+    },
+    {
+      "pointer": "engine:NetworkConnectRequest/EndpointConfig/IPPrefixLen",
+      "item": "engine:container",
+      "ops": [
+        "NetworkConnect"
+      ],
+      "context": "EndpointSettings",
+      "type": "integer",
+      "doc": "Mask length of the IPv4 address."
+    },
+    {
+      "pointer": "engine:NetworkConnectRequest/EndpointConfig/IPv6Gateway",
+      "item": "engine:container",
+      "ops": [
+        "NetworkConnect"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "IPv6 gateway address."
+    },
+    {
+      "pointer": "engine:NetworkConnectRequest/EndpointConfig/Links",
+      "item": "engine:container",
+      "ops": [
+        "NetworkConnect"
+      ],
+      "context": "EndpointSettings",
+      "type": "array"
+    },
+    {
+      "pointer": "engine:NetworkConnectRequest/EndpointConfig/NetworkID",
+      "item": "engine:container",
+      "ops": [
+        "NetworkConnect"
+      ],
+      "context": "EndpointSettings",
+      "type": "string",
+      "doc": "Unique ID of the network."
+    },
+    {
+      "pointer": "engine:NetworkCreate/ConfigFrom/Network",
+      "item": "engine:network",
+      "ops": [
+        "NetworkCreate"
+      ],
+      "context": "ConfigReference",
+      "type": "string",
+      "doc": "The name of the config-only network that provides the network's configuration."
+    },
+    {
+      "pointer": "engine:NetworkCreate/ConfigOnly",
+      "item": "engine:network",
+      "ops": [
+        "NetworkCreate"
+      ],
+      "context": "NetworkCreate",
+      "type": "boolean",
+      "doc": "Creates a config-only network."
+    },
+    {
+      "pointer": "engine:NetworkCreate/EnableIPv4",
+      "item": "engine:network",
+      "ops": [
+        "NetworkCreate"
+      ],
+      "context": "NetworkCreate",
+      "type": "boolean",
+      "doc": "Enable IPv4 on the network."
+    },
+    {
+      "pointer": "engine:NetworkCreate/Scope",
+      "item": "engine:network",
+      "ops": [
+        "NetworkCreate"
+      ],
+      "context": "NetworkCreate",
+      "type": "string",
+      "doc": "The level at which the network exists (e.g."
+    },
+    {
+      "pointer": "engine:PluginCreate#body",
+      "item": "engine:plugin-create",
+      "ops": [
+        "PluginCreate"
+      ],
+      "context": "PluginCreate",
+      "type": "string",
+      "doc": "Path to tar containing plugin rootfs and manifest"
+    },
+    {
+      "pointer": "engine:PluginPull?remote",
+      "item": "engine:plugin",
+      "ops": [
+        "PluginPull"
+      ],
+      "context": "PluginPull",
+      "type": "string",
+      "doc": "Remote reference for plugin to install."
+    },
+    {
+      "pointer": "engine:PluginPull#body",
+      "item": "engine:plugin",
+      "ops": [
+        "PluginPull"
+      ],
+      "context": "PluginPull",
+      "type": "array"
+    },
+    {
+      "pointer": "engine:PluginSet#body",
+      "item": "engine:plugin",
+      "ops": [
+        "PluginSet"
+      ],
+      "context": "PluginSet",
+      "type": "array"
+    },
+    {
+      "pointer": "engine:PluginUpgrade?remote",
+      "item": "engine:plugin",
+      "ops": [
+        "PluginUpgrade"
+      ],
+      "context": "PluginUpgrade",
+      "type": "string",
+      "doc": "Remote reference to upgrade to."
+    },
+    {
+      "pointer": "engine:PluginUpgrade#body",
+      "item": "engine:plugin",
+      "ops": [
+        "PluginUpgrade"
+      ],
+      "context": "PluginUpgrade",
+      "type": "array"
+    },
+    {
+      "pointer": "engine:PutContainerArchive?noOverwriteDirNonDir",
+      "item": "engine:container",
+      "ops": [
+        "PutContainerArchive"
+      ],
+      "context": "PutContainerArchive",
+      "type": "string",
+      "doc": "If `1`, `true`, or `True` then it will be an error if unpacking the given content would cause an existing directory to be replaced with a non-directory and vice versa."
+    },
+    {
+      "pointer": "engine:PutContainerArchive?copyUIDGID",
+      "item": "engine:container",
+      "ops": [
+        "PutContainerArchive"
+      ],
+      "context": "PutContainerArchive",
+      "type": "string",
+      "doc": "If `1`, `true`, then it will copy UID/GID maps to the dest file or dir"
+    },
+    {
+      "pointer": "engine:PutContainerArchive#body",
+      "item": "engine:container",
+      "ops": [
+        "PutContainerArchive"
+      ],
+      "context": "PutContainerArchive",
+      "type": "string",
+      "doc": "The input stream must be a tar archive compressed with one of the following algorithms: `identity` (no compression), `gzip`, `bzip2`, or `xz`."
+    },
+    {
+      "pointer": "engine:VolumeCreateRequest/ClusterVolumeSpec/AccessMode/Availability",
+      "item": "engine:volume",
+      "ops": [
+        "VolumeCreate"
+      ],
+      "context": "ClusterVolumeSpec.AccessMode",
+      "type": "string",
+      "doc": "The availability of the volume for use in tasks."
+    },
+    {
+      "pointer": "engine:VolumeUpdate/Spec/AccessMode/Availability",
+      "item": "engine:volume",
+      "ops": [
+        "VolumeUpdate"
+      ],
+      "context": "ClusterVolumeSpec.AccessMode",
+      "type": "string",
+      "doc": "The availability of the volume for use in tasks."
+    }
+  ],
+  "lane": "A"
+}

@@ -19,7 +19,7 @@ REF = os.path.normpath(os.path.join(HERE, ".."))  # reference/
 Z = os.path.join(HERE, "fragments")
 FRAGS = ["z1-engine.json", "z2-compose.json", "z3-cli.json", "z4-dockerfile.json"]
 # Fragments added after the harvest; each is read only when the file exists, in this order.
-EXTRA_FRAGS = ["dockerfile-sources.json", "pass5.json"]
+EXTRA_FRAGS = ["dockerfile-sources.json", "pass5.json"] + ["pass53-%s.json" % l for l in "ARSKBI"]  # Pass 5.3: one per lane
 OUTPUTS_DIR = os.path.join(Z, "outputs")  # outputs/<lane>.json, joined onto items by id (SCHEMA.md)
 OUT_CATEGORIES = ["raw", "structured", "result", "identity", "version", "hash"]
 OUT_SOURCE_TYPES = ["swagger", "schema", "doc", "cli", "sources_md", "derived"]

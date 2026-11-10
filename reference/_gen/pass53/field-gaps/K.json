@@ -1,0 +1,874 @@
+{
+  "about": "Pass 5.3 Lane 0: the fields go run ./tools/fieldcov found unmapped on items lane K owns. Close each one in reference/_gen/fieldmap.d/K.json (attr after implementing it under the upstream name, or skip / partial with a real reason), or by implementing it so auto-mapping finds it.",
+  "count": 117,
+  "gaps": [
+    {
+      "pointer": "compose:service/attach",
+      "item": "compose:services",
+      "context": "service",
+      "note": "types.ServiceConfig.Attach (not read)"
+    },
+    {
+      "pointer": "compose:service/blkio_config/device_read_bps/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the device (e.g., '/dev/sda'). [compose-go: compose-go ThrottleDevice has no field for \"path\"]"
+    },
+    {
+      "pointer": "compose:service/blkio_config/device_read_bps/[]/rate",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Rate limit in bytes per second or IO operations per second. [compose-go: compose-go ThrottleDevice has no field for \"rate\"]"
+    },
+    {
+      "pointer": "compose:service/blkio_config/device_read_iops/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the device (e.g., '/dev/sda'). [compose-go: compose-go ThrottleDevice has no field for \"path\"]"
+    },
+    {
+      "pointer": "compose:service/blkio_config/device_read_iops/[]/rate",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Rate limit in bytes per second or IO operations per second. [compose-go: compose-go ThrottleDevice has no field for \"rate\"]"
+    },
+    {
+      "pointer": "compose:service/blkio_config/device_write_bps/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the device (e.g., '/dev/sda'). [compose-go: compose-go ThrottleDevice has no field for \"path\"]"
+    },
+    {
+      "pointer": "compose:service/blkio_config/device_write_bps/[]/rate",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Rate limit in bytes per second or IO operations per second. [compose-go: compose-go ThrottleDevice has no field for \"rate\"]"
+    },
+    {
+      "pointer": "compose:service/blkio_config/device_write_iops/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the device (e.g., '/dev/sda'). [compose-go: compose-go ThrottleDevice has no field for \"path\"]"
+    },
+    {
+      "pointer": "compose:service/blkio_config/device_write_iops/[]/rate",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Rate limit in bytes per second or IO operations per second. [compose-go: compose-go ThrottleDevice has no field for \"rate\"]"
+    },
+    {
+      "pointer": "compose:service/blkio_config/weight",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Block IO weight (relative weight) for the service, between 10 and 1000.",
+      "note": "types.BlkioConfig.Weight (not read)"
+    },
+    {
+      "pointer": "compose:service/blkio_config/weight_device/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the device (e.g., '/dev/sda'). [compose-go: compose-go WeightDevice has no field for \"path\"]"
+    },
+    {
+      "pointer": "compose:service/blkio_config/weight_device/[]/weight",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Relative weight for the device, between 10 and 1000. [compose-go: compose-go WeightDevice has no field for \"weight\"]"
+    },
+    {
+      "pointer": "compose:service/build/additional_contexts",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Additional build contexts to use, specified as a map of name to context path or URL.",
+      "note": "types.BuildConfig.AdditionalContexts (not read)"
+    },
+    {
+      "pointer": "compose:service/build/entitlements",
+      "item": "compose:services",
+      "context": "service",
+      "type": "array",
+      "doc": "List of extra privileged entitlements to grant to the build process.",
+      "note": "types.BuildConfig.Entitlements (not read)"
+    },
+    {
+      "pointer": "compose:service/build/isolation",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Container isolation technology to use for the build process.",
+      "note": "types.BuildConfig.Isolation (not read)"
+    },
+    {
+      "pointer": "compose:service/build/privileged",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Give extended privileges to the build container.",
+      "note": "types.BuildConfig.Privileged (not read)"
+    },
+    {
+      "pointer": "compose:service/build/secrets/[]/gid",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "GID of the file in the container.",
+      "note": "types.ServiceSecretConfig.GID (not read)"
+    },
+    {
+      "pointer": "compose:service/build/secrets/[]/mode",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "File permission mode inside the container, in octal.",
+      "note": "types.ServiceSecretConfig.Mode (not read)"
+    },
+    {
+      "pointer": "compose:service/build/secrets/[]/uid",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "UID of the file in the container.",
+      "note": "types.ServiceSecretConfig.UID (not read)"
+    },
+    {
+      "pointer": "compose:service/configs/[]/gid",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "GID of the file in the container.",
+      "note": "types.ServiceConfigObjConfig.GID (not read)"
+    },
+    {
+      "pointer": "compose:service/configs/[]/mode",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "File permission mode inside the container, in octal.",
+      "note": "types.ServiceConfigObjConfig.Mode (not read)"
+    },
+    {
+      "pointer": "compose:service/configs/[]/uid",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "UID of the file in the container.",
+      "note": "types.ServiceConfigObjConfig.UID (not read)"
+    },
+    {
+      "pointer": "compose:service/credential_spec/config",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "The name of the credential spec Config to use.",
+      "note": "types.CredentialSpecConfig.Config (not read)"
+    },
+    {
+      "pointer": "compose:service/credential_spec/file",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to a credential spec file.",
+      "note": "types.CredentialSpecConfig.File (not read)"
+    },
+    {
+      "pointer": "compose:service/credential_spec/registry",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to a credential spec in the Windows registry.",
+      "note": "types.CredentialSpecConfig.Registry (not read)"
+    },
+    {
+      "pointer": "compose:service/develop/watch/[]/action",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Action to take when a change is detected: rebuild the container, sync files, restart the container, sync and restart, or sync and execute a command.",
+      "note": "types.Trigger.Action (not read)"
+    },
+    {
+      "pointer": "compose:service/develop/watch/[]/exec/command",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Command to execute as part of the hook.",
+      "note": "types.ServiceHook.Command (not read)"
+    },
+    {
+      "pointer": "compose:service/develop/watch/[]/exec/environment",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Environment variables for the command.",
+      "note": "types.ServiceHook.Environment (not read)"
+    },
+    {
+      "pointer": "compose:service/develop/watch/[]/exec/privileged",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Whether to run the command with extended privileges.",
+      "note": "types.ServiceHook.Privileged (not read)"
+    },
+    {
+      "pointer": "compose:service/develop/watch/[]/exec/user",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "User to run the command as.",
+      "note": "types.ServiceHook.User (not read)"
+    },
+    {
+      "pointer": "compose:service/develop/watch/[]/exec/working_dir",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Working directory for the command.",
+      "note": "types.ServiceHook.WorkingDir (not read)"
+    },
+    {
+      "pointer": "compose:service/develop/watch/[]/ignore",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Patterns to exclude from watching.",
+      "note": "types.Trigger.Ignore (not read)"
+    },
+    {
+      "pointer": "compose:service/develop/watch/[]/include",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Patterns to include in watching.",
+      "note": "types.Trigger.Include (not read)"
+    },
+    {
+      "pointer": "compose:service/develop/watch/[]/initial_sync",
+      "item": "compose:services",
+      "context": "service",
+      "type": "boolean",
+      "doc": "Ensure that an initial synchronization is done before starting watch mode for sync+x triggers",
+      "note": "types.Trigger.InitialSync (not read)"
+    },
+    {
+      "pointer": "compose:service/develop/watch/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to watch for changes.",
+      "note": "types.Trigger.Path (not read)"
+    },
+    {
+      "pointer": "compose:service/develop/watch/[]/target",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Target path in the container for sync operations.",
+      "note": "types.Trigger.Target (not read)"
+    },
+    {
+      "pointer": "compose:service/env_file/[]/format",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Format attribute lets you to use an alternative file formats for env_file.",
+      "note": "types.EnvFile.Format (not read)"
+    },
+    {
+      "pointer": "compose:service/env_file/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the environment file.",
+      "note": "types.EnvFile.Path (not read)"
+    },
+    {
+      "pointer": "compose:service/env_file/[]/required",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Whether the file is required.",
+      "note": "types.EnvFile.Required (not read)"
+    },
+    {
+      "pointer": "compose:service/extends/file",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "The file path where the service to extend is defined.",
+      "note": "types.ExtendsConfig.File (not read)"
+    },
+    {
+      "pointer": "compose:service/extends/service",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "The name of the service to extend.",
+      "note": "types.ExtendsConfig.Service (not read)"
+    },
+    {
+      "pointer": "compose:service/external_links",
+      "item": "compose:services",
+      "context": "service",
+      "type": "array",
+      "doc": "Link to services started outside this Compose application.",
+      "note": "types.ServiceConfig.ExternalLinks (not read)"
+    },
+    {
+      "pointer": "compose:service/label_file",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Add metadata to containers using files containing Docker labels.",
+      "note": "types.ContainerSpec.LabelFiles (not read)"
+    },
+    {
+      "pointer": "compose:service/links",
+      "item": "compose:services",
+      "context": "service",
+      "type": "array",
+      "doc": "Link to containers in another service.",
+      "note": "types.ServiceConfig.Links (not read)"
+    },
+    {
+      "pointer": "compose:service/mac_address",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Container MAC address to set.",
+      "note": "types.ContainerSpec.MacAddress (not read)"
+    },
+    {
+      "pointer": "compose:service/models",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "AI Models to use, referencing entries under the top-level models key.",
+      "note": "types.ContainerSpec.Models (not read)"
+    },
+    {
+      "pointer": "compose:service/ports/[]/app_protocol",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Application protocol to use with the port (e.g., http, https, mysql).",
+      "note": "types.ServicePortConfig.AppProtocol (not read)"
+    },
+    {
+      "pointer": "compose:service/post_start/[]/command",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Command to execute as part of the hook.",
+      "note": "types.ServiceHook.Command (not read)"
+    },
+    {
+      "pointer": "compose:service/post_start/[]/environment",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Environment variables for the command.",
+      "note": "types.ServiceHook.Environment (not read)"
+    },
+    {
+      "pointer": "compose:service/post_start/[]/privileged",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Whether to run the command with extended privileges.",
+      "note": "types.ServiceHook.Privileged (not read)"
+    },
+    {
+      "pointer": "compose:service/post_start/[]/user",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "User to run the command as.",
+      "note": "types.ServiceHook.User (not read)"
+    },
+    {
+      "pointer": "compose:service/post_start/[]/working_dir",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Working directory for the command.",
+      "note": "types.ServiceHook.WorkingDir (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/blkio_config/device_read_bps/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the device (e.g., '/dev/sda'). [compose-go: compose-go ThrottleDevice has no field for \"path\"]"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/blkio_config/device_read_bps/[]/rate",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Rate limit in bytes per second or IO operations per second. [compose-go: compose-go ThrottleDevice has no field for \"rate\"]"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/blkio_config/device_read_iops/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the device (e.g., '/dev/sda'). [compose-go: compose-go ThrottleDevice has no field for \"path\"]"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/blkio_config/device_read_iops/[]/rate",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Rate limit in bytes per second or IO operations per second. [compose-go: compose-go ThrottleDevice has no field for \"rate\"]"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/blkio_config/device_write_bps/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the device (e.g., '/dev/sda'). [compose-go: compose-go ThrottleDevice has no field for \"path\"]"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/blkio_config/device_write_bps/[]/rate",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Rate limit in bytes per second or IO operations per second. [compose-go: compose-go ThrottleDevice has no field for \"rate\"]"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/blkio_config/device_write_iops/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the device (e.g., '/dev/sda'). [compose-go: compose-go ThrottleDevice has no field for \"path\"]"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/blkio_config/device_write_iops/[]/rate",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Rate limit in bytes per second or IO operations per second. [compose-go: compose-go ThrottleDevice has no field for \"rate\"]"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/blkio_config/weight",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Block IO weight (relative weight) for the service, between 10 and 1000.",
+      "note": "types.BlkioConfig.Weight (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/blkio_config/weight_device/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the device (e.g., '/dev/sda'). [compose-go: compose-go WeightDevice has no field for \"path\"]"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/blkio_config/weight_device/[]/weight",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Relative weight for the device, between 10 and 1000. [compose-go: compose-go WeightDevice has no field for \"weight\"]"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/configs/[]/gid",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "GID of the file in the container.",
+      "note": "types.ServiceConfigObjConfig.GID (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/configs/[]/mode",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "File permission mode inside the container, in octal.",
+      "note": "types.ServiceConfigObjConfig.Mode (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/configs/[]/uid",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "UID of the file in the container.",
+      "note": "types.ServiceConfigObjConfig.UID (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/credential_spec/config",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "The name of the credential spec Config to use.",
+      "note": "types.CredentialSpecConfig.Config (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/credential_spec/file",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to a credential spec file.",
+      "note": "types.CredentialSpecConfig.File (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/credential_spec/registry",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to a credential spec in the Windows registry.",
+      "note": "types.CredentialSpecConfig.Registry (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/env_file/[]/format",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Format attribute lets you to use an alternative file formats for env_file.",
+      "note": "types.EnvFile.Format (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/env_file/[]/path",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Path to the environment file.",
+      "note": "types.EnvFile.Path (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/env_file/[]/required",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Whether the file is required.",
+      "note": "types.EnvFile.Required (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/label_file",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Add metadata to containers using files containing Docker labels.",
+      "note": "types.ContainerSpec.LabelFiles (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/mac_address",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Container MAC address to set.",
+      "note": "types.ContainerSpec.MacAddress (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/models",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "AI Models to use, referencing entries under the top-level models key.",
+      "note": "types.ContainerSpec.Models (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/per_replica",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "When true, the hook runs once per service replica instead of once per service.",
+      "note": "types.PreStartHook.PerReplica (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/pull_refresh_after",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Time after which to refresh the image.",
+      "note": "types.ContainerSpec.PullRefreshAfter (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/secrets/[]/gid",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "GID of the file in the container.",
+      "note": "types.ServiceSecretConfig.GID (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/secrets/[]/mode",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "File permission mode inside the container, in octal.",
+      "note": "types.ServiceSecretConfig.Mode (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/secrets/[]/uid",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "UID of the file in the container.",
+      "note": "types.ServiceSecretConfig.UID (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/umask",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Set the initial umask for the container process.",
+      "note": "types.ContainerSpec.Umask (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/use_api_socket",
+      "item": "compose:services",
+      "context": "service",
+      "type": "boolean",
+      "doc": "Bind mount Docker API socket and required auth.",
+      "note": "types.ContainerSpec.UseAPISocket (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_start/[]/volumes/[]/volume/labels",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Labels to apply to the volume.",
+      "note": "types.ServiceVolumeVolume.Labels (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_stop/[]/command",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Command to execute as part of the hook.",
+      "note": "types.ServiceHook.Command (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_stop/[]/environment",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Environment variables for the command.",
+      "note": "types.ServiceHook.Environment (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_stop/[]/privileged",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Whether to run the command with extended privileges.",
+      "note": "types.ServiceHook.Privileged (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_stop/[]/user",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "User to run the command as.",
+      "note": "types.ServiceHook.User (not read)"
+    },
+    {
+      "pointer": "compose:service/pre_stop/[]/working_dir",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Working directory for the command.",
+      "note": "types.ServiceHook.WorkingDir (not read)"
+    },
+    {
+      "pointer": "compose:service/provider/options",
+      "item": "compose:services",
+      "context": "service",
+      "type": "object",
+      "doc": "Provider-specific options.",
+      "note": "types.ServiceProviderConfig.Options (not read)"
+    },
+    {
+      "pointer": "compose:service/provider/type",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "External component used by Compose to manage setup and teardown lifecycle of the service.",
+      "note": "types.ServiceProviderConfig.Type (not read)"
+    },
+    {
+      "pointer": "compose:service/pull_refresh_after",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "Time after which to refresh the image.",
+      "note": "types.ContainerSpec.PullRefreshAfter (not read)"
+    },
+    {
+      "pointer": "compose:service/secrets/[]/gid",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "GID of the file in the container.",
+      "note": "types.ServiceSecretConfig.GID (not read)"
+    },
+    {
+      "pointer": "compose:service/secrets/[]/mode",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "File permission mode inside the container, in octal.",
+      "note": "types.ServiceSecretConfig.Mode (not read)"
+    },
+    {
+      "pointer": "compose:service/secrets/[]/uid",
+      "item": "compose:services",
+      "context": "service",
+      "type": "string",
+      "doc": "UID of the file in the container.",
+      "note": "types.ServiceSecretConfig.UID (not read)"
+    },
+    {
+      "pointer": "compose:service/umask",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Set the initial umask for the container process.",
+      "note": "types.ContainerSpec.Umask (not read)"
+    },
+    {
+      "pointer": "compose:service/use_api_socket",
+      "item": "compose:services",
+      "context": "service",
+      "type": "boolean",
+      "doc": "Bind mount Docker API socket and required auth.",
+      "note": "types.ContainerSpec.UseAPISocket (not read)"
+    },
+    {
+      "pointer": "compose:service/volumes/[]/volume/labels",
+      "item": "compose:services",
+      "context": "service",
+      "doc": "Labels to apply to the volume.",
+      "note": "types.ServiceVolumeVolume.Labels (not read)"
+    },
+    {
+      "pointer": "compose:network/external/name",
+      "item": "compose:networks",
+      "context": "network",
+      "type": "string",
+      "deprecated": true,
+      "doc": "Specifies the name of the external network. [compose-go: external/name: name is not a struct]"
+    },
+    {
+      "pointer": "compose:volume/external/name",
+      "item": "compose:volumes",
+      "context": "volume",
+      "type": "string",
+      "deprecated": true,
+      "doc": "Specifies the name of the external volume. [compose-go: external/name: name is not a struct]"
+    },
+    {
+      "pointer": "compose:config/content",
+      "item": "compose:configs",
+      "context": "config",
+      "type": "string",
+      "doc": "Inline content of the config.",
+      "note": "types.ConfigObjConfig.Content (not read)"
+    },
+    {
+      "pointer": "compose:config/environment",
+      "item": "compose:configs",
+      "context": "config",
+      "type": "string",
+      "doc": "Name of an environment variable from which to get the config value.",
+      "note": "types.ConfigObjConfig.Environment (not read)"
+    },
+    {
+      "pointer": "compose:config/external/name",
+      "item": "compose:configs",
+      "context": "config",
+      "type": "string",
+      "deprecated": true,
+      "doc": "Specifies the name of the external config. [compose-go: external/name: name is not a struct]"
+    },
+    {
+      "pointer": "compose:config/file",
+      "item": "compose:configs",
+      "context": "config",
+      "type": "string",
+      "doc": "Path to a file containing the config value.",
+      "note": "types.ConfigObjConfig.File (not read)"
+    },
+    {
+      "pointer": "compose:config/labels",
+      "item": "compose:configs",
+      "context": "config",
+      "doc": "Add metadata to the config using labels.",
+      "note": "types.ConfigObjConfig.Labels (not read)"
+    },
+    {
+      "pointer": "compose:config/template_driver",
+      "item": "compose:configs",
+      "context": "config",
+      "type": "string",
+      "doc": "Driver to use for templating the config's value.",
+      "note": "types.ConfigObjConfig.TemplateDriver (not read)"
+    },
+    {
+      "pointer": "compose:secret/driver",
+      "item": "compose:secrets",
+      "context": "secret",
+      "type": "string",
+      "doc": "Specify which secret driver should be used for this secret.",
+      "note": "types.SecretConfig.Driver (not read)"
+    },
+    {
+      "pointer": "compose:secret/driver_opts",
+      "item": "compose:secrets",
+      "context": "secret",
+      "type": "object",
+      "doc": "Specify driver-specific options.",
+      "note": "types.SecretConfig.DriverOpts (not read)"
+    },
+    {
+      "pointer": "compose:secret/environment",
+      "item": "compose:secrets",
+      "context": "secret",
+      "type": "string",
+      "doc": "Name of an environment variable from which to get the secret value.",
+      "note": "types.SecretConfig.Environment (not read)"
+    },
+    {
+      "pointer": "compose:secret/external/name",
+      "item": "compose:secrets",
+      "context": "secret",
+      "type": "string",
+      "doc": "Specifies the name of the external secret. [compose-go: external/name: name is not a struct]"
+    },
+    {
+      "pointer": "compose:secret/labels",
+      "item": "compose:secrets",
+      "context": "secret",
+      "doc": "Add metadata to the secret using labels.",
+      "note": "types.SecretConfig.Labels (not read)"
+    },
+    {
+      "pointer": "compose:secret/template_driver",
+      "item": "compose:secrets",
+      "context": "secret",
+      "type": "string",
+      "doc": "Driver to use for templating the secret's value.",
+      "note": "types.SecretConfig.TemplateDriver (not read)"
+    },
+    {
+      "pointer": "compose:model/context_size",
+      "item": "compose:models",
+      "context": "model",
+      "type": "integer",
+      "note": "types.ModelConfig.ContextSize (not read)"
+    },
+    {
+      "pointer": "compose:model/name",
+      "item": "compose:models",
+      "context": "model",
+      "type": "string",
+      "doc": "Custom name for this model.",
+      "note": "types.ModelConfig.Name (not read)"
+    },
+    {
+      "pointer": "compose:model/runtime_flags",
+      "item": "compose:models",
+      "context": "model",
+      "type": "array",
+      "doc": "Raw runtime flags to pass to the inference engine.",
+      "note": "types.ModelConfig.RuntimeFlags (not read)"
+    },
+    {
+      "pointer": "compose:include/env_file",
+      "item": "compose:include",
+      "context": "include",
+      "doc": "Path to the environment files to use to define default values when interpolating variables in the Compose files being parsed.",
+      "note": "types.IncludeConfig.EnvFile (not read)"
+    },
+    {
+      "pointer": "compose:include/path",
+      "item": "compose:include",
+      "context": "include",
+      "doc": "Path to the Compose application or sub-project files to include.",
+      "note": "types.IncludeConfig.Path (not read)"
+    },
+    {
+      "pointer": "compose:include/project_directory",
+      "item": "compose:include",
+      "context": "include",
+      "type": "string",
+      "doc": "Path to resolve relative paths set in the Compose file",
+      "note": "types.IncludeConfig.ProjectDirectory (not read)"
+    }
+  ],
+  "lane": "K"
+}

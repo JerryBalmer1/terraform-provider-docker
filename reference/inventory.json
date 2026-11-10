@@ -22,11 +22,10 @@
         "exists": 7
       },
       "data_source": {
-        "exists": 22,
-        "partial": 1
+        "exists": 23
       },
       "action": {
-        "exists": 22
+        "exists": 23
       },
       "ephemeral_resource": {
         "exists": 3
@@ -60,8 +59,8 @@
     },
     "compose": {
       "resource": {
-        "partial": 4,
-        "exists": 7
+        "exists": 10,
+        "partial": 1
       },
       "data_source": {
         "exists": 8
@@ -87,11 +86,11 @@
     },
     "buildx": {
       "resource": {
-        "partial": 2
+        "exists": 1,
+        "partial": 1
       },
       "data_source": {
-        "exists": 5,
-        "partial": 1
+        "exists": 6
       },
       "action": {
         "partial": 1
@@ -640,6 +639,9 @@
     "P5": [
       "Pass 5 Lane 0: types registered before Pass 5 that the harvest did not list (ephemeral resources, list resources, functions, data.docker_registry_image_tags, data.docker_swarm_tokens, action.docker_system_prune) and the new docker_node resource (Q4). list_resource and function items have no outputs: the contract (V1/V2) covers the types that read or change Docker objects."
     ],
+    "P53-A": [
+      "Pass 5.3 Lane A: D2 docker_container_run (run once and remove); the kept one-shot container is docker_container with state = \"exited\" (D1)."
+    ],
     "outputs:A": [
       "Scope: every layer=engine item except engine:image, engine:image-data, engine:registry-image-data (Lane D). Field names come mechanically from swagger.yaml (API 1.56) via $ref/allOf resolution; every pointer was checked to resolve.",
       "fields depth: top-level fields plus one nested level for every object-valued field (MAXDEPTH=2). fields_complete is false wherever a second-level field is itself an object/list of objects/map of objects left to the mechanical rule.",
@@ -710,6 +712,9 @@
     ],
     "outputs:P5": [
       "Pass 5 Lane 0: outputs of the items in fragments/pass5.json."
+    ],
+    "outputs:P53A": [
+      "Pass 5.3 Lane A: outputs of docker_container_run (fragments/pass53-A.json)."
     ],
     "outputs:Z": [
       "Lane Z (merge/contract) owns no items. It carries cross-lane questions raised while merging lanes A-E; per-lane questions stay in each lane's file.",
@@ -11683,12 +11688,8 @@
       "outputs_note": "Today: name, id (`name@digest`, ~ image_digest_ref), sha256_digest (= digest). Missing: image_ref, image_digest_ref, platforms, manifests, inspect, inspect_json, content_sha256, versions. labels, created and config stay null on this side: DistributionInspect returns only the descriptor and the platform list, not the image config or per-platform digests.",
       "uses_cli": false,
       "outputs_lane": "D",
-      "status": "partial",
-      "status_note": "`insecure_skip_verify` is accepted but has no effect (the read goes through the daemon)",
+      "status": "exists",
       "registered": "data.docker_registry_image",
-      "stub_files": [
-        "pass51_partial_s.go"
-      ],
       "lane": "Z1"
     },
     {
@@ -13975,6 +13976,166 @@
       "status": "exists",
       "registered": "action.docker_container_restart",
       "lane": "Z1"
+    },
+    {
+      "id": "engine:container-run",
+      "layer": "engine",
+      "kind": "action",
+      "name": "docker_container_run",
+      "summary": "Run a one-shot container like `docker run --rm`: create, start, wait for the exit, capture exit code, stdout and stderr, then remove it (remove = true by default).",
+      "sources": [
+        {
+          "type": "swagger",
+          "operationId": "ContainerCreate",
+          "method": "POST",
+          "path": "/containers/create"
+        },
+        {
+          "type": "swagger",
+          "operationId": "ContainerStart",
+          "method": "POST",
+          "path": "/containers/{id}/start"
+        },
+        {
+          "type": "swagger",
+          "operationId": "ContainerWait",
+          "method": "POST",
+          "path": "/containers/{id}/wait"
+        },
+        {
+          "type": "swagger",
+          "operationId": "ContainerLogs",
+          "method": "GET",
+          "path": "/containers/{id}/logs"
+        },
+        {
+          "type": "swagger",
+          "operationId": "ContainerDelete",
+          "method": "DELETE",
+          "path": "/containers/{id}"
+        },
+        {
+          "type": "cli",
+          "command": "docker container run --rm",
+          "file": "upstream/docker-cli/docs/reference/commandline/container_run.md"
+        }
+      ],
+      "min_api": null,
+      "cli_only": false,
+      "decisions": [
+        "Q15",
+        "Q35"
+      ],
+      "outputs": [
+        {
+          "name": "container_id",
+          "tf_type": "string",
+          "category": "identity",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/ContainerCreateResponse/properties/Id"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "ID of the run's container (removed afterwards unless remove = false)."
+        },
+        {
+          "name": "result",
+          "tf_type": "object({...})",
+          "category": "result",
+          "source": {
+            "type": "derived",
+            "from": "ContainerWait, ContainerLogs",
+            "how": "StatusCode of POST /containers/{id}/wait, and the demultiplexed stdout / stderr of GET /containers/{id}/logs (the last `tail` lines)"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "The run's outcome (Q35): exit_code, stdout, stderr.",
+          "fields_complete": true,
+          "fields": [
+            {
+              "name": "exit_code",
+              "upstream": "StatusCode",
+              "tf_type": "number",
+              "pointer": "#/definitions/ContainerWaitResponse/properties/StatusCode"
+            },
+            {
+              "name": "stdout",
+              "upstream": "logs stream 1 (stdout)",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1logs/get",
+              "sensitive": true
+            },
+            {
+              "name": "stderr",
+              "upstream": "logs stream 2 (stderr)",
+              "tf_type": "string",
+              "pointer": "#/paths/~1containers~1{id}~1logs/get",
+              "sensitive": true
+            }
+          ]
+        },
+        {
+          "name": "engine_api_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/ApiVersion"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion)."
+        },
+        {
+          "name": "docker_server_version",
+          "tf_type": "string",
+          "category": "version",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/definitions/SystemVersion/properties/Version"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "description": "Docker Engine version from GET /version."
+        }
+      ],
+      "outputs_status": "missing",
+      "outputs_note": "Terraform actions have no result attributes; the result goes to progress messages and result_path.",
+      "uses_cli": false,
+      "inputs": [
+        {
+          "name": "result_path",
+          "tf_type": "string",
+          "default": null,
+          "upstream": null,
+          "source": {
+            "type": "derived",
+            "from": "result",
+            "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+          },
+          "description": "Optional local file the action writes its result object to (Q35)."
+        },
+        {
+          "name": "tail",
+          "tf_type": "number",
+          "default": 1000,
+          "upstream": "tail",
+          "source": {
+            "type": "swagger",
+            "file": "upstream/engine-api/api/swagger.yaml",
+            "pointer": "#/paths/~1containers~1{id}~1logs/get"
+          },
+          "description": "Lines kept from the end of the run's output in stdout / stderr (Engine `tail`); default 1000."
+        }
+      ],
+      "outputs_lane": "P53A",
+      "status": "exists",
+      "registered": "action.docker_container_run",
+      "lane": "P53-A"
     },
     {
       "id": "engine:container-start",
@@ -32409,12 +32570,8 @@
       "outputs_status": "missing",
       "uses_cli": false,
       "outputs_lane": "C",
-      "status": "partial",
-      "status_note": "swarm mode ignores `template_driver` (plan warning)",
+      "status": "exists",
       "registered": "docker_compose",
-      "stub_files": [
-        "pass51_partial_s.go"
-      ],
       "lane": "Z2"
     },
     {
@@ -33747,10 +33904,10 @@
       "uses_cli": false,
       "outputs_lane": "C",
       "status": "partial",
-      "status_note": "models are recorded in the `models` output but never pulled or run, and service `models` bindings are ignored",
+      "status_note": "models are recorded in the `models` output but never pulled or run (Engine API 1.56 has no model endpoint; compose runs the docker-model CLI plugin), and service `models` bindings are ignored",
       "registered": "docker_compose",
       "stub_files": [
-        "pass51_partial_s.go"
+        "pass53_partial_k.go"
       ],
       "lane": "Z2"
     },
@@ -36766,12 +36923,8 @@
       "outputs_status": "missing",
       "uses_cli": false,
       "outputs_lane": "C",
-      "status": "partial",
-      "status_note": "swarm mode ignores `driver` and `template_driver` (plan warning)",
+      "status": "exists",
       "registered": "docker_compose",
-      "stub_files": [
-        "pass51_partial_s.go"
-      ],
       "lane": "Z2"
     },
     {
@@ -38115,12 +38268,8 @@
       "outputs_note": "Today: `services` (name -> container IDs / service ID). Missing: project.services, container_names, image_refs, versions.",
       "uses_cli": false,
       "outputs_lane": "C",
-      "status": "partial",
-      "status_note": "local mode ignores lifecycle hooks (pre_start/post_start/pre_stop), blkio_config, credential_spec, use_api_socket and external_links (plan warning), and treats pull_policy daily/weekly/every_<n> as missing",
+      "status": "exists",
       "registered": "docker_compose",
-      "stub_files": [
-        "pass51_partial_s.go"
-      ],
       "lane": "Z2"
     },
     {
@@ -43945,10 +44094,10 @@
       ],
       "outputs_lane": "C",
       "status": "partial",
-      "status_note": "env files (`--with-env`), `--resolve-image-digests`, `--oci-version` and `--app` are not implemented; only the compose files are published",
+      "status_note": "`--app` is not implemented: the service images are not copied into the repository and no image index is pushed",
       "registered": "action.docker_compose_publish",
       "stub_files": [
-        "pass51_partial_s.go"
+        "pass53_partial_k.go"
       ],
       "lane": "Z2"
     },
@@ -51426,7 +51575,7 @@
       "uses_cli": false,
       "outputs_lane": "E",
       "status": "partial",
-      "status_note": "only the docker-container driver; the kubernetes and remote drivers and the buildx instance store (`docker buildx ls`, `--use`) are not implemented",
+      "status_note": "the kubernetes driver needs the Kubernetes API (k8s.io/client-go, not a dependency); the buildx instance store (`docker buildx ls`, `--use`) is buildx-private client files (github.com/docker/buildx/store, not a dependency), not BuildKit or Engine API",
       "registered": "docker_buildx_builder",
       "stub_files": [
         "buildx_builder_resource.go"
@@ -51798,12 +51947,8 @@
       "outputs_note": "Today docker_image exposes id, image_id, repo_digest (= image_digest_ref), context_digest. Missing: metadata_json/build_metadata, dockerfile text, digest, platforms, labels, build_ref, the version outputs. Image inspect outputs (inspect_json) belong to the engine image item, not here.",
       "uses_cli": false,
       "outputs_lane": "E",
-      "status": "partial",
-      "status_note": "build.platforms takes one platform; multi-platform builds (`docker buildx build --platform a,b`) are only available through docker_buildx_bake",
+      "status": "exists",
       "registered": "docker_image",
-      "stub_files": [
-        "image_build_buildkit.go"
-      ],
       "lane": "Z3"
     },
     {
@@ -53045,12 +53190,8 @@
       "outputs_note": "No data source today. Gap: attachment content (provenance/SBOM bodies, `docker buildx history inspect attachment`) is not an output; only attachment digests/types. Config holds more keys than ImageResolveMode in practice (fields_complete false).",
       "uses_cli": false,
       "outputs_lane": "E",
-      "status": "partial",
-      "status_note": "materials are always empty and attachment bodies are not read (digests and types only)",
+      "status": "exists",
       "registered": "data.docker_buildx_history",
-      "stub_files": [
-        "datasource_buildx_history.go"
-      ],
       "lane": "Z3"
     },
     {
@@ -54374,11 +54515,10 @@
       ],
       "outputs_lane": "E",
       "status": "partial",
-      "status_note": "target `policy` and `resources` are parsed but not applied to the build; `target:` named contexts and `target.<name>.<attr>` cross-target references are not supported",
+      "status_note": "target `policy` is parsed but not evaluated: Rego evaluation needs github.com/open-policy-agent/opa (buildx's policy package), not a dependency; buildkit v0.34.2 only has the policysession transport",
       "registered": "action.docker_buildx_bake",
       "stub_files": [
-        "action_buildx_bake.go",
-        "buildx_bake_parse.go"
+        "action_buildx_bake.go"
       ],
       "lane": "Z3"
     },

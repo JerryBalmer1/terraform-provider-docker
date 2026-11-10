@@ -1,0 +1,427 @@
+{
+  "about": "Pass 5.3 Lane 0: the fields go run ./tools/fieldcov found unmapped on items lane R owns. Close each one in reference/_gen/fieldmap.d/R.json (attr after implementing it under the upstream name, or skip / partial with a real reason), or by implementing it so auto-mapping finds it.",
+  "count": 42,
+  "gaps": [
+    {
+      "pointer": "engine:ContainerConfig/ArgsEscaped",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Command is already escaped (Windows only)"
+    },
+    {
+      "pointer": "engine:ContainerConfig/AttachStderr",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Whether to attach to `stderr`."
+    },
+    {
+      "pointer": "engine:ContainerConfig/AttachStdin",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Whether to attach to `stdin`."
+    },
+    {
+      "pointer": "engine:ContainerConfig/AttachStdout",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Whether to attach to `stdout`."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Cmd",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "array",
+      "doc": "Command to run specified as a string or an array of strings."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Domainname",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "string",
+      "doc": "The domain name to use for the container."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Entrypoint",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "array",
+      "doc": "The entry point for the container as a string or an array of strings."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Env",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "array",
+      "doc": "A list of environment variables to set inside the container in the form `[\"VAR=value\", ...]`."
+    },
+    {
+      "pointer": "engine:ContainerConfig/ExposedPorts",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "object",
+      "doc": "An object mapping ports to an empty object in the form: `{\"\u003cport\u003e/\u003ctcp|udp|sctp\u003e\": {}}`"
+    },
+    {
+      "pointer": "engine:ContainerConfig/Healthcheck/Interval",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "HealthConfig",
+      "type": "integer",
+      "doc": "The time to wait between checks in nanoseconds."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Healthcheck/Retries",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "HealthConfig",
+      "type": "integer",
+      "doc": "The number of consecutive failures needed to consider a container as unhealthy."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Healthcheck/StartInterval",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "HealthConfig",
+      "type": "integer",
+      "doc": "The time to wait between checks in nanoseconds during the start period."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Healthcheck/StartPeriod",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "HealthConfig",
+      "type": "integer",
+      "doc": "Start period for the container to initialize before starting health-retries countdown in nanoseconds."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Healthcheck/Test",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "HealthConfig",
+      "type": "array",
+      "doc": "The test to perform."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Healthcheck/Timeout",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "HealthConfig",
+      "type": "integer",
+      "doc": "The time to wait before considering the check to have hung."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Hostname",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "string",
+      "doc": "The hostname to use for the container, as a valid RFC 1123 hostname."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Image",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "string",
+      "doc": "The name (or reference) of the image to use when creating the container, or which was used when the container was created."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Labels",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "object",
+      "doc": "User-defined key/value metadata."
+    },
+    {
+      "pointer": "engine:ContainerConfig/NetworkDisabled",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Disable networking for the container."
+    },
+    {
+      "pointer": "engine:ContainerConfig/OnBuild",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "array",
+      "doc": "`ONBUILD` metadata that were defined in the image's `Dockerfile`."
+    },
+    {
+      "pointer": "engine:ContainerConfig/OpenStdin",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Open `stdin`"
+    },
+    {
+      "pointer": "engine:ContainerConfig/Shell",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "array",
+      "doc": "Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell."
+    },
+    {
+      "pointer": "engine:ContainerConfig/StdinOnce",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Close `stdin` after one attached client disconnects"
+    },
+    {
+      "pointer": "engine:ContainerConfig/StopSignal",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "string",
+      "doc": "Signal to stop a container as a string or unsigned integer."
+    },
+    {
+      "pointer": "engine:ContainerConfig/StopTimeout",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "integer",
+      "doc": "Timeout to stop a container in seconds."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Tty",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "boolean",
+      "doc": "Attach standard streams to a TTY, including `stdin` if it is not closed."
+    },
+    {
+      "pointer": "engine:ContainerConfig/User",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "string",
+      "doc": "Commands run as this user inside the container."
+    },
+    {
+      "pointer": "engine:ContainerConfig/Volumes",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "object",
+      "doc": "An object mapping mount point paths inside the container to empty objects."
+    },
+    {
+      "pointer": "engine:ContainerConfig/WorkingDir",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ContainerConfig",
+      "type": "string",
+      "doc": "The working directory for commands to run in."
+    },
+    {
+      "pointer": "engine:ImageCommit?container",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ImageCommit",
+      "type": "string",
+      "doc": "The ID or name of the container to commit"
+    },
+    {
+      "pointer": "engine:ImageCommit?repo",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ImageCommit",
+      "type": "string",
+      "doc": "Repository name for the created image"
+    },
+    {
+      "pointer": "engine:ImageCommit?tag",
+      "item": "engine:image-commit",
+      "ops": [
+        "ImageCommit"
+      ],
+      "context": "ImageCommit",
+      "type": "string",
+      "doc": "Tag name for the create image"
+    },
+    {
+      "pointer": "engine:ImageCreate?fromImage",
+      "item": "engine:image",
+      "ops": [
+        "ImageCreate"
+      ],
+      "context": "ImageCreate",
+      "type": "string",
+      "doc": "Name of the image to pull."
+    },
+    {
+      "pointer": "engine:ImageCreate?fromSrc",
+      "item": "engine:image",
+      "ops": [
+        "ImageCreate"
+      ],
+      "context": "ImageCreate",
+      "type": "string",
+      "doc": "Source to import."
+    },
+    {
+      "pointer": "engine:ImageCreate?repo",
+      "item": "engine:image",
+      "ops": [
+        "ImageCreate"
+      ],
+      "context": "ImageCreate",
+      "type": "string",
+      "doc": "Repository name given to an image when it is imported."
+    },
+    {
+      "pointer": "engine:ImageCreate#body",
+      "item": "engine:image",
+      "ops": [
+        "ImageCreate"
+      ],
+      "context": "ImageCreate",
+      "type": "string",
+      "doc": "Image content if the value `-` has been specified in fromSrc query parameter"
+    },
+    {
+      "pointer": "engine:ImageLoad#body",
+      "item": "engine:image-load",
+      "ops": [
+        "ImageLoad"
+      ],
+      "context": "ImageLoad",
+      "type": "string",
+      "doc": "Tar archive containing images"
+    },
+    {
+      "pointer": "engine:ImageLoad?quiet",
+      "item": "engine:image-load",
+      "ops": [
+        "ImageLoad"
+      ],
+      "context": "ImageLoad",
+      "type": "boolean",
+      "doc": "Suppress progress details during load."
+    },
+    {
+      "pointer": "engine:ImagePush?tag",
+      "item": "engine:registry-image",
+      "ops": [
+        "ImagePush"
+      ],
+      "context": "ImagePush",
+      "type": "string",
+      "doc": "Tag of the image to push."
+    },
+    {
+      "pointer": "engine:ImagePush?platform",
+      "item": "engine:registry-image",
+      "ops": [
+        "ImagePush"
+      ],
+      "context": "ImagePush",
+      "type": "string",
+      "doc": "JSON-encoded OCI platform to select the platform-variant to push."
+    },
+    {
+      "pointer": "engine:ImageTag?repo",
+      "item": "engine:tag",
+      "ops": [
+        "ImageTag"
+      ],
+      "context": "ImageTag",
+      "type": "string",
+      "doc": "The repository to tag in."
+    },
+    {
+      "pointer": "engine:ImageTag?tag",
+      "item": "engine:tag",
+      "ops": [
+        "ImageTag"
+      ],
+      "context": "ImageTag",
+      "type": "string",
+      "doc": "The name of the new tag."
+    }
+  ],
+  "lane": "R"
+}

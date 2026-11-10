@@ -186,13 +186,17 @@ This provider moves the state of every kreuzwerker/docker v4.6.0 managed resourc
 
 ## Requirements
 
-- **Terraform 1.8 or later.** Moving state between resource types or providers uses the MoveResourceState protocol call, added in Terraform 1.8. Terraform treats a ` + "`moved`" + ` block as a cross-provider move whenever the provider of the ` + "`to`" + ` resource differs from the provider recorded in state for the ` + "`from`" + ` resource, even when the type name (` + "`docker_container`" + `) is the same.
+- **Terraform 1.8 or later.** See the next section.
 - **kreuzwerker/docker v4.6.0 state.** The move reads the state at kreuzwerker's latest schema version for each type (the table below). Run ` + "`terraform apply -refresh-only`" + ` once with kreuzwerker/docker v4.6.0 before migrating so older states are upgraded; a move from an older schema version fails with that instruction.
 - **Different from and to addresses.** Terraform rejects a ` + "`moved`" + ` block whose ` + "`from`" + ` and ` + "`to`" + ` are the same address ("Redundant move statement"), so the resource label changes (` + "`docker_container.web`" + ` to ` + "`docker_container.web_moved`" + `). You can move it back to the old label later with an ordinary ` + "`moved`" + ` block (same provider, same type).
 
+## Terraform 1.8 or later
+
+Moving state between resource types or providers uses the MoveResourceState protocol call, added in Terraform 1.8. Terraform treats a ` + "`moved`" + ` block as a cross-provider move whenever the provider of the ` + "`to`" + ` resource differs from the provider recorded in state for the ` + "`from`" + ` resource, even when the type name (` + "`docker_container`" + `) is the same. Terraform reports the source provider as **` + "`registry.terraform.io/kreuzwerker/docker`" + `**, the address kreuzwerker/docker was installed from.
+
 ## How Terraform picks the providers
 
-A ` + "`moved`" + ` block has no provider argument. The source provider is the one recorded in state for the ` + "`from`" + ` address (registry.terraform.io/kreuzwerker/docker); the target is the provider of the ` + "`to`" + ` resource in configuration. Both type names start with ` + "`docker_`" + `, so both providers want the default local name ` + "`docker`" + `. Give this provider the local name ` + "`docker`" + ` and kreuzwerker another local name while the migration runs:
+A ` + "`moved`" + ` block has no provider argument. The source provider is the one recorded in state for the ` + "`from`" + ` address (` + "`registry.terraform.io/kreuzwerker/docker`" + `); the target is the provider of the ` + "`to`" + ` resource in configuration. Both type names start with ` + "`docker_`" + `, so both providers want the default local name ` + "`docker`" + `. Give this provider the local name ` + "`docker`" + ` and kreuzwerker another local name while the migration runs:
 
 ` + "```terraform" + `
 terraform {

@@ -45,14 +45,16 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-// kreuzwerkerProviderAddress is the source provider of every kwMove.
+// kreuzwerkerProviderAddress is the source provider of every kwMove, as
+// Terraform (>= 1.8) reports it in MoveResourceState.
 const kreuzwerkerProviderAddress = "registry.terraform.io/kreuzwerker/docker"
 
 // kwIsSource reports whether a MoveResourceState source provider address is
-// kreuzwerker/docker (any registry host, so mirrors work too).
+// kreuzwerker/docker. Only the fully qualified registry.terraform.io address
+// is accepted: Terraform records it in state, and provider installation
+// mirrors do not change it.
 func kwIsSource(addr string) bool {
-	a := strings.ToLower(strings.TrimSpace(addr))
-	return a == kreuzwerkerProviderAddress || a == "kreuzwerker/docker" || strings.HasSuffix(a, "/kreuzwerker/docker")
+	return strings.ToLower(strings.TrimSpace(addr)) == kreuzwerkerProviderAddress
 }
 
 // kwMove moves one kreuzwerker resource type into one of ours.
