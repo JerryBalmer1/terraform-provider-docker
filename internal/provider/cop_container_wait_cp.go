@@ -165,6 +165,7 @@ type copCpModel struct {
 	UID                       types.Int64  `tfsdk:"uid"`
 	GID                       types.Int64  `tfsdk:"gid"`
 	AllowOverwriteDirWithFile types.Bool   `tfsdk:"allow_overwrite_dir_with_file"`
+	CopyUIDGID                types.Bool   `tfsdk:"copy_uidgid"`
 	ResultPath                types.String `tfsdk:"result_path"`
 }
 
@@ -195,6 +196,9 @@ func (a *copCpAction) Schema(_ context.Context, _ action.SchemaRequest, resp *ac
 			"gid": schema.Int64Attribute{Optional: true, MarkdownDescription: "Numeric group of the copied files. Default 0 (root)."},
 			"allow_overwrite_dir_with_file": schema.BoolAttribute{Optional: true,
 				MarkdownDescription: "Let a file replace an existing directory of the same name (Engine `noOverwriteDirNonDir=false`). Default `false`."},
+			"copy_uidgid": schema.BoolAttribute{Optional: true,
+				MarkdownDescription: "Map the archive's `uid` / `gid` through the container's user-namespace mapping so the files belong to the same " +
+					"user inside the container as they would without remapping (Engine `copyUIDGID`, `docker cp --archive`). Default `false`."},
 			"result_path": actResultPathAttribute(),
 		},
 	}
@@ -270,6 +274,7 @@ func (a *copCpAction) Invoke(ctx context.Context, req action.InvokeRequest, resp
 		DestinationPath:           path.Dir(dst),
 		Content:                   bytes.NewReader(archive),
 		AllowOverwriteDirWithFile: actBool(m.AllowOverwriteDirWithFile, false),
+		CopyUIDGID:                actBool(m.CopyUIDGID, false),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("docker_container_cp failed", fmt.Sprintf("copying to %s in container %q: %v", dst, ref, err))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -15,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
@@ -25,6 +27,7 @@ var (
 	_ resource.ResourceWithConfigure   = (*networkResource)(nil)
 	_ resource.ResourceWithImportState = (*networkResource)(nil)
 	_ resource.ResourceWithIdentity    = (*networkResource)(nil)
+	_ resource.ResourceWithModifyPlan  = (*networkResource)(nil)
 )
 
 // NewNetworkResource is the docker_network constructor.
@@ -55,6 +58,10 @@ type networkResourceModel struct {
 	Options     types.Map                `tfsdk:"options"`
 	Labels      types.Map                `tfsdk:"labels"`
 	Scope       types.String             `tfsdk:"scope"`
+	ConfigOnly  types.Bool               `tfsdk:"config_only"`
+	ConfigFrom  types.String             `tfsdk:"config_from"`
+	EnableIPv4  types.Bool               `tfsdk:"enable_ipv4"`
+	Adopt       types.Bool               `tfsdk:"adopt"`
 	contractEngineNetwork
 }
 
@@ -126,9 +133,31 @@ func (r *networkResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				PlanModifiers:       rrMap,
 			},
 			"scope": schema.StringAttribute{
-				Computed: true, MarkdownDescription: "`local` or `swarm`, as reported by the daemon.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Optional: true, Computed: true,
+				Validators: []validator.String{stringvalidator.OneOf("local", "swarm", "global")},
+				MarkdownDescription: "Level at which the network exists (`Scope`): `local` (this host) or `swarm` (cluster-wide; `global` is " +
+					"also accepted by plugins). Unset lets the driver decide, and the daemon's value is reported. Changing this forces a new resource.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()},
 			},
+			"config_only": schema.BoolAttribute{
+				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
+				MarkdownDescription: "Create a config-only network (`ConfigOnly`): a placeholder holding IPAM and driver options for other networks' " +
+					"`config_from`; containers cannot attach to it. Changing this forces a new resource.",
+				PlanModifiers: rrBool,
+			},
+			"config_from": schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "Name of the config-only network that provides this network's configuration (`ConfigFrom.Network`), e.g. " +
+					"for a swarm-scoped `macvlan` network. Changing this forces a new resource.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"enable_ipv4": schema.BoolAttribute{
+				Optional: true,
+				MarkdownDescription: "Enable IPv4 on the network (`EnableIPv4`); `false` disables IPv4 IPAM (only for networks that support it). " +
+					"Unset uses the daemon default (enabled), which is not reported. Changing this forces a new resource." + apiSince("1.48"),
+				PlanModifiers: rrBool,
+			},
+			"adopt": ownerAdoptAttribute(),
 		}, "engine:network"),
 		Blocks: map[string]schema.Block{
 			"ipam_config": schema.ListNestedBlock{
@@ -187,6 +216,24 @@ func networkIPAMRequiresReplace(ctx context.Context, req planmodifier.ListReques
 
 func (r *networkResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	r.pd = providerDataFrom(req.ProviderData, &resp.Diagnostics)
+}
+
+// ModifyPlan checks Engine API minimums (enable_ipv4) and the owner label.
+func (r *networkResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if !req.Config.Raw.IsNull() {
+		r.pd.gateAPISince(ctx, "docker_network", req.Config, &resp.Diagnostics)
+	}
+	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() {
+		return
+	}
+	var name types.String
+	var adopt types.Bool
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("name"), &name)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("adopt"), &adopt)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(ownerPlanCheck(ctx, r.pd, req.Private, "network", name.ValueString(), adopt)...)
 }
 
 // networkExpandIPAM builds the IPAM config from the plan.
@@ -281,8 +328,14 @@ func networkFromInspect(n network.Inspect, prior networkResourceModel) networkRe
 		opts = containerSubtractDefaults(n.Options, nil, containerMapKeys(prior.Options), true)
 	}
 	out.Options = containerMapValue(prior.Options, opts)
-	out.Labels = containerMapValue(prior.Labels, userLabels(n.Labels, false))
+	out.Labels = containerMapValue(prior.Labels, ownerStrip(userLabels(n.Labels, false)))
 	out.Scope = types.StringValue(n.Scope)
+	out.ConfigOnly = types.BoolValue(n.ConfigOnly)
+	out.ConfigFrom = containerStringRead(prior.ConfigFrom, n.ConfigFrom.Network, "")
+	out.EnableIPv4 = types.BoolNull()
+	if containerKnown(prior.EnableIPv4) {
+		out.EnableIPv4 = types.BoolValue(n.EnableIPv4)
+	}
 	return out
 }
 
@@ -311,10 +364,26 @@ func (r *networkResource) Create(ctx context.Context, req resource.CreateRequest
 		EnableIPv6: &ipv6,
 		IPAM:       ipam,
 		Options:    stringMapFrom(ctx, plan.Options, &resp.Diagnostics),
-		Labels:     mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue}),
+		Labels:     r.pd.ownerInject(mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue})),
+		ConfigOnly: plan.ConfigOnly.ValueBool(),
+		ConfigFrom: plan.ConfigFrom.ValueString(),
+	}
+	if sc, ok := knownString(plan.Scope); ok {
+		opts.Scope = sc
+	}
+	if v, ok := knownBool(plan.EnableIPv4); ok {
+		opts.EnableIPv4 = &v
 	}
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if r.pd.Owner != "" {
+		if ex, err := r.pd.Client.NetworkInspect(ctx, plan.Name.ValueString(), client.NetworkInspectOptions{}); err == nil && ex.Network.Name == plan.Name.ValueString() {
+			if err := ownerCreateCheck(r.pd, "network", plan.Name.ValueString(), ex.Network.Labels); err != nil {
+				resp.Diagnostics.AddAttributeError(path.Root("name"), "Network owned by another configuration", err.Error())
+				return
+			}
+		}
 	}
 	created, err := r.pd.Client.NetworkCreate(ctx, plan.Name.ValueString(), opts)
 	if err != nil {
@@ -353,6 +422,9 @@ func (r *networkResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 	state := networkFromInspect(n, prior)
+	if !ctrNilPrivate(resp.Private) {
+		resp.Diagnostics.Append(ownerRecord(ctx, resp.Private, n.Labels)...)
+	}
 	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(nRes.Raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)

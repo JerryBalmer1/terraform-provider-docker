@@ -21,6 +21,7 @@ var (
 	_ resource.ResourceWithConfigure   = (*volumeResource)(nil)
 	_ resource.ResourceWithImportState = (*volumeResource)(nil)
 	_ resource.ResourceWithIdentity    = (*volumeResource)(nil)
+	_ resource.ResourceWithModifyPlan  = (*volumeResource)(nil)
 )
 
 // NewVolumeResource is the docker_volume constructor.
@@ -40,6 +41,7 @@ type volumeResourceModel struct {
 	// ClusterVolumeSpec is the Swarm cluster (CSI) volume spec; ClusterVolumeID its swarm object ID.
 	ClusterVolumeSpec types.Object `tfsdk:"cluster_volume_spec"`
 	ClusterVolumeID   types.String `tfsdk:"cluster_volume_id"`
+	Adopt             types.Bool   `tfsdk:"adopt"`
 	contractEngineVolume
 }
 
@@ -79,6 +81,7 @@ func (r *volumeResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers:       []planmodifier.Map{mapplanmodifier.RequiresReplace()},
 			},
 			"cluster_volume_spec": objClusterVolumeSpecAttribute(),
+			"adopt":               ownerAdoptAttribute(),
 			"cluster_volume_id": schema.StringAttribute{
 				Computed: true, MarkdownDescription: "Swarm object ID of a cluster volume (`ClusterVolume.ID`); null for a local volume.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -95,6 +98,21 @@ func (r *volumeResource) Configure(_ context.Context, req resource.ConfigureRequ
 	r.pd = providerDataFrom(req.ProviderData, &resp.Diagnostics)
 }
 
+// ModifyPlan checks the owner label of an existing volume.
+func (r *volumeResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || req.State.Raw.IsNull() {
+		return
+	}
+	var name types.String
+	var adopt types.Bool
+	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("name"), &name)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("adopt"), &adopt)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(ownerPlanCheck(ctx, r.pd, req.Private, "volume", name.ValueString(), adopt)...)
+}
+
 // volumeFromInspect maps VolumeInspect output onto prior.
 func volumeFromInspect(v volume.Volume, prior volumeResourceModel) volumeResourceModel {
 	out := prior
@@ -102,7 +120,7 @@ func volumeFromInspect(v volume.Volume, prior volumeResourceModel) volumeResourc
 	out.Name = types.StringValue(v.Name)
 	out.Driver = types.StringValue(v.Driver)
 	out.DriverOpts = containerMapValue(prior.DriverOpts, v.Options)
-	out.Labels = containerMapValue(prior.Labels, userLabels(v.Labels, false))
+	out.Labels = containerMapValue(prior.Labels, ownerStrip(userLabels(v.Labels, false)))
 	out.Mountpoint = types.StringValue(v.Mountpoint)
 	out.ClusterVolumeSpec, out.ClusterVolumeID = objClusterVolumeState(prior.ClusterVolumeSpec, v.ClusterVolume)
 	return out
@@ -123,7 +141,7 @@ func (r *volumeResource) Create(ctx context.Context, req resource.CreateRequest,
 		Name:       name,
 		Driver:     plan.Driver.ValueString(),
 		DriverOpts: stringMapFrom(ctx, plan.DriverOpts, &resp.Diagnostics),
-		Labels:     mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue}),
+		Labels:     r.pd.ownerInject(mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue})),
 
 		ClusterVolumeSpec: objExpandClusterVolumeSpec(ctx, plan.ClusterVolumeSpec, &resp.Diagnostics),
 	}
@@ -144,6 +162,14 @@ func (r *volumeResource) Create(ctx context.Context, req resource.CreateRequest,
 		if err != nil {
 			resp.Diagnostics.AddError("Cannot inspect volume", err.Error())
 			return
+		}
+		if exists && r.pd.Owner != "" {
+			if ex, err := r.pd.Client.VolumeInspect(ctx, name, client.VolumeInspectOptions{}); err == nil {
+				if err := ownerCreateCheck(r.pd, "volume", name, ex.Volume.Labels); err != nil {
+					resp.Diagnostics.AddAttributeError(path.Root("name"), "Volume owned by another configuration", err.Error())
+					return
+				}
+			}
 		}
 		if exists {
 			resp.Diagnostics.AddAttributeError(path.Root("name"), "Volume already exists",
@@ -188,6 +214,9 @@ func (r *volumeResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 	state := volumeFromInspect(v, prior)
+	if !ctrNilPrivate(resp.Private) {
+		resp.Diagnostics.Append(ownerRecord(ctx, resp.Private, v.Labels)...)
+	}
 	resp.Diagnostics.Append(state.contractFill(ctx, r.pd, contractFillInput{Raw: map[string][]byte{"inspect_json": rEngineBody(vRes.Raw)}})...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, state.ID.ValueString())...)

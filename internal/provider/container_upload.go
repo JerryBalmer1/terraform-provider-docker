@@ -6,7 +6,7 @@ package provider
 // from a single-file tar built in memory, after ContainerCreate and before
 // ContainerStart. The daemon cannot report them back, so Read keeps the
 // prior value. A changed upload replaces the container, except when the
-// container is stopped and must_run is false: then Update copies the files
+// container is stopped and state is "created": then Update copies the files
 // into the stopped container in place.
 //
 // selinux_relabel cannot be expressed through HostConfig.Mounts (mount.Mount
@@ -62,7 +62,7 @@ func containerUploadBlockSchema() schema.ListNestedBlock {
 		MarkdownDescription: "Files written into the container with `PutContainerArchive` after create and before start (like `docker cp`). " +
 			"Each block sets exactly one of `content`, `content_base64` or `source`. The parent directory of `path` must already exist " +
 			"in the image. Files are not read back from the daemon. Changing a file forces a new container, unless the container " +
-			"is stopped (`must_run = false` and not running), in which case the files are copied in place. " +
+			"is stopped and `state = \"created\"`, in which case the files are copied in place. " +
 			"To copy files into a running container at any time use the `docker_container_cp` action.",
 		PlanModifiers: []planmodifier.List{containerUploadReplaceIf()},
 		NestedObject: schema.NestedBlockObject{Attributes: map[string]schema.Attribute{
@@ -110,21 +110,25 @@ func containerUploadBlockSchema() schema.ListNestedBlock {
 // containerUploadReplaceIf forces replacement on an upload change unless the
 // prior container is stopped and the plan does not require it to run.
 func containerUploadReplaceIf() planmodifier.List {
-	desc := "Changing files forces a new container unless the container is stopped and must_run is false."
+	desc := "Changing files forces a new container unless the container is stopped and state is \"created\"."
 	return listplanmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
-		var mustRun, running types.Bool
-		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, fwpath.Root("must_run"), &mustRun)...)
+		var state types.String
+		var running types.Bool
+		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, fwpath.Root("state"), &state)...)
 		resp.Diagnostics.Append(req.State.GetAttribute(ctx, fwpath.Root("running"), &running)...)
-		resp.RequiresReplace = containerUploadNeedsReplace(mustRun, running)
+		resp.RequiresReplace = containerUploadNeedsReplace(state, running)
 	}, desc, desc)
 }
 
-// containerUploadNeedsReplace is the decision behind containerUploadReplaceIf.
-func containerUploadNeedsReplace(mustRun, running types.Bool) bool {
-	if mustRun.IsUnknown() || mustRun.IsNull() || mustRun.ValueBool() {
-		return true // null must_run means the default, true
+// containerUploadNeedsReplace is the decision behind containerUploadReplaceIf:
+// only a stopped container with state = "created" takes files in place (a
+// running one would not see them before start, an exited run is not run
+// again).
+func containerUploadNeedsReplace(state types.String, running types.Bool) bool {
+	if state.ValueString() != ctrStateCreated {
+		return true
 	}
-	return running.IsUnknown() || running.ValueBool()
+	return running.IsUnknown() || running.IsNull() || running.ValueBool()
 }
 
 var (

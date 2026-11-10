@@ -169,7 +169,7 @@ action "docker_container_unpause" "u" {
   }
 }`, "action.docker_container_stop.s, action.docker_container_start.s, action.docker_container_restart.r, action.docker_container_kill.k"),
 				Check: copAccState(t, name+"-2", func(running, _ bool) bool { return !running }, "stopped (killed)"),
-				// docker_container.c has must_run = true (the default): after
+				// docker_container.c has state = "running" (the default): after
 				// the out-of-band kill, the refresh must plan it to be started
 				// again in place.
 				ExpectNonEmptyPlan: true,

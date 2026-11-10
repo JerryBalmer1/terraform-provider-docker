@@ -18,5 +18,8 @@ action "docker_container_cp" "index" {
     path         = "/usr/share/nginx/html/index.html"
     content      = "<h1>deployed by Terraform</h1>"
     mode         = "0644"
+    uid          = 101 # nginx
+    gid          = 101
+    copy_uidgid  = true # map uid / gid through a user-namespace remapping (docker cp -a)
   }
 }

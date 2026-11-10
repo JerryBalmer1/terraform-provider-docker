@@ -1,0 +1,141 @@
+{
+  "about": "Pass 5.3 Lane A manual field-coverage entries (single-host engine objects). Skips cite the swagger / docs line; attr entries name a provider attribute fieldcov cannot see (client option names differ from the query/body names, or the body is assembled by the client).",
+  "fields": {
+    "engine:ContainerCreate/ArgsEscaped": {
+      "skip": "Windows-only flag (swagger.yaml:1420 'Command is already escaped (Windows only)') that the image builder records for shell-form Windows commands; docker run has no flag for it and the provider passes command / entrypoint as exec-form arrays, so there is nothing escaped"
+    },
+    "engine:ContainerCreate/AttachStderr": {
+      "skip": "the provider never attaches to a container's streams (no ContainerAttach call; swagger.yaml:1361-1400): a run's output is read afterwards with ContainerLogs (docker_container state = \"exited\", docker_container_run), so the attach flags would have no effect"
+    },
+    "engine:ContainerCreate/AttachStdin": {
+      "skip": "the provider never attaches to a container's streams (no ContainerAttach call; swagger.yaml:1361-1400): a run's output is read afterwards with ContainerLogs (docker_container state = \"exited\", docker_container_run), so the attach flags would have no effect"
+    },
+    "engine:ContainerCreate/AttachStdout": {
+      "skip": "the provider never attaches to a container's streams (no ContainerAttach call; swagger.yaml:1361-1400): a run's output is read afterwards with ContainerLogs (docker_container state = \"exited\", docker_container_run), so the attach flags would have no effect"
+    },
+    "engine:ContainerCreate/HostConfig/ContainerIDFile": {
+      "skip": "client-side option: the docker CLI itself creates the --cidfile and writes the ID (docker-cli docs container_run.md:175-187, 'Docker closes this file when docker run exits'); the daemon only stores the path (swagger.yaml:1028); the container ID is the resource's id output"
+    },
+    "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/DNSNames": {
+      "skip": "daemon-computed output (swagger.yaml:3451-3463; api/docs/CHANGELOG.md:421-423, v1.44): built from the container name, aliases, short ID and hostname; set it through networks.aliases, name and hostname"
+    },
+    "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/EndpointID": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/Gateway": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/GlobalIPv6Address": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/GlobalIPv6PrefixLen": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/IPAddress": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/IPPrefixLen": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/IPv6Gateway": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/NetworkID": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:ContainerCreate/OnBuild": {
+      "skip": "image build metadata (swagger.yaml:1461 'ONBUILD metadata that were defined in the image's Dockerfile'): it only affects a later build FROM a committed image, not the container, and docker run has no flag for it; commit-time config is docker_image_commit's (Lane R)"
+    },
+    "engine:ContainerCreate/StdinOnce": {
+      "skip": "closes stdin when an attached client disconnects (swagger.yaml:1397); the provider never attaches to a container's streams (no ContainerAttach call; swagger.yaml:1361-1400): a run's output is read afterwards with ContainerLogs (docker_container state = \"exited\", docker_container_run), so the attach flags would have no effect"
+    },
+    "engine:ContainerExec/AttachStdin": {
+      "skip": "docker_exec and docker_exec_output have no stdin input: the command never receives data on stdin, and an attached stdin with nothing to write would leave commands that read it blocked"
+    },
+    "engine:ContainerExec/DetachKeys": {
+      "skip": "detach key sequence only matters to an interactive client attached to a TTY that types it (swagger.yaml:8970-8976, 11244-11249); the provider never attaches interactively"
+    },
+    "engine:ContainerRestart?t": {
+      "item": "engine:container-restart",
+      "attr": "timeout"
+    },
+    "engine:ContainerStart?detachKeys": {
+      "skip": "detach key sequence only matters to an interactive client attached to a TTY that types it (swagger.yaml:8970-8976, 11244-11249); the provider never attaches interactively"
+    },
+    "engine:ContainerStop?t": {
+      "item": "engine:container-stop",
+      "attr": "timeout"
+    },
+    "engine:NetworkConnectRequest/EndpointConfig/DNSNames": {
+      "skip": "daemon-computed output (swagger.yaml:3451-3463; api/docs/CHANGELOG.md:421-423, v1.44): built from the container name, aliases, short ID and hostname; set it through networks.aliases, name and hostname"
+    },
+    "engine:NetworkConnectRequest/EndpointConfig/EndpointID": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:NetworkConnectRequest/EndpointConfig/Gateway": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:NetworkConnectRequest/EndpointConfig/GlobalIPv6Address": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:NetworkConnectRequest/EndpointConfig/GlobalIPv6PrefixLen": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:NetworkConnectRequest/EndpointConfig/IPAddress": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:NetworkConnectRequest/EndpointConfig/IPPrefixLen": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:NetworkConnectRequest/EndpointConfig/IPv6Gateway": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:NetworkConnectRequest/EndpointConfig/NetworkID": {
+      "skip": "daemon-assigned operational data: swagger.yaml:3397-3450 describes the endpoint the daemon allocated (network ID, endpoint ID, gateway, assigned address and prefix); a static address is requested through IPAMConfig (networks.ipv4_address / ipv6_address), and these values are reported as computed attributes of each docker_container networks entry"
+    },
+    "engine:NetworkCreate/ConfigFrom/Network": {
+      "item": "engine:network",
+      "attr": "config_from"
+    },
+    "engine:PluginCreate#body": {
+      "item": "engine:plugin-create",
+      "attr": "context_dir"
+    },
+    "engine:PluginPull#body": {
+      "item": "engine:plugin",
+      "attr": "grant_permissions"
+    },
+    "engine:PluginPull?remote": {
+      "item": "engine:plugin",
+      "attr": "name"
+    },
+    "engine:PluginSet#body": {
+      "item": "engine:plugin",
+      "attr": "env"
+    },
+    "engine:PluginUpgrade#body": {
+      "item": "engine:plugin",
+      "attr": "grant_permissions"
+    },
+    "engine:PluginUpgrade?remote": {
+      "item": "engine:plugin",
+      "attr": "name"
+    },
+    "engine:PutContainerArchive#body": {
+      "item": "engine:container",
+      "attr": "files"
+    },
+    "engine:PutContainerArchive?noOverwriteDirNonDir": {
+      "item": "engine:container-upload",
+      "attr": "allow_overwrite_dir_with_file"
+    },
+    "engine:VolumeCreateRequest/ClusterVolumeSpec/AccessMode/Availability": {
+      "item": "engine:volume",
+      "attr": "cluster_volume_spec.availability"
+    },
+    "engine:VolumeUpdate/Spec/AccessMode/Availability": {
+      "item": "engine:volume",
+      "attr": "cluster_volume_spec.availability"
+    }
+  }
+}

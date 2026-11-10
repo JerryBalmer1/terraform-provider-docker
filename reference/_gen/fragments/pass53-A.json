@@ -1,0 +1,59 @@
+{
+ "lane": "P53-A",
+ "notes": [
+  "Pass 5.3 Lane A: D2 docker_container_run (run once and remove); the kept one-shot container is docker_container with state = \"exited\" (D1)."
+ ],
+ "naming_questions": [],
+ "items": [
+  {
+   "id": "engine:container-run",
+   "layer": "engine",
+   "kind": "action",
+   "name": "docker_container_run",
+   "summary": "Run a one-shot container like `docker run --rm`: create, start, wait for the exit, capture exit code, stdout and stderr, then remove it (remove = true by default).",
+   "sources": [
+    {
+     "type": "swagger",
+     "operationId": "ContainerCreate",
+     "method": "POST",
+     "path": "/containers/create"
+    },
+    {
+     "type": "swagger",
+     "operationId": "ContainerStart",
+     "method": "POST",
+     "path": "/containers/{id}/start"
+    },
+    {
+     "type": "swagger",
+     "operationId": "ContainerWait",
+     "method": "POST",
+     "path": "/containers/{id}/wait"
+    },
+    {
+     "type": "swagger",
+     "operationId": "ContainerLogs",
+     "method": "GET",
+     "path": "/containers/{id}/logs"
+    },
+    {
+     "type": "swagger",
+     "operationId": "ContainerDelete",
+     "method": "DELETE",
+     "path": "/containers/{id}"
+    },
+    {
+     "type": "cli",
+     "command": "docker container run --rm",
+     "file": "upstream/docker-cli/docs/reference/commandline/container_run.md"
+    }
+   ],
+   "min_api": null,
+   "cli_only": false,
+   "decisions": [
+    "Q15",
+    "Q35"
+   ]
+  }
+ ]
+}

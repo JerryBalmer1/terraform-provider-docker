@@ -26,7 +26,7 @@ func containerP2Model() containerResourceModel {
 	v6 := types.ObjectValueMust(ctrNetworkAttrTypes, map[string]attr.Value{
 		"aliases": types.SetNull(types.StringType), "ipv4_address": types.StringNull(), "ipv6_address": str("fd00::10"),
 		"link_local_ips": stringSetValue([]string{"169.254.0.5"}, false), "mac_address": str("02:42:ac:11:00:02"),
-		"driver_opts": stringMapValue(map[string]string{"com.example.opt": "1"}, false), "gw_priority": i64(10),
+		"driver_opts": stringMapValue(map[string]string{"com.example.opt": "1"}, false), "gw_priority": i64(10), "links": types.ListNull(types.StringType),
 		"network_id": str("n-v6net"), "endpoint_id": types.StringNull(), "gateway": types.StringNull(), "ip_address": types.StringNull(),
 		"ip_prefix_len": i64(0), "ipv6_gateway": types.StringNull(), "global_ipv6_address": types.StringNull(), "global_ipv6_prefix_len": i64(0),
 	})
@@ -37,7 +37,7 @@ func containerP2Model() containerResourceModel {
 		User: types.StringNull(), WorkingDir: types.StringNull(),
 		Logging: &ctrLoggingModel{Driver: str("json-file"), Options: stringMapValue(map[string]string{"max-size": "10m"}, false)},
 		Memory:  types.Int64Null(), MemorySwap: i64(0), CPUShares: types.Int64Null(), NanoCPUs: types.Int64Null(),
-		MustRun: types.BoolValue(true), Wait: types.BoolValue(false), WaitTimeout: str(containerDefaultWaitTimeout), Running: types.BoolValue(true),
+		Wait: types.BoolValue(false), WaitTimeout: str(containerDefaultWaitTimeout), Running: types.BoolValue(true),
 		ExitCode: i64(0),
 		Ports:    []containerPortModel{}, Ulimits: []containerUlimitModel{},
 		Mounts: []containerMountModel{
@@ -45,7 +45,7 @@ func containerP2Model() containerResourceModel {
 			{Type: str("bind"), Source: str("/srv/b"), Target: str("/b"), ReadOnly: types.BoolValue(true), SelinuxRelabel: str("Z")},
 			{Type: str("volume"), Source: str("vol"), Target: str("/v"), ReadOnly: types.BoolValue(false), SelinuxRelabel: str("z")},
 			{Type: str("tmpfs"), Source: types.StringNull(), Target: str("/t"), ReadOnly: types.BoolValue(false), SelinuxRelabel: types.StringNull(),
-				TmpfsOptions: &ctrTmpfsOptionsModel{SizeBytes: i64(1 << 20), Mode: str("1777")}},
+				TmpfsOptions: &ctrTmpfsOptionsModel{SizeBytes: i64(1 << 20), Mode: str("1777"), Options: types.ListNull(ctrTmpfsOptionsType)}},
 		},
 		Files: []containerUploadModel{{
 			Path: str("/etc/app.conf"), Content: str("x=1"), ContentBase64: types.StringNull(), Source: types.StringNull(),
@@ -101,6 +101,7 @@ func containerP2Model() containerResourceModel {
 		UsernsMode:           str("host"),
 		VolumesFrom:          stringListValue([]string{"data:ro"}, false),
 	}
+	m.ctrP53Model = ctrP53Null()
 	m.contractSetNull()
 	return m
 }
@@ -169,7 +170,13 @@ func TestContainerP2ExpandFlattenRoundTrip(t *testing.T) {
 	got.ImageID = m.ImageID
 	if !reflect.DeepEqual(got, m) {
 		gv, wv := reflect.ValueOf(got), reflect.ValueOf(m)
+		if !reflect.DeepEqual(got.ctrP53Model, m.ctrP53Model) {
+			t.Errorf("Pass 5.3 fields: got %#v want %#v", got.ctrP53Model, m.ctrP53Model)
+		}
 		for i := 0; i < gv.NumField(); i++ {
+			if !gv.Field(i).CanInterface() {
+				continue
+			}
 			if !reflect.DeepEqual(gv.Field(i).Interface(), wv.Field(i).Interface()) {
 				t.Errorf("field %s: got %#v want %#v", gv.Type().Field(i).Name, gv.Field(i).Interface(), wv.Field(i).Interface())
 			}

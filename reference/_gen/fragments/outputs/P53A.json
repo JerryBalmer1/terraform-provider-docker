@@ -1,0 +1,117 @@
+{
+ "lane": "P53A",
+ "notes": [
+  "Pass 5.3 Lane A: outputs of docker_container_run (fragments/pass53-A.json)."
+ ],
+ "naming_questions": [],
+ "items": {
+  "engine:container-run": {
+   "outputs": [
+    {
+     "name": "container_id",
+     "tf_type": "string",
+     "category": "identity",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/definitions/ContainerCreateResponse/properties/Id"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "ID of the run's container (removed afterwards unless remove = false)."
+    },
+    {
+     "name": "result",
+     "tf_type": "object({...})",
+     "category": "result",
+     "source": {
+      "type": "derived",
+      "from": "ContainerWait, ContainerLogs",
+      "how": "StatusCode of POST /containers/{id}/wait, and the demultiplexed stdout / stderr of GET /containers/{id}/logs (the last `tail` lines)"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "The run's outcome (Q35): exit_code, stdout, stderr.",
+     "fields_complete": true,
+     "fields": [
+      {
+       "name": "exit_code",
+       "upstream": "StatusCode",
+       "tf_type": "number",
+       "pointer": "#/definitions/ContainerWaitResponse/properties/StatusCode"
+      },
+      {
+       "name": "stdout",
+       "upstream": "logs stream 1 (stdout)",
+       "tf_type": "string",
+       "pointer": "#/paths/~1containers~1{id}~1logs/get",
+       "sensitive": true
+      },
+      {
+       "name": "stderr",
+       "upstream": "logs stream 2 (stderr)",
+       "tf_type": "string",
+       "pointer": "#/paths/~1containers~1{id}~1logs/get",
+       "sensitive": true
+      }
+     ]
+    },
+    {
+     "name": "engine_api_version",
+     "tf_type": "string",
+     "category": "version",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/definitions/SystemVersion/properties/ApiVersion"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion)."
+    },
+    {
+     "name": "docker_server_version",
+     "tf_type": "string",
+     "category": "version",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/definitions/SystemVersion/properties/Version"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "description": "Docker Engine version from GET /version."
+    }
+   ],
+   "outputs_status": "missing",
+   "outputs_note": "Terraform actions have no result attributes; the result goes to progress messages and result_path.",
+   "uses_cli": false,
+   "inputs": [
+    {
+     "name": "result_path",
+     "tf_type": "string",
+     "default": null,
+     "upstream": null,
+     "source": {
+      "type": "derived",
+      "from": "result",
+      "how": "Q35: after a successful run, the action's result object as JSON (UTF-8, sorted keys, trailing newline)"
+     },
+     "description": "Optional local file the action writes its result object to (Q35)."
+    },
+    {
+     "name": "tail",
+     "tf_type": "number",
+     "default": 1000,
+     "upstream": "tail",
+     "source": {
+      "type": "swagger",
+      "file": "upstream/engine-api/api/swagger.yaml",
+      "pointer": "#/paths/~1containers~1{id}~1logs/get"
+     },
+     "description": "Lines kept from the end of the run's output in stdout / stderr (Engine `tail`); default 1000."
+    }
+   ]
+  }
+ }
+}

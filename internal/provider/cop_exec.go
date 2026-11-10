@@ -63,13 +63,13 @@ func copExecRun(ctx context.Context, c *client.Client, s copExecSpec) (copExecOu
 	}
 	out.ExecID = created.ID
 	if s.Detach {
-		if _, err := c.ExecStart(ctx, created.ID, client.ExecStartOptions{Detach: true, TTY: opts.TTY}); err != nil {
+		if _, err := c.ExecStart(ctx, created.ID, client.ExecStartOptions{Detach: true, TTY: opts.TTY, ConsoleSize: opts.ConsoleSize}); err != nil {
 			return out, fmt.Errorf("starting exec %s: %w", created.ID, err)
 		}
 		out.Inspect, out.ExitCode, out.Running = copExecInspect(ctx, c, created.ID, opts)
 		return out, nil
 	}
-	hj, err := c.ExecAttach(ctx, created.ID, client.ExecAttachOptions{TTY: opts.TTY})
+	hj, err := c.ExecAttach(ctx, created.ID, client.ExecAttachOptions{TTY: opts.TTY, ConsoleSize: opts.ConsoleSize})
 	if err != nil {
 		return out, fmt.Errorf("starting exec %s: %w", created.ID, err)
 	}

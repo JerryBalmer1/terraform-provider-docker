@@ -179,7 +179,11 @@ func containerHostnameRead(prior types.String, got, containerID string) types.St
 	return types.StringValue(got)
 }
 
-// containerStopTimeoutRead maps Config.StopTimeout to state.
+// containerStopTimeoutRead maps Config.StopTimeout to state. stop_timeout is
+// Optional + Computed (Pass 5.3 Lane Z): some daemons (Docker Desktop 29.5)
+// fill Config.StopTimeout themselves when the create request left it unset,
+// and that value is reported rather than hidden, so an import reads the real
+// value and an unset stop_timeout never yields an inconsistent result.
 func containerStopTimeoutRead(got *int) types.Int64 {
 	if got == nil {
 		return types.Int64Null()

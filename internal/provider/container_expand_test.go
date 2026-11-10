@@ -268,7 +268,7 @@ func TestContainerFromInspectSubtractsImageDefaults(t *testing.T) {
 		Labels: types.MapNull(types.StringType), Command: types.ListNull(types.StringType), Entrypoint: types.ListNull(types.StringType),
 		Memory: types.Int64Null(), CPUShares: types.Int64Null(), NanoCPUs: types.Int64Null(), MaximumRetryCount: types.Int64Null(),
 		User: types.StringNull(), WorkingDir: types.StringNull(), Networks: types.MapNull(types.ObjectType{AttrTypes: ctrNetworkAttrTypes}),
-		MustRun: types.BoolNull(), Wait: types.BoolNull(), WaitTimeout: types.StringNull(), Running: types.BoolNull(),
+		Wait: types.BoolNull(), WaitTimeout: types.StringNull(), Running: types.BoolNull(),
 	}
 	got := containerFromInspect(insp, img, prior)
 	if got.ID.ValueString() != "abc" || got.Name.ValueString() != "web" || got.Image.ValueString() != "nginx:1.27" {
@@ -283,8 +283,8 @@ func TestContainerFromInspectSubtractsImageDefaults(t *testing.T) {
 	if !got.Command.IsNull() || !got.Entrypoint.IsNull() || !got.WorkingDir.IsNull() || got.Healthcheck != nil {
 		t.Errorf("image defaults leaked: cmd=%v ep=%v wd=%v hc=%+v", got.Command, got.Entrypoint, got.WorkingDir, got.Healthcheck)
 	}
-	if got.Restart.ValueString() != "unless-stopped" || got.Running.ValueBool() || !got.MustRun.ValueBool() || got.WaitTimeout.ValueString() != containerDefaultWaitTimeout {
-		t.Errorf("restart/running/defaults: %v %v %v %v", got.Restart, got.Running, got.MustRun, got.WaitTimeout)
+	if got.Restart.ValueString() != "unless-stopped" || got.Running.ValueBool() || got.State.ValueString() != ctrStateRunning || got.WaitTimeout.ValueString() != containerDefaultWaitTimeout {
+		t.Errorf("restart/running/defaults: %v %v %v %v", got.Restart, got.Running, got.State, got.WaitTimeout)
 	}
 	if len(got.Ports) != 1 || !got.Networks.IsNull() || !got.Memory.IsNull() {
 		t.Errorf("ports/networks/memory: %+v %v %v", got.Ports, got.Networks, got.Memory)

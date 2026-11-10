@@ -19,6 +19,7 @@ package provider
 //     appended in a stable sorted order (drift).
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -27,6 +28,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
@@ -51,20 +53,32 @@ type containerMountModel struct {
 	// SelinuxRelabel ("z" or "Z") sends the entry as a HostConfig.Binds
 	// string instead of a mount.Mount (container_upload.go).
 	SelinuxRelabel types.String           `tfsdk:"selinux_relabel"`
+	Consistency    types.String           `tfsdk:"consistency"`
 	TmpfsOptions   *ctrTmpfsOptionsModel  `tfsdk:"tmpfs_options"`
 	BindOptions    *ctrBindOptionsModel   `tfsdk:"bind_options"`
 	VolumeOptions  *ctrVolumeOptionsModel `tfsdk:"volume_options"`
+	ImageOptions   *ctrImageOptionsModel  `tfsdk:"image_options"`
 }
 
 // ctrTmpfsOptionsModel is mounts.tmpfs_options (mount.TmpfsOptions).
 type ctrTmpfsOptionsModel struct {
 	SizeBytes types.Int64  `tfsdk:"size_bytes"`
 	Mode      types.String `tfsdk:"mode"`
+	Options   types.List   `tfsdk:"options"`
 }
 
 // ctrBindOptionsModel is mounts.bind_options (mount.BindOptions).
 type ctrBindOptionsModel struct {
-	Propagation types.String `tfsdk:"propagation"`
+	Propagation            types.String `tfsdk:"propagation"`
+	NonRecursive           types.Bool   `tfsdk:"non_recursive"`
+	CreateMountpoint       types.Bool   `tfsdk:"create_mountpoint"`
+	ReadOnlyNonRecursive   types.Bool   `tfsdk:"read_only_non_recursive"`
+	ReadOnlyForceRecursive types.Bool   `tfsdk:"read_only_force_recursive"`
+}
+
+// ctrImageOptionsModel is mounts.image_options (mount.ImageOptions).
+type ctrImageOptionsModel struct {
+	Subpath types.String `tfsdk:"subpath"`
 }
 
 // ctrVolumeOptionsModel is mounts.volume_options (mount.VolumeOptions).
@@ -350,10 +364,11 @@ func containerExpandMountsBinds(in []containerMountModel) ([]mount.Mount, []stri
 	for i, m := range in {
 		t := m.Type.ValueString()
 		mm := mount.Mount{
-			Type:     mount.Type(t),
-			Source:   m.Source.ValueString(),
-			Target:   m.Target.ValueString(),
-			ReadOnly: m.ReadOnly.ValueBool(),
+			Type:        mount.Type(t),
+			Source:      m.Source.ValueString(),
+			Target:      m.Target.ValueString(),
+			ReadOnly:    m.ReadOnly.ValueBool(),
+			Consistency: mount.Consistency(m.Consistency.ValueString()),
 		}
 		if mm.Target == "" {
 			return nil, nil, fmt.Errorf("mounts[%d].target is required", i)
@@ -368,8 +383,12 @@ func containerExpandMountsBinds(in []containerMountModel) ([]mount.Mount, []stri
 			if mm.Source != "" {
 				return nil, nil, fmt.Errorf("mounts[%d]: a tmpfs mount takes no source", i)
 			}
+		case mount.TypeImage:
+			if mm.Source == "" {
+				return nil, nil, fmt.Errorf("mounts[%d]: an image mount needs source (image reference)", i)
+			}
 		default:
-			return nil, nil, fmt.Errorf("mounts[%d].type %q: must be bind, volume or tmpfs", i, t)
+			return nil, nil, fmt.Errorf("mounts[%d].type %q: must be bind, volume, tmpfs or image", i, t)
 		}
 		if o := m.TmpfsOptions; o != nil {
 			if mm.Type != mount.TypeTmpfs {
@@ -386,7 +405,21 @@ func containerExpandMountsBinds(in []containerMountModel) ([]mount.Mount, []stri
 				}
 				to.Mode = ctrFileMode(mode)
 			}
-			if to.SizeBytes != 0 || to.Mode != 0 {
+			if containerKnown(o.Options) {
+				var opts [][]string
+				var d diag.Diagnostics
+				d.Append(o.Options.ElementsAs(context.Background(), &opts, false)...)
+				if d.HasError() {
+					return nil, nil, fmt.Errorf("mounts[%d].tmpfs_options.options: %v", i, d)
+				}
+				for j, kv := range opts {
+					if len(kv) < 1 || len(kv) > 2 {
+						return nil, nil, fmt.Errorf("mounts[%d].tmpfs_options.options[%d]: want [flag] or [key, value]", i, j)
+					}
+				}
+				to.Options = opts
+			}
+			if to.SizeBytes != 0 || to.Mode != 0 || len(to.Options) > 0 {
 				mm.TmpfsOptions = to
 			}
 		}
@@ -394,8 +427,15 @@ func containerExpandMountsBinds(in []containerMountModel) ([]mount.Mount, []stri
 			if mm.Type != mount.TypeBind {
 				return nil, nil, fmt.Errorf("mounts[%d].bind_options only applies to type bind", i)
 			}
-			if p, ok := knownString(o.Propagation); ok && p != "" {
-				mm.BindOptions = &mount.BindOptions{Propagation: mount.Propagation(p)}
+			bo := &mount.BindOptions{
+				Propagation:            mount.Propagation(o.Propagation.ValueString()),
+				NonRecursive:           o.NonRecursive.ValueBool(),
+				CreateMountpoint:       o.CreateMountpoint.ValueBool(),
+				ReadOnlyNonRecursive:   o.ReadOnlyNonRecursive.ValueBool(),
+				ReadOnlyForceRecursive: o.ReadOnlyForceRecursive.ValueBool(),
+			}
+			if *bo != (mount.BindOptions{}) {
+				mm.BindOptions = bo
 			}
 		}
 		if o := m.VolumeOptions; o != nil {
@@ -408,9 +448,17 @@ func containerExpandMountsBinds(in []containerMountModel) ([]mount.Mount, []stri
 			}
 			mm.VolumeOptions = vo
 		}
+		if o := m.ImageOptions; o != nil {
+			if mm.Type != mount.TypeImage {
+				return nil, nil, fmt.Errorf("mounts[%d].image_options only applies to type image", i)
+			}
+			if sp := o.Subpath.ValueString(); sp != "" {
+				mm.ImageOptions = &mount.ImageOptions{Subpath: sp}
+			}
+		}
 		if rl, ok := knownString(m.SelinuxRelabel); ok && rl != "" {
-			if mm.TmpfsOptions != nil || mm.BindOptions != nil || mm.VolumeOptions != nil {
-				return nil, nil, fmt.Errorf("mounts[%d]: selinux_relabel cannot be combined with tmpfs_options, bind_options or volume_options", i)
+			if mm.TmpfsOptions != nil || mm.BindOptions != nil || mm.VolumeOptions != nil || mm.ImageOptions != nil || mm.Consistency != "" {
+				return nil, nil, fmt.Errorf("mounts[%d]: selinux_relabel cannot be combined with consistency, tmpfs_options, bind_options, volume_options or image_options", i)
 			}
 			spec, err := containerBindSpec(i, m, rl)
 			if err != nil {
@@ -448,15 +496,17 @@ func containerFlattenMounts(in []mount.Mount, binds []string, prior []containerM
 			SelinuxRelabel: types.StringNull(),
 		}
 		p := priorBy[containerMountKey(mm)]
+		mm.Consistency = containerStringRead(p.Consistency, string(m.Consistency), "")
 		mm.TmpfsOptions = ctrFlattenTmpfsOptions(m.TmpfsOptions, p.TmpfsOptions)
-		if o := m.BindOptions; (o != nil && o.Propagation != "") || p.BindOptions != nil {
-			bo := &ctrBindOptionsModel{Propagation: types.StringNull()}
-			if o != nil {
-				bo.Propagation = stringOrNull(string(o.Propagation))
-			}
-			mm.BindOptions = bo
-		}
+		mm.BindOptions = ctrFlattenBindOptions(m.BindOptions, p.BindOptions)
 		mm.VolumeOptions = ctrFlattenVolumeOptions(m.VolumeOptions, p.VolumeOptions)
+		if o := m.ImageOptions; (o != nil && o.Subpath != "") || p.ImageOptions != nil {
+			io := &ctrImageOptionsModel{Subpath: types.StringNull()}
+			if o != nil {
+				io.Subpath = stringOrNull(o.Subpath)
+			}
+			mm.ImageOptions = io
+		}
 		got = append(got, mm)
 	}
 	got = append(got, containerFlattenBinds(binds)...)
@@ -464,7 +514,7 @@ func containerFlattenMounts(in []mount.Mount, binds []string, prior []containerM
 }
 
 func ctrFlattenTmpfsOptions(o *mount.TmpfsOptions, prior *ctrTmpfsOptionsModel) *ctrTmpfsOptionsModel {
-	if (o == nil || (o.SizeBytes == 0 && o.Mode == 0)) && prior == nil {
+	if (o == nil || (o.SizeBytes == 0 && o.Mode == 0 && len(o.Options) == 0)) && prior == nil {
 		return nil
 	}
 	if o == nil {
@@ -472,11 +522,62 @@ func ctrFlattenTmpfsOptions(o *mount.TmpfsOptions, prior *ctrTmpfsOptionsModel) 
 	}
 	p := prior
 	if p == nil {
-		p = &ctrTmpfsOptionsModel{SizeBytes: types.Int64Null(), Mode: types.StringNull()}
+		p = &ctrTmpfsOptionsModel{SizeBytes: types.Int64Null(), Mode: types.StringNull(), Options: types.ListNull(ctrTmpfsOptionsType)}
 	}
 	return &ctrTmpfsOptionsModel{
 		SizeBytes: containerInt64Read(p.SizeBytes, o.SizeBytes),
 		Mode:      ctrModeValue(p.Mode, ctrModeBits(o.Mode)),
+		Options:   ctrTmpfsOptionsValue(p.Options, o.Options),
+	}
+}
+
+// ctrTmpfsOptionsType is the type of tmpfs_options.options.
+var ctrTmpfsOptionsType = types.ListType{ElemType: types.StringType}
+
+// ctrTmpfsOptionsValue maps TmpfsOptions.Options; empty stays null unless
+// the prior was a known empty list.
+func ctrTmpfsOptionsValue(prior types.List, opts [][]string) types.List {
+	if len(opts) == 0 {
+		if containerKnown(prior) && len(prior.Elements()) == 0 {
+			return prior
+		}
+		return types.ListNull(ctrTmpfsOptionsType)
+	}
+	vals := make([]attr.Value, 0, len(opts))
+	for _, kv := range opts {
+		vals = append(vals, stringListValue(kv, false))
+	}
+	return types.ListValueMust(ctrTmpfsOptionsType, vals)
+}
+
+// ctrOptBoolRead reports a daemon bool option: false stays null when the
+// prior did not set it.
+func ctrOptBoolRead(prior types.Bool, v bool) types.Bool {
+	if !v && !containerKnown(prior) {
+		return types.BoolNull()
+	}
+	return types.BoolValue(v)
+}
+
+// ctrFlattenBindOptions maps BindOptions onto bind_options. The block is
+// reported when the daemon holds a value or the prior entry had it.
+func ctrFlattenBindOptions(o *mount.BindOptions, prior *ctrBindOptionsModel) *ctrBindOptionsModel {
+	if (o == nil || *o == (mount.BindOptions{})) && prior == nil {
+		return nil
+	}
+	if o == nil {
+		o = &mount.BindOptions{}
+	}
+	p := prior
+	if p == nil {
+		p = &ctrBindOptionsModel{}
+	}
+	return &ctrBindOptionsModel{
+		Propagation:            stringOrNull(string(o.Propagation)),
+		NonRecursive:           ctrOptBoolRead(p.NonRecursive, o.NonRecursive),
+		CreateMountpoint:       ctrOptBoolRead(p.CreateMountpoint, o.CreateMountpoint),
+		ReadOnlyNonRecursive:   ctrOptBoolRead(p.ReadOnlyNonRecursive, o.ReadOnlyNonRecursive),
+		ReadOnlyForceRecursive: ctrOptBoolRead(p.ReadOnlyForceRecursive, o.ReadOnlyForceRecursive),
 	}
 }
 

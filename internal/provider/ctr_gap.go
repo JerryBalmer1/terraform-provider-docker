@@ -461,6 +461,9 @@ func ctrMountOptionBlocks() map[string]schema.Block {
 				"size_bytes": schema.Int64Attribute{Optional: true, MarkdownDescription: "Size of the tmpfs in bytes (`SizeBytes`). Unset is unlimited."},
 				"mode": schema.StringAttribute{Optional: true,
 					MarkdownDescription: "Permission bits of the tmpfs root as an octal string, e.g. `\"1777\"` (`Mode`)."},
+				"options": schema.ListAttribute{ElementType: types.ListType{ElemType: types.StringType}, Optional: true,
+					MarkdownDescription: "Options passed to the tmpfs mount (`Options`): a flag as a one-element list, a key and value as two, " +
+						"e.g. `[[\"noexec\"], [\"nr_inodes\", \"1000\"]]`." + apiSince("1.46")},
 			},
 		},
 		"bind_options": schema.SingleNestedBlock{
@@ -469,6 +472,21 @@ func ctrMountOptionBlocks() map[string]schema.Block {
 				"propagation": schema.StringAttribute{Optional: true,
 					MarkdownDescription: "Mount propagation (`Propagation`): `private`, `rprivate`, `shared`, `rshared`, `slave` or `rslave`.",
 					Validators:          []validator.String{stringvalidator.OneOf("private", "rprivate", "shared", "rshared", "slave", "rslave")}},
+				"non_recursive": schema.BoolAttribute{Optional: true,
+					MarkdownDescription: "Do not bind-mount the submounts of the source recursively (`NonRecursive`)."},
+				"create_mountpoint": schema.BoolAttribute{Optional: true,
+					MarkdownDescription: "Create the source path on the host when it is missing (`CreateMountpoint`)."},
+				"read_only_non_recursive": schema.BoolAttribute{Optional: true,
+					MarkdownDescription: "With `read_only`, make only the mount itself read-only, not its submounts (`ReadOnlyNonRecursive`)."},
+				"read_only_force_recursive": schema.BoolAttribute{Optional: true,
+					MarkdownDescription: "With `read_only`, fail when the mount cannot be made recursively read-only (`ReadOnlyForceRecursive`)."},
+			},
+		},
+		"image_options": schema.SingleNestedBlock{
+			MarkdownDescription: "Image mount options (`ImageOptions`); `type = \"image\"` only." + apiSince("1.48"),
+			Attributes: map[string]schema.Attribute{
+				"subpath": schema.StringAttribute{Optional: true,
+					MarkdownDescription: "Path inside the image to mount instead of its root (`Subpath`)."},
 			},
 		},
 		"volume_options": schema.SingleNestedBlock{

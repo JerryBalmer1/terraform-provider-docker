@@ -18,7 +18,7 @@ var kwMoveContainer = kwMove{
 	sourceType:    "docker_container",
 	schemaVersion: 2,
 	rules: concatRules(
-		same("id", "name", "image", "command", "entrypoint", "cpu_shares", "gpus", "hostname", "must_run",
+		same("id", "name", "image", "command", "entrypoint", "cpu_shares", "gpus", "hostname",
 			"privileged", "read_only", "restart", "stdin_open", "stop_signal", "stop_timeout", "sysctls", "tty",
 			"user", "wait", "working_dir", "dns", "dns_search"),
 		[]mvRule{
@@ -58,6 +58,7 @@ var kwMoveContainer = kwMove{
 			blocks("ulimit", "ulimits", same("hard", "name", "soft")...),
 			kwUploadRule(),
 			cp("wait_timeout", "wait_timeout", tfSecondsToDuration),
+			kwContainerStateRule(),
 
 			// Forward mappings for kreuzwerker attributes renames.json lists as
 			// gaps ("if added, name it ..."): applied when the schema has them.
@@ -244,4 +245,23 @@ func kwUploadRule() mvRule {
 		}),
 	}
 	return blocks("upload", "files", sub...)
+}
+
+// kwContainerStateRule maps kreuzwerker's start / attach / must_run onto
+// state (Pass 5.3, D1): start = false -> "created" (kreuzwerker created the
+// container without starting it); attach = true -> "exited" (kreuzwerker
+// ran it attached until it exited); otherwise "running". must_run is
+// dropped: state = "running" already starts a container found stopped, and
+// must_run = false has no counterpart (renames.json says so).
+func kwContainerStateRule() mvRule {
+	return custom([][2]string{{"start", "state"}, {"attach", "state"}}, func(src, dst map[string]any) {
+		st := ctrStateRunning
+		switch {
+		case src["start"] == false:
+			st = ctrStateCreated
+		case src["attach"] == true:
+			st = ctrStateExited
+		}
+		dst["state"] = st
+	})
 }

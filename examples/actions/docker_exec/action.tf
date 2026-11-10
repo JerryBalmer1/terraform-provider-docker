@@ -21,6 +21,10 @@ action "docker_exec" "migrate" {
     user         = "postgres"
     workdir      = "/tmp"
     timeout      = "2m"
+    # A TTY with a fixed size (height, width) for tools that format to it;
+    # stdout and stderr then arrive merged in stdout.
+    # tty          = true
+    # console_size = [40, 160]
     # stdout, stderr and the exec inspect (exit_code, pid, ...) as JSON.
     result_path = "${path.module}/out/migrate.json"
   }

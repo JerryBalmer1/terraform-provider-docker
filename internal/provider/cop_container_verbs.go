@@ -41,7 +41,7 @@ var copVerbs = map[string]copVerb{
 	"start": {
 		suffix: "container_start", itemID: "engine:container-start", progress: "started",
 		doc: "Starts a stopped or created container, like `docker container start`. " +
-			"docker_container starts its container only at create (`must_run`); use this action to start one later, for example after `docker_container_stop`. " +
+			"docker_container never starts a container with `state = \"created\"`; use this action to start one later, for example after `docker_container_stop`. " +
 			"Starting a running container is a no-op.",
 		run: func(ctx context.Context, c *client.Client, id string, _ copVerbArgs) error {
 			_, err := c.ContainerStart(ctx, id, client.ContainerStartOptions{})

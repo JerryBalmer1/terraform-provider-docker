@@ -127,14 +127,17 @@ func TestContainerUploadErrors(t *testing.T) {
 
 func TestContainerUploadNeedsReplace(t *testing.T) {
 	tr, fa := types.BoolValue(true), types.BoolValue(false)
+	run, cre, exi := types.StringValue(ctrStateRunning), types.StringValue(ctrStateCreated), types.StringValue(ctrStateExited)
 	for _, c := range []struct {
-		mustRun, running types.Bool
-		want             bool
+		state   types.String
+		running types.Bool
+		want    bool
 	}{
-		{tr, fa, true}, {tr, tr, true}, {fa, tr, true}, {fa, fa, false}, {types.BoolNull(), fa, true}, {fa, types.BoolUnknown(), true},
+		{run, fa, true}, {run, tr, true}, {cre, tr, true}, {cre, fa, false}, {exi, fa, true}, {types.StringNull(), fa, true},
+		{cre, types.BoolUnknown(), true},
 	} {
-		if got := containerUploadNeedsReplace(c.mustRun, c.running); got != c.want {
-			t.Errorf("must_run=%v running=%v: got %v", c.mustRun, c.running, got)
+		if got := containerUploadNeedsReplace(c.state, c.running); got != c.want {
+			t.Errorf("state=%v running=%v: got %v", c.state, c.running, got)
 		}
 	}
 }
@@ -193,6 +196,17 @@ type ctrFakeEngine struct {
 	createQuery string
 	networks    map[string]*network.EndpointSettings
 	gone        bool
+
+	// Pass 5.3: a one-shot container exits right after start with
+	// exitCode and logs (multiplexed frames); startBodies records the body
+	// length of every POST /start; mutate edits every inspect response
+	// (daemon-filled defaults).
+	oneShot     bool
+	exited      bool
+	exitCode    int
+	logs        []byte
+	startBodies []int
+	mutate      func(*container.InspectResponse)
 }
 
 func (f *ctrFakeEngine) handler(w http.ResponseWriter, r *http.Request) {
@@ -267,20 +281,38 @@ func (f *ctrFakeEngine) handler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	case r.Method == http.MethodPost && strings.HasSuffix(p, "/start"):
 		f.calls = append(f.calls, "start")
-		f.running = true
+		b, _ := io.ReadAll(r.Body)
+		f.startBodies = append(f.startBodies, len(b))
+		f.running = !f.oneShot
+		f.exited = f.oneShot
 		w.WriteHeader(http.StatusNoContent)
+	case r.Method == http.MethodPost && strings.HasSuffix(p, "/wait"):
+		f.calls = append(f.calls, "wait")
+		_ = json.NewEncoder(w).Encode(map[string]any{"StatusCode": f.exitCode})
+	case r.Method == http.MethodGet && strings.HasSuffix(p, "/logs"):
+		f.calls = append(f.calls, "logs")
+		w.Header().Set("Content-Type", "application/vnd.docker.multiplexed-stream")
+		_, _ = w.Write(f.logs)
 	case r.Method == http.MethodGet && strings.HasSuffix(p, "/json"):
 		hc := f.created.HostConfig
 		if hc == nil {
 			hc = &container.HostConfig{}
 		}
-		_ = json.NewEncoder(w).Encode(container.InspectResponse{
-
+		st := &container.State{Running: f.running, Status: map[bool]container.ContainerState{true: "running", false: "created"}[f.running]}
+		if f.exited {
+			st.Status, st.ExitCode, st.FinishedAt = "exited", f.exitCode, "2026-11-09T10:00:00Z"
+		}
+		resp := container.InspectResponse{
 			ID: "c0ffee0123456789", Name: "/up", Image: "sha256:img",
-			State: &container.State{Running: f.running, Status: map[bool]container.ContainerState{true: "running", false: "created"}[f.running]}, HostConfig: hc,
+			State: st, HostConfig: hc,
 			Config:          f.created.Config,
 			NetworkSettings: &container.NetworkSettings{Networks: f.networks},
-		})
+		}
+		if f.mutate != nil {
+			resp.Config = ctrCloneConfig(resp.Config)
+			f.mutate(&resp)
+		}
+		_ = json.NewEncoder(w).Encode(resp)
 	default:
 		w.WriteHeader(http.StatusNotImplemented)
 		fmt.Fprintf(w, `{"message":"fake: %s %s"}`, r.Method, p)
@@ -361,12 +393,12 @@ func TestContainerUploadFakeEngine(t *testing.T) {
 		t.Errorf("platform not sent: %q", f.createQuery)
 	}
 
-	// Stopped container with must_run = false: Update re-uploads in place
+	// Stopped container with state = "created": Update re-uploads in place
 	// and does not start the container.
 	f.running = false
 	f.calls = nil
 	state.Running = types.BoolValue(false)
-	state.MustRun = types.BoolValue(false)
+	state.State = types.StringValue(ctrStateCreated)
 	next := state
 	u := ctrUpload("/etc/app.conf")
 	u.Content = types.StringValue("v2")
@@ -478,4 +510,14 @@ func TestContainerUploadDiagnosticsPath(t *testing.T) {
 func mustRegexpT(t *testing.T, s string) *regexp.Regexp {
 	t.Helper()
 	return regexp.MustCompile(s)
+}
+
+// ctrCloneConfig copies a config so a mutate hook does not change the
+// recorded create request.
+func ctrCloneConfig(c *container.Config) *container.Config {
+	if c == nil {
+		return &container.Config{}
+	}
+	cp := *c
+	return &cp
 }

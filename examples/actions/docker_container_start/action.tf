@@ -1,7 +1,7 @@
 resource "docker_container" "app" {
-  name     = "app"
-  image    = "nginx:1.27"
-  must_run = false
+  name  = "app"
+  image = "nginx:1.27"
+  state = "created" # created only: the provider never starts it
 
   lifecycle {
     action_trigger {
@@ -11,7 +11,7 @@ resource "docker_container" "app" {
   }
 }
 
-# Start a container that docker_container created but left stopped. On demand:
+# Start a container that docker_container created but left stopped (state = "created"). On demand:
 #   terraform apply -invoke=action.docker_container_start.app
 action "docker_container_start" "app" {
   config {

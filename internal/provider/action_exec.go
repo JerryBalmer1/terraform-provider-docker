@@ -8,10 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/moby/moby/client"
@@ -43,6 +45,7 @@ type execActionModel struct {
 	Workdir     types.String `tfsdk:"workdir"`
 	Privileged  types.Bool   `tfsdk:"privileged"`
 	TTY         types.Bool   `tfsdk:"tty"`
+	ConsoleSize types.List   `tfsdk:"console_size"`
 	Detach      types.Bool   `tfsdk:"detach"`
 	Timeout     types.String `tfsdk:"timeout"`
 	ResultPath  types.String `tfsdk:"result_path"`
@@ -78,6 +81,10 @@ func (a *execAction) Schema(_ context.Context, _ action.SchemaRequest, resp *act
 			"privileged": schema.BoolAttribute{Optional: true, MarkdownDescription: "Give the command extended privileges. Default `false`."},
 			"tty": schema.BoolAttribute{Optional: true,
 				MarkdownDescription: "Allocate a pseudo-TTY (`docker exec --tty`). Default `false`. With a TTY, stdout and stderr arrive merged in `stdout`."},
+			"console_size": schema.ListAttribute{Optional: true, ElementType: types.Int64Type,
+				Validators: []validator.List{listvalidator.SizeBetween(2, 2)},
+				MarkdownDescription: "Initial terminal size as `[height, width]` (Engine `ConsoleSize`); only with `tty = true`, e.g. for programs " +
+					"that format output to the terminal width."},
 			"detach": schema.BoolAttribute{Optional: true,
 				MarkdownDescription: "Start the command and return at once without waiting for it (`docker exec --detach`). Default `false`. Output is not captured and the exit code is not checked."},
 			"timeout": schema.StringAttribute{
@@ -99,6 +106,9 @@ func (a *execAction) ValidateConfig(ctx context.Context, req action.ValidateConf
 	if !m.ContainerID.IsUnknown() && !m.ServiceID.IsUnknown() && m.ContainerID.IsNull() == m.ServiceID.IsNull() {
 		resp.Diagnostics.AddAttributeError(path.Root("container_id"), "Exactly one of container_id and service_id",
 			"Set container_id (a container ID or name) or service_id (a Swarm service name), not both and not neither.")
+	}
+	if containerKnown(m.ConsoleSize) && !actBool(m.TTY, false) {
+		resp.Diagnostics.AddAttributeError(path.Root("console_size"), "console_size needs tty", "The Engine only applies console_size to a TTY; set tty = true.")
 	}
 	if !m.Command.IsUnknown() && !m.Command.IsNull() && len(m.Command.Elements()) == 0 {
 		resp.Diagnostics.AddAttributeError(path.Root("command"), "Empty command", "command needs at least one element.")
@@ -150,12 +160,13 @@ func (a *execAction) Invoke(ctx context.Context, req action.InvokeRequest, resp 
 	out, err := copExecRun(ctx, c, copExecSpec{
 		Container: insp.ID,
 		Opts: client.ExecCreateOptions{
-			User:       m.User.ValueString(),
-			Privileged: actBool(m.Privileged, false),
-			TTY:        actBool(m.TTY, false),
-			Env:        copMergeEnv(fileEnv, envMap),
-			WorkingDir: m.Workdir.ValueString(),
-			Cmd:        cmd,
+			User:        m.User.ValueString(),
+			Privileged:  actBool(m.Privileged, false),
+			TTY:         actBool(m.TTY, false),
+			ConsoleSize: actExecConsoleSize(ctx, m.ConsoleSize, &resp.Diagnostics),
+			Env:         copMergeEnv(fileEnv, envMap),
+			WorkingDir:  m.Workdir.ValueString(),
+			Cmd:         cmd,
 		},
 		Detach:   detach,
 		Timeout:  timeout,
@@ -217,4 +228,18 @@ func actExecServiceContainer(ctx context.Context, c *client.Client, svc string, 
 	}
 	sort.Slice(list, func(i, j int) bool { return strings.Join(list[i].Names, ",") < strings.Join(list[j].Names, ",") })
 	return list[0].ID
+}
+
+// actExecConsoleSize converts console_size ([height, width]) to the
+// client's ConsoleSize (zero when unset).
+func actExecConsoleSize(ctx context.Context, l types.List, diags *diag.Diagnostics) client.ConsoleSize {
+	if !containerKnown(l) {
+		return client.ConsoleSize{}
+	}
+	var hw []int64
+	diags.Append(l.ElementsAs(ctx, &hw, false)...)
+	if len(hw) != 2 || hw[0] < 0 || hw[1] < 0 {
+		return client.ConsoleSize{}
+	}
+	return client.ConsoleSize{Height: uint(hw[0]), Width: uint(hw[1])}
 }

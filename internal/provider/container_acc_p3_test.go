@@ -51,7 +51,7 @@ func ctrP3Inspect(t *testing.T, s *terraform.State, addr string) (container.Insp
 // ctrP3Ignore lists what import cannot verify: arguments that only steer
 // apply, logging (reported on import, unset in these configs) and the
 // inspect outputs (re-read at import time).
-var ctrP3Ignore = []string{"wait", "wait_timeout", "must_run", "logging", "inspect_json", "inspect", "content_sha256"}
+var ctrP3Ignore = []string{"wait", "wait_timeout", "logging", "inspect_json", "inspect", "content_sha256"}
 
 // TestAccContainerP3_capabilities: cap add/drop written in mixed spellings
 // (lower case, CAP_ prefix) round-trip without drift and import verifies
@@ -187,7 +187,7 @@ resource "docker_container" "c" {
 
 // TestAccContainerP3_mustRunRestart: a container stopped out of band is
 // planned for start (running -> true) and started in place by the next
-// apply (Pass 2 map: L2 must_run restarts a stopped container).
+// apply (Pass 2 map: L2; since Pass 5.3 state = "running", the default).
 func TestAccContainerP3_mustRunRestart(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-mustrun")
@@ -196,7 +196,7 @@ resource "docker_container" "c" {
   name     = %q
   image    = "busybox:1.36"
   command  = ["sleep", "3600"]
-  must_run = true
+  state    = "running"
 }
 `, name)
 	var id string

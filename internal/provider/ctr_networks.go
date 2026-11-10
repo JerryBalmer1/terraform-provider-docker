@@ -33,6 +33,7 @@ type ctrNetworkModel struct {
 	MacAddress          types.String `tfsdk:"mac_address"`
 	DriverOpts          types.Map    `tfsdk:"driver_opts"`
 	GwPriority          types.Int64  `tfsdk:"gw_priority"`
+	Links               types.List   `tfsdk:"links"`
 	NetworkID           types.String `tfsdk:"network_id"`
 	EndpointID          types.String `tfsdk:"endpoint_id"`
 	Gateway             types.String `tfsdk:"gateway"`
@@ -52,6 +53,7 @@ var ctrNetworkAttrTypes = map[string]attr.Type{
 	"mac_address":            types.StringType,
 	"driver_opts":            types.MapType{ElemType: types.StringType},
 	"gw_priority":            types.Int64Type,
+	"links":                  types.ListType{ElemType: types.StringType},
 	"network_id":             types.StringType,
 	"endpoint_id":            types.StringType,
 	"gateway":                types.StringType,
@@ -64,7 +66,7 @@ var ctrNetworkAttrTypes = map[string]attr.Type{
 
 // ctrNetworkInputs are the element attributes the user sets; a change in any
 // of them reconnects the container to that network.
-var ctrNetworkInputs = []string{"aliases", "ipv4_address", "ipv6_address", "link_local_ips", "driver_opts", "gw_priority"}
+var ctrNetworkInputs = []string{"aliases", "ipv4_address", "ipv6_address", "link_local_ips", "driver_opts", "gw_priority", "links"}
 
 func ctrNetworksSchema() schema.MapNestedAttribute {
 	keep := []planmodifier.String{ctrNetKeepState{}}
@@ -95,6 +97,9 @@ func ctrNetworksSchema() schema.MapNestedAttribute {
 				MarkdownDescription: "Driver-specific endpoint options (`DriverOpts`)."},
 			"gw_priority": schema.Int64Attribute{Optional: true,
 				MarkdownDescription: "Gateway priority (`GwPriority`): the endpoint with the highest priority provides the container's default gateway." + apiSince("1.48")},
+			"links": schema.ListAttribute{ElementType: types.StringType, Optional: true,
+				MarkdownDescription: "Legacy links on this network, each `<name|id>[:<alias>]` (`Links`, `docker network connect --link`): " +
+					"the alias resolves to that container on this network only."},
 			"network_id":          str("ID of the network (`NetworkID`)."),
 			"endpoint_id":         str("ID of the endpoint (`EndpointID`)."),
 			"gateway":             str("IPv4 gateway of the network (`Gateway`)."),
@@ -155,6 +160,7 @@ func ctrEndpointFromModel(ctx context.Context, n ctrNetworkModel, diags *diag.Di
 	if v, ok := knownInt64(n.GwPriority); ok {
 		ep.GwPriority = int(v)
 	}
+	ep.Links = stringListFrom(ctx, n.Links, diags)
 	return ep, nil
 }
 
@@ -186,7 +192,7 @@ func ctrNetworkingConfig(ctx context.Context, nets map[string]ctrNetworkModel, n
 func ctrNetInputsEqual(a, b ctrNetworkModel) bool {
 	if !ctrSetEqual(a.Aliases, b.Aliases) || !ctrSetEqual(a.LinkLocalIPs, b.LinkLocalIPs) ||
 		!a.IPv4Address.Equal(b.IPv4Address) || !a.IPv6Address.Equal(b.IPv6Address) ||
-		!ctrMapEqual(a.DriverOpts, b.DriverOpts) || !ctrInt64Equal(a.GwPriority, b.GwPriority) {
+		!ctrMapEqual(a.DriverOpts, b.DriverOpts) || !ctrInt64Equal(a.GwPriority, b.GwPriority) || !ctrListEqual(a.Links, b.Links) {
 		return false
 	}
 	if mac, ok := knownString(a.MacAddress); ok && mac != "" && !a.MacAddress.Equal(b.MacAddress) {
@@ -197,6 +203,17 @@ func ctrNetInputsEqual(a, b ctrNetworkModel) bool {
 
 // ctrSetEqual treats null and empty as equal.
 func ctrSetEqual(a, b types.Set) bool {
+	if a.IsUnknown() || b.IsUnknown() {
+		return a.Equal(b)
+	}
+	if len(a.Elements()) == 0 && len(b.Elements()) == 0 {
+		return true
+	}
+	return a.Equal(b)
+}
+
+// ctrListEqual treats null and empty as equal.
+func ctrListEqual(a, b types.List) bool {
 	if a.IsUnknown() || b.IsUnknown() {
 		return a.Equal(b)
 	}
@@ -271,7 +288,7 @@ func ctrNullNetwork() ctrNetworkModel {
 	return ctrNetworkModel{
 		Aliases: types.SetNull(types.StringType), LinkLocalIPs: types.SetNull(types.StringType),
 		IPv4Address: types.StringNull(), IPv6Address: types.StringNull(), MacAddress: types.StringNull(),
-		DriverOpts: types.MapNull(types.StringType), GwPriority: types.Int64Null(),
+		DriverOpts: types.MapNull(types.StringType), GwPriority: types.Int64Null(), Links: types.ListNull(types.StringType),
 	}
 }
 
@@ -305,6 +322,7 @@ func ctrNetworkValue(ep *network.EndpointSettings, p ctrNetworkModel, containerI
 		"mac_address":            stringOrNull(mac),
 		"driver_opts":            containerMapValue(p.DriverOpts, ep.DriverOpts),
 		"gw_priority":            containerInt64Read(p.GwPriority, int64(ep.GwPriority)),
+		"links":                  ctrLinksRead(ctrKnownList(p.Links), ep.Links),
 		"network_id":             stringOrNull(ep.NetworkID),
 		"endpoint_id":            stringOrNull(ep.EndpointID),
 		"gateway":                stringOrNull(addrString(ep.Gateway)),
@@ -408,4 +426,12 @@ func (m ctrNetKeepState) PlanModifyInt64(ctx context.Context, req planmodifier.I
 // ctrAttrGetter is tfsdk.Plan / tfsdk.State.
 type ctrAttrGetter interface {
 	GetAttribute(ctx context.Context, p path.Path, target interface{}) diag.Diagnostics
+}
+
+// ctrKnownList returns l, or a typed null when l is the zero value.
+func ctrKnownList(l types.List) types.List {
+	if l.IsNull() {
+		return types.ListNull(types.StringType)
+	}
+	return l
 }

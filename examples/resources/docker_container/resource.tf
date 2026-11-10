@@ -105,12 +105,30 @@ resource "docker_container" "web" {
     options = { max-size = "10m", max-file = "3" }
   }
 
-  memory    = 268435456 # 256 MiB, updated in place
-  nano_cpus = 500000000 # 0.5 CPU, updated in place
+  memory       = 268435456 # 256 MiB, updated in place
+  nano_cpus    = 500000000 # 0.5 CPU, updated in place
+  pids_limit   = 512       # updated in place
+  blkio_weight = 300       # updated in place
 
-  must_run     = true
+  oom_score_adj = 100
+  annotations   = { "com.example.team" = "web" }
+
+  state        = "running" # the default: started, and started again if found stopped
   wait         = true
   wait_timeout = "2m"
+}
+
+# A one-shot run kept as an exited container: created, started and waited for.
+# A non-zero exit code fails the apply; the output is kept in logs / log_entries.
+resource "docker_container" "migrate" {
+  name    = "migrate"
+  image   = "busybox:1.36"
+  command = ["sh", "-c", "echo migrating; exit 0"]
+
+  state               = "exited"
+  expected_exit_codes = [0]
+  wait_timeout        = "10m"
+  logs_tail           = 200
 }
 
 # Read-only endpoint values sit beside the settings in each networks entry;
