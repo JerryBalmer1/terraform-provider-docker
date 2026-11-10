@@ -63,54 +63,52 @@ README_resources.md (generated) lists every type by layer.
   - a MarkdownDescription whose first sentence stands alone (genskill reads it);
   - a row in `tools/parity/paritydata`;
   - if it replaces a CLI command, an entry in `tools/climap/commands.json`.
+- **PARTIAL(pass5) markers** record a registered type whose documented sub-feature is absent or a no-op:
+  - Format: `// PARTIAL(pass5) <item id> <note>`, next to the code that lacks the feature. The item id is `layer:name` from `reference/inventory.json`; the note is required and names what is missing.
+  - Not for placeholders: an unimplemented type is `// STUB(pass5) <item id>` (nothing after the id). Its status is `missing`, which fails InventoryValidate (validate.py S1; allowed-violations.txt cannot excuse it).
+  - Status is computed by `reference/_gen/merge.py` from registry_gen.go and the markers (`partial` = registered with a PARTIAL marker). Never hand-set it in a fragment or the inventory. Partials are listed and never fail.
+  - Only non-test `internal/provider/*.go` files are scanned (`*_test.go` is ignored). A marker with no note, or for an unknown, skipped or unregistered item, fails the merge.
+  - Remove the marker in the change that implements the feature.
 - Attributes with RequiresReplace say "Forces replacement." in their description (`genskill -strict`).
 - At the start of every pass run the **engine-api-watch** skill (`go run ./tools/apiwatch`) and file what it finds.
 
 ## Build and test
 
-PowerShell (Windows; no make needed). [terraform-provider-docker.build.ps1](terraform-provider-docker.build.ps1)
-is an [Invoke-Build](https://github.com/nightroman/Invoke-Build) script; run it from the repo root
-(`Install-Module InvokeBuild -Scope CurrentUser` once):
+[terraform-provider-docker.build.ps1](terraform-provider-docker.build.ps1) is an
+[Invoke-Build](https://github.com/nightroman/Invoke-Build) script. Run it from the repo root
+(`Install-Module InvokeBuild -Scope CurrentUser` once). Invoke-Build also runs under PowerShell 7 (`pwsh`) on
+Linux and macOS, so the same tasks work there (the harness script `Invoke-E2E.ps1` requires PowerShell 7):
 
 ```
 Invoke-Build ?                   # list tasks
 Invoke-Build                     # default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck
 Invoke-Build ContractGen         # regenerate internal/provider/contract_gen.go (outputs contract) from the inventory
 Invoke-Build RegistryGen         # regenerate internal/provider/registry_gen.go from reference/inventory.json
-Invoke-Build StubReport          # list the Pass 5 stubs / STUB(pass5) markers left
+Invoke-Build StubReport          # list STUB(pass5) stubs (fail) and PARTIAL(pass5) sub-feature gaps (listed)
 Invoke-Build Build, Vet, Test    # go build + provider binary, go vet, unit tests (-short, TF_ACC unset)
 Invoke-Build Tools               # unit tests of tools/ only
 Invoke-Build GenSkill            # regenerate .claude/skills + README_resources.md (GenSkillCheck: -check)
 Invoke-Build Docs                # GenSkill, then tfplugindocs generate + validate
 Invoke-Build Check               # gofmt, vet, genskill -check/-strict, tfplugindocs validate
 Invoke-Build TestAcc             # dind harness: plain pass, then -SwarmInit pass (TF_ACC=1)
+Invoke-Build E2E                 # dind harness: TestAccE2E only
 Invoke-Build Parity              # kreuzwerker parity: types + every attribute vs reference/_gen/renames.json
+Invoke-Build Guide               # regenerate the migration guide template from renames.json (GuideCheck: fail if stale)
 Invoke-Build ApiWatch            # Engine API drift vs tools/apiwatch/pinned.json
 Invoke-Build Inventory           # reference/inventory.json + INVENTORY.md from reference/_gen/fragments (InventoryCheck: diff must be empty)
+Invoke-Build InventoryValidate   # outputs contract and status: a missing item fails, partials are listed
 Invoke-Build ReferenceVerify     # re-hash reference/upstream against the SHAs pinned in reference/SOURCES.md
 Invoke-Build Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm
 ```
 
 Nobody hand-edits `reference/inventory.json` or `INVENTORY.md`: edit `reference/_gen/fragments/*.json`, then `Invoke-Build Inventory`.
 
-bash (Linux/macOS/CI):
+- CI (`.github/workflows/ci.yml`) still calls the GNUmakefile (`make build`, `test`, `check`, `e2e`), then `go run ./tools/parity -check BUILD_REPORT.md` and `go run ./tools/apiwatch -check`. The GNUmakefile is a subset with no Inventory, Registry, Contract or Guide tasks, and its `testacc` target runs straight against DOCKER_HOST: don't use it for acceptance runs.
+- Acceptance tests by hand go through the harness script, one run at a time. Add `-SwarmInit` for the swarm-manager tests and `-KeepUp` to leave the harness up:
 
 ```
-make build vet test
-make skill docs check
-make testacc
-make parity apiwatch
-make compose2stack IN=docker-compose.yml OUT=stack.tf MODE=swarm
-go run ./tools/parity -check BUILD_REPORT.md
-go run ./tools/apiwatch -check
-```
-
-Acceptance tests by hand in bash:
-
-```
-bash test/harness/scripts/harness-up.sh && set -a && source test/harness/.env && set +a
-TF_ACC=1 go test ./internal/provider/ -run TestAcc -count=1 -v -timeout 120m
-bash test/harness/scripts/harness-down.sh
+pwsh -NoProfile -File test/harness/Invoke-E2E.ps1 -Run TestAccNetwork_basic -Timeout 30m
+pwsh -NoProfile -File test/harness/Invoke-E2E.ps1 -SwarmInit -Run 'TestAccService' -Timeout 60m -Log test/harness/last-acc-swarm.log
 ```
 
 ## Skills
