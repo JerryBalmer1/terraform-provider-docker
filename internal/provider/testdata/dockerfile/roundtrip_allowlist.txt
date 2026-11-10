@@ -14,7 +14,8 @@
 #           until its entry is reviewed.
 #   kind    fragment: not a whole Dockerfile (a syntax template with
 #           <placeholders> or [optional] parts, `...` elisions, an example the
-#           reference itself shows as invalid);
+#           reference itself shows as invalid, a parser-directive header with
+#           no instruction, instructions shown without a FROM);
 #           blocked:  a real Dockerfile the BuildKit parser cannot round-trip
 #           through our renderer (logged as BLOCKED in the pass report).
 #   reason  free text, the rest of the line.
@@ -22,13 +23,108 @@
 # Lines starting with # and blank lines are ignored. The test fails on an
 # example that does not round-trip and is not listed, on a listed example that
 # round-trips, changed or no longer exists, and on a malformed line.
+#
+# The test never edits an example (no FROM is added, nothing is skipped): an
+# example counts as round-tripping only if it does so exactly as the reference
+# shows it. The only normalisation is extraction: CRLF -> LF and removing the
+# common indentation of a fence nested in a list item.
 
 from-platform-flag-const-disallowed.md#003 2120bf8d2464 fragment three stages whose bodies are elided with `...` lines; `...` is not an instruction
+legacy-key-value-format.md#002 fbc26acac71c fragment instruction snippet with no FROM (ENV at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+legacy-key-value-format.md#003 3fc5aa1bb1c7 fragment instruction snippet with no FROM (ENV at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+maintainer-deprecated.md#000 5c8dcbe48ddd fragment instruction snippet with no FROM (MAINTAINER at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+maintainer-deprecated.md#001 9b1f4638c30c fragment instruction snippet with no FROM (LABEL at line 1; only ARG may precede the first FROM); not a complete Dockerfile
 reference.md#000 b10e41be7a71 fragment the generic format template `INSTRUCTION arguments`; INSTRUCTION is a placeholder, not an instruction
+reference.md#001 d7ada61662b0 fragment instruction snippet with no FROM (RUN at line 2; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#002 143ad1a080c0 fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#003 ce4198ad2b68 fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
 reference.md#004 ed78c26ad43c fragment shown by the reference as invalid ("Invalid due to line continuation"): directives do not continue lines, so `tive=value` would be an unknown instruction
+reference.md#008 08353fe6bbcf fragment parser directives only, no instruction; not a complete Dockerfile (BuildKit: "file with no instructions")
+reference.md#009 9a14e1e31844 fragment parser directives only, no instruction; not a complete Dockerfile (BuildKit: "file with no instructions")
+reference.md#010 7eb48bd758a0 fragment parser directives only, no instruction; not a complete Dockerfile (BuildKit: "file with no instructions")
+reference.md#011 7cc0eb170f81 fragment parser directives only, no instruction; not a complete Dockerfile (BuildKit: "file with no instructions")
+reference.md#012 f906cc60564c fragment parser directives only, no instruction; not a complete Dockerfile (BuildKit: "file with no instructions")
 reference.md#015 cc4d813e58ac fragment the check directive syntax template (`<checks|all>`, `<boolean>` placeholders, two check lines where one is allowed); BuildKit rejects the duplicate directive
+reference.md#016 15541c2738e8 fragment parser directives only, no instruction; not a complete Dockerfile (BuildKit: "file with no instructions")
+reference.md#017 5c5491972271 fragment parser directives only, no instruction; not a complete Dockerfile (BuildKit: "file with no instructions")
+reference.md#018 8caeeb28d950 fragment parser directives only, no instruction; not a complete Dockerfile (BuildKit: "file with no instructions")
+reference.md#020 90a530cbf578 fragment instruction snippet with no FROM (ENV at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#021 130c57698052 fragment instruction snippet with no FROM (ENTRYPOINT at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#022 d98346b6969a fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#023 ad880068ef06 fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#024 552e8c6f021b fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#025 3a5e8588e55c fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#026 758832e19342 fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#027 39d57d6c1040 fragment instruction snippet with no FROM (SHELL at line 1; only ARG may precede the first FROM); not a complete Dockerfile
 reference.md#028 aab49d90418d fragment FROM syntax template with [optional] parts and <placeholders>
 reference.md#029 6e128e5dbcff fragment FROM syntax template with [optional] parts and <placeholders>
 reference.md#030 3657727f35dc fragment FROM syntax template with [optional] parts and <placeholders>
+reference.md#034 695bcb0a74b2 fragment instruction snippet with no FROM (RUN at line 2; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#035 b1ffba377fe6 fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#036 a4d2aa9335c6 fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#038 45209c6921fd fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#044 01010a509369 fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#046 9bb596534516 fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#048 39a636478eae fragment instruction snippet with no FROM (LABEL at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#049 8e457da61ca1 fragment instruction snippet with no FROM (LABEL at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#050 ad1740ca139a fragment instruction snippet with no FROM (LABEL at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#051 a9ab76e50235 fragment instruction snippet with no FROM (LABEL at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#052 383703d58522 fragment instruction snippet with no FROM (MAINTAINER at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#053 f5e67cc9f833 fragment instruction snippet with no FROM (LABEL at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#054 869c3db2f688 fragment instruction snippet with no FROM (EXPOSE at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#055 51a975100672 fragment instruction snippet with no FROM (EXPOSE at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#056 fd764191b9b1 fragment instruction snippet with no FROM (EXPOSE at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#057 92a46dfa9d39 fragment instruction snippet with no FROM (ENV at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#058 717f83c91734 fragment instruction snippet with no FROM (ENV at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#059 b7ece12a204e fragment instruction snippet with no FROM (ENV at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#060 e34e7354672f fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#061 14ca9a414838 fragment instruction snippet with no FROM (RUN at line 2; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#062 7eb4b8312e70 fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#063 6e0f48fc02d7 fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#064 7112bfddb635 fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#065 4e628dd09e13 fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#066 281020ca3090 fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#067 93203e4ba5be fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#068 3a2ac6974ac3 fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#069 430908253639 fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#071 d77202f8cde4 fragment instruction snippet with no FROM (ADD at line 2; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#072 0830d2844f8e fragment instruction snippet with no FROM (WORKDIR at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#073 3108430e89a4 fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#075 6d52092b4045 fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#076 9cd1a14d615f fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#077 b014b97659f3 fragment instruction snippet with no FROM (ADD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#079 20f810b2ffa7 fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#080 dd253474a4d7 fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#082 309263b297eb fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#083 3e11f557613b fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#084 39bf36b157ec fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#085 c7a342818687 fragment instruction snippet with no FROM (COPY at line 2; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#086 7ef5f84fa49e fragment instruction snippet with no FROM (WORKDIR at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#087 7307914ef9fc fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#089 af53fa0dc487 fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#090 5309c8570cdb fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#091 d84ca4d4c4d3 fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#092 3d5183eb79fa fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#093 121b165efa74 fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#094 a14f0519bc1e fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#095 20f5d87a9f18 fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#099 04fee34a98c3 fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#103 80fc64c23103 fragment instruction snippet with no FROM (COPY at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#106 b90641b4df9d fragment instruction snippet with no FROM (ENTRYPOINT at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#107 0fd4b0d38734 fragment instruction snippet with no FROM (ENTRYPOINT at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#112 e20dca0be14f fragment instruction snippet with no FROM (VOLUME at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#114 b65457be72de fragment instruction snippet with no FROM (USER at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#115 be1da791c45e fragment instruction snippet with no FROM (USER at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#117 bbdb697b6bf6 fragment instruction snippet with no FROM (WORKDIR at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#118 897f56511822 fragment instruction snippet with no FROM (WORKDIR at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#119 cf75db770707 fragment instruction snippet with no FROM (ENV at line 1; only ARG may precede the first FROM); not a complete Dockerfile
 reference.md#120 71b480406786 fragment ARG syntax template (`<name>[=<default value>] ...`); no FROM, nothing to round-trip but placeholder words
 reference.md#134 69eef4c10ddd fragment ONBUILD syntax template; <INSTRUCTION> is a placeholder
+reference.md#135 a1741b62bdba fragment instruction snippet with no FROM (ONBUILD at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#137 a0df5f8b720b fragment instruction snippet with no FROM (STOPSIGNAL at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#138 23e5e997cbb1 fragment instruction snippet with no FROM (HEALTHCHECK at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#139 6d965cd688f7 fragment instruction snippet with no FROM (SHELL at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#141 5e7f3c1b47c8 fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+reference.md#142 8305eaf5a6bc fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile
+secrets-used-in-arg-or-env.md#000 6d26ee2d9109 fragment instruction snippet with no FROM (RUN at line 3; only ARG may precede the first FROM); not a complete Dockerfile
+secrets-used-in-arg-or-env.md#001 372013041be1 fragment instruction snippet with no FROM (RUN at line 1; only ARG may precede the first FROM); not a complete Dockerfile

@@ -113,54 +113,29 @@ func dockerfileReadAllowlist(t *testing.T) map[string]dockerfileAllowEntry {
 	return out
 }
 
-// dockerfileDocExampleRoundTrip round-trips one doc example and returns why it
-// does not. Snippets are completed the way a reader would: a header of parser
-// directives / comments only, or instructions before any FROM, get a
-// "FROM scratch" stage. Nothing else is skipped.
+// dockerfileDocExampleRoundTrip round-trips one doc example exactly as the
+// reference shows it and returns why it does not. The test never edits an
+// example: no FROM is added to a directive-only header or to instructions
+// shown before FROM, nothing is skipped. An example that is not a complete
+// Dockerfile on its own is a fragment and belongs in the allowlist.
 func dockerfileDocExampleRoundTrip(src string) error {
 	if _, err := parser.Parse(bytes.NewReader([]byte(src))); err != nil {
-		if !dockerfileCommentsOnly(src) {
-			return fmt.Errorf("buildkit parser: %w", err)
-		}
-		// A directive header shown on its own.
-		src = strings.TrimRight(src, "\n") + "\nFROM scratch\n"
-		if _, err := parser.Parse(bytes.NewReader([]byte(src))); err != nil {
-			return fmt.Errorf("buildkit parser: %w", err)
-		}
+		return fmt.Errorf("buildkit parser: %w", err)
 	}
 	p1, err := dockerfileParse(src)
-	if err != nil && strings.Contains(err.Error(), "before the first FROM") {
-		// Instruction snippets: give them a stage.
-		p1, err = dockerfileParse(dockerfileWithFrom(src))
-	}
 	if err != nil {
 		return err
 	}
 	if len(p1.Doc.Stages) == 0 {
-		return fmt.Errorf("no stage (FROM) and no instruction to give one")
+		return fmt.Errorf("no stage (FROM)")
 	}
 	_, err = dockerfileRoundTrip(p1.Doc)
 	return err
 }
 
-// dockerfileCommentsOnly reports whether every non-blank line is a comment.
-func dockerfileCommentsOnly(src string) bool {
-	seen := false
-	for _, l := range strings.Split(src, "\n") {
-		l = strings.TrimSpace(l)
-		if l == "" {
-			continue
-		}
-		if !strings.HasPrefix(l, "#") {
-			return false
-		}
-		seen = true
-	}
-	return seen
-}
-
 // TestDockerfileGoldenDocExamples: parse -> render -> parse round-trips for
-// every Dockerfile example of the harvested reference docs. Every example
+// every Dockerfile example of the harvested reference docs, exactly as the
+// reference shows it (no test-side completion). Every example
 // must round-trip unless testdata/dockerfile/roundtrip_allowlist.txt lists it
 // (a fragment, or a BuildKit parser limit); a listed example that now
 // round-trips, changed, or no longer exists fails the test too.
@@ -199,21 +174,15 @@ func TestDockerfileGoldenDocExamples(t *testing.T) {
 			t.Errorf("%s:%d: %s is not an example of %s any more: remove it", dockerfileRoundTripAllowlist, a.Line, k, dockerfileDocsDir)
 		}
 	}
-	t.Logf("%d doc examples: %d round-trip, %d allowlisted fragment, %d allowlisted blocked",
+	// The counts are part of the test output (-v) so the honest round-trip
+	// number is visible. Every unlisted example must round-trip (above), so
+	// the round-trip count can only drop by adding an allowlist entry.
+	t.Logf("%d doc examples: %d round-trip with no test-side edits, %d allowlisted fragment, %d allowlisted blocked",
 		len(ex), roundTripped, kinds["fragment"], kinds["blocked"])
-}
-
-// dockerfileWithFrom inserts "FROM scratch" after the leading parser
-// directives of a snippet.
-func dockerfileWithFrom(src string) string {
-	lines := strings.Split(src, "\n")
-	i := 0
-	for i < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[i]), "#") &&
-		dockerfileDirectiveLikeRe.MatchString(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(lines[i]), "#"))) {
-		i++
+	if !t.Failed() && roundTripped+kinds["fragment"]+kinds["blocked"] != len(ex) {
+		t.Errorf("counts do not add up: %d round-trip + %d fragment + %d blocked != %d examples",
+			roundTripped, kinds["fragment"], kinds["blocked"], len(ex))
 	}
-	out := append(append(append([]string{}, lines[:i]...), "FROM scratch"), lines[i:]...)
-	return strings.Join(out, "\n")
 }
 
 // dockerfileAssertRoundTrip renders doc, parses the text again and checks
