@@ -1,0 +1,10 @@
+{
+  "inputs": {"swagger": "", "compose_schema": "new", "bake_ref": ""},
+  "fields": [
+    {"pointer": "compose:service/image", "source": "compose", "how": "auto-code", "item": "compose:services", "attr": "content"},
+    {"pointer": "compose:service/sparkle", "source": "compose", "how": "gap", "item": "compose:services"},
+    {"pointer": "bake:target/context", "source": "bake", "how": "auto-code", "item": "buildx:bake", "attr": "target.context"}
+  ],
+  "operations": [],
+  "errors": []
+}

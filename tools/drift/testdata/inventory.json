@@ -1,0 +1,4 @@
+{"items": [
+  {"id": "engine:container", "layer": "engine", "kind": "resource", "sources": [{"type": "swagger", "operationId": "ContainerCreate", "method": "POST"}]},
+  {"id": "engine:image-planned", "layer": "engine", "kind": "skip", "sources": [{"type": "swagger", "operationId": "ImagePlanned", "method": "POST"}]}
+]}

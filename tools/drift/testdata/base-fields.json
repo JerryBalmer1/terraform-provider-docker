@@ -1,0 +1,15 @@
+{
+  "inputs": {"swagger": "", "compose_schema": "", "bake_ref": ""},
+  "fields": [
+    {"pointer": "engine:ContainerConfig/Image", "source": "engine", "how": "auto-code", "item": "engine:container", "attr": "image"},
+    {"pointer": "engine:ContainerConfig/OldThing", "source": "engine", "how": "auto-schema", "item": "engine:container", "attr": "old_thing"},
+    {"pointer": "engine:ContainerConfig/Ignored", "source": "engine", "how": "manual:A", "item": "engine:container", "skip": "not applicable to a declarative provider"},
+    {"pointer": "compose:service/image", "source": "compose", "how": "auto-code", "item": "compose:services", "attr": "content"},
+    {"pointer": "bake:target/context", "source": "bake", "how": "auto-code", "item": "buildx:bake", "attr": "target.context"}
+  ],
+  "operations": [
+    {"id": "ContainerCreate", "method": "POST", "path": "/containers/create"},
+    {"id": "ContainerLegacy", "method": "POST", "path": "/containers/{id}/legacy"}
+  ],
+  "errors": []
+}

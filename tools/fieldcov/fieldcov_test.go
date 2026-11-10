@@ -265,3 +265,47 @@ func TestRenderMapDropsLineNumbers(t *testing.T) {
 		t.Errorf("rendered map keeps line numbers:\n%s", b)
 	}
 }
+
+func TestInputsResolve(t *testing.T) {
+	repo := filepath.Join("r")
+	in := inputs{}.resolve(repo)
+	if in.Swagger != filepath.Join(repo, "reference", "upstream", "engine-api", "api", "swagger.yaml") ||
+		in.Compose != filepath.Join(repo, "reference", "upstream", "compose-spec", "schema", "compose-spec.json") ||
+		in.Bake != filepath.Join(repo, "reference", "upstream", "buildx", "docs", "bake-reference.md") {
+		t.Errorf("pinned defaults: %+v", in)
+	}
+	if (inputs{}).alternate() {
+		t.Error("empty inputs are not alternate")
+	}
+	alt := inputs{Bake: "x.md"}
+	if !alt.alternate() || !filepath.IsAbs(alt.resolve(repo).Bake) {
+		t.Errorf("alternate bake: %+v", alt.resolve(repo))
+	}
+}
+
+func TestRenderFields(t *testing.T) {
+	res := &result{
+		Fields: []field{
+			{Pointer: "engine:X/B", Source: "engine", Ops: []string{"Op"}, Deprecated: true},
+			{Pointer: "bake:target/a", Source: "bake"},
+		},
+		Map: map[string]entry{
+			"engine:X/B":    {Item: "engine:container", How: "gap"},
+			"bake:target/a": {Item: "buildx:bake", Attr: "target.a", How: "auto-code"},
+		},
+		Operations: []fieldsOp{{ID: "Op", Method: "POST", Path: "/op"}},
+	}
+	b, err := renderFields(res, inputs{Swagger: "s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	for _, want := range []string{`"pointer": "bake:target/a"`, `"how": "gap"`, `"deprecated": true`, `"id": "Op"`, `"errors": []`, `"swagger": "s"`} {
+		if !strings.Contains(s, want) {
+			t.Errorf("fields-out lacks %s:\n%s", want, s)
+		}
+	}
+	if strings.Index(s, "bake:target/a") > strings.Index(s, "engine:X/B") {
+		t.Error("fields are not sorted by pointer")
+	}
+}

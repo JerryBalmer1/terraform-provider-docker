@@ -1,0 +1,93 @@
+# Weekly upstream drift check: Invoke-Build DriftCheck (tools/drift) compares every source pinned in
+# reference/SOURCES.md with its newest upstream release and diffs the moved specs with tools/fieldcov.
+# On failure it opens, or updates, ONE issue titled exactly "Upstream drift" with the report. It never
+# changes code or a pin: resolve the issue by hand (map, accept in reference/_gen/drift-accepted.json, or
+# re-pin), see the "Resolving" section of the report.
+name: Upstream drift
+
+on:
+  schedule:
+    - cron: '17 6 * * 1' # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: upstream-drift
+  cancel-in-progress: false
+
+env:
+  # Pinned Invoke-Build module version (PowerShell Gallery), as in ci.yml.
+  INVOKE_BUILD_VERSION: 5.14.23
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install InvokeBuild
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module InvokeBuild -RequiredVersion $env:INVOKE_BUILD_VERSION -Scope CurrentUser -Force
+
+      # Exit 1: unmapped drift not in reference/_gen/drift-accepted.json; exit 2: a probe or fieldcov error.
+      # The report is written in every case.
+      - name: Invoke-Build DriftCheck
+        id: drift
+        shell: pwsh
+        env:
+          DRIFT_REPORT: ${{ runner.temp }}/drift-report.md
+        run: Invoke-Build DriftCheck
+
+      - name: upload drift report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: drift-report
+          path: |
+            ${{ runner.temp }}/drift-report.md
+            ${{ runner.temp }}/drift-report.json
+          if-no-files-found: ignore
+
+      # One issue titled exactly "Upstream drift": edit its body when it is open, else create it.
+      - name: open or update the "Upstream drift" issue
+        if: failure() && steps.drift.conclusion == 'failure'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REPORT: ${{ runner.temp }}/drift-report.md
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title='Upstream drift'
+          body="$RUNNER_TEMP/drift-issue.md"
+          {
+            if [ -s "$REPORT" ]; then
+              # GitHub caps an issue body at 65536 characters; the full report is the run artifact.
+              head -c 60000 "$REPORT"
+            else
+              echo "DriftCheck failed before writing a report."
+            fi
+            printf '\n\n---\nWorkflow run: %s (artifact drift-report has the full Markdown and JSON reports).\n' "$RUN_URL"
+          } > "$body"
+          number="$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+            --jq "map(select(.title == \"$title\")) | first | .number // empty")"
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body-file "$body"
+            gh issue comment "$number" --body "Drift report refreshed: $RUN_URL"
+            echo "updated issue #$number"
+          else
+            gh issue create --title "$title" --body-file "$body"
+          fi

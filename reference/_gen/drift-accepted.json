@@ -1,0 +1,4 @@
+{
+  "about": "Upstream drift reviewed and knowingly not mapped yet, read by Invoke-Build DriftCheck (tools/drift). Each entry: item (a DriftCheck finding: operation:<operationId>, a fieldcov pointer such as engine:ContainerConfig/Foo or compose:service/foo or bake:target/foo, or version:<source> for a documentation-only source: compose, docker-cli, buildkit), reason (at least 20 characters), date (YYYY-MM-DD the decision was made), version_seen (the upstream release that brought it). A version:<source> entry accepts exactly version_seen, so the next release fails again; other entries accept the item whatever release brings it. Remove an entry once the item is mapped or the source is re-pinned: DriftCheck lists entries that matched nothing as stale.",
+  "accepted": []
+}

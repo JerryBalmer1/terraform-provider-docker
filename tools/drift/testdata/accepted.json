@@ -1,0 +1,8 @@
+{
+  "about": "test fixture",
+  "accepted": [
+    {"item": "version:compose", "reason": "reviewed the v5.7.0 CLI reference, nothing new", "date": "2026-11-09", "version_seen": "v5.7.0"},
+    {"item": "engine:ContainerConfig/Waived", "reason": "accepted until the next re-pin of the Engine API", "date": "2026-11-09", "version_seen": "api/v1.57.0"},
+    {"item": "operation:GoneAway", "reason": "an entry nothing matches any more, so it is stale", "date": "2026-11-01", "version_seen": "api/v1.57.0"}
+  ]
+}

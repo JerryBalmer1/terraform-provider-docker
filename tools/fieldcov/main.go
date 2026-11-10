@@ -9,6 +9,19 @@
 //	go run ./tools/fieldcov -gaps DIR             write DIR/<lane>.json, the gaps per Pass 5.3 lane
 //	go run ./tools/fieldcov -v                    list every gap in the report
 //	go run ./tools/fieldcov -summary FILE         write the counts as JSON
+//	go run ./tools/fieldcov -fields-out FILE      write every field with its mapping, the swagger operations and the errors as JSON
+//
+// Alternate upstream inputs (tools/drift: a newer upstream spec fetched to a
+// temp directory, never into reference/):
+//
+//	-swagger FILE          Engine API swagger instead of reference/upstream/engine-api/api/swagger.yaml
+//	-compose-schema FILE   compose JSON schema instead of reference/upstream/compose-spec/schema/compose-spec.json
+//	-bake-ref FILE         bake reference instead of reference/upstream/buildx/docs/bake-reference.md
+//
+// With an alternate input, -write, -enforce and -gaps are refused (fieldmap.json
+// describes the pinned specs only), an inventory operation missing from the
+// alternate swagger is an error line instead of a fatal error, and overlay
+// pointers the alternate spec no longer has are error lines as usual.
 //
 // Mapping, in order (the first that applies wins):
 //
@@ -64,6 +77,24 @@ type result struct {
 	Map     map[string]entry
 	Errors  []string
 	Overlay map[string]string // pointer -> overlay file
+	// Operations are every operation of the swagger spec, sorted by id.
+	Operations []fieldsOp
+}
+
+// fieldsOp is one swagger operation in the -fields-out file.
+type fieldsOp struct {
+	ID     string `json:"id"`
+	Method string `json:"method"`
+	Path   string `json:"path"`
+}
+
+func sortedOps(all map[string]swaggerOp) []fieldsOp {
+	out := make([]fieldsOp, 0, len(all))
+	for _, o := range all {
+		out = append(out, fieldsOp{ID: o.ID, Method: o.Method, Path: o.Path})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
 }
 
 func repoRoot() (string, error) {
@@ -91,13 +122,22 @@ func main() {
 	gapsDir := flag.String("gaps", "", "write the gaps per lane to DIR/<lane>.json")
 	verbose := flag.Bool("v", false, "list every gap")
 	summary := flag.String("summary", "", "write the counts as JSON to FILE")
+	fieldsOut := flag.String("fields-out", "", "write every field with its mapping, the swagger operations and the errors as JSON to FILE")
+	var in inputs
+	flag.StringVar(&in.Swagger, "swagger", "", "alternate Engine API swagger file (default: the pinned reference/upstream copy)")
+	flag.StringVar(&in.Compose, "compose-schema", "", "alternate compose JSON schema file (default: the pinned compose-spec copy)")
+	flag.StringVar(&in.Bake, "bake-ref", "", "alternate bake-reference.md (default: the pinned buildx copy)")
 	flag.Parse()
 	repo, err := repoRoot()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "fieldcov:", err)
 		os.Exit(2)
 	}
-	res, err := run(context.Background(), repo)
+	if in.alternate() && (*write || *enforce || *gapsDir != "") {
+		fmt.Fprintln(os.Stderr, "fieldcov: -write, -enforce and -gaps describe the pinned specs; they cannot be combined with -swagger, -compose-schema or -bake-ref")
+		os.Exit(2)
+	}
+	res, err := runWith(context.Background(), repo, in)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "fieldcov:", err)
 		os.Exit(2)
@@ -119,6 +159,12 @@ func main() {
 	}
 	if *gapsDir != "" {
 		if err := writeGaps(*gapsDir, res); err != nil {
+			fmt.Fprintln(os.Stderr, "fieldcov:", err)
+			os.Exit(2)
+		}
+	}
+	if *fieldsOut != "" {
+		if err := writeFields(*fieldsOut, res, in.resolve(repo)); err != nil {
 			fmt.Fprintln(os.Stderr, "fieldcov:", err)
 			os.Exit(2)
 		}
@@ -160,7 +206,39 @@ func firstN(s []string, n int) []string {
 
 func normalizeEOL(s string) string { return strings.ReplaceAll(s, "\r\n", "\n") }
 
-func run(ctx context.Context, repo string) (*result, error) {
+// inputs names alternate upstream spec files; empty means the pinned copy.
+type inputs struct {
+	Swagger string `json:"swagger"`
+	Compose string `json:"compose_schema"`
+	Bake    string `json:"bake_ref"`
+}
+
+func (in inputs) alternate() bool { return in.Swagger != "" || in.Compose != "" || in.Bake != "" }
+
+// resolve fills in the pinned defaults (paths under repo) and makes the
+// alternate paths absolute.
+func (in inputs) resolve(repo string) inputs {
+	def := func(v string, rel ...string) string {
+		if v != "" {
+			if a, err := filepath.Abs(v); err == nil {
+				return a
+			}
+			return v
+		}
+		return filepath.Join(append([]string{repo}, rel...)...)
+	}
+	return inputs{
+		Swagger: def(in.Swagger, "reference", "upstream", "engine-api", "api", "swagger.yaml"),
+		Compose: def(in.Compose, "reference", "upstream", "compose-spec", "schema", "compose-spec.json"),
+		Bake:    def(in.Bake, "reference", "upstream", "buildx", "docs", "bake-reference.md"),
+	}
+}
+
+func run(ctx context.Context, repo string) (*result, error) { return runWith(ctx, repo, inputs{}) }
+
+func runWith(ctx context.Context, repo string, in inputs) (*result, error) {
+	lenient := in.Swagger != ""
+	in = in.resolve(repo)
 	items, err := loadInventory(filepath.Join(repo, "reference", "inventory.json"))
 	if err != nil {
 		return nil, err
@@ -169,14 +247,21 @@ func run(ctx context.Context, repo string) (*result, error) {
 	for _, it := range items {
 		byID[it.ID] = it
 	}
-	sw, err := loadSwagger(filepath.Join(repo, "reference", "upstream", "engine-api", "api", "swagger.yaml"))
+	sw, err := loadSwagger(in.Swagger)
 	if err != nil {
 		return nil, err
 	}
 	scope := engineScope(items)
 	ops := make([]string, 0, len(scope))
 	opInfo := map[string]opOwner{}
+	all := sw.operations()
+	var missingOps []string
 	for _, o := range scope {
+		if _, ok := all[o.Op]; !ok && lenient {
+			// An alternate (newer) spec dropped an operation the inventory maps.
+			missingOps = append(missingOps, "operation "+o.Op+" is not in the swagger spec")
+			continue
+		}
 		ops = append(ops, o.Op)
 		opInfo[o.Op] = o
 	}
@@ -184,11 +269,11 @@ func run(ctx context.Context, repo string) (*result, error) {
 	if err != nil {
 		return nil, err
 	}
-	cmp, err := composeFields(filepath.Join(repo, "reference", "upstream", "compose-spec", "schema", "compose-spec.json"))
+	cmp, err := composeFields(in.Compose)
 	if err != nil {
 		return nil, err
 	}
-	bake, err := bakeFields(filepath.Join(repo, "reference", "upstream", "buildx", "docs", "bake-reference.md"))
+	bake, err := bakeFields(in.Bake)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +290,7 @@ func run(ctx context.Context, repo string) (*result, error) {
 		return nil, err
 	}
 
-	res := &result{Map: map[string]entry{}, Overlay: map[string]string{}}
+	res := &result{Map: map[string]entry{}, Overlay: map[string]string{}, Errors: missingOps, Operations: sortedOps(all)}
 	res.Fields = append(append(append(res.Fields, eng...), cmp...), bake...)
 
 	// Automatic mapping.
@@ -532,6 +617,55 @@ func renderMap(res *result) ([]byte, error) {
 		return nil, err
 	}
 	return append(b, '\n'), nil
+}
+
+// fieldsFile is the -fields-out document, read by tools/drift.
+type fieldsFile struct {
+	Inputs     inputs      `json:"inputs"`
+	Fields     []fieldsRow `json:"fields"`
+	Operations []fieldsOp  `json:"operations"`
+	Errors     []string    `json:"errors"`
+}
+
+type fieldsRow struct {
+	Pointer    string   `json:"pointer"`
+	Source     string   `json:"source"`
+	How        string   `json:"how"`
+	Item       string   `json:"item,omitempty"`
+	Attr       string   `json:"attr,omitempty"`
+	Skip       string   `json:"skip,omitempty"`
+	Partial    string   `json:"partial,omitempty"`
+	Ops        []string `json:"ops,omitempty"`
+	Deprecated bool     `json:"deprecated,omitempty"`
+}
+
+func renderFields(res *result, in inputs) ([]byte, error) {
+	doc := fieldsFile{Inputs: in, Fields: make([]fieldsRow, 0, len(res.Fields)), Operations: res.Operations, Errors: res.Errors}
+	if doc.Operations == nil {
+		doc.Operations = []fieldsOp{}
+	}
+	if doc.Errors == nil {
+		doc.Errors = []string{}
+	}
+	for _, f := range res.Fields {
+		e := res.Map[f.Pointer]
+		doc.Fields = append(doc.Fields, fieldsRow{Pointer: f.Pointer, Source: f.Source, How: e.How, Item: e.Item, Attr: e.Attr,
+			Skip: e.Skip, Partial: e.Partial, Ops: f.Ops, Deprecated: f.Deprecated})
+	}
+	sort.Slice(doc.Fields, func(i, j int) bool { return doc.Fields[i].Pointer < doc.Fields[j].Pointer })
+	b, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(b, '\n'), nil
+}
+
+func writeFields(path string, res *result, in inputs) error {
+	b, err := renderFields(res, in)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, b, 0o644)
 }
 
 type gapEntry struct {

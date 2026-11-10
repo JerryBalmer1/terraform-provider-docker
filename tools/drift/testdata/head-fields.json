@@ -1,0 +1,18 @@
+{
+  "inputs": {"swagger": "new", "compose_schema": "", "bake_ref": ""},
+  "fields": [
+    {"pointer": "engine:ContainerConfig/Image", "source": "engine", "how": "auto-code", "item": "engine:container", "attr": "image"},
+    {"pointer": "engine:ContainerConfig/Ignored", "source": "engine", "how": "manual:A", "item": "engine:container", "skip": "not applicable to a declarative provider"},
+    {"pointer": "engine:ContainerConfig/Shiny", "source": "engine", "how": "gap", "item": "engine:container"},
+    {"pointer": "engine:ContainerConfig/Known", "source": "engine", "how": "auto-schema", "item": "engine:container", "attr": "known"},
+    {"pointer": "engine:ContainerConfig/Waived", "source": "engine", "how": "gap", "item": "engine:container"},
+    {"pointer": "compose:service/image", "source": "compose", "how": "auto-code", "item": "compose:services", "attr": "content"},
+    {"pointer": "bake:target/context", "source": "bake", "how": "auto-code", "item": "buildx:bake", "attr": "target.context"}
+  ],
+  "operations": [
+    {"id": "ContainerCreate", "method": "POST", "path": "/containers/create"},
+    {"id": "ContainerBrandNew", "method": "POST", "path": "/containers/{id}/brandnew"},
+    {"id": "ImagePlanned", "method": "POST", "path": "/images/planned"}
+  ],
+  "errors": ["fieldmap.d/A.json: engine:ContainerConfig/OldThing: no such upstream field (stale pointer)"]
+}

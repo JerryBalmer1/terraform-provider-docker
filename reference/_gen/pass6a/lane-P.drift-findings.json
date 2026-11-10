@@ -1,0 +1,97 @@
+{
+  "about": "Pass 6a Lane P: the real Invoke-Build DriftCheck result on 2026-11-09 (tools/drift against reference/SOURCES.md). Not accepted in reference/_gen/drift-accepted.json: the user decides (re-pin, or accept each version:<source> entry).",
+  "generated": "2026-11-10T05:19:12Z",
+  "sources": [
+    {
+      "name": "moby",
+      "model": "engine",
+      "pinned": "api/v1.56.1",
+      "newest": "api/v1.56.1",
+      "moved": false,
+      "note": null
+    },
+    {
+      "name": "docs-engine-api",
+      "model": "engine",
+      "pinned": "1.56",
+      "newest": "1.56",
+      "moved": false,
+      "note": null
+    },
+    {
+      "name": "compose-spec",
+      "model": "compose",
+      "pinned": "main@3a4a6995e4a9",
+      "newest": "main@3a4a6995e4a9",
+      "moved": false,
+      "note": "no release tags: tracks main HEAD"
+    },
+    {
+      "name": "compose-go",
+      "model": "compose-go",
+      "pinned": "v2.16.2",
+      "newest": "v2.16.2",
+      "moved": false,
+      "note": null
+    },
+    {
+      "name": "compose",
+      "model": "doc",
+      "pinned": "v5.1.4",
+      "newest": "v5.7.0",
+      "moved": true,
+      "note": null
+    },
+    {
+      "name": "docker-cli",
+      "model": "doc",
+      "pinned": "v29.5.3",
+      "newest": "v29.9.3",
+      "moved": true,
+      "note": null
+    },
+    {
+      "name": "buildkit",
+      "model": "doc",
+      "pinned": "dockerfile/1.28.0",
+      "newest": "dockerfile/1.28.0",
+      "moved": false,
+      "note": null
+    },
+    {
+      "name": "buildx",
+      "model": "bake",
+      "pinned": "v0.38.2",
+      "newest": "v0.38.2",
+      "moved": false,
+      "note": null
+    }
+  ],
+  "findings": [
+    {
+      "kind": "version",
+      "change": "moved",
+      "source": "compose",
+      "item": "version:compose",
+      "status": "unmapped",
+      "detail": "pinned v5.1.4, newest v5.7.0",
+      "version_seen": "v5.7.0"
+    },
+    {
+      "kind": "version",
+      "change": "moved",
+      "source": "docker-cli",
+      "item": "version:docker-cli",
+      "status": "unmapped",
+      "detail": "pinned v29.5.3, newest v29.9.3",
+      "version_seen": "v29.9.3"
+    }
+  ],
+  "counts": {
+    "new_operations": 0,
+    "new_writable_fields": 0,
+    "removed_operations": 0,
+    "removed_fields": 0,
+    "unaccepted_version_moves": 2
+  }
+}
