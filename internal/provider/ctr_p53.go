@@ -668,11 +668,18 @@ func (r *containerResource) UpgradeState(ctx context.Context) map[int64]resource
 			var sr resource.SchemaResponse
 			r.Schema(ctx, resource.SchemaRequest{}, &sr)
 			b, err := ctrUpgradeV0(ctx, req.RawState.JSON, sr.Schema.Type().TerraformType(ctx))
+			if err == nil {
+				b, err = contractUpgradeNullOutputs("engine:container", b)
+			}
 			if err != nil {
 				resp.Diagnostics.AddError("Cannot upgrade docker_container state", err.Error())
 				return
 			}
 			resp.DynamicValue = &tfprotov6.DynamicValue{JSON: b}
+		}},
+		// v1 -> v2 (Pass 6c): structured outputs changed shape; null them, the next Read refills them.
+		1: {StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+			p6cUpgradeOutputs("docker_container", "engine:container", req, resp)
 		}},
 	}
 }

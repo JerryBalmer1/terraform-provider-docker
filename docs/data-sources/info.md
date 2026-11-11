@@ -113,7 +113,16 @@ Read-Only:
 Read-Only:
 
 - `address` (String) Upstream `Address`.
-- `namespaces` (Dynamic) Upstream `Namespaces`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `namespaces` (Attributes) Upstream `Namespaces`. (see [below for nested schema](#nestedatt--info--containerd--namespaces))
+
+<a id="nestedatt--info--containerd--namespaces"></a>
+### Nested Schema for `info.containerd.namespaces`
+
+Read-Only:
+
+- `containers` (String) Upstream `Containers`.
+- `plugins` (String) Upstream `Plugins`.
+
 
 
 <a id="nestedatt--info--containerd_commit"></a>
@@ -156,8 +165,26 @@ Read-Only:
 
 Read-Only:
 
-- `discrete_resource_spec` (String) Upstream `DiscreteResourceSpec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `named_resource_spec` (String) Upstream `NamedResourceSpec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `discrete_resource_spec` (Attributes) Upstream `DiscreteResourceSpec`. (see [below for nested schema](#nestedatt--info--generic_resources--discrete_resource_spec))
+- `named_resource_spec` (Attributes) Upstream `NamedResourceSpec`. (see [below for nested schema](#nestedatt--info--generic_resources--named_resource_spec))
+
+<a id="nestedatt--info--generic_resources--discrete_resource_spec"></a>
+### Nested Schema for `info.generic_resources.discrete_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `Kind`.
+- `value` (Number) Upstream `Value`.
+
+
+<a id="nestedatt--info--generic_resources--named_resource_spec"></a>
+### Nested Schema for `info.generic_resources.named_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `Kind`.
+- `value` (String) Upstream `Value`.
+
 
 
 <a id="nestedatt--info--init_commit"></a>
@@ -192,9 +219,20 @@ Read-Only:
 
 Read-Only:
 
-- `index_configs` (Map of String) Upstream `IndexConfigs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `index_configs` (Attributes Map) Upstream `IndexConfigs`. (see [below for nested schema](#nestedatt--info--registry_config--index_configs))
 - `insecure_registry_cid_rs` (List of String) Upstream `InsecureRegistryCIDRs`.
 - `mirrors` (List of String) Upstream `Mirrors`.
+
+<a id="nestedatt--info--registry_config--index_configs"></a>
+### Nested Schema for `info.registry_config.index_configs`
+
+Read-Only:
+
+- `mirrors` (List of String) Upstream `Mirrors`.
+- `name` (String) Upstream `Name`.
+- `official` (Boolean) Upstream `Official`.
+- `secure` (Boolean) Upstream `Secure`.
+
 
 
 <a id="nestedatt--info--runc_commit"></a>
@@ -220,7 +258,7 @@ Read-Only:
 
 Read-Only:
 
-- `cluster` (Dynamic) Upstream `Cluster`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `cluster` (Attributes) Upstream `Cluster`. (see [below for nested schema](#nestedatt--info--swarm--cluster))
 - `control_available` (Boolean) Upstream `ControlAvailable`.
 - `error` (String) Upstream `Error`.
 - `local_node_state` (String) Upstream `LocalNodeState`.
@@ -228,4 +266,138 @@ Read-Only:
 - `node_addr` (String) Upstream `NodeAddr`.
 - `node_id` (String) Upstream `NodeID`.
 - `nodes` (Number) Upstream `Nodes`.
-- `remote_managers` (List of String) Upstream `RemoteManagers`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `remote_managers` (Attributes List) Upstream `RemoteManagers`. (see [below for nested schema](#nestedatt--info--swarm--remote_managers))
+
+<a id="nestedatt--info--swarm--cluster"></a>
+### Nested Schema for `info.swarm.cluster`
+
+Read-Only:
+
+- `created_at` (String) Upstream `CreatedAt`.
+- `data_path_port` (Number) Upstream `DataPathPort`.
+- `default_addr_pool` (List of String) Upstream `DefaultAddrPool`.
+- `id` (String) Upstream `ID`.
+- `root_rotation_in_progress` (Boolean) Upstream `RootRotationInProgress`.
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--info--swarm--cluster--spec))
+- `subnet_size` (Number) Upstream `SubnetSize`.
+- `tls_info` (Attributes) Upstream `TLSInfo`. (see [below for nested schema](#nestedatt--info--swarm--cluster--tls_info))
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--info--swarm--cluster--version))
+
+<a id="nestedatt--info--swarm--cluster--spec"></a>
+### Nested Schema for `info.swarm.cluster.spec`
+
+Read-Only:
+
+- `ca_config` (Attributes) Upstream `CAConfig`. (see [below for nested schema](#nestedatt--info--swarm--cluster--spec--ca_config))
+- `dispatcher` (Attributes) Upstream `Dispatcher`. (see [below for nested schema](#nestedatt--info--swarm--cluster--spec--dispatcher))
+- `encryption_config` (Attributes) Upstream `EncryptionConfig`. (see [below for nested schema](#nestedatt--info--swarm--cluster--spec--encryption_config))
+- `labels` (Map of String) Upstream `Labels`.
+- `name` (String) Upstream `Name`.
+- `orchestration` (Attributes) Upstream `Orchestration`. (see [below for nested schema](#nestedatt--info--swarm--cluster--spec--orchestration))
+- `raft` (Attributes) Upstream `Raft`. (see [below for nested schema](#nestedatt--info--swarm--cluster--spec--raft))
+- `task_defaults` (Attributes) Upstream `TaskDefaults`. (see [below for nested schema](#nestedatt--info--swarm--cluster--spec--task_defaults))
+
+<a id="nestedatt--info--swarm--cluster--spec--ca_config"></a>
+### Nested Schema for `info.swarm.cluster.spec.ca_config`
+
+Read-Only:
+
+- `external_cas` (Attributes List) Upstream `ExternalCAs`. (see [below for nested schema](#nestedatt--info--swarm--cluster--spec--ca_config--external_cas))
+- `force_rotate` (Number) Upstream `ForceRotate`.
+- `node_cert_expiry` (Number) Upstream `NodeCertExpiry`.
+- `signing_ca_cert` (String) Upstream `SigningCACert`.
+- `signing_ca_key` (String) Upstream `SigningCAKey`.
+
+<a id="nestedatt--info--swarm--cluster--spec--ca_config--external_cas"></a>
+### Nested Schema for `info.swarm.cluster.spec.ca_config.external_cas`
+
+Read-Only:
+
+- `ca_cert` (String) Upstream `CACert`.
+- `options` (Map of String) Upstream `Options`.
+- `protocol` (String) Upstream `Protocol`.
+- `url` (String) Upstream `URL`.
+
+
+
+<a id="nestedatt--info--swarm--cluster--spec--dispatcher"></a>
+### Nested Schema for `info.swarm.cluster.spec.dispatcher`
+
+Read-Only:
+
+- `heartbeat_period` (Number) Upstream `HeartbeatPeriod`.
+
+
+<a id="nestedatt--info--swarm--cluster--spec--encryption_config"></a>
+### Nested Schema for `info.swarm.cluster.spec.encryption_config`
+
+Read-Only:
+
+- `auto_lock_managers` (Boolean) Upstream `AutoLockManagers`.
+
+
+<a id="nestedatt--info--swarm--cluster--spec--orchestration"></a>
+### Nested Schema for `info.swarm.cluster.spec.orchestration`
+
+Read-Only:
+
+- `task_history_retention_limit` (Number) Upstream `TaskHistoryRetentionLimit`.
+
+
+<a id="nestedatt--info--swarm--cluster--spec--raft"></a>
+### Nested Schema for `info.swarm.cluster.spec.raft`
+
+Read-Only:
+
+- `election_tick` (Number) Upstream `ElectionTick`.
+- `heartbeat_tick` (Number) Upstream `HeartbeatTick`.
+- `keep_old_snapshots` (Number) Upstream `KeepOldSnapshots`.
+- `log_entries_for_slow_followers` (Number) Upstream `LogEntriesForSlowFollowers`.
+- `snapshot_interval` (Number) Upstream `SnapshotInterval`.
+
+
+<a id="nestedatt--info--swarm--cluster--spec--task_defaults"></a>
+### Nested Schema for `info.swarm.cluster.spec.task_defaults`
+
+Read-Only:
+
+- `log_driver` (Attributes) Upstream `LogDriver`. (see [below for nested schema](#nestedatt--info--swarm--cluster--spec--task_defaults--log_driver))
+
+<a id="nestedatt--info--swarm--cluster--spec--task_defaults--log_driver"></a>
+### Nested Schema for `info.swarm.cluster.spec.task_defaults.log_driver`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `options` (Map of String) Upstream `Options`.
+
+
+
+
+<a id="nestedatt--info--swarm--cluster--tls_info"></a>
+### Nested Schema for `info.swarm.cluster.tls_info`
+
+Read-Only:
+
+- `cert_issuer_public_key` (String) Upstream `CertIssuerPublicKey`.
+- `cert_issuer_subject` (String) Upstream `CertIssuerSubject`.
+- `trust_root` (String) Upstream `TrustRoot`.
+
+
+<a id="nestedatt--info--swarm--cluster--version"></a>
+### Nested Schema for `info.swarm.cluster.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.
+
+
+
+<a id="nestedatt--info--swarm--remote_managers"></a>
+### Nested Schema for `info.swarm.remote_managers`
+
+Read-Only:
+
+- `addr` (String) Upstream `Addr`.
+- `node_id` (String) Upstream `NodeID`.

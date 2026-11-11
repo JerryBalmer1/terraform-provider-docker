@@ -51,6 +51,7 @@ func (r *volumeResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (r *volumeResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: 1, // Pass 6c: structured outputs changed shape (state_upgrade_p6c_z.go)
 		MarkdownDescription: "A Docker volume (`VolumeCreate`). Volumes cannot be changed after creation, so every argument except " +
 			"`cluster_volume_spec.availability` forces a new volume (and its data is lost). Destroy fails while a container still uses the volume. Import by volume name. " +
 			"Swarm cluster (CSI) volumes are created with `cluster_volume_spec` (their `availability` updates in place). The raw `inspect_json` output is sensitive because driver options can hold credentials.",

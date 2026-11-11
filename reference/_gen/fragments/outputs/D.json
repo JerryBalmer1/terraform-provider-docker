@@ -3294,9 +3294,9 @@
             {
               "name": "exposed_ports",
               "upstream": "ExposedPorts",
-              "tf_type": "list(string)",
+              "tf_type": "map(object({}))",
               "pointer": "#/definitions/ImageConfig/properties/ExposedPorts",
-              "description": "Map keys (`<port>/<proto>`) as a list."
+              "description": "ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list)."
             },
             {
               "name": "env",
@@ -3364,9 +3364,9 @@
             {
               "name": "volumes",
               "upstream": "Volumes",
-              "tf_type": "list(string)",
+              "tf_type": "map(object({}))",
               "pointer": "#/definitions/ImageConfig/properties/Volumes",
-              "description": "Map keys as a list."
+              "description": "Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list)."
             },
             {
               "name": "working_dir",
@@ -3736,9 +3736,9 @@
                 {
                   "name": "exposed_ports",
                   "upstream": "ExposedPorts",
-                  "tf_type": "list(string)",
+                  "tf_type": "map(object({}))",
                   "pointer": "#/definitions/ImageConfig/properties/ExposedPorts",
-                  "description": "Map keys (`<port>/<proto>`) as a list."
+                  "description": "ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list)."
                 },
                 {
                   "name": "env",
@@ -3806,9 +3806,9 @@
                 {
                   "name": "volumes",
                   "upstream": "Volumes",
-                  "tf_type": "list(string)",
+                  "tf_type": "map(object({}))",
                   "pointer": "#/definitions/ImageConfig/properties/Volumes",
-                  "description": "Map keys as a list."
+                  "description": "Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list)."
                 },
                 {
                   "name": "working_dir",
@@ -4239,9 +4239,9 @@
             {
               "name": "exposed_ports",
               "upstream": "ExposedPorts",
-              "tf_type": "list(string)",
+              "tf_type": "map(object({}))",
               "pointer": "#/definitions/ImageConfig/properties/ExposedPorts",
-              "description": "Map keys (`<port>/<proto>`) as a list."
+              "description": "ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list)."
             },
             {
               "name": "env",
@@ -4309,9 +4309,9 @@
             {
               "name": "volumes",
               "upstream": "Volumes",
-              "tf_type": "list(string)",
+              "tf_type": "map(object({}))",
               "pointer": "#/definitions/ImageConfig/properties/Volumes",
-              "description": "Map keys as a list."
+              "description": "Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list)."
             },
             {
               "name": "working_dir",
@@ -5304,9 +5304,9 @@
                 {
                   "name": "exposed_ports",
                   "upstream": "ExposedPorts",
-                  "tf_type": "list(string)",
+                  "tf_type": "map(object({}))",
                   "pointer": "#/definitions/ImageConfig/properties/ExposedPorts",
-                  "description": "Map keys (`<port>/<proto>`) as a list."
+                  "description": "ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list)."
                 },
                 {
                   "name": "env",
@@ -5374,9 +5374,9 @@
                 {
                   "name": "volumes",
                   "upstream": "Volumes",
-                  "tf_type": "list(string)",
+                  "tf_type": "map(object({}))",
                   "pointer": "#/definitions/ImageConfig/properties/Volumes",
-                  "description": "Map keys as a list."
+                  "description": "Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list)."
                 },
                 {
                   "name": "working_dir",

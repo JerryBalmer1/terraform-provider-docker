@@ -178,7 +178,7 @@ Optional:
 - `additional_contexts` (Map of String) BuildKit only. Named build contexts (`--build-context name=value`): a local directory, `docker-image://ref` or a URL, used by `FROM name` / `COPY --from=name`. Forces replacement.
 - `args` (Map of String) Build arguments (`--build-arg`). Forces replacement.
 - `attestations` (List of String) BuildKit only. Extra attestation specs (`--attest`), e.g. `type=sbom,generator=image`; `provenance` and `sbom` cover the common cases. Forces replacement.
-- `builder` (String) Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit), the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`) or a BuildKit address (`tcp://`, `unix://`, `docker-container://`, e.g. a remote-driver builder's endpoint). With BuildKit the build runs with a session (serving `secrets`, `ssh` and `registry_auth` credentials) so Dockerfile features such as `RUN --mount=type=secret` and heredocs work, and `cache_to`, `ssh`, `outputs`, `attestations`, `provenance`, `sbom` and `no_cache_filter` become available. Requires a daemon with BuildKit enabled (default since Docker 23). Forces replacement.
+- `builder` (String) Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit), the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`) or a BuildKit address (`tcp://`, `unix://`, `docker-container://`, e.g. a remote-driver builder's endpoint), or a Docker Build Cloud builder as `cloud://<org>/<builder>` or `<org>/<builder>` (a `docker_buildx_builder` with `driver = "cloud"`, its `id`). With BuildKit the build runs with a session (serving `secrets`, `ssh` and `registry_auth` credentials) so Dockerfile features such as `RUN --mount=type=secret` and heredocs work, and `cache_to`, `ssh`, `outputs`, `attestations`, `provenance`, `sbom` and `no_cache_filter` become available. Requires a daemon with BuildKit enabled (default since Docker 23). Forces replacement.
 - `cache_from` (List of String) BuildKit only. Cache sources (`--cache-from`): image references carrying inline cache metadata, or buildx cache specs such as `type=registry,ref=...`. Forces replacement.
 - `cache_to` (List of String) BuildKit only. Cache export specs (`--cache-to`), e.g. `type=inline` or `type=registry,ref=registry.example.com/app:cache`. Forces replacement.
 - `cgroup_parent` (String) Classic builder only. Parent cgroup for the `RUN` containers (`--cgroup-parent`). Forces replacement.
@@ -253,9 +253,9 @@ Required:
 
 Read-Only:
 
-- `buildx_build_provenance` (Dynamic, Sensitive) Upstream `buildx.build.provenance`. Sensitive. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `buildx_build_provenance` (Dynamic, Sensitive) Upstream `buildx.build.provenance`. Sensitive. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here).
 - `buildx_build_ref` (String) Upstream `buildx.build.ref`.
-- `buildx_build_warnings` (Dynamic) Upstream `buildx.build.warnings`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `buildx_build_warnings` (Dynamic) Upstream `buildx.build.warnings`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here).
 - `containerimage_config_digest` (String) Upstream `containerimage.config.digest`.
 - `containerimage_descriptor` (Attributes) Upstream `containerimage.descriptor`. (see [below for nested schema](#nestedatt--build_metadata--containerimage_descriptor))
 - `containerimage_digest` (String) Upstream `containerimage.digest`.
@@ -305,15 +305,19 @@ Read-Only:
 - `cmd` (List of String) Upstream `Cmd`.
 - `entrypoint` (List of String) Upstream `Entrypoint`.
 - `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
-- `exposed_ports` (List of String) Map keys (`<port>/<proto>`) as a list.
+- `exposed_ports` (Attributes Map) ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list). (see [below for nested schema](#nestedatt--inspect--config--exposed_ports))
 - `healthcheck` (Attributes) Upstream `Healthcheck`. (see [below for nested schema](#nestedatt--inspect--config--healthcheck))
 - `labels` (Map of String) Upstream `Labels`.
 - `on_build` (List of String) Upstream `OnBuild`.
 - `shell` (List of String) Upstream `Shell`.
 - `stop_signal` (String) Upstream `StopSignal`.
 - `user` (String) Upstream `User`.
-- `volumes` (List of String) Map keys as a list.
+- `volumes` (Attributes Map) Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list). (see [below for nested schema](#nestedatt--inspect--config--volumes))
 - `working_dir` (String) Upstream `WorkingDir`.
+
+<a id="nestedatt--inspect--config--exposed_ports"></a>
+### Nested Schema for `inspect.config.exposed_ports`
+
 
 <a id="nestedatt--inspect--config--healthcheck"></a>
 ### Nested Schema for `inspect.config.healthcheck`
@@ -326,6 +330,10 @@ Read-Only:
 - `start_period` (Number) Upstream `StartPeriod`.
 - `test` (List of String) Upstream `Test`.
 - `timeout` (Number) Upstream `Timeout`.
+
+
+<a id="nestedatt--inspect--config--volumes"></a>
+### Nested Schema for `inspect.config.volumes`
 
 
 
@@ -370,9 +378,75 @@ Read-Only:
 
 Read-Only:
 
-- `build` (List of String) Upstream `Build`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `pull` (List of String) Upstream `Pull`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `signature` (List of String) Upstream `Signature`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `build` (Attributes List) Upstream `Build`. (see [below for nested schema](#nestedatt--inspect--identity--build))
+- `pull` (Attributes List) Upstream `Pull`. (see [below for nested schema](#nestedatt--inspect--identity--pull))
+- `signature` (Attributes List) Upstream `Signature`. (see [below for nested schema](#nestedatt--inspect--identity--signature))
+
+<a id="nestedatt--inspect--identity--build"></a>
+### Nested Schema for `inspect.identity.build`
+
+Read-Only:
+
+- `created_at` (String) Upstream `CreatedAt`.
+- `ref` (String) Upstream `Ref`.
+
+
+<a id="nestedatt--inspect--identity--pull"></a>
+### Nested Schema for `inspect.identity.pull`
+
+Read-Only:
+
+- `repository` (String) Upstream `Repository`.
+
+
+<a id="nestedatt--inspect--identity--signature"></a>
+### Nested Schema for `inspect.identity.signature`
+
+Read-Only:
+
+- `docker_reference` (String) Upstream `DockerReference`.
+- `error` (String) Upstream `Error`.
+- `known_signer` (String) Upstream `KnownSigner`.
+- `name` (String) Upstream `Name`.
+- `signature_type` (String) Upstream `SignatureType`.
+- `signer` (Attributes) Upstream `Signer`. (see [below for nested schema](#nestedatt--inspect--identity--signature--signer))
+- `timestamps` (Attributes List) Upstream `Timestamps`. (see [below for nested schema](#nestedatt--inspect--identity--signature--timestamps))
+- `warnings` (List of String) Upstream `Warnings`.
+
+<a id="nestedatt--inspect--identity--signature--signer"></a>
+### Nested Schema for `inspect.identity.signature.signer`
+
+Read-Only:
+
+- `build_config_digest` (String) Upstream `BuildConfigDigest`.
+- `build_config_uri` (String) Upstream `BuildConfigURI`.
+- `build_signer_digest` (String) Upstream `BuildSignerDigest`.
+- `build_signer_uri` (String) Upstream `BuildSignerURI`.
+- `build_trigger` (String) Upstream `BuildTrigger`.
+- `certificate_issuer` (String) Upstream `CertificateIssuer`.
+- `issuer` (String) Upstream `Issuer`.
+- `run_invocation_uri` (String) Upstream `RunInvocationURI`.
+- `runner_environment` (String) Upstream `RunnerEnvironment`.
+- `source_repository_digest` (String) Upstream `SourceRepositoryDigest`.
+- `source_repository_identifier` (String) Upstream `SourceRepositoryIdentifier`.
+- `source_repository_owner_identifier` (String) Upstream `SourceRepositoryOwnerIdentifier`.
+- `source_repository_owner_uri` (String) Upstream `SourceRepositoryOwnerURI`.
+- `source_repository_ref` (String) Upstream `SourceRepositoryRef`.
+- `source_repository_uri` (String) Upstream `SourceRepositoryURI`.
+- `source_repository_visibility_at_signing` (String) Upstream `SourceRepositoryVisibilityAtSigning`.
+- `subject_alternative_name` (String) Upstream `SubjectAlternativeName`.
+
+
+<a id="nestedatt--inspect--identity--signature--timestamps"></a>
+### Nested Schema for `inspect.identity.signature.timestamps`
+
+Read-Only:
+
+- `timestamp` (String) Upstream `Timestamp`.
+- `type` (String) Upstream `Type`.
+- `uri` (String) Upstream `URI`.
+
+
 
 
 <a id="nestedatt--inspect--manifests"></a>
@@ -380,13 +454,21 @@ Read-Only:
 
 Read-Only:
 
-- `attestation_data` (String) Upstream `AttestationData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `attestation_data` (Attributes) Upstream `AttestationData`. (see [below for nested schema](#nestedatt--inspect--manifests--attestation_data))
 - `available` (Boolean) Upstream `Available`.
 - `descriptor` (Attributes) Upstream `Descriptor`. (see [below for nested schema](#nestedatt--inspect--manifests--descriptor))
 - `id` (String) Upstream `ID`.
-- `image_data` (String) Upstream `ImageData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `image_data` (Attributes) Upstream `ImageData`. (see [below for nested schema](#nestedatt--inspect--manifests--image_data))
 - `kind` (String) Upstream `Kind`.
 - `size` (Attributes) Upstream `Size`. (see [below for nested schema](#nestedatt--inspect--manifests--size))
+
+<a id="nestedatt--inspect--manifests--attestation_data"></a>
+### Nested Schema for `inspect.manifests.attestation_data`
+
+Read-Only:
+
+- `for` (String) Upstream `For`.
+
 
 <a id="nestedatt--inspect--manifests--descriptor"></a>
 ### Nested Schema for `inspect.manifests.descriptor`
@@ -412,6 +494,113 @@ Read-Only:
 - `os_features` (List of String) Upstream `os.features`.
 - `os_version` (String) Upstream `os.version`.
 - `variant` (String) Upstream `variant`.
+
+
+
+<a id="nestedatt--inspect--manifests--image_data"></a>
+### Nested Schema for `inspect.manifests.image_data`
+
+Read-Only:
+
+- `containers` (List of String) Upstream `Containers`.
+- `identity` (Attributes) Upstream `Identity`. (see [below for nested schema](#nestedatt--inspect--manifests--image_data--identity))
+- `platform` (Attributes) Upstream `Platform`. (see [below for nested schema](#nestedatt--inspect--manifests--image_data--platform))
+- `size` (Attributes) Upstream `Size`. (see [below for nested schema](#nestedatt--inspect--manifests--image_data--size))
+
+<a id="nestedatt--inspect--manifests--image_data--identity"></a>
+### Nested Schema for `inspect.manifests.image_data.identity`
+
+Read-Only:
+
+- `build` (Attributes List) Upstream `Build`. (see [below for nested schema](#nestedatt--inspect--manifests--image_data--identity--build))
+- `pull` (Attributes List) Upstream `Pull`. (see [below for nested schema](#nestedatt--inspect--manifests--image_data--identity--pull))
+- `signature` (Attributes List) Upstream `Signature`. (see [below for nested schema](#nestedatt--inspect--manifests--image_data--identity--signature))
+
+<a id="nestedatt--inspect--manifests--image_data--identity--build"></a>
+### Nested Schema for `inspect.manifests.image_data.identity.build`
+
+Read-Only:
+
+- `created_at` (String) Upstream `CreatedAt`.
+- `ref` (String) Upstream `Ref`.
+
+
+<a id="nestedatt--inspect--manifests--image_data--identity--pull"></a>
+### Nested Schema for `inspect.manifests.image_data.identity.pull`
+
+Read-Only:
+
+- `repository` (String) Upstream `Repository`.
+
+
+<a id="nestedatt--inspect--manifests--image_data--identity--signature"></a>
+### Nested Schema for `inspect.manifests.image_data.identity.signature`
+
+Read-Only:
+
+- `docker_reference` (String) Upstream `DockerReference`.
+- `error` (String) Upstream `Error`.
+- `known_signer` (String) Upstream `KnownSigner`.
+- `name` (String) Upstream `Name`.
+- `signature_type` (String) Upstream `SignatureType`.
+- `signer` (Attributes) Upstream `Signer`. (see [below for nested schema](#nestedatt--inspect--manifests--image_data--identity--signature--signer))
+- `timestamps` (Attributes List) Upstream `Timestamps`. (see [below for nested schema](#nestedatt--inspect--manifests--image_data--identity--signature--timestamps))
+- `warnings` (List of String) Upstream `Warnings`.
+
+<a id="nestedatt--inspect--manifests--image_data--identity--signature--signer"></a>
+### Nested Schema for `inspect.manifests.image_data.identity.signature.signer`
+
+Read-Only:
+
+- `build_config_digest` (String) Upstream `BuildConfigDigest`.
+- `build_config_uri` (String) Upstream `BuildConfigURI`.
+- `build_signer_digest` (String) Upstream `BuildSignerDigest`.
+- `build_signer_uri` (String) Upstream `BuildSignerURI`.
+- `build_trigger` (String) Upstream `BuildTrigger`.
+- `certificate_issuer` (String) Upstream `CertificateIssuer`.
+- `issuer` (String) Upstream `Issuer`.
+- `run_invocation_uri` (String) Upstream `RunInvocationURI`.
+- `runner_environment` (String) Upstream `RunnerEnvironment`.
+- `source_repository_digest` (String) Upstream `SourceRepositoryDigest`.
+- `source_repository_identifier` (String) Upstream `SourceRepositoryIdentifier`.
+- `source_repository_owner_identifier` (String) Upstream `SourceRepositoryOwnerIdentifier`.
+- `source_repository_owner_uri` (String) Upstream `SourceRepositoryOwnerURI`.
+- `source_repository_ref` (String) Upstream `SourceRepositoryRef`.
+- `source_repository_uri` (String) Upstream `SourceRepositoryURI`.
+- `source_repository_visibility_at_signing` (String) Upstream `SourceRepositoryVisibilityAtSigning`.
+- `subject_alternative_name` (String) Upstream `SubjectAlternativeName`.
+
+
+<a id="nestedatt--inspect--manifests--image_data--identity--signature--timestamps"></a>
+### Nested Schema for `inspect.manifests.image_data.identity.signature.timestamps`
+
+Read-Only:
+
+- `timestamp` (String) Upstream `Timestamp`.
+- `type` (String) Upstream `Type`.
+- `uri` (String) Upstream `URI`.
+
+
+
+
+<a id="nestedatt--inspect--manifests--image_data--platform"></a>
+### Nested Schema for `inspect.manifests.image_data.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
+
+<a id="nestedatt--inspect--manifests--image_data--size"></a>
+### Nested Schema for `inspect.manifests.image_data.size`
+
+Read-Only:
+
+- `unpacked` (Number) Upstream `Unpacked`.
 
 
 
@@ -462,31 +651,31 @@ Read-Only:
 
 Read-Only:
 
-- `add` (String) Set when keyword = ADD; shape = the `add` output of dockerfile:ADD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `arg` (String, Sensitive) Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `cmd` (String) Set when keyword = CMD; shape = the `cmd` output of dockerfile:CMD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `add` (String) Set when keyword = ADD; shape = the `add` output of dockerfile:ADD. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `arg` (String, Sensitive) Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG. Sensitive. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `cmd` (String) Set when keyword = CMD; shape = the `cmd` output of dockerfile:CMD. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `comment` (String) Upstream `Comment`.
-- `copy` (String) Set when keyword = COPY; shape = the `copy` output of dockerfile:COPY. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `copy` (String) Set when keyword = COPY; shape = the `copy` output of dockerfile:COPY. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `created` (Number) Image mode only: Unix time of the history entry.
 - `created_by` (String, Sensitive) Image mode only: the history entry this instruction was reconstructed from. Sensitive.
 - `dockerfile` (String) Upstream `(rendered instruction text)`.
-- `entrypoint` (String) Set when keyword = ENTRYPOINT; shape = the `entrypoint` output of dockerfile:ENTRYPOINT. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `env` (String, Sensitive) Set when keyword = ENV; shape = the `env` output of dockerfile:ENV. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `expose` (String) Set when keyword = EXPOSE; shape = the `expose` output of dockerfile:EXPOSE. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `healthcheck` (String) Set when keyword = HEALTHCHECK; shape = the `healthcheck` output of dockerfile:HEALTHCHECK. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `entrypoint` (String) Set when keyword = ENTRYPOINT; shape = the `entrypoint` output of dockerfile:ENTRYPOINT. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `env` (String, Sensitive) Set when keyword = ENV; shape = the `env` output of dockerfile:ENV. Sensitive. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `expose` (String) Set when keyword = EXPOSE; shape = the `expose` output of dockerfile:EXPOSE. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `healthcheck` (String) Set when keyword = HEALTHCHECK; shape = the `healthcheck` output of dockerfile:HEALTHCHECK. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `index` (Number) Upstream `(position in stage)`.
 - `keyword` (String) Upstream `INSTRUCTION`.
-- `label` (String) Set when keyword = LABEL; shape = the `label` output of dockerfile:LABEL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `label` (String) Set when keyword = LABEL; shape = the `label` output of dockerfile:LABEL. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `layer_size` (Number) Upstream `Size`.
 - `line` (Number) 1-based start line; null in image mode.
-- `maintainer` (String) Set when keyword = MAINTAINER; shape = the `maintainer` output of dockerfile:MAINTAINER. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `onbuild` (String) Set when keyword = ONBUILD; shape = the `onbuild` output of dockerfile:ONBUILD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `run` (String) Set when keyword = RUN; shape = the `run` output of dockerfile:RUN. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `shell` (String) Set when keyword = SHELL; shape = the `shell` output of dockerfile:SHELL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `stopsignal` (String) Set when keyword = STOPSIGNAL; shape = the `stopsignal` output of dockerfile:STOPSIGNAL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `user` (String) Set when keyword = USER; shape = the `user` output of dockerfile:USER. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `volume` (String) Set when keyword = VOLUME; shape = the `volume` output of dockerfile:VOLUME. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `workdir` (String) Set when keyword = WORKDIR; shape = the `workdir` output of dockerfile:WORKDIR. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `maintainer` (String) Set when keyword = MAINTAINER; shape = the `maintainer` output of dockerfile:MAINTAINER. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `onbuild` (String) Set when keyword = ONBUILD; shape = the `onbuild` output of dockerfile:ONBUILD. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `run` (String) Set when keyword = RUN; shape = the `run` output of dockerfile:RUN. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `shell` (String) Set when keyword = SHELL; shape = the `shell` output of dockerfile:SHELL. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `stopsignal` (String) Set when keyword = STOPSIGNAL; shape = the `stopsignal` output of dockerfile:STOPSIGNAL. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `user` (String) Set when keyword = USER; shape = the `user` output of dockerfile:USER. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `volume` (String) Set when keyword = VOLUME; shape = the `volume` output of dockerfile:VOLUME. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `workdir` (String) Set when keyword = WORKDIR; shape = the `workdir` output of dockerfile:WORKDIR. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 
 ## Import
 

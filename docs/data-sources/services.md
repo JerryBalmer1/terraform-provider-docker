@@ -176,8 +176,8 @@ Read-Only:
 
 Read-Only:
 
-- `global` (String) Upstream `Global`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `global_job` (String) Upstream `GlobalJob`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `global` (String) Upstream `Global`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `global_job` (String) Upstream `GlobalJob`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `replicated` (Attributes) Upstream `Replicated`. (see [below for nested schema](#nestedatt--services--spec--mode--replicated))
 - `replicated_job` (Attributes) Upstream `ReplicatedJob`. (see [below for nested schema](#nestedatt--services--spec--mode--replicated_job))
 
@@ -280,7 +280,7 @@ Read-Only:
 - `config_id` (String) Upstream `ConfigID`.
 - `config_name` (String) Upstream `ConfigName`.
 - `file` (Attributes) Upstream `File`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--configs--file))
-- `runtime` (String) Upstream `Runtime`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `runtime` (String) Upstream `Runtime`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 
 <a id="nestedatt--services--spec--task_template--container_spec--configs--file"></a>
 ### Nested Schema for `services.spec.task_template.container_spec.configs.file`
@@ -329,7 +329,7 @@ Read-Only:
 - `source` (String) Upstream `Source`.
 - `target` (String) Upstream `Target`.
 - `tmpfs_options` (Attributes) Upstream `TmpfsOptions`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--mounts--tmpfs_options))
-- `type` (String) Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `type` (String) Upstream `Type`.
 - `volume_options` (Attributes) Upstream `VolumeOptions`. (see [below for nested schema](#nestedatt--services--spec--task_template--container_spec--mounts--volume_options))
 
 <a id="nestedatt--services--spec--task_template--container_spec--mounts--bind_options"></a>

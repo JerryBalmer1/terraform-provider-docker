@@ -56,7 +56,7 @@ Read-Only:
 
 Read-Only:
 
-- `data` (String) Upstream `Data`.
+- `data` (String, Sensitive) Upstream `Data`. Sensitive.
 - `driver` (Attributes) Upstream `Driver`. (see [below for nested schema](#nestedatt--secrets--spec--driver))
 - `labels` (Map of String) Upstream `Labels`.
 - `name` (String) Upstream `Name`.

@@ -43,7 +43,505 @@ nested attribute, list(object). Runtime view per service (the `stack services` r
 | `ports` | `list(string)` | computed |  |  | Upstream `Ports`. |
 | `replicas` | `string` | computed |  |  | Upstream `Replicas`. |
 | `running_replicas` | `number` | computed |  |  | Upstream `Replicas (running half)`. |
-| `spec` | `string` | computed |  | yes | Upstream `Spec`. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `spec` | `object` | computed |  | yes | Upstream `Spec`. Sensitive. |
+
+### `service_status.spec`
+
+nested attribute, object. Upstream `Spec`. Sensitive.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `endpoint_spec` | `object` | computed |  | yes | Upstream `EndpointSpec`. |
+| `labels` | `map(string)` | computed |  | yes | Upstream `Labels`. |
+| `mode` | `object` | computed |  | yes | Upstream `Mode`. |
+| `name` | `string` | computed |  | yes | Upstream `Name`. |
+| `networks` | `list(object)` | computed |  | yes | Upstream `Networks`. |
+| `rollback_config` | `object` | computed |  | yes | Upstream `RollbackConfig`. |
+| `task_template` | `object` | computed |  | yes | Upstream `TaskTemplate`. |
+| `update_config` | `object` | computed |  | yes | Upstream `UpdateConfig`. |
+
+### `service_status.spec.endpoint_spec`
+
+nested attribute, object. Upstream `EndpointSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | computed |  | yes | Upstream `Mode`. |
+| `ports` | `list(object)` | computed |  | yes | Upstream `Ports`. |
+
+### `service_status.spec.endpoint_spec.ports`
+
+nested attribute, list(object). Upstream `Ports`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  | yes | Upstream `Name`. |
+| `protocol` | `string` | computed |  | yes | Upstream `Protocol`. |
+| `publish_mode` | `string` | computed |  | yes | Upstream `PublishMode`. |
+| `published_port` | `number` | computed |  | yes | Upstream `PublishedPort`. |
+| `target_port` | `number` | computed |  | yes | Upstream `TargetPort`. |
+
+### `service_status.spec.mode`
+
+nested attribute, object. Upstream `Mode`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `global` | `string` | computed |  | yes | Upstream `Global`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `global_job` | `string` | computed |  | yes | Upstream `GlobalJob`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `replicated` | `object` | computed |  | yes | Upstream `Replicated`. |
+| `replicated_job` | `object` | computed |  | yes | Upstream `ReplicatedJob`. |
+
+### `service_status.spec.mode.replicated`
+
+nested attribute, object. Upstream `Replicated`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `replicas` | `number` | computed |  | yes | Upstream `Replicas`. |
+
+### `service_status.spec.mode.replicated_job`
+
+nested attribute, object. Upstream `ReplicatedJob`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `max_concurrent` | `number` | computed |  | yes | Upstream `MaxConcurrent`. |
+| `total_completions` | `number` | computed |  | yes | Upstream `TotalCompletions`. |
+
+### `service_status.spec.networks`
+
+nested attribute, list(object). Upstream `Networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  | yes | Upstream `Aliases`. |
+| `driver_opts` | `map(string)` | computed |  | yes | Upstream `DriverOpts`. |
+| `target` | `string` | computed |  | yes | Upstream `Target`. |
+
+### `service_status.spec.rollback_config`
+
+nested attribute, object. Upstream `RollbackConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `delay` | `number` | computed |  | yes | Upstream `Delay`. |
+| `failure_action` | `string` | computed |  | yes | Upstream `FailureAction`. |
+| `max_failure_ratio` | `number` | computed |  | yes | Upstream `MaxFailureRatio`. |
+| `monitor` | `number` | computed |  | yes | Upstream `Monitor`. |
+| `order` | `string` | computed |  | yes | Upstream `Order`. |
+| `parallelism` | `number` | computed |  | yes | Upstream `Parallelism`. |
+
+### `service_status.spec.task_template`
+
+nested attribute, object. Upstream `TaskTemplate`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `container_spec` | `object` | computed |  | yes | Upstream `ContainerSpec`. |
+| `force_update` | `number` | computed |  | yes | Upstream `ForceUpdate`. |
+| `log_driver` | `object` | computed |  | yes | Upstream `LogDriver`. |
+| `network_attachment_spec` | `object` | computed |  | yes | Upstream `NetworkAttachmentSpec`. |
+| `networks` | `list(object)` | computed |  | yes | Upstream `Networks`. |
+| `placement` | `object` | computed |  | yes | Upstream `Placement`. |
+| `plugin_spec` | `object` | computed |  | yes | Upstream `PluginSpec`. |
+| `resources` | `object` | computed |  | yes | Upstream `Resources`. |
+| `restart_policy` | `object` | computed |  | yes | Upstream `RestartPolicy`. |
+| `runtime` | `string` | computed |  | yes | Upstream `Runtime`. |
+
+### `service_status.spec.task_template.container_spec`
+
+nested attribute, object. Upstream `ContainerSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `args` | `list(string)` | computed |  | yes | Upstream `Args`. |
+| `capability_add` | `list(string)` | computed |  | yes | Upstream `CapabilityAdd`. |
+| `capability_drop` | `list(string)` | computed |  | yes | Upstream `CapabilityDrop`. |
+| `command` | `list(string)` | computed |  | yes | Upstream `Command`. |
+| `configs` | `list(object)` | computed |  | yes | Upstream `Configs`. |
+| `dir` | `string` | computed |  | yes | Upstream `Dir`. |
+| `dns_config` | `object` | computed |  | yes | Upstream `DNSConfig`. |
+| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
+| `groups` | `list(string)` | computed |  | yes | Upstream `Groups`. |
+| `healthcheck` | `object` | computed |  | yes | Upstream `Healthcheck`. |
+| `hostname` | `string` | computed |  | yes | Upstream `Hostname`. |
+| `hosts` | `list(string)` | computed |  | yes | Upstream `Hosts`. |
+| `image` | `string` | computed |  | yes | Upstream `Image`. |
+| `init` | `bool` | computed |  | yes | Upstream `Init`. |
+| `isolation` | `string` | computed |  | yes | Upstream `Isolation`. |
+| `labels` | `map(string)` | computed |  | yes | Upstream `Labels`. |
+| `mounts` | `list(object)` | computed |  | yes | Upstream `Mounts`. |
+| `oom_score_adj` | `number` | computed |  | yes | Upstream `OomScoreAdj`. |
+| `open_stdin` | `bool` | computed |  | yes | Upstream `OpenStdin`. |
+| `privileges` | `object` | computed |  | yes | Upstream `Privileges`. |
+| `read_only` | `bool` | computed |  | yes | Upstream `ReadOnly`. |
+| `secrets` | `list(object)` | computed |  | yes | Upstream `Secrets`. |
+| `stop_grace_period` | `number` | computed |  | yes | Upstream `StopGracePeriod`. |
+| `stop_signal` | `string` | computed |  | yes | Upstream `StopSignal`. |
+| `sysctls` | `map(string)` | computed |  | yes | Upstream `Sysctls`. |
+| `tty` | `bool` | computed |  | yes | Upstream `TTY`. |
+| `ulimits` | `list(object)` | computed |  | yes | Upstream `Ulimits`. |
+| `user` | `string` | computed |  | yes | Upstream `User`. |
+
+### `service_status.spec.task_template.container_spec.configs`
+
+nested attribute, list(object). Upstream `Configs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config_id` | `string` | computed |  | yes | Upstream `ConfigID`. |
+| `config_name` | `string` | computed |  | yes | Upstream `ConfigName`. |
+| `file` | `object` | computed |  | yes | Upstream `File`. |
+| `runtime` | `string` | computed |  | yes | Upstream `Runtime`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+
+### `service_status.spec.task_template.container_spec.configs.file`
+
+nested attribute, object. Upstream `File`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  | yes | Upstream `GID`. |
+| `mode` | `number` | computed |  | yes | Upstream `Mode`. |
+| `name` | `string` | computed |  | yes | Upstream `Name`. |
+| `uid` | `string` | computed |  | yes | Upstream `UID`. |
+
+### `service_status.spec.task_template.container_spec.dns_config`
+
+nested attribute, object. Upstream `DNSConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `nameservers` | `list(string)` | computed |  | yes | Upstream `Nameservers`. |
+| `options` | `list(string)` | computed |  | yes | Upstream `Options`. |
+| `search` | `list(string)` | computed |  | yes | Upstream `Search`. |
+
+### `service_status.spec.task_template.container_spec.healthcheck`
+
+nested attribute, object. Upstream `Healthcheck`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `interval` | `number` | computed |  | yes | Upstream `Interval`. |
+| `retries` | `number` | computed |  | yes | Upstream `Retries`. |
+| `start_interval` | `number` | computed |  | yes | Upstream `StartInterval`. |
+| `start_period` | `number` | computed |  | yes | Upstream `StartPeriod`. |
+| `test` | `list(string)` | computed |  | yes | Upstream `Test`. |
+| `timeout` | `number` | computed |  | yes | Upstream `Timeout`. |
+
+### `service_status.spec.task_template.container_spec.mounts`
+
+nested attribute, list(object). Upstream `Mounts`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `bind_options` | `object` | computed |  | yes | Upstream `BindOptions`. |
+| `consistency` | `string` | computed |  | yes | Upstream `Consistency`. |
+| `image_options` | `object` | computed |  | yes | Upstream `ImageOptions`. |
+| `read_only` | `bool` | computed |  | yes | Upstream `ReadOnly`. |
+| `source` | `string` | computed |  | yes | Upstream `Source`. |
+| `target` | `string` | computed |  | yes | Upstream `Target`. |
+| `tmpfs_options` | `object` | computed |  | yes | Upstream `TmpfsOptions`. |
+| `type` | `string` | computed |  | yes | Upstream `Type`. |
+| `volume_options` | `object` | computed |  | yes | Upstream `VolumeOptions`. |
+
+### `service_status.spec.task_template.container_spec.mounts.bind_options`
+
+nested attribute, object. Upstream `BindOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `create_mountpoint` | `bool` | computed |  | yes | Upstream `CreateMountpoint`. |
+| `non_recursive` | `bool` | computed |  | yes | Upstream `NonRecursive`. |
+| `propagation` | `string` | computed |  | yes | Upstream `Propagation`. |
+| `read_only_force_recursive` | `bool` | computed |  | yes | Upstream `ReadOnlyForceRecursive`. |
+| `read_only_non_recursive` | `bool` | computed |  | yes | Upstream `ReadOnlyNonRecursive`. |
+
+### `service_status.spec.task_template.container_spec.mounts.image_options`
+
+nested attribute, object. Upstream `ImageOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `subpath` | `string` | computed |  | yes | Upstream `Subpath`. |
+
+### `service_status.spec.task_template.container_spec.mounts.tmpfs_options`
+
+nested attribute, object. Upstream `TmpfsOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `number` | computed |  | yes | Upstream `Mode`. |
+| `options` | `list(list(string))` | computed |  | yes | Upstream `Options`. |
+| `size_bytes` | `number` | computed |  | yes | Upstream `SizeBytes`. |
+
+### `service_status.spec.task_template.container_spec.mounts.volume_options`
+
+nested attribute, object. Upstream `VolumeOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `driver_config` | `object` | computed |  | yes | Upstream `DriverConfig`. |
+| `labels` | `map(string)` | computed |  | yes | Upstream `Labels`. |
+| `no_copy` | `bool` | computed |  | yes | Upstream `NoCopy`. |
+| `subpath` | `string` | computed |  | yes | Upstream `Subpath`. |
+
+### `service_status.spec.task_template.container_spec.mounts.volume_options.driver_config`
+
+nested attribute, object. Upstream `DriverConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  | yes | Upstream `Name`. |
+| `options` | `map(string)` | computed |  | yes | Upstream `Options`. |
+
+### `service_status.spec.task_template.container_spec.privileges`
+
+nested attribute, object. Upstream `Privileges`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `app_armor` | `object` | computed |  | yes | Upstream `AppArmor`. |
+| `credential_spec` | `object` | computed |  | yes | Upstream `CredentialSpec`. |
+| `no_new_privileges` | `bool` | computed |  | yes | Upstream `NoNewPrivileges`. |
+| `seccomp` | `object` | computed |  | yes | Upstream `Seccomp`. |
+| `selinux_context` | `object` | computed |  | yes | Upstream `SELinuxContext`. |
+
+### `service_status.spec.task_template.container_spec.privileges.app_armor`
+
+nested attribute, object. Upstream `AppArmor`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | computed |  | yes | Upstream `Mode`. |
+
+### `service_status.spec.task_template.container_spec.privileges.credential_spec`
+
+nested attribute, object. Upstream `CredentialSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `string` | computed |  | yes | Upstream `Config`. |
+| `file` | `string` | computed |  | yes | Upstream `File`. |
+| `registry` | `string` | computed |  | yes | Upstream `Registry`. |
+
+### `service_status.spec.task_template.container_spec.privileges.seccomp`
+
+nested attribute, object. Upstream `Seccomp`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `string` | computed |  | yes | Upstream `Mode`. |
+| `profile` | `string` | computed |  | yes | Upstream `Profile`. |
+
+### `service_status.spec.task_template.container_spec.privileges.selinux_context`
+
+nested attribute, object. Upstream `SELinuxContext`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `disable` | `bool` | computed |  | yes | Upstream `Disable`. |
+| `level` | `string` | computed |  | yes | Upstream `Level`. |
+| `role` | `string` | computed |  | yes | Upstream `Role`. |
+| `type` | `string` | computed |  | yes | Upstream `Type`. |
+| `user` | `string` | computed |  | yes | Upstream `User`. |
+
+### `service_status.spec.task_template.container_spec.secrets`
+
+nested attribute, list(object). Upstream `Secrets`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `file` | `object` | computed |  | yes | Upstream `File`. |
+| `secret_id` | `string` | computed |  | yes | Upstream `SecretID`. |
+| `secret_name` | `string` | computed |  | yes | Upstream `SecretName`. |
+
+### `service_status.spec.task_template.container_spec.secrets.file`
+
+nested attribute, object. Upstream `File`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  | yes | Upstream `GID`. |
+| `mode` | `number` | computed |  | yes | Upstream `Mode`. |
+| `name` | `string` | computed |  | yes | Upstream `Name`. |
+| `uid` | `string` | computed |  | yes | Upstream `UID`. |
+
+### `service_status.spec.task_template.container_spec.ulimits`
+
+nested attribute, list(object). Upstream `Ulimits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `hard` | `number` | computed |  | yes | Upstream `Hard`. |
+| `name` | `string` | computed |  | yes | Upstream `Name`. |
+| `soft` | `number` | computed |  | yes | Upstream `Soft`. |
+
+### `service_status.spec.task_template.log_driver`
+
+nested attribute, object. Upstream `LogDriver`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  | yes | Upstream `Name`. |
+| `options` | `map(string)` | computed |  | yes | Upstream `Options`. |
+
+### `service_status.spec.task_template.network_attachment_spec`
+
+nested attribute, object. Upstream `NetworkAttachmentSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `container_id` | `string` | computed |  | yes | Upstream `ContainerID`. |
+
+### `service_status.spec.task_template.networks`
+
+nested attribute, list(object). Upstream `Networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  | yes | Upstream `Aliases`. |
+| `driver_opts` | `map(string)` | computed |  | yes | Upstream `DriverOpts`. |
+| `target` | `string` | computed |  | yes | Upstream `Target`. |
+
+### `service_status.spec.task_template.placement`
+
+nested attribute, object. Upstream `Placement`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `constraints` | `list(string)` | computed |  | yes | Upstream `Constraints`. |
+| `max_replicas` | `number` | computed |  | yes | Upstream `MaxReplicas`. |
+| `platforms` | `list(object)` | computed |  | yes | Upstream `Platforms`. |
+| `preferences` | `list(object)` | computed |  | yes | Upstream `Preferences`. |
+
+### `service_status.spec.task_template.placement.platforms`
+
+nested attribute, list(object). Upstream `Platforms`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  | yes | Upstream `Architecture`. |
+| `os` | `string` | computed |  | yes | Upstream `OS`. |
+
+### `service_status.spec.task_template.placement.preferences`
+
+nested attribute, list(object). Upstream `Preferences`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `spread` | `object` | computed |  | yes | Upstream `Spread`. |
+
+### `service_status.spec.task_template.placement.preferences.spread`
+
+nested attribute, object. Upstream `Spread`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `spread_descriptor` | `string` | computed |  | yes | Upstream `SpreadDescriptor`. |
+
+### `service_status.spec.task_template.plugin_spec`
+
+nested attribute, object. Upstream `PluginSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `disabled` | `bool` | computed |  | yes | Upstream `Disabled`. |
+| `name` | `string` | computed |  | yes | Upstream `Name`. |
+| `plugin_privilege` | `list(object)` | computed |  | yes | Upstream `PluginPrivilege`. |
+| `remote` | `string` | computed |  | yes | Upstream `Remote`. |
+
+### `service_status.spec.task_template.plugin_spec.plugin_privilege`
+
+nested attribute, list(object). Upstream `PluginPrivilege`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `description` | `string` | computed |  | yes | Upstream `Description`. |
+| `name` | `string` | computed |  | yes | Upstream `Name`. |
+| `value` | `list(string)` | computed |  | yes | Upstream `Value`. |
+
+### `service_status.spec.task_template.resources`
+
+nested attribute, object. Upstream `Resources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `limits` | `object` | computed |  | yes | Upstream `Limits`. |
+| `memory_swappiness` | `number` | computed |  | yes | Upstream `MemorySwappiness`. |
+| `reservations` | `object` | computed |  | yes | Upstream `Reservations`. |
+| `swap_bytes` | `number` | computed |  | yes | Upstream `SwapBytes`. |
+
+### `service_status.spec.task_template.resources.limits`
+
+nested attribute, object. Upstream `Limits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `memory_bytes` | `number` | computed |  | yes | Upstream `MemoryBytes`. |
+| `nano_cpus` | `number` | computed |  | yes | Upstream `NanoCPUs`. |
+| `pids` | `number` | computed |  | yes | Upstream `Pids`. |
+
+### `service_status.spec.task_template.resources.reservations`
+
+nested attribute, object. Upstream `Reservations`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `generic_resources` | `list(object)` | computed |  | yes | Upstream `GenericResources`. |
+| `memory_bytes` | `number` | computed |  | yes | Upstream `MemoryBytes`. |
+| `nano_cpus` | `number` | computed |  | yes | Upstream `NanoCPUs`. |
+
+### `service_status.spec.task_template.resources.reservations.generic_resources`
+
+nested attribute, list(object). Upstream `GenericResources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `discrete_resource_spec` | `object` | computed |  | yes | Upstream `DiscreteResourceSpec`. |
+| `named_resource_spec` | `object` | computed |  | yes | Upstream `NamedResourceSpec`. |
+
+### `service_status.spec.task_template.resources.reservations.generic_resources.discrete_resource_spec`
+
+nested attribute, object. Upstream `DiscreteResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  | yes | Upstream `Kind`. |
+| `value` | `number` | computed |  | yes | Upstream `Value`. |
+
+### `service_status.spec.task_template.resources.reservations.generic_resources.named_resource_spec`
+
+nested attribute, object. Upstream `NamedResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  | yes | Upstream `Kind`. |
+| `value` | `string` | computed |  | yes | Upstream `Value`. |
+
+### `service_status.spec.task_template.restart_policy`
+
+nested attribute, object. Upstream `RestartPolicy`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `condition` | `string` | computed |  | yes | Upstream `Condition`. |
+| `delay` | `number` | computed |  | yes | Upstream `Delay`. |
+| `max_attempts` | `number` | computed |  | yes | Upstream `MaxAttempts`. |
+| `window` | `number` | computed |  | yes | Upstream `Window`. |
+
+### `service_status.spec.update_config`
+
+nested attribute, object. Upstream `UpdateConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `delay` | `number` | computed |  | yes | Upstream `Delay`. |
+| `failure_action` | `string` | computed |  | yes | Upstream `FailureAction`. |
+| `max_failure_ratio` | `number` | computed |  | yes | Upstream `MaxFailureRatio`. |
+| `monitor` | `number` | computed |  | yes | Upstream `Monitor`. |
+| `order` | `string` | computed |  | yes | Upstream `Order`. |
+| `parallelism` | `number` | computed |  | yes | Upstream `Parallelism`. |
 
 ### `stack`
 
@@ -51,12 +549,12 @@ nested attribute, object. The stack as a compose-spec document field by field: `
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `configs` | `map(string)` | computed |  |  | Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `configs` | `map(string)` | computed |  |  | Upstream `configs`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `name` | `string` | computed |  |  | Upstream `name`. |
-| `networks` | `map(string)` | computed |  |  | Upstream `networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `secrets` | `map(string)` | computed |  |  | Upstream `secrets`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `networks` | `map(string)` | computed |  |  | Upstream `networks`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `secrets` | `map(string)` | computed |  |  | Upstream `secrets`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `services` | `map(object)` | computed |  |  | Upstream `services`. |
-| `volumes` | `map(string)` | computed |  |  | Upstream `volumes`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `volumes` | `map(string)` | computed |  |  | Upstream `volumes`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 
 ### `stack.services`
 
@@ -66,17 +564,17 @@ nested attribute, map(object). Upstream `services`.
 |---|---|---|---|---|---|
 | `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
 | `attach` | `bool` | computed |  |  | Upstream `attach`. |
-| `blkio_config` | `string` | computed |  |  | Upstream `blkio_config`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `build` | `string` | computed |  |  | Upstream `build`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `cap_add` | `list(string)` | computed |  |  | Upstream `cap_add`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `cap_drop` | `list(string)` | computed |  |  | Upstream `cap_drop`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `blkio_config` | `string` | computed |  |  | Upstream `blkio_config`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `build` | `string` | computed |  |  | Upstream `build`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cap_add` | `list(string)` | computed |  |  | Upstream `cap_add`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cap_drop` | `list(string)` | computed |  |  | Upstream `cap_drop`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `cgroup` | `string` | computed |  |  | Upstream `cgroup`. |
 | `cgroup_parent` | `string` | computed |  |  | Upstream `cgroup_parent`. |
 | `command` | `list(string)` | computed |  |  | Upstream `command`. |
-| `configs` | `list(string)` | computed |  |  | Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `configs` | `list(string)` | computed |  |  | Upstream `configs`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `container_name` | `string` | computed |  |  | Upstream `container_name`. |
-| `cpu_count` | `string` | computed |  |  | Upstream `cpu_count`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `cpu_percent` | `string` | computed |  |  | Upstream `cpu_percent`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cpu_count` | `string` | computed |  |  | Upstream `cpu_count`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cpu_percent` | `string` | computed |  |  | Upstream `cpu_percent`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `cpu_period` | `number` | computed |  |  | Upstream `cpu_period`. |
 | `cpu_quota` | `number` | computed |  |  | Upstream `cpu_quota`. |
 | `cpu_rt_period` | `number` | computed |  |  | Upstream `cpu_rt_period`. |
@@ -84,26 +582,26 @@ nested attribute, map(object). Upstream `services`.
 | `cpu_shares` | `number` | computed |  |  | Upstream `cpu_shares`. |
 | `cpus` | `number` | computed |  |  | Upstream `cpus`. |
 | `cpuset` | `string` | computed |  |  | Upstream `cpuset`. |
-| `credential_spec` | `string` | computed |  |  | Upstream `credential_spec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `depends_on` | `string` | computed |  |  | Upstream `depends_on`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `deploy` | `string` | computed |  |  | Upstream `deploy`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `develop` | `string` | computed |  |  | Upstream `develop`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `credential_spec` | `string` | computed |  |  | Upstream `credential_spec`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `depends_on` | `string` | computed |  |  | Upstream `depends_on`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `deploy` | `string` | computed |  |  | Upstream `deploy`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `develop` | `string` | computed |  |  | Upstream `develop`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `device_cgroup_rules` | `list(string)` | computed |  |  | Upstream `device_cgroup_rules`. |
-| `devices` | `list(string)` | computed |  |  | Upstream `devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `devices` | `list(string)` | computed |  |  | Upstream `devices`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `dns` | `list(string)` | computed |  |  | Upstream `dns`. |
-| `dns_opt` | `list(string)` | computed |  |  | Upstream `dns_opt`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `dns_opt` | `list(string)` | computed |  |  | Upstream `dns_opt`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `dns_search` | `list(string)` | computed |  |  | Upstream `dns_search`. |
 | `domainname` | `string` | computed |  |  | Upstream `domainname`. |
 | `entrypoint` | `list(string)` | computed |  |  | Upstream `entrypoint`. |
-| `env_file` | `list(string)` | computed |  | yes | Upstream `env_file`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `env_file` | `list(string)` | computed |  | yes | Upstream `env_file`. Sensitive. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `environment` | `map(string)` | computed |  | yes | Upstream `environment`. Sensitive. |
-| `expose` | `list(string)` | computed |  |  | Upstream `expose`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `extends` | `string` | computed |  |  | Upstream `extends`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `external_links` | `list(string)` | computed |  |  | Upstream `external_links`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `expose` | `list(string)` | computed |  |  | Upstream `expose`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `extends` | `string` | computed |  |  | Upstream `extends`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `external_links` | `list(string)` | computed |  |  | Upstream `external_links`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `extra_hosts` | `map(list(string))` | computed |  |  | Upstream `extra_hosts`. |
-| `gpus` | `string` | computed |  |  | Upstream `gpus`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `group_add` | `list(string)` | computed |  |  | Upstream `group_add`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `healthcheck` | `string` | computed |  |  | Upstream `healthcheck`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `gpus` | `string` | computed |  |  | Upstream `gpus`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `group_add` | `list(string)` | computed |  |  | Upstream `group_add`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `healthcheck` | `string` | computed |  |  | Upstream `healthcheck`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `hostname` | `string` | computed |  |  | Upstream `hostname`. |
 | `image` | `string` | computed |  |  | Upstream `image`. |
 | `init` | `bool` | computed |  |  | Upstream `init`. |
@@ -111,52 +609,52 @@ nested attribute, map(object). Upstream `services`.
 | `isolation` | `string` | computed |  |  | Upstream `isolation`. |
 | `label_file` | `list(string)` | computed |  |  | Upstream `label_file`. |
 | `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
-| `links` | `list(string)` | computed |  |  | Upstream `links`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `logging` | `string` | computed |  |  | Upstream `logging`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `links` | `list(string)` | computed |  |  | Upstream `links`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `logging` | `string` | computed |  |  | Upstream `logging`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `mac_address` | `string` | computed |  |  | Upstream `mac_address`. |
 | `mem_limit` | `number` | computed |  |  | Upstream `mem_limit`. |
 | `mem_reservation` | `number` | computed |  |  | Upstream `mem_reservation`. |
 | `mem_swappiness` | `number` | computed |  |  | Upstream `mem_swappiness`. |
 | `memswap_limit` | `number` | computed |  |  | Upstream `memswap_limit`. |
-| `models` | `string` | computed |  |  | Upstream `models`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `models` | `string` | computed |  |  | Upstream `models`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `network_mode` | `string` | computed |  |  | Upstream `network_mode`. |
-| `networks` | `string` | computed |  |  | Upstream `networks`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `networks` | `string` | computed |  |  | Upstream `networks`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `oom_kill_disable` | `bool` | computed |  |  | Upstream `oom_kill_disable`. |
-| `oom_score_adj` | `string` | computed |  |  | Upstream `oom_score_adj`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `oom_score_adj` | `string` | computed |  |  | Upstream `oom_score_adj`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `pid` | `string` | computed |  |  | Upstream `pid`. |
 | `pids_limit` | `number` | computed |  |  | Upstream `pids_limit`. |
 | `platform` | `string` | computed |  |  | Upstream `platform`. |
-| `ports` | `list(string)` | computed |  |  | Upstream `ports`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `post_start` | `list(string)` | computed |  |  | Upstream `post_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `pre_start` | `list(string)` | computed |  |  | Upstream `pre_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `pre_stop` | `list(string)` | computed |  |  | Upstream `pre_stop`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `ports` | `list(string)` | computed |  |  | Upstream `ports`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `post_start` | `list(string)` | computed |  |  | Upstream `post_start`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `pre_start` | `list(string)` | computed |  |  | Upstream `pre_start`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `pre_stop` | `list(string)` | computed |  |  | Upstream `pre_stop`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
 | `profiles` | `list(string)` | computed |  |  | Upstream `profiles`. |
-| `provider` | `string` | computed |  |  | Upstream `provider`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `provider` | `string` | computed |  |  | Upstream `provider`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `pull_policy` | `string` | computed |  |  | Upstream `pull_policy`. |
 | `pull_refresh_after` | `string` | computed |  |  | Upstream `pull_refresh_after`. |
 | `read_only` | `bool` | computed |  |  | Upstream `read_only`. |
 | `restart` | `string` | computed |  |  | Upstream `restart`. |
 | `runtime` | `string` | computed |  |  | Upstream `runtime`. |
 | `scale` | `number` | computed |  |  | Upstream `scale`. |
-| `secrets` | `list(string)` | computed |  | yes | Upstream `secrets`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `security_opt` | `list(string)` | computed |  |  | Upstream `security_opt`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `secrets` | `list(string)` | computed |  | yes | Upstream `secrets`. Sensitive. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `security_opt` | `list(string)` | computed |  |  | Upstream `security_opt`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `shm_size` | `number` | computed |  |  | Upstream `shm_size`. |
 | `stdin_open` | `bool` | computed |  |  | Upstream `stdin_open`. |
 | `stop_grace_period` | `string` | computed |  |  | Upstream `stop_grace_period`. |
 | `stop_signal` | `string` | computed |  |  | Upstream `stop_signal`. |
-| `storage_opt` | `string` | computed |  |  | Upstream `storage_opt`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `storage_opt` | `string` | computed |  |  | Upstream `storage_opt`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `sysctls` | `map(string)` | computed |  |  | Upstream `sysctls`. |
 | `tmpfs` | `list(string)` | computed |  |  | Upstream `tmpfs`. |
 | `tty` | `bool` | computed |  |  | Upstream `tty`. |
-| `ulimits` | `string` | computed |  |  | Upstream `ulimits`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `ulimits` | `string` | computed |  |  | Upstream `ulimits`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `umask` | `number` | computed |  |  | Upstream `umask`. |
 | `use_api_socket` | `bool` | computed |  |  | Upstream `use_api_socket`. |
 | `user` | `string` | computed |  |  | Upstream `user`. |
 | `userns_mode` | `string` | computed |  |  | Upstream `userns_mode`. |
 | `uts` | `string` | computed |  |  | Upstream `uts`. |
-| `volumes` | `list(string)` | computed |  |  | Upstream `volumes`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `volumes_from` | `list(string)` | computed |  |  | Upstream `volumes_from`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `volumes` | `list(string)` | computed |  |  | Upstream `volumes`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `volumes_from` | `list(string)` | computed |  |  | Upstream `volumes_from`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `working_dir` | `string` | computed |  |  | Upstream `working_dir`. |
 
 ### `config`

@@ -116,6 +116,7 @@ func stackBlobBlock(kind string, sensitive bool) schema.ListNestedBlock {
 func (r *stackResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	svcAttrs, svcBlocks := svcSchema(false)
 	resp.Schema = schema.Schema{
+		Version: 1, // Pass 6c: structured outputs changed shape (state_upgrade_p6c_z.go)
 		MarkdownDescription: "A Swarm stack built from API primitives (not a compose file, no CLI): services, overlay networks, " +
 			"secrets and configs, each named `<stack>_<name>` and labelled `com.docker.stack.namespace=<stack>` so `docker stack ls/ps` " +
 			"show them. Requires the provider to point at a Swarm manager. Apply creates networks, secrets and configs first, then " +

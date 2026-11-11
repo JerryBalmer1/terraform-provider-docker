@@ -261,7 +261,8 @@ output "web_ip" {
 
 ### Read-Only
 
-- `content_sha256` (String) sha256 of inspect_json.
+- `config_sha256` (String) SHA-256 (hex) of the configuration part of inspect_json only (Name, Image, Platform, Config, HostConfig and, per network in NetworkSettings.Networks, the requested endpoint settings (IPAMConfig, Links, Aliases, DriverOpts, GwPriority); never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch.
+- `content_sha256` (String) SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes.
 - `docker_server_version` (String) Docker Engine version from GET /version.
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `exit_code` (Number) Exit code of the container's main process at the last refresh (`State.ExitCode`); 0 while it runs.
@@ -550,8 +551,8 @@ Read-Only:
 - `domainname` (String) Upstream `Domainname`.
 - `entrypoint` (List of String) Upstream `Entrypoint`.
 - `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
-- `exposed_ports` (Dynamic) Upstream `ExposedPorts`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
-- `healthcheck` (Dynamic) Upstream `Healthcheck`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `exposed_ports` (Attributes Map) Upstream `ExposedPorts`. (see [below for nested schema](#nestedatt--inspect--config--exposed_ports))
+- `healthcheck` (Attributes) Upstream `Healthcheck`. (see [below for nested schema](#nestedatt--inspect--config--healthcheck))
 - `hostname` (String) Upstream `Hostname`.
 - `image` (String) Upstream `Image`.
 - `labels` (Map of String) Upstream `Labels`.
@@ -564,8 +565,29 @@ Read-Only:
 - `stop_timeout` (Number) Upstream `StopTimeout`.
 - `tty` (Boolean) Upstream `Tty`.
 - `user` (String) Upstream `User`.
-- `volumes` (Dynamic) Upstream `Volumes`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `volumes` (Attributes Map) Upstream `Volumes`. (see [below for nested schema](#nestedatt--inspect--config--volumes))
 - `working_dir` (String) Upstream `WorkingDir`.
+
+<a id="nestedatt--inspect--config--exposed_ports"></a>
+### Nested Schema for `inspect.config.exposed_ports`
+
+
+<a id="nestedatt--inspect--config--healthcheck"></a>
+### Nested Schema for `inspect.config.healthcheck`
+
+Read-Only:
+
+- `interval` (Number) Upstream `Interval`.
+- `retries` (Number) Upstream `Retries`.
+- `start_interval` (Number) Upstream `StartInterval`.
+- `start_period` (Number) Upstream `StartPeriod`.
+- `test` (List of String) Upstream `Test`.
+- `timeout` (Number) Upstream `Timeout`.
+
+
+<a id="nestedatt--inspect--config--volumes"></a>
+### Nested Schema for `inspect.config.volumes`
+
 
 
 <a id="nestedatt--inspect--graph_driver"></a>
@@ -585,12 +607,12 @@ Read-Only:
 - `annotations` (Map of String) Upstream `Annotations`.
 - `auto_remove` (Boolean) Upstream `AutoRemove`.
 - `binds` (List of String) Upstream `Binds`.
-- `blkio_device_read_bps` (List of String) Upstream `BlkioDeviceReadBps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `blkio_device_read_iops` (List of String) Upstream `BlkioDeviceReadIOps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `blkio_device_write_bps` (List of String) Upstream `BlkioDeviceWriteBps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `blkio_device_write_iops` (List of String) Upstream `BlkioDeviceWriteIOps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `blkio_device_read_bps` (Attributes List) Upstream `BlkioDeviceReadBps`. (see [below for nested schema](#nestedatt--inspect--host_config--blkio_device_read_bps))
+- `blkio_device_read_iops` (Attributes List) Upstream `BlkioDeviceReadIOps`. (see [below for nested schema](#nestedatt--inspect--host_config--blkio_device_read_iops))
+- `blkio_device_write_bps` (Attributes List) Upstream `BlkioDeviceWriteBps`. (see [below for nested schema](#nestedatt--inspect--host_config--blkio_device_write_bps))
+- `blkio_device_write_iops` (Attributes List) Upstream `BlkioDeviceWriteIOps`. (see [below for nested schema](#nestedatt--inspect--host_config--blkio_device_write_iops))
 - `blkio_weight` (Number) Upstream `BlkioWeight`.
-- `blkio_weight_device` (List of String) Upstream `BlkioWeightDevice`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `blkio_weight_device` (Attributes List) Upstream `BlkioWeightDevice`. (see [below for nested schema](#nestedatt--inspect--host_config--blkio_weight_device))
 - `cap_add` (List of String) Upstream `CapAdd`.
 - `cap_drop` (List of String) Upstream `CapDrop`.
 - `cgroup` (String) Upstream `Cgroup`.
@@ -608,8 +630,8 @@ Read-Only:
 - `cpuset_cpus` (String) Upstream `CpusetCpus`.
 - `cpuset_mems` (String) Upstream `CpusetMems`.
 - `device_cgroup_rules` (List of String) Upstream `DeviceCgroupRules`.
-- `device_requests` (List of String) Upstream `DeviceRequests`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `devices` (List of String) Upstream `Devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `device_requests` (Attributes List) Upstream `DeviceRequests`. (see [below for nested schema](#nestedatt--inspect--host_config--device_requests))
+- `devices` (Attributes List) Upstream `Devices`. (see [below for nested schema](#nestedatt--inspect--host_config--devices))
 - `dns` (List of String) Upstream `Dns`.
 - `dns_options` (List of String) Upstream `DnsOptions`.
 - `dns_search` (List of String) Upstream `DnsSearch`.
@@ -621,37 +643,198 @@ Read-Only:
 - `ipc_mode` (String) Upstream `IpcMode`.
 - `isolation` (String) Upstream `Isolation`.
 - `links` (List of String) Upstream `Links`.
-- `log_config` (Dynamic) Upstream `LogConfig`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `log_config` (Attributes) Upstream `LogConfig`. (see [below for nested schema](#nestedatt--inspect--host_config--log_config))
 - `masked_paths` (List of String) Upstream `MaskedPaths`.
 - `memory` (Number) Upstream `Memory`.
 - `memory_reservation` (Number) Upstream `MemoryReservation`.
 - `memory_swap` (Number) Upstream `MemorySwap`.
 - `memory_swappiness` (Number) Upstream `MemorySwappiness`.
-- `mounts` (List of String) Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `mounts` (Attributes List) Upstream `Mounts`. (see [below for nested schema](#nestedatt--inspect--host_config--mounts))
 - `nano_cpus` (Number) Upstream `NanoCpus`.
 - `network_mode` (String) Upstream `NetworkMode`.
 - `oom_kill_disable` (Boolean) Upstream `OomKillDisable`.
 - `oom_score_adj` (Number) Upstream `OomScoreAdj`.
 - `pid_mode` (String) Upstream `PidMode`.
 - `pids_limit` (Number) Upstream `PidsLimit`.
-- `port_bindings` (Map of List of String) Upstream `PortBindings`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `port_bindings` (Map of List of Object) Upstream `PortBindings`.
 - `privileged` (Boolean) Upstream `Privileged`.
 - `publish_all_ports` (Boolean) Upstream `PublishAllPorts`.
 - `readonly_paths` (List of String) Upstream `ReadonlyPaths`.
 - `readonly_rootfs` (Boolean) Upstream `ReadonlyRootfs`.
-- `restart_policy` (Dynamic) Upstream `RestartPolicy`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `restart_policy` (Attributes) Upstream `RestartPolicy`. (see [below for nested schema](#nestedatt--inspect--host_config--restart_policy))
 - `runtime` (String) Upstream `Runtime`.
 - `security_opt` (List of String) Upstream `SecurityOpt`.
 - `shm_size` (Number) Upstream `ShmSize`.
 - `storage_opt` (Map of String) Upstream `StorageOpt`.
 - `sysctls` (Map of String) Upstream `Sysctls`.
 - `tmpfs` (Map of String) Upstream `Tmpfs`.
-- `ulimits` (List of String) Upstream `Ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `ulimits` (Attributes List) Upstream `Ulimits`. (see [below for nested schema](#nestedatt--inspect--host_config--ulimits))
 - `umask` (Number) Upstream `Umask`.
 - `userns_mode` (String) Upstream `UsernsMode`.
 - `uts_mode` (String) Upstream `UTSMode`.
 - `volume_driver` (String) Upstream `VolumeDriver`.
 - `volumes_from` (List of String) Upstream `VolumesFrom`.
+
+<a id="nestedatt--inspect--host_config--blkio_device_read_bps"></a>
+### Nested Schema for `inspect.host_config.blkio_device_read_bps`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (Number) Upstream `Rate`.
+
+
+<a id="nestedatt--inspect--host_config--blkio_device_read_iops"></a>
+### Nested Schema for `inspect.host_config.blkio_device_read_iops`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (Number) Upstream `Rate`.
+
+
+<a id="nestedatt--inspect--host_config--blkio_device_write_bps"></a>
+### Nested Schema for `inspect.host_config.blkio_device_write_bps`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (Number) Upstream `Rate`.
+
+
+<a id="nestedatt--inspect--host_config--blkio_device_write_iops"></a>
+### Nested Schema for `inspect.host_config.blkio_device_write_iops`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (Number) Upstream `Rate`.
+
+
+<a id="nestedatt--inspect--host_config--blkio_weight_device"></a>
+### Nested Schema for `inspect.host_config.blkio_weight_device`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `weight` (Number) Upstream `Weight`.
+
+
+<a id="nestedatt--inspect--host_config--device_requests"></a>
+### Nested Schema for `inspect.host_config.device_requests`
+
+Read-Only:
+
+- `capabilities` (List of List of String) Upstream `Capabilities`.
+- `count` (Number) Upstream `Count`.
+- `device_ids` (List of String) Upstream `DeviceIDs`.
+- `driver` (String) Upstream `Driver`.
+- `options` (Map of String) Upstream `Options`.
+
+
+<a id="nestedatt--inspect--host_config--devices"></a>
+### Nested Schema for `inspect.host_config.devices`
+
+Read-Only:
+
+- `cgroup_permissions` (String) Upstream `CgroupPermissions`.
+- `path_in_container` (String) Upstream `PathInContainer`.
+- `path_on_host` (String) Upstream `PathOnHost`.
+
+
+<a id="nestedatt--inspect--host_config--log_config"></a>
+### Nested Schema for `inspect.host_config.log_config`
+
+Read-Only:
+
+- `config` (Map of String) Upstream `Config`.
+- `type` (String) Upstream `Type`.
+
+
+<a id="nestedatt--inspect--host_config--mounts"></a>
+### Nested Schema for `inspect.host_config.mounts`
+
+Read-Only:
+
+- `bind_options` (Attributes) Upstream `BindOptions`. (see [below for nested schema](#nestedatt--inspect--host_config--mounts--bind_options))
+- `consistency` (String) Upstream `Consistency`.
+- `image_options` (Attributes) Upstream `ImageOptions`. (see [below for nested schema](#nestedatt--inspect--host_config--mounts--image_options))
+- `read_only` (Boolean) Upstream `ReadOnly`.
+- `source` (String) Upstream `Source`.
+- `target` (String) Upstream `Target`.
+- `tmpfs_options` (Attributes) Upstream `TmpfsOptions`. (see [below for nested schema](#nestedatt--inspect--host_config--mounts--tmpfs_options))
+- `type` (String) Upstream `Type`.
+- `volume_options` (Attributes) Upstream `VolumeOptions`. (see [below for nested schema](#nestedatt--inspect--host_config--mounts--volume_options))
+
+<a id="nestedatt--inspect--host_config--mounts--bind_options"></a>
+### Nested Schema for `inspect.host_config.mounts.bind_options`
+
+Read-Only:
+
+- `create_mountpoint` (Boolean) Upstream `CreateMountpoint`.
+- `non_recursive` (Boolean) Upstream `NonRecursive`.
+- `propagation` (String) Upstream `Propagation`.
+- `read_only_force_recursive` (Boolean) Upstream `ReadOnlyForceRecursive`.
+- `read_only_non_recursive` (Boolean) Upstream `ReadOnlyNonRecursive`.
+
+
+<a id="nestedatt--inspect--host_config--mounts--image_options"></a>
+### Nested Schema for `inspect.host_config.mounts.image_options`
+
+Read-Only:
+
+- `subpath` (String) Upstream `Subpath`.
+
+
+<a id="nestedatt--inspect--host_config--mounts--tmpfs_options"></a>
+### Nested Schema for `inspect.host_config.mounts.tmpfs_options`
+
+Read-Only:
+
+- `mode` (Number) Upstream `Mode`.
+- `options` (List of List of String) Upstream `Options`.
+- `size_bytes` (Number) Upstream `SizeBytes`.
+
+
+<a id="nestedatt--inspect--host_config--mounts--volume_options"></a>
+### Nested Schema for `inspect.host_config.mounts.volume_options`
+
+Read-Only:
+
+- `driver_config` (Attributes) Upstream `DriverConfig`. (see [below for nested schema](#nestedatt--inspect--host_config--mounts--volume_options--driver_config))
+- `labels` (Map of String) Upstream `Labels`.
+- `no_copy` (Boolean) Upstream `NoCopy`.
+- `subpath` (String) Upstream `Subpath`.
+
+<a id="nestedatt--inspect--host_config--mounts--volume_options--driver_config"></a>
+### Nested Schema for `inspect.host_config.mounts.volume_options.driver_config`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+- `options` (Map of String) Upstream `Options`.
+
+
+
+
+<a id="nestedatt--inspect--host_config--restart_policy"></a>
+### Nested Schema for `inspect.host_config.restart_policy`
+
+Read-Only:
+
+- `maximum_retry_count` (Number) Upstream `MaximumRetryCount`.
+- `name` (String) Upstream `Name`.
+
+
+<a id="nestedatt--inspect--host_config--ulimits"></a>
+### Nested Schema for `inspect.host_config.ulimits`
+
+Read-Only:
+
+- `hard` (Number) Upstream `Hard`.
+- `name` (String) Upstream `Name`.
+- `soft` (Number) Upstream `Soft`.
+
 
 
 <a id="nestedatt--inspect--image_manifest_descriptor"></a>
@@ -664,9 +847,21 @@ Read-Only:
 - `data` (String) Upstream `data`.
 - `digest` (String) Upstream `digest`.
 - `media_type` (String) Upstream `mediaType`.
-- `platform` (Dynamic) Upstream `platform`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--inspect--image_manifest_descriptor--platform))
 - `size` (Number) Upstream `size`.
 - `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--inspect--image_manifest_descriptor--platform"></a>
+### Nested Schema for `inspect.image_manifest_descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
 
 
 <a id="nestedatt--inspect--mounts"></a>
@@ -681,7 +876,7 @@ Read-Only:
 - `propagation` (String) Upstream `Propagation`.
 - `rw` (Boolean) Upstream `RW`.
 - `source` (String) Upstream `Source`.
-- `type` (String) Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `type` (String) Upstream `Type`.
 
 
 <a id="nestedatt--inspect--network_settings"></a>
@@ -689,10 +884,42 @@ Read-Only:
 
 Read-Only:
 
-- `networks` (Map of String) Upstream `Networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `ports` (Map of List of String) Upstream `Ports`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `networks` (Attributes Map) Upstream `Networks`. (see [below for nested schema](#nestedatt--inspect--network_settings--networks))
+- `ports` (Map of List of Object) Upstream `Ports`.
 - `sandbox_id` (String) Upstream `SandboxID`.
 - `sandbox_key` (String) Upstream `SandboxKey`.
+
+<a id="nestedatt--inspect--network_settings--networks"></a>
+### Nested Schema for `inspect.network_settings.networks`
+
+Read-Only:
+
+- `aliases` (List of String) Upstream `Aliases`.
+- `dns_names` (List of String) Upstream `DNSNames`.
+- `driver_opts` (Map of String) Upstream `DriverOpts`.
+- `endpoint_id` (String) Upstream `EndpointID`.
+- `gateway` (String) Upstream `Gateway`.
+- `global_ipv6_address` (String) Upstream `GlobalIPv6Address`.
+- `global_ipv6_prefix_len` (Number) Upstream `GlobalIPv6PrefixLen`.
+- `gw_priority` (Number) Upstream `GwPriority`.
+- `ip_address` (String) Upstream `IPAddress`.
+- `ip_prefix_len` (Number) Upstream `IPPrefixLen`.
+- `ipam_config` (Attributes) Upstream `IPAMConfig`. (see [below for nested schema](#nestedatt--inspect--network_settings--networks--ipam_config))
+- `ipv6_gateway` (String) Upstream `IPv6Gateway`.
+- `links` (List of String) Upstream `Links`.
+- `mac_address` (String) Upstream `MacAddress`.
+- `network_id` (String) Upstream `NetworkID`.
+
+<a id="nestedatt--inspect--network_settings--networks--ipam_config"></a>
+### Nested Schema for `inspect.network_settings.networks.ipam_config`
+
+Read-Only:
+
+- `ipv4_address` (String) Upstream `IPv4Address`.
+- `ipv6_address` (String) Upstream `IPv6Address`.
+- `link_local_ips` (List of String) Upstream `LinkLocalIPs`.
+
+
 
 
 <a id="nestedatt--inspect--state"></a>
@@ -704,7 +931,7 @@ Read-Only:
 - `error` (String) Upstream `Error`.
 - `exit_code` (Number) Upstream `ExitCode`.
 - `finished_at` (String) Upstream `FinishedAt`.
-- `health` (Dynamic) Upstream `Health`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `health` (Attributes) Upstream `Health`. (see [below for nested schema](#nestedatt--inspect--state--health))
 - `oom_killed` (Boolean) Upstream `OOMKilled`.
 - `paused` (Boolean) Upstream `Paused`.
 - `pid` (Number) Upstream `Pid`.
@@ -713,13 +940,50 @@ Read-Only:
 - `started_at` (String) Upstream `StartedAt`.
 - `status` (String) Upstream `Status`.
 
+<a id="nestedatt--inspect--state--health"></a>
+### Nested Schema for `inspect.state.health`
+
+Read-Only:
+
+- `failing_streak` (Number) Upstream `FailingStreak`.
+- `log` (Attributes List) Upstream `Log`. (see [below for nested schema](#nestedatt--inspect--state--health--log))
+- `status` (String) Upstream `Status`.
+
+<a id="nestedatt--inspect--state--health--log"></a>
+### Nested Schema for `inspect.state.health.log`
+
+Read-Only:
+
+- `end` (String) Upstream `End`.
+- `exit_code` (Number) Upstream `ExitCode`.
+- `output` (String, Sensitive) Upstream `Output`. Sensitive.
+- `start` (String) Upstream `Start`.
+
+
+
 
 <a id="nestedatt--inspect--storage"></a>
 ### Nested Schema for `inspect.storage`
 
 Read-Only:
 
-- `root_fs` (Dynamic) Upstream `RootFS`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `root_fs` (Attributes) Upstream `RootFS`. (see [below for nested schema](#nestedatt--inspect--storage--root_fs))
+
+<a id="nestedatt--inspect--storage--root_fs"></a>
+### Nested Schema for `inspect.storage.root_fs`
+
+Read-Only:
+
+- `snapshot` (Attributes) Upstream `Snapshot`. (see [below for nested schema](#nestedatt--inspect--storage--root_fs--snapshot))
+
+<a id="nestedatt--inspect--storage--root_fs--snapshot"></a>
+### Nested Schema for `inspect.storage.root_fs.snapshot`
+
+Read-Only:
+
+- `name` (String) Upstream `Name`.
+
+
 
 
 

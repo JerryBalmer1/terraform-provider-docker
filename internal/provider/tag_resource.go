@@ -56,6 +56,7 @@ func (r *tagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 	replace := []planmodifier.String{stringplanmodifier.RequiresReplace()}
 	keep := []planmodifier.String{stringplanmodifier.UseStateForUnknown()}
 	resp.Schema = schema.Schema{
+		Version: 1, // Pass 6c: structured outputs changed shape (state_upgrade_p6c_z.go)
 		MarkdownDescription: "Adds a tag to an image already on the provider's daemon, like `docker tag SOURCE TARGET`. " +
 			"Create calls `ImageTag`; refresh inspects `target_image` and plans a re-tag when the tag is gone or now points at a different " +
 			"image than `source_image`. Destroy untags `target_image` only (`ImageRemove` on the tag, never by ID); when it is the image's " +

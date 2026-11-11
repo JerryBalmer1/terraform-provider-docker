@@ -105,21 +105,114 @@ Read-Only:
 
 Read-Only:
 
-- `args` (Dynamic) Upstream `Args`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `args` (Attributes) Upstream `Args`. (see [below for nested schema](#nestedatt--inspect--config--args))
 - `description` (String) Upstream `Description`.
 - `documentation` (String) Upstream `Documentation`.
 - `entrypoint` (List of String) Upstream `Entrypoint`.
-- `env` (List of String, Sensitive) Upstream `Env`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `interface` (Dynamic) Upstream `Interface`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `env` (Attributes List, Sensitive) Upstream `Env`. Sensitive. (see [below for nested schema](#nestedatt--inspect--config--env))
+- `interface` (Attributes) Upstream `Interface`. (see [below for nested schema](#nestedatt--inspect--config--interface))
 - `ipc_host` (Boolean) Upstream `IpcHost`.
-- `linux` (Dynamic) Upstream `Linux`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
-- `mounts` (List of String) Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `network` (Dynamic) Upstream `Network`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `linux` (Attributes) Upstream `Linux`. (see [below for nested schema](#nestedatt--inspect--config--linux))
+- `mounts` (Attributes List) Upstream `Mounts`. (see [below for nested schema](#nestedatt--inspect--config--mounts))
+- `network` (Attributes) Upstream `Network`. (see [below for nested schema](#nestedatt--inspect--config--network))
 - `pid_host` (Boolean) Upstream `PidHost`.
 - `propagated_mount` (String) Upstream `PropagatedMount`.
-- `rootfs` (Dynamic) Upstream `rootfs`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
-- `user` (Dynamic) Upstream `User`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `rootfs` (Attributes) Upstream `rootfs`. (see [below for nested schema](#nestedatt--inspect--config--rootfs))
+- `user` (Attributes) Upstream `User`. (see [below for nested schema](#nestedatt--inspect--config--user))
 - `work_dir` (String) Upstream `WorkDir`.
+
+<a id="nestedatt--inspect--config--args"></a>
+### Nested Schema for `inspect.config.args`
+
+Read-Only:
+
+- `description` (String) Upstream `Description`.
+- `name` (String) Upstream `Name`.
+- `settable` (List of String) Upstream `Settable`.
+- `value` (List of String) Upstream `Value`.
+
+
+<a id="nestedatt--inspect--config--env"></a>
+### Nested Schema for `inspect.config.env`
+
+Read-Only:
+
+- `description` (String, Sensitive) Upstream `Description`.
+- `name` (String, Sensitive) Upstream `Name`.
+- `settable` (List of String, Sensitive) Upstream `Settable`.
+- `value` (String, Sensitive) Upstream `Value`. Sensitive.
+
+
+<a id="nestedatt--inspect--config--interface"></a>
+### Nested Schema for `inspect.config.interface`
+
+Read-Only:
+
+- `protocol_scheme` (String) Upstream `ProtocolScheme`.
+- `socket` (String) Upstream `Socket`.
+- `types` (List of String) Upstream `Types`.
+
+
+<a id="nestedatt--inspect--config--linux"></a>
+### Nested Schema for `inspect.config.linux`
+
+Read-Only:
+
+- `allow_all_devices` (Boolean) Upstream `AllowAllDevices`.
+- `capabilities` (List of String) Upstream `Capabilities`.
+- `devices` (Attributes List) Upstream `Devices`. (see [below for nested schema](#nestedatt--inspect--config--linux--devices))
+
+<a id="nestedatt--inspect--config--linux--devices"></a>
+### Nested Schema for `inspect.config.linux.devices`
+
+Read-Only:
+
+- `description` (String) Upstream `Description`.
+- `name` (String) Upstream `Name`.
+- `path` (String) Upstream `Path`.
+- `settable` (List of String) Upstream `Settable`.
+
+
+
+<a id="nestedatt--inspect--config--mounts"></a>
+### Nested Schema for `inspect.config.mounts`
+
+Read-Only:
+
+- `description` (String) Upstream `Description`.
+- `destination` (String) Upstream `Destination`.
+- `name` (String) Upstream `Name`.
+- `options` (List of String) Upstream `Options`.
+- `settable` (List of String) Upstream `Settable`.
+- `source` (String) Upstream `Source`.
+- `type` (String) Upstream `Type`.
+
+
+<a id="nestedatt--inspect--config--network"></a>
+### Nested Schema for `inspect.config.network`
+
+Read-Only:
+
+- `type` (String) Upstream `Type`.
+
+
+<a id="nestedatt--inspect--config--rootfs"></a>
+### Nested Schema for `inspect.config.rootfs`
+
+Read-Only:
+
+- `diff_ids` (List of String) Upstream `diff_ids`.
+- `type` (String) Upstream `type`.
+
+
+<a id="nestedatt--inspect--config--user"></a>
+### Nested Schema for `inspect.config.user`
+
+Read-Only:
+
+- `gid` (Number) Upstream `GID`.
+- `uid` (Number) Upstream `UID`.
+
 
 
 <a id="nestedatt--inspect--settings"></a>
@@ -128,9 +221,33 @@ Read-Only:
 Read-Only:
 
 - `args` (List of String) Upstream `Args`.
-- `devices` (List of String) Upstream `Devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `devices` (Attributes List) Upstream `Devices`. (see [below for nested schema](#nestedatt--inspect--settings--devices))
 - `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
-- `mounts` (List of String) Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `mounts` (Attributes List) Upstream `Mounts`. (see [below for nested schema](#nestedatt--inspect--settings--mounts))
+
+<a id="nestedatt--inspect--settings--devices"></a>
+### Nested Schema for `inspect.settings.devices`
+
+Read-Only:
+
+- `description` (String) Upstream `Description`.
+- `name` (String) Upstream `Name`.
+- `path` (String) Upstream `Path`.
+- `settable` (List of String) Upstream `Settable`.
+
+
+<a id="nestedatt--inspect--settings--mounts"></a>
+### Nested Schema for `inspect.settings.mounts`
+
+Read-Only:
+
+- `description` (String) Upstream `Description`.
+- `destination` (String) Upstream `Destination`.
+- `name` (String) Upstream `Name`.
+- `options` (List of String) Upstream `Options`.
+- `settable` (List of String) Upstream `Settable`.
+- `source` (String) Upstream `Source`.
+- `type` (String) Upstream `Type`.
 
 ## Import
 

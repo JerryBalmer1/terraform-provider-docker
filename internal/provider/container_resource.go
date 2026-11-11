@@ -158,7 +158,7 @@ func (r *containerResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	rrList := []planmodifier.List{listplanmodifier.RequiresReplace()}
 	rrMap := []planmodifier.Map{mapplanmodifier.RequiresReplace()}
 	resp.Schema = schema.Schema{
-		Version: 1,
+		Version: 2, // Pass 6c: structured outputs changed shape (ctr_p53.go UpgradeState)
 		MarkdownDescription: "A single-host Docker container, created with `ContainerCreate`, attached to its networks and, per `state`, started " +
 			"(`running`, the default), left created (`created`) or run once to completion (`exited`). " +
 			"Refresh diffs against `ContainerInspect`: values the image already supplies (env, labels, command, entrypoint, user, " +

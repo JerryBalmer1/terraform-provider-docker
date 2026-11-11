@@ -1,0 +1,8 @@
+README.md
+reference/_gen/pass6c/lane-R.md
+templates/index.md.tmpl
+tools/doccounts/doccounts.go
+tools/doccounts/doccounts_test.go
+tools/doccounts/evidence.go
+tools/doccounts/evidence_test.go
+tools/doccounts/main.go

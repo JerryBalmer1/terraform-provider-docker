@@ -52,6 +52,9 @@ type Field struct {
 	Sensitive   bool    `json:"sensitive"`
 	Description string  `json:"description"`
 	Fields      []Field `json:"fields"`
+	// Pointer is the field's upstream source (ApplyFieldPointers reads it;
+	// it is not generated).
+	Pointer string `json:"pointer"`
 }
 
 // Input is an argument an item's outputs depend on (the logs bounds).

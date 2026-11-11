@@ -30,7 +30,7 @@ nested attribute, list(object). The GET /images/{name}/attestations response as 
 |---|---|---|---|---|---|
 | `descriptor` | `object` | computed |  |  | Upstream `Descriptor`. |
 | `predicate_type` | `string` | computed |  |  | Upstream `PredicateType`. |
-| `statement` | `string` | computed |  | yes | Upstream `Statement`. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `statement` | `string` | computed |  | yes | Upstream `Statement`. Sensitive. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 
 ### `attestations.descriptor`
 
@@ -43,9 +43,21 @@ nested attribute, object. Upstream `Descriptor`.
 | `data` | `string` | computed |  | yes | Upstream `data`. Sensitive. |
 | `digest` | `string` | computed |  |  | Upstream `digest`. |
 | `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
-| `platform` | `string` | computed |  |  | Upstream `platform`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `platform` | `object` | computed |  |  | Upstream `platform`. |
 | `size` | `number` | computed |  |  | Upstream `size`. |
 | `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `attestations.descriptor.platform`
+
+nested attribute, object. Upstream `platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
 
 ## Example
 

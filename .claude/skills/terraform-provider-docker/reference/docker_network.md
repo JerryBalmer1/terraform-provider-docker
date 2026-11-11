@@ -14,7 +14,8 @@ A Docker network (`NetworkCreate`): a local `bridge`/`macvlan`/`ipvlan` network,
 | `attachable` | `bool` | optional, computed | yes |  | Let standalone containers attach to an `overlay` network. Changing this forces a new resource. |
 | `config_from` | `string` | optional | yes |  | Name of the config-only network that provides this network's configuration (`ConfigFrom.Network`), e.g. for a swarm-scoped `macvlan` network. The network takes its IPAM, IPv4/IPv6 settings and labels from it: `labels`, `ipam_config`, `ipam_options`, `enable_ipv4 = false` and `enable_ipv6 = true` are rejected with it (the Engine refuses them), and no owner or managed-by label is added. Changing this forces a new resource. |
 | `config_only` | `bool` | optional, computed | yes |  | Create a config-only network (`ConfigOnly`): a placeholder holding IPAM and driver options for other networks' `config_from`; containers cannot attach to it. Changing this forces a new resource. |
-| `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `config_sha256` | `string` | computed |  |  | SHA-256 (hex) of the configuration part of inspect_json only (Name, Driver, Scope, EnableIPv4, EnableIPv6, IPAM, Internal, Attachable, Ingress, ConfigFrom, ConfigOnly, Options and Labels; never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes. |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `driver` | `string` | optional, computed | yes |  | Network driver: `bridge` (default), `overlay` (Swarm manager only), `macvlan`, `ipvlan`, or a plugin. Changing this forces a new resource. |
 | `enable_ipv4` | `bool` | optional | yes |  | Enable IPv4 on the network (`EnableIPv4`); `false` disables IPv4 IPAM (only for networks that support it). Unset uses the daemon default (enabled), which is not reported. Changing this forces a new resource. Needs Engine API >= 1.48. |
@@ -57,7 +58,7 @@ nested attribute, object. The GET /networks/{id} response as a nested object, fi
 | `options` | `map(string)` | computed |  |  | Upstream `Options`. |
 | `peers` | `list(object)` | computed |  |  | Upstream `Peers`. |
 | `scope` | `string` | computed |  |  | Upstream `Scope`. |
-| `services` | `dynamic` | computed |  |  | Upstream `Services`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `services` | `map(string)` | computed |  |  | Upstream `Services`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `status` | `object` | computed |  |  | Upstream `Status`. |
 
 ### `inspect.config_from`
@@ -86,9 +87,20 @@ nested attribute, object. Upstream `IPAM`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `config` | `list(string)` | computed |  |  | Upstream `Config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `config` | `list(object)` | computed |  |  | Upstream `Config`. |
 | `driver` | `string` | computed |  |  | Upstream `Driver`. |
 | `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `inspect.ipam.config`
+
+nested attribute, list(object). Upstream `Config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `auxiliary_addresses` | `map(string)` | computed |  |  | Upstream `AuxiliaryAddresses`. |
+| `gateway` | `string` | computed |  |  | Upstream `Gateway`. |
+| `ip_range` | `string` | computed |  |  | Upstream `IPRange`. |
+| `subnet` | `string` | computed |  |  | Upstream `Subnet`. |
 
 ### `inspect.peers`
 
@@ -105,7 +117,24 @@ nested attribute, object. Upstream `Status`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `ipam` | `dynamic` | computed |  |  | Upstream `IPAM`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `ipam` | `object` | computed |  |  | Upstream `IPAM`. |
+
+### `inspect.status.ipam`
+
+nested attribute, object. Upstream `IPAM`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `subnets` | `map(object)` | computed |  |  | Upstream `Subnets`. |
+
+### `inspect.status.ipam.subnets`
+
+nested attribute, map(object). Upstream `Subnets`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `dynamic_ips_available` | `number` | computed |  |  | Upstream `DynamicIPsAvailable`. |
+| `ips_in_use` | `number` | computed |  |  | Upstream `IPsInUse`. |
 
 ### `ipam_config`
 

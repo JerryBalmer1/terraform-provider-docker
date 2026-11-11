@@ -37,15 +37,19 @@ nested attribute, object. Image config (ImageInspect.Config).
 | `cmd` | `list(string)` | computed |  |  | Upstream `Cmd`. |
 | `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
 | `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
-| `exposed_ports` | `list(string)` | computed |  |  | Map keys (`<port>/<proto>`) as a list. |
+| `exposed_ports` | `map(object)` | computed |  |  | ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list). |
 | `healthcheck` | `object` | computed |  |  | Upstream `Healthcheck`. |
 | `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
 | `on_build` | `list(string)` | computed |  |  | Upstream `OnBuild`. |
 | `shell` | `list(string)` | computed |  |  | Upstream `Shell`. |
 | `stop_signal` | `string` | computed |  |  | Upstream `StopSignal`. |
 | `user` | `string` | computed |  |  | Upstream `User`. |
-| `volumes` | `list(string)` | computed |  |  | Map keys as a list. |
+| `volumes` | `map(object)` | computed |  |  | Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list). |
 | `working_dir` | `string` | computed |  |  | Upstream `WorkingDir`. |
+
+### `config.exposed_ports`
+
+nested attribute, map(object). ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list).
 
 ### `config.healthcheck`
 
@@ -59,6 +63,10 @@ nested attribute, object. Upstream `Healthcheck`.
 | `start_period` | `number` | computed |  |  | Upstream `StartPeriod`. |
 | `test` | `list(string)` | computed |  |  | Upstream `Test`. |
 | `timeout` | `number` | computed |  |  | Upstream `Timeout`. |
+
+### `config.volumes`
+
+nested attribute, map(object). Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list).
 
 ### `inspect`
 
@@ -95,15 +103,19 @@ nested attribute, object. Upstream `Config`.
 | `cmd` | `list(string)` | computed |  |  | Upstream `Cmd`. |
 | `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
 | `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
-| `exposed_ports` | `list(string)` | computed |  |  | Map keys (`<port>/<proto>`) as a list. |
+| `exposed_ports` | `map(object)` | computed |  |  | ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list). |
 | `healthcheck` | `object` | computed |  |  | Upstream `Healthcheck`. |
 | `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
 | `on_build` | `list(string)` | computed |  |  | Upstream `OnBuild`. |
 | `shell` | `list(string)` | computed |  |  | Upstream `Shell`. |
 | `stop_signal` | `string` | computed |  |  | Upstream `StopSignal`. |
 | `user` | `string` | computed |  |  | Upstream `User`. |
-| `volumes` | `list(string)` | computed |  |  | Map keys as a list. |
+| `volumes` | `map(object)` | computed |  |  | Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list). |
 | `working_dir` | `string` | computed |  |  | Upstream `WorkingDir`. |
+
+### `inspect.config.exposed_ports`
+
+nested attribute, map(object). ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list).
 
 ### `inspect.config.healthcheck`
 
@@ -117,6 +129,10 @@ nested attribute, object. Upstream `Healthcheck`.
 | `start_period` | `number` | computed |  |  | Upstream `StartPeriod`. |
 | `test` | `list(string)` | computed |  |  | Upstream `Test`. |
 | `timeout` | `number` | computed |  |  | Upstream `Timeout`. |
+
+### `inspect.config.volumes`
+
+nested attribute, map(object). Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list).
 
 ### `inspect.descriptor`
 
@@ -160,9 +176,75 @@ nested attribute, object. Upstream `Identity`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `build` | `list(string)` | computed |  |  | Upstream `Build`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `pull` | `list(string)` | computed |  |  | Upstream `Pull`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `signature` | `list(string)` | computed |  |  | Upstream `Signature`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `build` | `list(object)` | computed |  |  | Upstream `Build`. |
+| `pull` | `list(object)` | computed |  |  | Upstream `Pull`. |
+| `signature` | `list(object)` | computed |  |  | Upstream `Signature`. |
+
+### `inspect.identity.build`
+
+nested attribute, list(object). Upstream `Build`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `ref` | `string` | computed |  |  | Upstream `Ref`. |
+
+### `inspect.identity.pull`
+
+nested attribute, list(object). Upstream `Pull`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `repository` | `string` | computed |  |  | Upstream `Repository`. |
+
+### `inspect.identity.signature`
+
+nested attribute, list(object). Upstream `Signature`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `docker_reference` | `string` | computed |  |  | Upstream `DockerReference`. |
+| `error` | `string` | computed |  |  | Upstream `Error`. |
+| `known_signer` | `string` | computed |  |  | Upstream `KnownSigner`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `signature_type` | `string` | computed |  |  | Upstream `SignatureType`. |
+| `signer` | `object` | computed |  |  | Upstream `Signer`. |
+| `timestamps` | `list(object)` | computed |  |  | Upstream `Timestamps`. |
+| `warnings` | `list(string)` | computed |  |  | Upstream `Warnings`. |
+
+### `inspect.identity.signature.signer`
+
+nested attribute, object. Upstream `Signer`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `build_config_digest` | `string` | computed |  |  | Upstream `BuildConfigDigest`. |
+| `build_config_uri` | `string` | computed |  |  | Upstream `BuildConfigURI`. |
+| `build_signer_digest` | `string` | computed |  |  | Upstream `BuildSignerDigest`. |
+| `build_signer_uri` | `string` | computed |  |  | Upstream `BuildSignerURI`. |
+| `build_trigger` | `string` | computed |  |  | Upstream `BuildTrigger`. |
+| `certificate_issuer` | `string` | computed |  |  | Upstream `CertificateIssuer`. |
+| `issuer` | `string` | computed |  |  | Upstream `Issuer`. |
+| `run_invocation_uri` | `string` | computed |  |  | Upstream `RunInvocationURI`. |
+| `runner_environment` | `string` | computed |  |  | Upstream `RunnerEnvironment`. |
+| `source_repository_digest` | `string` | computed |  |  | Upstream `SourceRepositoryDigest`. |
+| `source_repository_identifier` | `string` | computed |  |  | Upstream `SourceRepositoryIdentifier`. |
+| `source_repository_owner_identifier` | `string` | computed |  |  | Upstream `SourceRepositoryOwnerIdentifier`. |
+| `source_repository_owner_uri` | `string` | computed |  |  | Upstream `SourceRepositoryOwnerURI`. |
+| `source_repository_ref` | `string` | computed |  |  | Upstream `SourceRepositoryRef`. |
+| `source_repository_uri` | `string` | computed |  |  | Upstream `SourceRepositoryURI`. |
+| `source_repository_visibility_at_signing` | `string` | computed |  |  | Upstream `SourceRepositoryVisibilityAtSigning`. |
+| `subject_alternative_name` | `string` | computed |  |  | Upstream `SubjectAlternativeName`. |
+
+### `inspect.identity.signature.timestamps`
+
+nested attribute, list(object). Upstream `Timestamps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `timestamp` | `string` | computed |  |  | Upstream `Timestamp`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+| `uri` | `string` | computed |  |  | Upstream `URI`. |
 
 ### `inspect.manifests`
 
@@ -170,13 +252,21 @@ nested attribute, list(object). Only with a multi-platform (containerd) image st
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `attestation_data` | `string` | computed |  |  | Upstream `AttestationData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `attestation_data` | `object` | computed |  |  | Upstream `AttestationData`. |
 | `available` | `bool` | computed |  |  | Upstream `Available`. |
 | `descriptor` | `object` | computed |  |  | Upstream `Descriptor`. |
 | `id` | `string` | computed |  |  | Upstream `ID`. |
-| `image_data` | `string` | computed |  |  | Upstream `ImageData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `image_data` | `object` | computed |  |  | Upstream `ImageData`. |
 | `kind` | `string` | computed |  |  | Upstream `Kind`. |
 | `size` | `object` | computed |  |  | Upstream `Size`. |
+
+### `inspect.manifests.attestation_data`
+
+nested attribute, object. Upstream `AttestationData`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `for` | `string` | computed |  |  | Upstream `For`. |
 
 ### `inspect.manifests.descriptor`
 
@@ -204,6 +294,113 @@ nested attribute, object. Upstream `platform`.
 | `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
 | `os_version` | `string` | computed |  |  | Upstream `os.version`. |
 | `variant` | `string` | computed |  |  | Upstream `variant`. |
+
+### `inspect.manifests.image_data`
+
+nested attribute, object. Upstream `ImageData`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `containers` | `list(string)` | computed |  |  | Upstream `Containers`. |
+| `identity` | `object` | computed |  |  | Upstream `Identity`. |
+| `platform` | `object` | computed |  |  | Upstream `Platform`. |
+| `size` | `object` | computed |  |  | Upstream `Size`. |
+
+### `inspect.manifests.image_data.identity`
+
+nested attribute, object. Upstream `Identity`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `build` | `list(object)` | computed |  |  | Upstream `Build`. |
+| `pull` | `list(object)` | computed |  |  | Upstream `Pull`. |
+| `signature` | `list(object)` | computed |  |  | Upstream `Signature`. |
+
+### `inspect.manifests.image_data.identity.build`
+
+nested attribute, list(object). Upstream `Build`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `ref` | `string` | computed |  |  | Upstream `Ref`. |
+
+### `inspect.manifests.image_data.identity.pull`
+
+nested attribute, list(object). Upstream `Pull`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `repository` | `string` | computed |  |  | Upstream `Repository`. |
+
+### `inspect.manifests.image_data.identity.signature`
+
+nested attribute, list(object). Upstream `Signature`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `docker_reference` | `string` | computed |  |  | Upstream `DockerReference`. |
+| `error` | `string` | computed |  |  | Upstream `Error`. |
+| `known_signer` | `string` | computed |  |  | Upstream `KnownSigner`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `signature_type` | `string` | computed |  |  | Upstream `SignatureType`. |
+| `signer` | `object` | computed |  |  | Upstream `Signer`. |
+| `timestamps` | `list(object)` | computed |  |  | Upstream `Timestamps`. |
+| `warnings` | `list(string)` | computed |  |  | Upstream `Warnings`. |
+
+### `inspect.manifests.image_data.identity.signature.signer`
+
+nested attribute, object. Upstream `Signer`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `build_config_digest` | `string` | computed |  |  | Upstream `BuildConfigDigest`. |
+| `build_config_uri` | `string` | computed |  |  | Upstream `BuildConfigURI`. |
+| `build_signer_digest` | `string` | computed |  |  | Upstream `BuildSignerDigest`. |
+| `build_signer_uri` | `string` | computed |  |  | Upstream `BuildSignerURI`. |
+| `build_trigger` | `string` | computed |  |  | Upstream `BuildTrigger`. |
+| `certificate_issuer` | `string` | computed |  |  | Upstream `CertificateIssuer`. |
+| `issuer` | `string` | computed |  |  | Upstream `Issuer`. |
+| `run_invocation_uri` | `string` | computed |  |  | Upstream `RunInvocationURI`. |
+| `runner_environment` | `string` | computed |  |  | Upstream `RunnerEnvironment`. |
+| `source_repository_digest` | `string` | computed |  |  | Upstream `SourceRepositoryDigest`. |
+| `source_repository_identifier` | `string` | computed |  |  | Upstream `SourceRepositoryIdentifier`. |
+| `source_repository_owner_identifier` | `string` | computed |  |  | Upstream `SourceRepositoryOwnerIdentifier`. |
+| `source_repository_owner_uri` | `string` | computed |  |  | Upstream `SourceRepositoryOwnerURI`. |
+| `source_repository_ref` | `string` | computed |  |  | Upstream `SourceRepositoryRef`. |
+| `source_repository_uri` | `string` | computed |  |  | Upstream `SourceRepositoryURI`. |
+| `source_repository_visibility_at_signing` | `string` | computed |  |  | Upstream `SourceRepositoryVisibilityAtSigning`. |
+| `subject_alternative_name` | `string` | computed |  |  | Upstream `SubjectAlternativeName`. |
+
+### `inspect.manifests.image_data.identity.signature.timestamps`
+
+nested attribute, list(object). Upstream `Timestamps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `timestamp` | `string` | computed |  |  | Upstream `Timestamp`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+| `uri` | `string` | computed |  |  | Upstream `URI`. |
+
+### `inspect.manifests.image_data.platform`
+
+nested attribute, object. Upstream `Platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
+
+### `inspect.manifests.image_data.size`
+
+nested attribute, object. Upstream `Size`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `unpacked` | `number` | computed |  |  | Upstream `Unpacked`. |
 
 ### `inspect.manifests.size`
 

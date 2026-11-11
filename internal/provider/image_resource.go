@@ -190,6 +190,7 @@ func (r *imageResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 		},
 	}
 	resp.Schema = schema.Schema{
+		Version: 1, // Pass 6c: structured outputs changed shape (state_upgrade_p6c_z.go)
 		MarkdownDescription: "A Docker image on the provider's daemon, pulled from its registry or built from a local context. Without a `build` block the image `name` is pulled " +
 			"(credentials from the provider's `registry_auth`); with a `build` block the image is built and tagged `name`: by the classic Engine builder " +
 			"(`POST /build`, the default) or by BuildKit with `build.builder = \"buildkit\"` or a buildx builder name (through the provider's BuildKit build path, " +
@@ -248,7 +249,7 @@ func imgBuildBlock() schema.SingleNestedBlock {
 			Optional: true,
 			MarkdownDescription: "Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's " +
 				"embedded BuildKit), the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`) or a " +
-				"BuildKit address (`tcp://`, `unix://`, `docker-container://`, e.g. a remote-driver builder's endpoint). " +
+				"BuildKit address (`tcp://`, `unix://`, `docker-container://`, e.g. a remote-driver builder's endpoint), or a Docker Build Cloud builder as `cloud://<org>/<builder>` or `<org>/<builder>` (a `docker_buildx_builder` with `driver = \"cloud\"`, its `id`). " +
 				"With BuildKit the build runs with a session (serving `secrets`, `ssh` and `registry_auth` credentials) so Dockerfile " +
 				"features such as `RUN --mount=type=secret` and heredocs work, and `cache_to`, `ssh`, `outputs`, `attestations`, `provenance`, " +
 				"`sbom` and `no_cache_filter` become available. Requires a daemon with BuildKit enabled (default since Docker 23). Forces replacement.",

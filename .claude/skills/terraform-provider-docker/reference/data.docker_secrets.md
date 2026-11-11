@@ -38,7 +38,7 @@ nested attribute, object. Upstream `Spec`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `data` | `string` | computed |  |  | Upstream `Data`. |
+| `data` | `string` | computed |  | yes | Upstream `Data`. Sensitive. |
 | `driver` | `object` | computed |  |  | Upstream `Driver`. |
 | `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
 | `name` | `string` | computed |  |  | Upstream `Name`. |

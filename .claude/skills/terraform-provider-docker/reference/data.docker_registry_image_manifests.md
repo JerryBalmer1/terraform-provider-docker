@@ -38,7 +38,7 @@ nested attribute, object. The image config field by field (for an index: one ent
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `architecture` | `string` | computed |  |  | Upstream `architecture`. |
-| `config` | `dynamic` | computed |  | yes | Upstream `config`. Sensitive. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `config` | `dynamic` | computed |  | yes | Upstream `config`. Sensitive. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here). |
 | `created` | `string` | computed |  |  | Upstream `created`. |
 | `history` | `list(object)` | computed |  |  | Upstream `history`. |
 | `os` | `string` | computed |  |  | Upstream `os`. |

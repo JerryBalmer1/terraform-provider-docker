@@ -3,12 +3,12 @@
 page_title: "docker_buildx_builder Resource - docker"
 subcategory: ""
 description: |-
-  A BuildKit builder run by the daemon as a docker-container driver node, the same container and state volume docker buildx create --driver docker-container --bootstrap makes, created through the Engine API without the buildx CLI. The container buildx_buildkit_<node> runs moby/buildkit privileged with the state volume buildx_buildkit_<node>_state; readiness is checked by listing BuildKit workers over buildctl dial-stdio in the container. Pass name to docker_image.build.builder, or use endpoint with buildctl --addr (tcp_address when tcp_port is set). The buildx CLI's own instance list (~/.docker/buildx/instances) is not written, so docker buildx ls does not show the builder until docker buildx create --name <name> --driver docker-container is run, which adopts the same container. Only the docker-container driver creates a container; the remote driver only checks and reports a BuildKit daemon run elsewhere, selected in builds by its endpoint. With the provider's owner set, the node container and state volume carry the owner label. Every argument except keep_state and adopt forces a new resource.
+  A BuildKit builder run by the daemon as a docker-container driver node, the same container and state volume docker buildx create --driver docker-container --bootstrap makes, created through the Engine API without the buildx CLI. The container buildx_buildkit_<node> runs moby/buildkit privileged with the state volume buildx_buildkit_<node>_state; readiness is checked by listing BuildKit workers over buildctl dial-stdio in the container. Pass name to docker_image.build.builder, or use endpoint with buildctl --addr (tcp_address when tcp_port is set). The buildx CLI's own instance list (~/.docker/buildx/instances) is not written, so docker buildx ls does not show the builder until docker buildx create --name <name> --driver docker-container is run, which adopts the same container. Only the docker-container driver creates a container; the remote driver only checks and reports a BuildKit daemon run elsewhere, selected in builds by its endpoint; the cloud driver checks and reports a Docker Build Cloud builder, whose access token lives only in memory for the connection. With the provider's owner set, the node container and state volume carry the owner label. Every argument except keep_state and adopt forces a new resource.
 ---
 
 # docker_buildx_builder (Resource)
 
-A BuildKit builder run by the daemon as a `docker-container` driver node, the same container and state volume `docker buildx create --driver docker-container --bootstrap` makes, created through the Engine API without the buildx CLI. The container `buildx_buildkit_<node>` runs `moby/buildkit` privileged with the state volume `buildx_buildkit_<node>_state`; readiness is checked by listing BuildKit workers over `buildctl dial-stdio` in the container. Pass `name` to `docker_image.build.builder`, or use `endpoint` with `buildctl --addr` (`tcp_address` when `tcp_port` is set). The buildx CLI's own instance list (`~/.docker/buildx/instances`) is not written, so `docker buildx ls` does not show the builder until `docker buildx create --name <name> --driver docker-container` is run, which adopts the same container. Only the `docker-container` driver creates a container; the `remote` driver only checks and reports a BuildKit daemon run elsewhere, selected in builds by its `endpoint`. With the provider's `owner` set, the node container and state volume carry the owner label. Every argument except `keep_state` and `adopt` forces a new resource.
+A BuildKit builder run by the daemon as a `docker-container` driver node, the same container and state volume `docker buildx create --driver docker-container --bootstrap` makes, created through the Engine API without the buildx CLI. The container `buildx_buildkit_<node>` runs `moby/buildkit` privileged with the state volume `buildx_buildkit_<node>_state`; readiness is checked by listing BuildKit workers over `buildctl dial-stdio` in the container. Pass `name` to `docker_image.build.builder`, or use `endpoint` with `buildctl --addr` (`tcp_address` when `tcp_port` is set). The buildx CLI's own instance list (`~/.docker/buildx/instances`) is not written, so `docker buildx ls` does not show the builder until `docker buildx create --name <name> --driver docker-container` is run, which adopts the same container. Only the `docker-container` driver creates a container; the `remote` driver only checks and reports a BuildKit daemon run elsewhere, selected in builds by its `endpoint`; the `cloud` driver checks and reports a Docker Build Cloud builder, whose access token lives only in memory for the connection. With the provider's `owner` set, the node container and state volume carry the owner label. Every argument except `keep_state` and `adopt` forces a new resource.
 
 ## Example Usage
 
@@ -67,6 +67,30 @@ resource "docker_buildx_builder" "remote" {
     servername = "buildkit.internal"
   }
 }
+
+# A Docker Build Cloud builder (docker buildx create --driver cloud myorg/default).
+# The provider logs in at auth.docker.io with its Docker Hub credential
+# (registry_auth for docker.io, else the docker config) and reaches BuildKit at
+# build-cloud.docker.com:443; the access token stays in memory, never in state.
+resource "docker_buildx_builder" "cloud" {
+  name     = "cloud"
+  driver   = "cloud"
+  endpoint = "myorg/default"
+}
+
+# Build several platforms at once on the cloud builder, e.g. in docker_image:
+#
+#   build {
+#     context   = "${path.module}/app"
+#     builder   = docker_buildx_builder.cloud.id # cloud://myorg/default
+#     platforms = ["linux/amd64", "linux/arm64"]
+#     outputs   = ["type=registry"] # push the image index
+#   }
+#
+# Loading a multi-platform result into the daemon needs its containerd image store.
+output "cloud_builder" {
+  value = docker_buildx_builder.cloud.id
+}
 ```
 
 <!-- schema generated by tfplugindocs -->
@@ -85,8 +109,8 @@ resource "docker_buildx_builder" "remote" {
 - `buildkitd_config_content` (String) Content of `buildkitd.toml`, copied like `buildkitd_config`. Forces replacement.
 - `buildkitd_flags` (String) Flags for buildkitd (`--buildkitd-flags`), whitespace-separated with no shell quoting, e.g. `"--debug --allow-insecure-entitlement=security.insecure"`. Default `--allow-insecure-entitlement=network.host`, like buildx. Forces replacement.
 - `docker_container` (Block, Optional) Settings for the BuildKit container (`--driver-opt`). Changing anything here forces a new resource. (see [below for nested schema](#nestedblock--docker_container))
-- `driver` (String) Builder driver: `docker-container` (default), a BuildKit container on the provider's daemon, or `remote`, a BuildKit daemon run elsewhere and reached at `endpoint` (TLS in the `remote` block). `docker` is the daemon's built-in builder (use `docker_image` without `build.builder`); `kubernetes` is not supported (it needs the Kubernetes API). Forces replacement.
-- `endpoint` (String) BuildKit address of the builder, for `buildctl --addr` and `docker_image.build.builder`. With `driver = "remote"` it is required: the remote BuildKit's `tcp://host:port` or `unix:///path` (the `docker buildx create --driver remote` endpoint argument). With `docker-container` it is computed: `docker-container://buildx_buildkit_<node>`. Forces replacement.
+- `driver` (String) Builder driver: `docker-container` (default), `remote` or `cloud`. `docker-container` runs BuildKit in a container on the provider's daemon; `remote` is a BuildKit daemon run elsewhere and reached at `endpoint` (TLS in the `remote` block); `cloud` is a Docker Build Cloud builder named by `endpoint` (`<org>/<builder>`), reached at build-cloud.docker.com:443 with a token from auth.docker.io obtained with the provider's Docker Hub credential (`registry_auth` for docker.io, else the docker config). `docker` is the daemon's built-in builder (use `docker_image` without `build.builder`); `kubernetes` is not supported (it needs the Kubernetes API). Forces replacement.
+- `endpoint` (String) BuildKit address of the builder, for `buildctl --addr` and `docker_image.build.builder`. With `driver = "remote"` it is required: the remote BuildKit's `tcp://host:port` or `unix:///path` (the `docker buildx create --driver remote` endpoint argument). With `driver = "cloud"` it is required: the Docker Build Cloud builder as `<org>/<builder>` (`cloud://<org>/<builder>` is also accepted), the `docker buildx create --driver cloud` endpoint argument; `id` is then `cloud://<org>/<builder>`, which `docker_image.build.builder` and `docker_buildx_bake.builder` accept. With `docker-container` it is computed: `docker-container://buildx_buildkit_<node>`. Forces replacement.
 - `keep_state` (Boolean) Whether to keep the state volume (build cache) on destroy (`docker buildx rm --keep-state`). Default `false`. Updated in place.
 - `node` (String) Node name (`--node`); the node container is `buildx_buildkit_<node>`. Default `<name>0`, like buildx. Forces replacement.
 - `platform` (List of String) Platforms this node is pinned to (`--platform`), listed first in `platforms`. buildx keeps pins in its client-side store; the provider stores them as a label on the node container. Forces replacement.

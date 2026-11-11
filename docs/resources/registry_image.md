@@ -87,9 +87,21 @@ Read-Only:
 - `data` (String) Upstream `data`.
 - `digest` (String) Upstream `digest`.
 - `media_type` (String) Upstream `mediaType`.
-- `platform` (Dynamic) Upstream `platform`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--distribution--descriptor--platform))
 - `size` (Number) Upstream `size`.
 - `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--distribution--descriptor--platform"></a>
+### Nested Schema for `distribution.descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
 
 
 <a id="nestedatt--distribution--platforms"></a>

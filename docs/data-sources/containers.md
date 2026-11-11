@@ -100,9 +100,21 @@ Read-Only:
 - `data` (String) Upstream `data`.
 - `digest` (String) Upstream `digest`.
 - `media_type` (String) Upstream `mediaType`.
-- `platform` (String) Upstream `platform`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--containers--image_manifest_descriptor--platform))
 - `size` (Number) Upstream `size`.
 - `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--containers--image_manifest_descriptor--platform"></a>
+### Nested Schema for `containers.image_manifest_descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
 
 
 <a id="nestedatt--containers--mounts"></a>
@@ -117,7 +129,7 @@ Read-Only:
 - `propagation` (String) Upstream `Propagation`.
 - `rw` (Boolean) Upstream `RW`.
 - `source` (String) Upstream `Source`.
-- `type` (String) Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `type` (String) Upstream `Type`.
 
 
 <a id="nestedatt--containers--network_settings"></a>
@@ -125,7 +137,39 @@ Read-Only:
 
 Read-Only:
 
-- `networks` (Map of String) Upstream `Networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `networks` (Attributes Map) Upstream `Networks`. (see [below for nested schema](#nestedatt--containers--network_settings--networks))
+
+<a id="nestedatt--containers--network_settings--networks"></a>
+### Nested Schema for `containers.network_settings.networks`
+
+Read-Only:
+
+- `aliases` (List of String) Upstream `Aliases`.
+- `dns_names` (List of String) Upstream `DNSNames`.
+- `driver_opts` (Map of String) Upstream `DriverOpts`.
+- `endpoint_id` (String) Upstream `EndpointID`.
+- `gateway` (String) Upstream `Gateway`.
+- `global_ipv6_address` (String) Upstream `GlobalIPv6Address`.
+- `global_ipv6_prefix_len` (Number) Upstream `GlobalIPv6PrefixLen`.
+- `gw_priority` (Number) Upstream `GwPriority`.
+- `ip_address` (String) Upstream `IPAddress`.
+- `ip_prefix_len` (Number) Upstream `IPPrefixLen`.
+- `ipam_config` (Attributes) Upstream `IPAMConfig`. (see [below for nested schema](#nestedatt--containers--network_settings--networks--ipam_config))
+- `ipv6_gateway` (String) Upstream `IPv6Gateway`.
+- `links` (List of String) Upstream `Links`.
+- `mac_address` (String) Upstream `MacAddress`.
+- `network_id` (String) Upstream `NetworkID`.
+
+<a id="nestedatt--containers--network_settings--networks--ipam_config"></a>
+### Nested Schema for `containers.network_settings.networks.ipam_config`
+
+Read-Only:
+
+- `ipv4_address` (String) Upstream `IPv4Address`.
+- `ipv6_address` (String) Upstream `IPv6Address`.
+- `link_local_ips` (List of String) Upstream `LinkLocalIPs`.
+
+
 
 
 <a id="nestedatt--containers--ports"></a>

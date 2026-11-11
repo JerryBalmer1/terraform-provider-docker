@@ -39,8 +39,8 @@ nested attribute, object. The `join_tokens` structured output.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `manager` | `string` | computed |  | yes | Upstream `Manager`. |
-| `worker` | `string` | computed |  | yes | Upstream `Worker`. |
+| `manager` | `string` | computed |  | yes | Upstream `Manager`. Sensitive. |
+| `worker` | `string` | computed |  | yes | Upstream `Worker`. Sensitive. |
 
 ## Example
 

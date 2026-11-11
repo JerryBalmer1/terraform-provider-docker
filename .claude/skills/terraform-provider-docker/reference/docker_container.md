@@ -20,8 +20,9 @@ A single-host Docker container, created with `ContainerCreate`, attached to its 
 | `cgroup_parent` | `string` | optional | yes |  | Parent cgroup of the container (`HostConfig.CgroupParent`). Forces replacement. |
 | `cgroupns_mode` | `string` | optional | yes |  | Cgroup namespace mode (`HostConfig.CgroupnsMode`): `private` or `host`. Unset uses the daemon default, which is not reported. Forces replacement. |
 | `command` | `list(string)` | optional | yes |  | Command (`CMD`) override. Unset uses the image's. Changing this forces a new resource. |
+| `config_sha256` | `string` | computed |  |  | SHA-256 (hex) of the configuration part of inspect_json only (Name, Image, Platform, Config, HostConfig and, per network in NetworkSettings.Networks, the requested endpoint settings (IPAMConfig, Links, Aliases, DriverOpts, GwPriority); never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch. |
 | `console_size` | `list(number)` | optional | yes |  | Initial console size as `[height, width]` (`HostConfig.ConsoleSize`); used with `tty = true`. Forces replacement. |
-| `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes. |
 | `cpu_count` | `number` | optional | yes |  | Number of usable CPUs (`HostConfig.CpuCount`). Windows daemons only; a Linux daemon ignores it. Forces replacement. |
 | `cpu_percent` | `number` | optional | yes |  | Usable percentage of the available CPUs (`HostConfig.CpuPercent`). Windows daemons only; a Linux daemon ignores it. Forces replacement. |
 | `cpu_period` | `number` | optional | yes |  | CPU CFS period in microseconds (`HostConfig.CpuPeriod`). Updated in place; removing it forces a new resource. |
@@ -157,8 +158,8 @@ nested attribute, object. Upstream `Config`.
 | `domainname` | `string` | computed |  |  | Upstream `Domainname`. |
 | `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
 | `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
-| `exposed_ports` | `dynamic` | computed |  |  | Upstream `ExposedPorts`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
-| `healthcheck` | `dynamic` | computed |  |  | Upstream `Healthcheck`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `exposed_ports` | `map(object)` | computed |  |  | Upstream `ExposedPorts`. |
+| `healthcheck` | `object` | computed |  |  | Upstream `Healthcheck`. |
 | `hostname` | `string` | computed |  |  | Upstream `Hostname`. |
 | `image` | `string` | computed |  |  | Upstream `Image`. |
 | `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
@@ -171,8 +172,29 @@ nested attribute, object. Upstream `Config`.
 | `stop_timeout` | `number` | computed |  |  | Upstream `StopTimeout`. |
 | `tty` | `bool` | computed |  |  | Upstream `Tty`. |
 | `user` | `string` | computed |  |  | Upstream `User`. |
-| `volumes` | `dynamic` | computed |  |  | Upstream `Volumes`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `volumes` | `map(object)` | computed |  |  | Upstream `Volumes`. |
 | `working_dir` | `string` | computed |  |  | Upstream `WorkingDir`. |
+
+### `inspect.config.exposed_ports`
+
+nested attribute, map(object). Upstream `ExposedPorts`.
+
+### `inspect.config.healthcheck`
+
+nested attribute, object. Upstream `Healthcheck`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `interval` | `number` | computed |  |  | Upstream `Interval`. |
+| `retries` | `number` | computed |  |  | Upstream `Retries`. |
+| `start_interval` | `number` | computed |  |  | Upstream `StartInterval`. |
+| `start_period` | `number` | computed |  |  | Upstream `StartPeriod`. |
+| `test` | `list(string)` | computed |  |  | Upstream `Test`. |
+| `timeout` | `number` | computed |  |  | Upstream `Timeout`. |
+
+### `inspect.config.volumes`
+
+nested attribute, map(object). Upstream `Volumes`.
 
 ### `inspect.graph_driver`
 
@@ -192,12 +214,12 @@ nested attribute, object. Upstream `HostConfig`.
 | `annotations` | `map(string)` | computed |  |  | Upstream `Annotations`. |
 | `auto_remove` | `bool` | computed |  |  | Upstream `AutoRemove`. |
 | `binds` | `list(string)` | computed |  |  | Upstream `Binds`. |
-| `blkio_device_read_bps` | `list(string)` | computed |  |  | Upstream `BlkioDeviceReadBps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `blkio_device_read_iops` | `list(string)` | computed |  |  | Upstream `BlkioDeviceReadIOps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `blkio_device_write_bps` | `list(string)` | computed |  |  | Upstream `BlkioDeviceWriteBps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `blkio_device_write_iops` | `list(string)` | computed |  |  | Upstream `BlkioDeviceWriteIOps`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `blkio_device_read_bps` | `list(object)` | computed |  |  | Upstream `BlkioDeviceReadBps`. |
+| `blkio_device_read_iops` | `list(object)` | computed |  |  | Upstream `BlkioDeviceReadIOps`. |
+| `blkio_device_write_bps` | `list(object)` | computed |  |  | Upstream `BlkioDeviceWriteBps`. |
+| `blkio_device_write_iops` | `list(object)` | computed |  |  | Upstream `BlkioDeviceWriteIOps`. |
 | `blkio_weight` | `number` | computed |  |  | Upstream `BlkioWeight`. |
-| `blkio_weight_device` | `list(string)` | computed |  |  | Upstream `BlkioWeightDevice`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `blkio_weight_device` | `list(object)` | computed |  |  | Upstream `BlkioWeightDevice`. |
 | `cap_add` | `list(string)` | computed |  |  | Upstream `CapAdd`. |
 | `cap_drop` | `list(string)` | computed |  |  | Upstream `CapDrop`. |
 | `cgroup` | `string` | computed |  |  | Upstream `Cgroup`. |
@@ -215,8 +237,8 @@ nested attribute, object. Upstream `HostConfig`.
 | `cpuset_cpus` | `string` | computed |  |  | Upstream `CpusetCpus`. |
 | `cpuset_mems` | `string` | computed |  |  | Upstream `CpusetMems`. |
 | `device_cgroup_rules` | `list(string)` | computed |  |  | Upstream `DeviceCgroupRules`. |
-| `device_requests` | `list(string)` | computed |  |  | Upstream `DeviceRequests`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `devices` | `list(string)` | computed |  |  | Upstream `Devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `device_requests` | `list(object)` | computed |  |  | Upstream `DeviceRequests`. |
+| `devices` | `list(object)` | computed |  |  | Upstream `Devices`. |
 | `dns` | `list(string)` | computed |  |  | Upstream `Dns`. |
 | `dns_options` | `list(string)` | computed |  |  | Upstream `DnsOptions`. |
 | `dns_search` | `list(string)` | computed |  |  | Upstream `DnsSearch`. |
@@ -228,37 +250,198 @@ nested attribute, object. Upstream `HostConfig`.
 | `ipc_mode` | `string` | computed |  |  | Upstream `IpcMode`. |
 | `isolation` | `string` | computed |  |  | Upstream `Isolation`. |
 | `links` | `list(string)` | computed |  |  | Upstream `Links`. |
-| `log_config` | `dynamic` | computed |  |  | Upstream `LogConfig`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `log_config` | `object` | computed |  |  | Upstream `LogConfig`. |
 | `masked_paths` | `list(string)` | computed |  |  | Upstream `MaskedPaths`. |
 | `memory` | `number` | computed |  |  | Upstream `Memory`. |
 | `memory_reservation` | `number` | computed |  |  | Upstream `MemoryReservation`. |
 | `memory_swap` | `number` | computed |  |  | Upstream `MemorySwap`. |
 | `memory_swappiness` | `number` | computed |  |  | Upstream `MemorySwappiness`. |
-| `mounts` | `list(string)` | computed |  |  | Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `mounts` | `list(object)` | computed |  |  | Upstream `Mounts`. |
 | `nano_cpus` | `number` | computed |  |  | Upstream `NanoCpus`. |
 | `network_mode` | `string` | computed |  |  | Upstream `NetworkMode`. |
 | `oom_kill_disable` | `bool` | computed |  |  | Upstream `OomKillDisable`. |
 | `oom_score_adj` | `number` | computed |  |  | Upstream `OomScoreAdj`. |
 | `pid_mode` | `string` | computed |  |  | Upstream `PidMode`. |
 | `pids_limit` | `number` | computed |  |  | Upstream `PidsLimit`. |
-| `port_bindings` | `map(list(string))` | computed |  |  | Upstream `PortBindings`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `port_bindings` | `map(list(object({host_ip=string, host_port=string})))` | computed |  |  | Upstream `PortBindings`. |
 | `privileged` | `bool` | computed |  |  | Upstream `Privileged`. |
 | `publish_all_ports` | `bool` | computed |  |  | Upstream `PublishAllPorts`. |
 | `readonly_paths` | `list(string)` | computed |  |  | Upstream `ReadonlyPaths`. |
 | `readonly_rootfs` | `bool` | computed |  |  | Upstream `ReadonlyRootfs`. |
-| `restart_policy` | `dynamic` | computed |  |  | Upstream `RestartPolicy`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `restart_policy` | `object` | computed |  |  | Upstream `RestartPolicy`. |
 | `runtime` | `string` | computed |  |  | Upstream `Runtime`. |
 | `security_opt` | `list(string)` | computed |  |  | Upstream `SecurityOpt`. |
 | `shm_size` | `number` | computed |  |  | Upstream `ShmSize`. |
 | `storage_opt` | `map(string)` | computed |  |  | Upstream `StorageOpt`. |
 | `sysctls` | `map(string)` | computed |  |  | Upstream `Sysctls`. |
 | `tmpfs` | `map(string)` | computed |  |  | Upstream `Tmpfs`. |
-| `ulimits` | `list(string)` | computed |  |  | Upstream `Ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `ulimits` | `list(object)` | computed |  |  | Upstream `Ulimits`. |
 | `umask` | `number` | computed |  |  | Upstream `Umask`. |
 | `userns_mode` | `string` | computed |  |  | Upstream `UsernsMode`. |
 | `uts_mode` | `string` | computed |  |  | Upstream `UTSMode`. |
 | `volume_driver` | `string` | computed |  |  | Upstream `VolumeDriver`. |
 | `volumes_from` | `list(string)` | computed |  |  | Upstream `VolumesFrom`. |
+
+### `inspect.host_config.blkio_device_read_bps`
+
+nested attribute, list(object). Upstream `BlkioDeviceReadBps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `number` | computed |  |  | Upstream `Rate`. |
+
+### `inspect.host_config.blkio_device_read_iops`
+
+nested attribute, list(object). Upstream `BlkioDeviceReadIOps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `number` | computed |  |  | Upstream `Rate`. |
+
+### `inspect.host_config.blkio_device_write_bps`
+
+nested attribute, list(object). Upstream `BlkioDeviceWriteBps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `number` | computed |  |  | Upstream `Rate`. |
+
+### `inspect.host_config.blkio_device_write_iops`
+
+nested attribute, list(object). Upstream `BlkioDeviceWriteIOps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `number` | computed |  |  | Upstream `Rate`. |
+
+### `inspect.host_config.blkio_weight_device`
+
+nested attribute, list(object). Upstream `BlkioWeightDevice`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `weight` | `number` | computed |  |  | Upstream `Weight`. |
+
+### `inspect.host_config.device_requests`
+
+nested attribute, list(object). Upstream `DeviceRequests`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `capabilities` | `list(list(string))` | computed |  |  | Upstream `Capabilities`. |
+| `count` | `number` | computed |  |  | Upstream `Count`. |
+| `device_ids` | `list(string)` | computed |  |  | Upstream `DeviceIDs`. |
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `inspect.host_config.devices`
+
+nested attribute, list(object). Upstream `Devices`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `cgroup_permissions` | `string` | computed |  |  | Upstream `CgroupPermissions`. |
+| `path_in_container` | `string` | computed |  |  | Upstream `PathInContainer`. |
+| `path_on_host` | `string` | computed |  |  | Upstream `PathOnHost`. |
+
+### `inspect.host_config.log_config`
+
+nested attribute, object. Upstream `LogConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `map(string)` | computed |  |  | Upstream `Config`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+
+### `inspect.host_config.mounts`
+
+nested attribute, list(object). Upstream `Mounts`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `bind_options` | `object` | computed |  |  | Upstream `BindOptions`. |
+| `consistency` | `string` | computed |  |  | Upstream `Consistency`. |
+| `image_options` | `object` | computed |  |  | Upstream `ImageOptions`. |
+| `read_only` | `bool` | computed |  |  | Upstream `ReadOnly`. |
+| `source` | `string` | computed |  |  | Upstream `Source`. |
+| `target` | `string` | computed |  |  | Upstream `Target`. |
+| `tmpfs_options` | `object` | computed |  |  | Upstream `TmpfsOptions`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+| `volume_options` | `object` | computed |  |  | Upstream `VolumeOptions`. |
+
+### `inspect.host_config.mounts.bind_options`
+
+nested attribute, object. Upstream `BindOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `create_mountpoint` | `bool` | computed |  |  | Upstream `CreateMountpoint`. |
+| `non_recursive` | `bool` | computed |  |  | Upstream `NonRecursive`. |
+| `propagation` | `string` | computed |  |  | Upstream `Propagation`. |
+| `read_only_force_recursive` | `bool` | computed |  |  | Upstream `ReadOnlyForceRecursive`. |
+| `read_only_non_recursive` | `bool` | computed |  |  | Upstream `ReadOnlyNonRecursive`. |
+
+### `inspect.host_config.mounts.image_options`
+
+nested attribute, object. Upstream `ImageOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `subpath` | `string` | computed |  |  | Upstream `Subpath`. |
+
+### `inspect.host_config.mounts.tmpfs_options`
+
+nested attribute, object. Upstream `TmpfsOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `number` | computed |  |  | Upstream `Mode`. |
+| `options` | `list(list(string))` | computed |  |  | Upstream `Options`. |
+| `size_bytes` | `number` | computed |  |  | Upstream `SizeBytes`. |
+
+### `inspect.host_config.mounts.volume_options`
+
+nested attribute, object. Upstream `VolumeOptions`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `driver_config` | `object` | computed |  |  | Upstream `DriverConfig`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `no_copy` | `bool` | computed |  |  | Upstream `NoCopy`. |
+| `subpath` | `string` | computed |  |  | Upstream `Subpath`. |
+
+### `inspect.host_config.mounts.volume_options.driver_config`
+
+nested attribute, object. Upstream `DriverConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `inspect.host_config.restart_policy`
+
+nested attribute, object. Upstream `RestartPolicy`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `maximum_retry_count` | `number` | computed |  |  | Upstream `MaximumRetryCount`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+
+### `inspect.host_config.ulimits`
+
+nested attribute, list(object). Upstream `Ulimits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `hard` | `number` | computed |  |  | Upstream `Hard`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `soft` | `number` | computed |  |  | Upstream `Soft`. |
 
 ### `inspect.image_manifest_descriptor`
 
@@ -271,9 +454,21 @@ nested attribute, object. Upstream `ImageManifestDescriptor`.
 | `data` | `string` | computed |  |  | Upstream `data`. |
 | `digest` | `string` | computed |  |  | Upstream `digest`. |
 | `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
-| `platform` | `dynamic` | computed |  |  | Upstream `platform`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `platform` | `object` | computed |  |  | Upstream `platform`. |
 | `size` | `number` | computed |  |  | Upstream `size`. |
 | `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `inspect.image_manifest_descriptor.platform`
+
+nested attribute, object. Upstream `platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
 
 ### `inspect.mounts`
 
@@ -288,7 +483,7 @@ nested attribute, list(object). Upstream `Mounts`.
 | `propagation` | `string` | computed |  |  | Upstream `Propagation`. |
 | `rw` | `bool` | computed |  |  | Upstream `RW`. |
 | `source` | `string` | computed |  |  | Upstream `Source`. |
-| `type` | `string` | computed |  |  | Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
 
 ### `inspect.network_settings`
 
@@ -296,10 +491,42 @@ nested attribute, object. Upstream `NetworkSettings`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `networks` | `map(string)` | computed |  |  | Upstream `Networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `ports` | `map(list(string))` | computed |  |  | Upstream `Ports`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `networks` | `map(object)` | computed |  |  | Upstream `Networks`. |
+| `ports` | `map(list(object({host_ip=string, host_port=string})))` | computed |  |  | Upstream `Ports`. |
 | `sandbox_id` | `string` | computed |  |  | Upstream `SandboxID`. |
 | `sandbox_key` | `string` | computed |  |  | Upstream `SandboxKey`. |
+
+### `inspect.network_settings.networks`
+
+nested attribute, map(object). Upstream `Networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  |  | Upstream `Aliases`. |
+| `dns_names` | `list(string)` | computed |  |  | Upstream `DNSNames`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `DriverOpts`. |
+| `endpoint_id` | `string` | computed |  |  | Upstream `EndpointID`. |
+| `gateway` | `string` | computed |  |  | Upstream `Gateway`. |
+| `global_ipv6_address` | `string` | computed |  |  | Upstream `GlobalIPv6Address`. |
+| `global_ipv6_prefix_len` | `number` | computed |  |  | Upstream `GlobalIPv6PrefixLen`. |
+| `gw_priority` | `number` | computed |  |  | Upstream `GwPriority`. |
+| `ip_address` | `string` | computed |  |  | Upstream `IPAddress`. |
+| `ip_prefix_len` | `number` | computed |  |  | Upstream `IPPrefixLen`. |
+| `ipam_config` | `object` | computed |  |  | Upstream `IPAMConfig`. |
+| `ipv6_gateway` | `string` | computed |  |  | Upstream `IPv6Gateway`. |
+| `links` | `list(string)` | computed |  |  | Upstream `Links`. |
+| `mac_address` | `string` | computed |  |  | Upstream `MacAddress`. |
+| `network_id` | `string` | computed |  |  | Upstream `NetworkID`. |
+
+### `inspect.network_settings.networks.ipam_config`
+
+nested attribute, object. Upstream `IPAMConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ipv4_address` | `string` | computed |  |  | Upstream `IPv4Address`. |
+| `ipv6_address` | `string` | computed |  |  | Upstream `IPv6Address`. |
+| `link_local_ips` | `list(string)` | computed |  |  | Upstream `LinkLocalIPs`. |
 
 ### `inspect.state`
 
@@ -311,7 +538,7 @@ nested attribute, object. Upstream `State`.
 | `error` | `string` | computed |  |  | Upstream `Error`. |
 | `exit_code` | `number` | computed |  |  | Upstream `ExitCode`. |
 | `finished_at` | `string` | computed |  |  | Upstream `FinishedAt`. |
-| `health` | `dynamic` | computed |  |  | Upstream `Health`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `health` | `object` | computed |  |  | Upstream `Health`. |
 | `oom_killed` | `bool` | computed |  |  | Upstream `OOMKilled`. |
 | `paused` | `bool` | computed |  |  | Upstream `Paused`. |
 | `pid` | `number` | computed |  |  | Upstream `Pid`. |
@@ -320,13 +547,50 @@ nested attribute, object. Upstream `State`.
 | `started_at` | `string` | computed |  |  | Upstream `StartedAt`. |
 | `status` | `string` | computed |  |  | Upstream `Status`. |
 
+### `inspect.state.health`
+
+nested attribute, object. Upstream `Health`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `failing_streak` | `number` | computed |  |  | Upstream `FailingStreak`. |
+| `log` | `list(object)` | computed |  |  | Upstream `Log`. |
+| `status` | `string` | computed |  |  | Upstream `Status`. |
+
+### `inspect.state.health.log`
+
+nested attribute, list(object). Upstream `Log`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `end` | `string` | computed |  |  | Upstream `End`. |
+| `exit_code` | `number` | computed |  |  | Upstream `ExitCode`. |
+| `output` | `string` | computed |  | yes | Upstream `Output`. Sensitive. |
+| `start` | `string` | computed |  |  | Upstream `Start`. |
+
 ### `inspect.storage`
 
 nested attribute, object. Upstream `Storage`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `root_fs` | `dynamic` | computed |  |  | Upstream `RootFS`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `root_fs` | `object` | computed |  |  | Upstream `RootFS`. |
+
+### `inspect.storage.root_fs`
+
+nested attribute, object. Upstream `RootFS`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `snapshot` | `object` | computed |  |  | Upstream `Snapshot`. |
+
+### `inspect.storage.root_fs.snapshot`
+
+nested attribute, object. Upstream `Snapshot`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
 
 ### `log_entries`
 

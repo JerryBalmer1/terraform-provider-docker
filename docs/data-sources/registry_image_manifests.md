@@ -75,7 +75,7 @@ output "app_provenance" {
 Read-Only:
 
 - `architecture` (String) Upstream `architecture`.
-- `config` (Dynamic, Sensitive) Upstream `config`. Sensitive. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `config` (Dynamic, Sensitive) Upstream `config`. Sensitive. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here).
 - `created` (String) Upstream `created`.
 - `history` (Attributes List) Upstream `history`. (see [below for nested schema](#nestedatt--image_config--history))
 - `os` (String) Upstream `os`.

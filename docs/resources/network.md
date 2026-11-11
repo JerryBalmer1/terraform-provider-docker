@@ -81,7 +81,8 @@ resource "docker_network" "macvlan" {
 
 ### Read-Only
 
-- `content_sha256` (String) sha256 of inspect_json.
+- `config_sha256` (String) SHA-256 (hex) of the configuration part of inspect_json only (Name, Driver, Scope, EnableIPv4, EnableIPv6, IPAM, Internal, Attachable, Ingress, ConfigFrom, ConfigOnly, Options and Labels; never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch.
+- `content_sha256` (String) SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes.
 - `docker_server_version` (String) Docker Engine version from GET /version.
 - `engine_api_version` (String) Engine API version negotiated with the daemon (min of the client maximum and GET /version ApiVersion).
 - `id` (String) Network ID.
@@ -121,7 +122,7 @@ Read-Only:
 - `options` (Map of String) Upstream `Options`.
 - `peers` (Attributes List) Upstream `Peers`. (see [below for nested schema](#nestedatt--inspect--peers))
 - `scope` (String) Upstream `Scope`.
-- `services` (Dynamic) Upstream `Services`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `services` (Map of String) Upstream `Services`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `status` (Attributes) Upstream `Status`. (see [below for nested schema](#nestedatt--inspect--status))
 
 <a id="nestedatt--inspect--config_from"></a>
@@ -149,9 +150,20 @@ Read-Only:
 
 Read-Only:
 
-- `config` (List of String) Upstream `Config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `config` (Attributes List) Upstream `Config`. (see [below for nested schema](#nestedatt--inspect--ipam--config))
 - `driver` (String) Upstream `Driver`.
 - `options` (Map of String) Upstream `Options`.
+
+<a id="nestedatt--inspect--ipam--config"></a>
+### Nested Schema for `inspect.ipam.config`
+
+Read-Only:
+
+- `auxiliary_addresses` (Map of String) Upstream `AuxiliaryAddresses`.
+- `gateway` (String) Upstream `Gateway`.
+- `ip_range` (String) Upstream `IPRange`.
+- `subnet` (String) Upstream `Subnet`.
+
 
 
 <a id="nestedatt--inspect--peers"></a>
@@ -168,7 +180,22 @@ Read-Only:
 
 Read-Only:
 
-- `ipam` (Dynamic) Upstream `IPAM`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `ipam` (Attributes) Upstream `IPAM`. (see [below for nested schema](#nestedatt--inspect--status--ipam))
+
+<a id="nestedatt--inspect--status--ipam"></a>
+### Nested Schema for `inspect.status.ipam`
+
+Read-Only:
+
+- `subnets` (Attributes Map) Upstream `Subnets`. (see [below for nested schema](#nestedatt--inspect--status--ipam--subnets))
+
+<a id="nestedatt--inspect--status--ipam--subnets"></a>
+### Nested Schema for `inspect.status.ipam.subnets`
+
+Read-Only:
+
+- `dynamic_ips_available` (Number) Upstream `DynamicIPsAvailable`.
+- `ips_in_use` (Number) Upstream `IPsInUse`.
 
 ## Import
 

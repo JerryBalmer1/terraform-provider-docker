@@ -67,14 +67,102 @@ Read-Only:
 
 Read-Only:
 
-- `io_merged_recursive` (List of String) Upstream `io_merged_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `io_queue_recursive` (List of String) Upstream `io_queue_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `io_service_bytes_recursive` (List of String) Upstream `io_service_bytes_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `io_service_time_recursive` (List of String) Upstream `io_service_time_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `io_serviced_recursive` (List of String) Upstream `io_serviced_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `io_time_recursive` (List of String) Upstream `io_time_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `io_wait_time_recursive` (List of String) Upstream `io_wait_time_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `sectors_recursive` (List of String) Upstream `sectors_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `io_merged_recursive` (Attributes List) Upstream `io_merged_recursive`. (see [below for nested schema](#nestedatt--stats--blkio_stats--io_merged_recursive))
+- `io_queue_recursive` (Attributes List) Upstream `io_queue_recursive`. (see [below for nested schema](#nestedatt--stats--blkio_stats--io_queue_recursive))
+- `io_service_bytes_recursive` (Attributes List) Upstream `io_service_bytes_recursive`. (see [below for nested schema](#nestedatt--stats--blkio_stats--io_service_bytes_recursive))
+- `io_service_time_recursive` (Attributes List) Upstream `io_service_time_recursive`. (see [below for nested schema](#nestedatt--stats--blkio_stats--io_service_time_recursive))
+- `io_serviced_recursive` (Attributes List) Upstream `io_serviced_recursive`. (see [below for nested schema](#nestedatt--stats--blkio_stats--io_serviced_recursive))
+- `io_time_recursive` (Attributes List) Upstream `io_time_recursive`. (see [below for nested schema](#nestedatt--stats--blkio_stats--io_time_recursive))
+- `io_wait_time_recursive` (Attributes List) Upstream `io_wait_time_recursive`. (see [below for nested schema](#nestedatt--stats--blkio_stats--io_wait_time_recursive))
+- `sectors_recursive` (Attributes List) Upstream `sectors_recursive`. (see [below for nested schema](#nestedatt--stats--blkio_stats--sectors_recursive))
+
+<a id="nestedatt--stats--blkio_stats--io_merged_recursive"></a>
+### Nested Schema for `stats.blkio_stats.io_merged_recursive`
+
+Read-Only:
+
+- `major` (Number) Upstream `major`.
+- `minor` (Number) Upstream `minor`.
+- `op` (String) Upstream `op`.
+- `value` (Number) Upstream `value`.
+
+
+<a id="nestedatt--stats--blkio_stats--io_queue_recursive"></a>
+### Nested Schema for `stats.blkio_stats.io_queue_recursive`
+
+Read-Only:
+
+- `major` (Number) Upstream `major`.
+- `minor` (Number) Upstream `minor`.
+- `op` (String) Upstream `op`.
+- `value` (Number) Upstream `value`.
+
+
+<a id="nestedatt--stats--blkio_stats--io_service_bytes_recursive"></a>
+### Nested Schema for `stats.blkio_stats.io_service_bytes_recursive`
+
+Read-Only:
+
+- `major` (Number) Upstream `major`.
+- `minor` (Number) Upstream `minor`.
+- `op` (String) Upstream `op`.
+- `value` (Number) Upstream `value`.
+
+
+<a id="nestedatt--stats--blkio_stats--io_service_time_recursive"></a>
+### Nested Schema for `stats.blkio_stats.io_service_time_recursive`
+
+Read-Only:
+
+- `major` (Number) Upstream `major`.
+- `minor` (Number) Upstream `minor`.
+- `op` (String) Upstream `op`.
+- `value` (Number) Upstream `value`.
+
+
+<a id="nestedatt--stats--blkio_stats--io_serviced_recursive"></a>
+### Nested Schema for `stats.blkio_stats.io_serviced_recursive`
+
+Read-Only:
+
+- `major` (Number) Upstream `major`.
+- `minor` (Number) Upstream `minor`.
+- `op` (String) Upstream `op`.
+- `value` (Number) Upstream `value`.
+
+
+<a id="nestedatt--stats--blkio_stats--io_time_recursive"></a>
+### Nested Schema for `stats.blkio_stats.io_time_recursive`
+
+Read-Only:
+
+- `major` (Number) Upstream `major`.
+- `minor` (Number) Upstream `minor`.
+- `op` (String) Upstream `op`.
+- `value` (Number) Upstream `value`.
+
+
+<a id="nestedatt--stats--blkio_stats--io_wait_time_recursive"></a>
+### Nested Schema for `stats.blkio_stats.io_wait_time_recursive`
+
+Read-Only:
+
+- `major` (Number) Upstream `major`.
+- `minor` (Number) Upstream `minor`.
+- `op` (String) Upstream `op`.
+- `value` (Number) Upstream `value`.
+
+
+<a id="nestedatt--stats--blkio_stats--sectors_recursive"></a>
+### Nested Schema for `stats.blkio_stats.sectors_recursive`
+
+Read-Only:
+
+- `major` (Number) Upstream `major`.
+- `minor` (Number) Upstream `minor`.
+- `op` (String) Upstream `op`.
+- `value` (Number) Upstream `value`.
+
 
 
 <a id="nestedatt--stats--cpu_stats"></a>
@@ -82,10 +170,31 @@ Read-Only:
 
 Read-Only:
 
-- `cpu_usage` (Dynamic) Upstream `cpu_usage`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `cpu_usage` (Attributes) Upstream `cpu_usage`. (see [below for nested schema](#nestedatt--stats--cpu_stats--cpu_usage))
 - `online_cpus` (Number) Upstream `online_cpus`.
 - `system_cpu_usage` (Number) Upstream `system_cpu_usage`.
-- `throttling_data` (Dynamic) Upstream `throttling_data`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `throttling_data` (Attributes) Upstream `throttling_data`. (see [below for nested schema](#nestedatt--stats--cpu_stats--throttling_data))
+
+<a id="nestedatt--stats--cpu_stats--cpu_usage"></a>
+### Nested Schema for `stats.cpu_stats.cpu_usage`
+
+Read-Only:
+
+- `percpu_usage` (List of Number) Upstream `percpu_usage`.
+- `total_usage` (Number) Upstream `total_usage`.
+- `usage_in_kernelmode` (Number) Upstream `usage_in_kernelmode`.
+- `usage_in_usermode` (Number) Upstream `usage_in_usermode`.
+
+
+<a id="nestedatt--stats--cpu_stats--throttling_data"></a>
+### Nested Schema for `stats.cpu_stats.throttling_data`
+
+Read-Only:
+
+- `periods` (Number) Upstream `periods`.
+- `throttled_periods` (Number) Upstream `throttled_periods`.
+- `throttled_time` (Number) Upstream `throttled_time`.
+
 
 
 <a id="nestedatt--stats--memory_stats"></a>
@@ -134,10 +243,31 @@ Read-Only:
 
 Read-Only:
 
-- `cpu_usage` (Dynamic) Upstream `cpu_usage`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `cpu_usage` (Attributes) Upstream `cpu_usage`. (see [below for nested schema](#nestedatt--stats--precpu_stats--cpu_usage))
 - `online_cpus` (Number) Upstream `online_cpus`.
 - `system_cpu_usage` (Number) Upstream `system_cpu_usage`.
-- `throttling_data` (Dynamic) Upstream `throttling_data`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `throttling_data` (Attributes) Upstream `throttling_data`. (see [below for nested schema](#nestedatt--stats--precpu_stats--throttling_data))
+
+<a id="nestedatt--stats--precpu_stats--cpu_usage"></a>
+### Nested Schema for `stats.precpu_stats.cpu_usage`
+
+Read-Only:
+
+- `percpu_usage` (List of Number) Upstream `percpu_usage`.
+- `total_usage` (Number) Upstream `total_usage`.
+- `usage_in_kernelmode` (Number) Upstream `usage_in_kernelmode`.
+- `usage_in_usermode` (Number) Upstream `usage_in_usermode`.
+
+
+<a id="nestedatt--stats--precpu_stats--throttling_data"></a>
+### Nested Schema for `stats.precpu_stats.throttling_data`
+
+Read-Only:
+
+- `periods` (Number) Upstream `periods`.
+- `throttled_periods` (Number) Upstream `throttled_periods`.
+- `throttled_time` (Number) Upstream `throttled_time`.
+
 
 
 <a id="nestedatt--stats--storage_stats"></a>

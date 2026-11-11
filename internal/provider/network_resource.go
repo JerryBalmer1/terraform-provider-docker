@@ -73,6 +73,7 @@ func (r *networkResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 	rrBool := []planmodifier.Bool{boolplanmodifier.RequiresReplace()}
 	rrMap := []planmodifier.Map{mapplanmodifier.RequiresReplace()}
 	resp.Schema = schema.Schema{
+		Version: 1, // Pass 6c: structured outputs changed shape (state_upgrade_p6c_z.go)
 		MarkdownDescription: "A Docker network (`NetworkCreate`): a local `bridge`/`macvlan`/`ipvlan` network, or a Swarm-scoped `overlay` " +
 			"network when the daemon is a Swarm manager. Docker networks cannot be changed after creation, so every argument forces " +
 			"a new network. Import by network name or ID.",

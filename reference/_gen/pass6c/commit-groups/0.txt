@@ -1,0 +1,4 @@
+reference/_gen/generators/pass6c/p6c_ownership.py
+reference/_gen/pass5/ownership.json
+reference/_gen/pass6c/lane-0.md
+test/harness/.gitignore

@@ -56,7 +56,7 @@ Read-Only:
 
 - `descriptor` (Attributes) Upstream `Descriptor`. (see [below for nested schema](#nestedatt--attestations--descriptor))
 - `predicate_type` (String) Upstream `PredicateType`.
-- `statement` (String, Sensitive) Upstream `Statement`. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `statement` (String, Sensitive) Upstream `Statement`. Sensitive. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 
 <a id="nestedatt--attestations--descriptor"></a>
 ### Nested Schema for `attestations.descriptor`
@@ -68,6 +68,17 @@ Read-Only:
 - `data` (String, Sensitive) Upstream `data`. Sensitive.
 - `digest` (String) Upstream `digest`.
 - `media_type` (String) Upstream `mediaType`.
-- `platform` (String) Upstream `platform`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--attestations--descriptor--platform))
 - `size` (Number) Upstream `size`.
 - `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--attestations--descriptor--platform"></a>
+### Nested Schema for `attestations.descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.

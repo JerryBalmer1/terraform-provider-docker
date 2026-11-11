@@ -125,31 +125,31 @@ nested attribute, list(object). Upstream `(instructions after FROM)`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `add` | `string` | computed |  |  | Set when keyword = ADD; shape = the `add` output of dockerfile:ADD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `arg` | `string` | computed |  | yes | Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `cmd` | `string` | computed |  |  | Set when keyword = CMD; shape = the `cmd` output of dockerfile:CMD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `add` | `string` | computed |  |  | Set when keyword = ADD; shape = the `add` output of dockerfile:ADD. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `arg` | `string` | computed |  | yes | Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG. Sensitive. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cmd` | `string` | computed |  |  | Set when keyword = CMD; shape = the `cmd` output of dockerfile:CMD. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `comment` | `string` | computed |  |  | Upstream `Comment`. |
-| `copy` | `string` | computed |  |  | Set when keyword = COPY; shape = the `copy` output of dockerfile:COPY. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `copy` | `string` | computed |  |  | Set when keyword = COPY; shape = the `copy` output of dockerfile:COPY. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `created` | `number` | computed |  |  | Image mode only: Unix time of the history entry. |
 | `created_by` | `string` | computed |  | yes | Image mode only: the history entry this instruction was reconstructed from. Sensitive. |
 | `dockerfile` | `string` | computed |  |  | Upstream `(rendered instruction text)`. |
-| `entrypoint` | `string` | computed |  |  | Set when keyword = ENTRYPOINT; shape = the `entrypoint` output of dockerfile:ENTRYPOINT. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `env` | `string` | computed |  | yes | Set when keyword = ENV; shape = the `env` output of dockerfile:ENV. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `expose` | `string` | computed |  |  | Set when keyword = EXPOSE; shape = the `expose` output of dockerfile:EXPOSE. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `healthcheck` | `string` | computed |  |  | Set when keyword = HEALTHCHECK; shape = the `healthcheck` output of dockerfile:HEALTHCHECK. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `entrypoint` | `string` | computed |  |  | Set when keyword = ENTRYPOINT; shape = the `entrypoint` output of dockerfile:ENTRYPOINT. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `env` | `string` | computed |  | yes | Set when keyword = ENV; shape = the `env` output of dockerfile:ENV. Sensitive. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `expose` | `string` | computed |  |  | Set when keyword = EXPOSE; shape = the `expose` output of dockerfile:EXPOSE. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `healthcheck` | `string` | computed |  |  | Set when keyword = HEALTHCHECK; shape = the `healthcheck` output of dockerfile:HEALTHCHECK. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `index` | `number` | computed |  |  | Upstream `(position in stage)`. |
 | `keyword` | `string` | computed |  |  | Upstream `INSTRUCTION`. |
-| `label` | `string` | computed |  |  | Set when keyword = LABEL; shape = the `label` output of dockerfile:LABEL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `label` | `string` | computed |  |  | Set when keyword = LABEL; shape = the `label` output of dockerfile:LABEL. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `layer_size` | `number` | computed |  |  | Upstream `Size`. |
 | `line` | `number` | computed |  |  | 1-based start line; null in image mode. |
-| `maintainer` | `string` | computed |  |  | Set when keyword = MAINTAINER; shape = the `maintainer` output of dockerfile:MAINTAINER. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `onbuild` | `string` | computed |  |  | Set when keyword = ONBUILD; shape = the `onbuild` output of dockerfile:ONBUILD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `run` | `string` | computed |  |  | Set when keyword = RUN; shape = the `run` output of dockerfile:RUN. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `shell` | `string` | computed |  |  | Set when keyword = SHELL; shape = the `shell` output of dockerfile:SHELL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `stopsignal` | `string` | computed |  |  | Set when keyword = STOPSIGNAL; shape = the `stopsignal` output of dockerfile:STOPSIGNAL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `user` | `string` | computed |  |  | Set when keyword = USER; shape = the `user` output of dockerfile:USER. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `volume` | `string` | computed |  |  | Set when keyword = VOLUME; shape = the `volume` output of dockerfile:VOLUME. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `workdir` | `string` | computed |  |  | Set when keyword = WORKDIR; shape = the `workdir` output of dockerfile:WORKDIR. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `maintainer` | `string` | computed |  |  | Set when keyword = MAINTAINER; shape = the `maintainer` output of dockerfile:MAINTAINER. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `onbuild` | `string` | computed |  |  | Set when keyword = ONBUILD; shape = the `onbuild` output of dockerfile:ONBUILD. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `run` | `string` | computed |  |  | Set when keyword = RUN; shape = the `run` output of dockerfile:RUN. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `shell` | `string` | computed |  |  | Set when keyword = SHELL; shape = the `shell` output of dockerfile:SHELL. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `stopsignal` | `string` | computed |  |  | Set when keyword = STOPSIGNAL; shape = the `stopsignal` output of dockerfile:STOPSIGNAL. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `user` | `string` | computed |  |  | Set when keyword = USER; shape = the `user` output of dockerfile:USER. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `volume` | `string` | computed |  |  | Set when keyword = VOLUME; shape = the `volume` output of dockerfile:VOLUME. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `workdir` | `string` | computed |  |  | Set when keyword = WORKDIR; shape = the `workdir` output of dockerfile:WORKDIR. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 
 ### `check`
 

@@ -64,7 +64,7 @@ nested attribute, object. The GET /networks/{id} response as a nested object, fi
 | `options` | `map(string)` | computed |  |  | Upstream `Options`. |
 | `peers` | `list(object)` | computed |  |  | Upstream `Peers`. |
 | `scope` | `string` | computed |  |  | Upstream `Scope`. |
-| `services` | `dynamic` | computed |  |  | Upstream `Services`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `services` | `map(string)` | computed |  |  | Upstream `Services`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `status` | `object` | computed |  |  | Upstream `Status`. |
 
 ### `inspect.config_from`
@@ -93,9 +93,20 @@ nested attribute, object. Upstream `IPAM`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `config` | `list(string)` | computed |  |  | Upstream `Config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `config` | `list(object)` | computed |  |  | Upstream `Config`. |
 | `driver` | `string` | computed |  |  | Upstream `Driver`. |
 | `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `inspect.ipam.config`
+
+nested attribute, list(object). Upstream `Config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `auxiliary_addresses` | `map(string)` | computed |  |  | Upstream `AuxiliaryAddresses`. |
+| `gateway` | `string` | computed |  |  | Upstream `Gateway`. |
+| `ip_range` | `string` | computed |  |  | Upstream `IPRange`. |
+| `subnet` | `string` | computed |  |  | Upstream `Subnet`. |
 
 ### `inspect.peers`
 
@@ -112,7 +123,24 @@ nested attribute, object. Upstream `Status`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `ipam` | `dynamic` | computed |  |  | Upstream `IPAM`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `ipam` | `object` | computed |  |  | Upstream `IPAM`. |
+
+### `inspect.status.ipam`
+
+nested attribute, object. Upstream `IPAM`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `subnets` | `map(object)` | computed |  |  | Upstream `Subnets`. |
+
+### `inspect.status.ipam.subnets`
+
+nested attribute, map(object). Upstream `Subnets`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `dynamic_ips_available` | `number` | computed |  |  | Upstream `DynamicIPsAvailable`. |
+| `ips_in_use` | `number` | computed |  |  | Upstream `IPsInUse`. |
 
 ### `ipam_config`
 

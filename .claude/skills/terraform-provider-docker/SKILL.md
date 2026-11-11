@@ -146,7 +146,7 @@ object (some are conditional; the description says when).
 | `docker_buildx_builder` | `buildkitd_config` | Path of a local `buildkitd.toml` (`--buildkitd-config`), read at apply and copied to `/etc/buildkit/buildkitd.toml` in the container. |
 | `docker_buildx_builder` | `buildkitd_config_content` | Content of `buildkitd.toml`, copied like `buildkitd_config`. |
 | `docker_buildx_builder` | `buildkitd_flags` | Flags for buildkitd (`--buildkitd-flags`), whitespace-separated with no shell quoting, e.g. `"--debug --allow-insecure-entitlement=security.insecure"`. |
-| `docker_buildx_builder` | `driver` | Builder driver: `docker-container` (default), a BuildKit container on the provider's daemon, or `remote`, a BuildKit daemon run elsewhere and reached at `endpoint` (TLS in the `remote` block). |
+| `docker_buildx_builder` | `driver` | Builder driver: `docker-container` (default), `remote` or `cloud`. |
 | `docker_buildx_builder` | `endpoint` | BuildKit address of the builder, for `buildctl --addr` and `docker_image.build.builder`. |
 | `docker_buildx_builder` | `name` | Builder name, as for `docker buildx create --name`; pass it to `docker_image.build.builder`. |
 | `docker_buildx_builder` | `node` | Node name (`--node`); the node container is `buildx_buildkit_<node>`. |
@@ -254,7 +254,7 @@ object (some are conditional; the description says when).
 | `docker_image` | `build.additional_contexts` | BuildKit only. |
 | `docker_image` | `build.args` | Build arguments (`--build-arg`). |
 | `docker_image` | `build.attestations` | BuildKit only. |
-| `docker_image` | `build.builder` | Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit), the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`) or a BuildKit address (`tcp://`, `unix://`, `docker-container://`, e.g. a remote-driver builder's endpoint). |
+| `docker_image` | `build.builder` | Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit), the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`) or a BuildKit address (`tcp://`, `unix://`, `docker-container://`, e.g. a remote-driver builder's endpoint), or a Docker Build Cloud builder as `cloud://<org>/<builder>` or `<org>/<builder>` (a `docker_buildx_builder` with `driver = "cloud"`, its `id`). |
 | `docker_image` | `build.cache_from` | BuildKit only. |
 | `docker_image` | `build.cache_to` | BuildKit only. |
 | `docker_image` | `build.cgroup_parent` | Classic builder only. |

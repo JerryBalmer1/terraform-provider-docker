@@ -83,7 +83,7 @@ Read-Only:
 - `options` (Map of String) Upstream `Options`.
 - `peers` (Attributes List) Upstream `Peers`. (see [below for nested schema](#nestedatt--inspect--peers))
 - `scope` (String) Upstream `Scope`.
-- `services` (Dynamic) Upstream `Services`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `services` (Map of String) Upstream `Services`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `status` (Attributes) Upstream `Status`. (see [below for nested schema](#nestedatt--inspect--status))
 
 <a id="nestedatt--inspect--config_from"></a>
@@ -111,9 +111,20 @@ Read-Only:
 
 Read-Only:
 
-- `config` (List of String) Upstream `Config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `config` (Attributes List) Upstream `Config`. (see [below for nested schema](#nestedatt--inspect--ipam--config))
 - `driver` (String) Upstream `Driver`.
 - `options` (Map of String) Upstream `Options`.
+
+<a id="nestedatt--inspect--ipam--config"></a>
+### Nested Schema for `inspect.ipam.config`
+
+Read-Only:
+
+- `auxiliary_addresses` (Map of String) Upstream `AuxiliaryAddresses`.
+- `gateway` (String) Upstream `Gateway`.
+- `ip_range` (String) Upstream `IPRange`.
+- `subnet` (String) Upstream `Subnet`.
+
 
 
 <a id="nestedatt--inspect--peers"></a>
@@ -130,7 +141,24 @@ Read-Only:
 
 Read-Only:
 
-- `ipam` (Dynamic) Upstream `IPAM`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `ipam` (Attributes) Upstream `IPAM`. (see [below for nested schema](#nestedatt--inspect--status--ipam))
+
+<a id="nestedatt--inspect--status--ipam"></a>
+### Nested Schema for `inspect.status.ipam`
+
+Read-Only:
+
+- `subnets` (Attributes Map) Upstream `Subnets`. (see [below for nested schema](#nestedatt--inspect--status--ipam--subnets))
+
+<a id="nestedatt--inspect--status--ipam--subnets"></a>
+### Nested Schema for `inspect.status.ipam.subnets`
+
+Read-Only:
+
+- `dynamic_ips_available` (Number) Upstream `DynamicIPsAvailable`.
+- `ips_in_use` (Number) Upstream `IPsInUse`.
+
+
 
 
 

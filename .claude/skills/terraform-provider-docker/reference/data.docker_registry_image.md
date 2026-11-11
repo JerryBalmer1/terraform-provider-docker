@@ -37,15 +37,19 @@ nested attribute, object. Same shape as data.docker_image.config; the registry s
 | `cmd` | `list(string)` | computed |  |  | Upstream `Cmd`. |
 | `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
 | `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
-| `exposed_ports` | `list(string)` | computed |  |  | Map keys (`<port>/<proto>`) as a list. |
+| `exposed_ports` | `map(object)` | computed |  |  | ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list). |
 | `healthcheck` | `object` | computed |  |  | Upstream `Healthcheck`. |
 | `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
 | `on_build` | `list(string)` | computed |  |  | Upstream `OnBuild`. |
 | `shell` | `list(string)` | computed |  |  | Upstream `Shell`. |
 | `stop_signal` | `string` | computed |  |  | Upstream `StopSignal`. |
 | `user` | `string` | computed |  |  | Upstream `User`. |
-| `volumes` | `list(string)` | computed |  |  | Map keys as a list. |
+| `volumes` | `map(object)` | computed |  |  | Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list). |
 | `working_dir` | `string` | computed |  |  | Upstream `WorkingDir`. |
+
+### `config.exposed_ports`
+
+nested attribute, map(object). ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list).
 
 ### `config.healthcheck`
 
@@ -59,6 +63,10 @@ nested attribute, object. Upstream `Healthcheck`.
 | `start_period` | `number` | computed |  |  | Upstream `StartPeriod`. |
 | `test` | `list(string)` | computed |  |  | Upstream `Test`. |
 | `timeout` | `number` | computed |  |  | Upstream `Timeout`. |
+
+### `config.volumes`
+
+nested attribute, map(object). Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list).
 
 ### `inspect`
 

@@ -59,21 +59,114 @@ Read-Only:
 
 Read-Only:
 
-- `args` (String) Upstream `Args`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `args` (Attributes) Upstream `Args`. (see [below for nested schema](#nestedatt--plugins--config--args))
 - `description` (String) Upstream `Description`.
 - `documentation` (String) Upstream `Documentation`.
 - `entrypoint` (List of String) Upstream `Entrypoint`.
-- `env` (List of String, Sensitive) Upstream `Env`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `interface` (String) Upstream `Interface`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `env` (Attributes List, Sensitive) Upstream `Env`. Sensitive. (see [below for nested schema](#nestedatt--plugins--config--env))
+- `interface` (Attributes) Upstream `Interface`. (see [below for nested schema](#nestedatt--plugins--config--interface))
 - `ipc_host` (Boolean) Upstream `IpcHost`.
-- `linux` (String) Upstream `Linux`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `mounts` (List of String) Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `network` (String) Upstream `Network`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `linux` (Attributes) Upstream `Linux`. (see [below for nested schema](#nestedatt--plugins--config--linux))
+- `mounts` (Attributes List) Upstream `Mounts`. (see [below for nested schema](#nestedatt--plugins--config--mounts))
+- `network` (Attributes) Upstream `Network`. (see [below for nested schema](#nestedatt--plugins--config--network))
 - `pid_host` (Boolean) Upstream `PidHost`.
 - `propagated_mount` (String) Upstream `PropagatedMount`.
-- `rootfs` (String) Upstream `rootfs`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `user` (String) Upstream `User`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `rootfs` (Attributes) Upstream `rootfs`. (see [below for nested schema](#nestedatt--plugins--config--rootfs))
+- `user` (Attributes) Upstream `User`. (see [below for nested schema](#nestedatt--plugins--config--user))
 - `work_dir` (String) Upstream `WorkDir`.
+
+<a id="nestedatt--plugins--config--args"></a>
+### Nested Schema for `plugins.config.args`
+
+Read-Only:
+
+- `description` (String) Upstream `Description`.
+- `name` (String) Upstream `Name`.
+- `settable` (List of String) Upstream `Settable`.
+- `value` (List of String) Upstream `Value`.
+
+
+<a id="nestedatt--plugins--config--env"></a>
+### Nested Schema for `plugins.config.env`
+
+Read-Only:
+
+- `description` (String, Sensitive) Upstream `Description`.
+- `name` (String, Sensitive) Upstream `Name`.
+- `settable` (List of String, Sensitive) Upstream `Settable`.
+- `value` (String, Sensitive) Upstream `Value`. Sensitive.
+
+
+<a id="nestedatt--plugins--config--interface"></a>
+### Nested Schema for `plugins.config.interface`
+
+Read-Only:
+
+- `protocol_scheme` (String) Upstream `ProtocolScheme`.
+- `socket` (String) Upstream `Socket`.
+- `types` (List of String) Upstream `Types`.
+
+
+<a id="nestedatt--plugins--config--linux"></a>
+### Nested Schema for `plugins.config.linux`
+
+Read-Only:
+
+- `allow_all_devices` (Boolean) Upstream `AllowAllDevices`.
+- `capabilities` (List of String) Upstream `Capabilities`.
+- `devices` (Attributes List) Upstream `Devices`. (see [below for nested schema](#nestedatt--plugins--config--linux--devices))
+
+<a id="nestedatt--plugins--config--linux--devices"></a>
+### Nested Schema for `plugins.config.linux.devices`
+
+Read-Only:
+
+- `description` (String) Upstream `Description`.
+- `name` (String) Upstream `Name`.
+- `path` (String) Upstream `Path`.
+- `settable` (List of String) Upstream `Settable`.
+
+
+
+<a id="nestedatt--plugins--config--mounts"></a>
+### Nested Schema for `plugins.config.mounts`
+
+Read-Only:
+
+- `description` (String) Upstream `Description`.
+- `destination` (String) Upstream `Destination`.
+- `name` (String) Upstream `Name`.
+- `options` (List of String) Upstream `Options`.
+- `settable` (List of String) Upstream `Settable`.
+- `source` (String) Upstream `Source`.
+- `type` (String) Upstream `Type`.
+
+
+<a id="nestedatt--plugins--config--network"></a>
+### Nested Schema for `plugins.config.network`
+
+Read-Only:
+
+- `type` (String) Upstream `Type`.
+
+
+<a id="nestedatt--plugins--config--rootfs"></a>
+### Nested Schema for `plugins.config.rootfs`
+
+Read-Only:
+
+- `diff_ids` (List of String) Upstream `diff_ids`.
+- `type` (String) Upstream `type`.
+
+
+<a id="nestedatt--plugins--config--user"></a>
+### Nested Schema for `plugins.config.user`
+
+Read-Only:
+
+- `gid` (Number) Upstream `GID`.
+- `uid` (Number) Upstream `UID`.
+
 
 
 <a id="nestedatt--plugins--settings"></a>
@@ -82,6 +175,30 @@ Read-Only:
 Read-Only:
 
 - `args` (List of String) Upstream `Args`.
-- `devices` (List of String) Upstream `Devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `devices` (Attributes List) Upstream `Devices`. (see [below for nested schema](#nestedatt--plugins--settings--devices))
 - `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
-- `mounts` (List of String) Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `mounts` (Attributes List) Upstream `Mounts`. (see [below for nested schema](#nestedatt--plugins--settings--mounts))
+
+<a id="nestedatt--plugins--settings--devices"></a>
+### Nested Schema for `plugins.settings.devices`
+
+Read-Only:
+
+- `description` (String) Upstream `Description`.
+- `name` (String) Upstream `Name`.
+- `path` (String) Upstream `Path`.
+- `settable` (List of String) Upstream `Settable`.
+
+
+<a id="nestedatt--plugins--settings--mounts"></a>
+### Nested Schema for `plugins.settings.mounts`
+
+Read-Only:
+
+- `description` (String) Upstream `Description`.
+- `destination` (String) Upstream `Destination`.
+- `name` (String) Upstream `Name`.
+- `options` (List of String) Upstream `Options`.
+- `settable` (List of String) Upstream `Settable`.
+- `source` (String) Upstream `Source`.
+- `type` (String) Upstream `Type`.

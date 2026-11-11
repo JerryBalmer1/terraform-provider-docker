@@ -45,8 +45,8 @@ func TestContainerUpgradeStateV0(t *testing.T) {
 	r := NewContainerResource().(*containerResource)
 	var sr resource.SchemaResponse
 	r.Schema(ctx, resource.SchemaRequest{}, &sr)
-	if sr.Schema.Version != 1 {
-		t.Fatalf("schema version = %d, want 1", sr.Schema.Version)
+	if sr.Schema.Version != 2 { // Pass 6c: 1 -> 2, structured output shapes
+		t.Fatalf("schema version = %d, want 2", sr.Schema.Version)
 	}
 	v0 := `{"id":"c1","name":"web","image":"nginx","must_run":false,"wait_timeout":"60s","running":true,
 	  "networks_advanced":[{"name":"x"}],"mounts":[{"type":"tmpfs","target":"/t","tmpfs_size":5,"read_only":false}]}`

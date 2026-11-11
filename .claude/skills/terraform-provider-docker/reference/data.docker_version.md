@@ -43,7 +43,7 @@ nested attribute, list(object). Upstream `Components`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `details` | `string` | computed |  |  | Upstream `Details`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `details` | `string` | computed |  |  | Upstream `Details`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `name` | `string` | computed |  |  | Upstream `Name`. |
 | `version` | `string` | computed |  |  | Upstream `Version`. |
 

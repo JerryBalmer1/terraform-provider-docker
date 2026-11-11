@@ -65,6 +65,7 @@ func (r *registryImageResource) Metadata(_ context.Context, req resource.Metadat
 
 func (r *registryImageResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: 1, // Pass 6c: structured outputs changed shape (state_upgrade_p6c_z.go)
 		MarkdownDescription: "Pushes an image that exists on the provider's daemon (typically a `docker_image`) to its registry, " +
 			"using the provider's `registry_auth` credentials. Read refreshes `digest` and the distribution outputs from the registry " +
 			"(`GET /distribution/<name>/json`). A push only happens on create: tie `triggers` to the source image (e.g. `docker_image.app.id`) so a rebuilt image is pushed again.",

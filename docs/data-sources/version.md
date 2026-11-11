@@ -61,7 +61,7 @@ Read-Only:
 
 Read-Only:
 
-- `details` (String) Upstream `Details`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `details` (String) Upstream `Details`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `name` (String) Upstream `Name`.
 - `version` (String) Upstream `Version`.
 

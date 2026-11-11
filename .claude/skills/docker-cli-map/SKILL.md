@@ -49,7 +49,8 @@ Source: `tools/climap/commands.json` (hand-maintained) + `tools/parity/paritydat
 | `docker pull` | [`docker_image`](../terraform-provider-docker/reference/docker_image.md) | `name`, `keep_locally` | - |
 | `docker build` | [`docker_image`](../terraform-provider-docker/reference/docker_image.md) | `name`, `build`, `build.context`, `build.dockerfile`, `build.builder` | `build.builder = "buildkit"` for BuildKit features (secrets, cache_from, platforms). |
 | `docker buildx build` | [`docker_image`](../terraform-provider-docker/reference/docker_image.md) | `build.builder`, `build.platforms`, `build.secrets`, `build.outputs`, `build.cache_to`, `build.attestations` | `build.builder` names a docker_buildx_builder, or `buildkit` for the daemon's own BuildKit. |
-| `docker buildx create` | [`docker_buildx_builder`](../terraform-provider-docker/reference/docker_buildx_builder.md) | `name`, `node`, `append`, `driver`, `platform`, `buildkitd_flags`, `buildkitd_config`, `docker_container` | docker-container driver only; the buildx instance list is BLOCKED (buildx-private local state). |
+| `docker buildx create` | [`docker_buildx_builder`](../terraform-provider-docker/reference/docker_buildx_builder.md) | `name`, `node`, `append`, `driver`, `platform`, `buildkitd_flags`, `buildkitd_config`, `docker_container`, `endpoint`, `remote` | docker-container, remote (`endpoint`, `remote`) and cloud (next row) drivers; the buildx instance list is BLOCKED (buildx-private local state). |
+| `docker buildx create --driver cloud` | [`docker_buildx_builder`](../terraform-provider-docker/reference/docker_buildx_builder.md) | `name`, `driver`, `endpoint` | Docker Build Cloud: `driver = "cloud"`, `endpoint = "<org>/<builder>"`; pass `id` (`cloud://<org>/<builder>`) to `docker_image.build.builder`. The Hub credential comes from `registry_auth` for docker.io or the docker config; the token is never stored. |
 | `docker buildx bake` | [`action.docker_buildx_bake`](../terraform-provider-docker/reference/action.docker_buildx_bake.md) | `files`, `targets`, `builder` | - |
 | `docker buildx inspect` | [`data.docker_buildx_builder`](../terraform-provider-docker/reference/data.docker_buildx_builder.md) | `name` | - |
 | `docker buildx ls` | [`data.docker_buildx_builders`](../terraform-provider-docker/reference/data.docker_buildx_builders.md) | - | - |
@@ -181,7 +182,7 @@ Every type in `tools/parity/paritydata`: its status against kreuzwerker/docker v
 
 | Kind | Type | Parity | Replaces |
 |---|---|---|---|
-| resource | `docker_buildx_builder` | partial | `docker buildx create` |
+| resource | `docker_buildx_builder` | partial | `docker buildx create`, `docker buildx create --driver cloud` |
 | resource | `docker_compose` | partial | `docker compose up`, `docker compose down`, `docker compose up --scale`, `docker stack deploy` |
 | resource | `docker_config` | have | `docker config create` |
 | resource | `docker_container` | have | `docker run`, `docker create`, `docker start / docker stop`, `docker rm`, `docker cp (host to container)`, `docker update`, `docker rename` |

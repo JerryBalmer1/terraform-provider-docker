@@ -50,7 +50,7 @@ output "image_digests" {
 Read-Only:
 
 - `architecture` (String) Upstream `Architecture`.
-- `container_name` (String) Upstream `Names`.
+- `container_name` (String) Upstream `Names[0] (leading "/" removed; the ID when Names is empty)`.
 - `created` (String) Upstream `Created`.
 - `id` (String) Upstream `Id`.
 - `os` (String) Upstream `Os`.

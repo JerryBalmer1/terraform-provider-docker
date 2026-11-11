@@ -43,7 +43,7 @@ output "volume_names" {
 
 Read-Only:
 
-- `cluster_volume` (String) Upstream `ClusterVolume`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `cluster_volume` (Attributes) Upstream `ClusterVolume`. (see [below for nested schema](#nestedatt--volumes--cluster_volume))
 - `created_at` (String) Upstream `CreatedAt`.
 - `driver` (String) Upstream `Driver`.
 - `labels` (Map of String) Upstream `Labels`.
@@ -51,5 +51,130 @@ Read-Only:
 - `name` (String) Upstream `Name`.
 - `options` (Map of String) Upstream `Options`.
 - `scope` (String) Upstream `Scope`.
-- `status` (Map of String) Upstream `Status`.
-- `usage_data` (String) Upstream `UsageData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `status` (Map of String) Upstream `Status`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `usage_data` (Attributes) Upstream `UsageData`. (see [below for nested schema](#nestedatt--volumes--usage_data))
+
+<a id="nestedatt--volumes--cluster_volume"></a>
+### Nested Schema for `volumes.cluster_volume`
+
+Read-Only:
+
+- `created_at` (String) Upstream `CreatedAt`.
+- `id` (String) Upstream `ID`.
+- `info` (Attributes) Upstream `Info`. (see [below for nested schema](#nestedatt--volumes--cluster_volume--info))
+- `publish_status` (Attributes List) Upstream `PublishStatus`. (see [below for nested schema](#nestedatt--volumes--cluster_volume--publish_status))
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--volumes--cluster_volume--spec))
+- `updated_at` (String) Upstream `UpdatedAt`.
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--volumes--cluster_volume--version))
+
+<a id="nestedatt--volumes--cluster_volume--info"></a>
+### Nested Schema for `volumes.cluster_volume.info`
+
+Read-Only:
+
+- `accessible_topology` (Attributes List) Upstream `AccessibleTopology`. (see [below for nested schema](#nestedatt--volumes--cluster_volume--info--accessible_topology))
+- `capacity_bytes` (Number) Upstream `CapacityBytes`.
+- `volume_context` (Map of String) Upstream `VolumeContext`.
+- `volume_id` (String) Upstream `VolumeID`.
+
+<a id="nestedatt--volumes--cluster_volume--info--accessible_topology"></a>
+### Nested Schema for `volumes.cluster_volume.info.accessible_topology`
+
+Read-Only:
+
+- `segments` (Map of String) Upstream `Segments`.
+
+
+
+<a id="nestedatt--volumes--cluster_volume--publish_status"></a>
+### Nested Schema for `volumes.cluster_volume.publish_status`
+
+Read-Only:
+
+- `node_id` (String) Upstream `NodeID`.
+- `publish_context` (Map of String) Upstream `PublishContext`.
+- `state` (String) Upstream `State`.
+
+
+<a id="nestedatt--volumes--cluster_volume--spec"></a>
+### Nested Schema for `volumes.cluster_volume.spec`
+
+Read-Only:
+
+- `access_mode` (Attributes) Upstream `AccessMode`. (see [below for nested schema](#nestedatt--volumes--cluster_volume--spec--access_mode))
+- `group` (String) Upstream `Group`.
+
+<a id="nestedatt--volumes--cluster_volume--spec--access_mode"></a>
+### Nested Schema for `volumes.cluster_volume.spec.access_mode`
+
+Read-Only:
+
+- `accessibility_requirements` (Attributes) Upstream `AccessibilityRequirements`. (see [below for nested schema](#nestedatt--volumes--cluster_volume--spec--access_mode--accessibility_requirements))
+- `availability` (String) Upstream `Availability`.
+- `capacity_range` (Attributes) Upstream `CapacityRange`. (see [below for nested schema](#nestedatt--volumes--cluster_volume--spec--access_mode--capacity_range))
+- `mount_volume` (String) Upstream `MountVolume`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `scope` (String) Upstream `Scope`.
+- `secrets` (Attributes List) Upstream `Secrets`. (see [below for nested schema](#nestedatt--volumes--cluster_volume--spec--access_mode--secrets))
+- `sharing` (String) Upstream `Sharing`.
+
+<a id="nestedatt--volumes--cluster_volume--spec--access_mode--accessibility_requirements"></a>
+### Nested Schema for `volumes.cluster_volume.spec.access_mode.accessibility_requirements`
+
+Read-Only:
+
+- `preferred` (Attributes List) Upstream `Preferred`. (see [below for nested schema](#nestedatt--volumes--cluster_volume--spec--access_mode--accessibility_requirements--preferred))
+- `requisite` (Attributes List) Upstream `Requisite`. (see [below for nested schema](#nestedatt--volumes--cluster_volume--spec--access_mode--accessibility_requirements--requisite))
+
+<a id="nestedatt--volumes--cluster_volume--spec--access_mode--accessibility_requirements--preferred"></a>
+### Nested Schema for `volumes.cluster_volume.spec.access_mode.accessibility_requirements.preferred`
+
+Read-Only:
+
+- `segments` (Map of String) Upstream `Segments`.
+
+
+<a id="nestedatt--volumes--cluster_volume--spec--access_mode--accessibility_requirements--requisite"></a>
+### Nested Schema for `volumes.cluster_volume.spec.access_mode.accessibility_requirements.requisite`
+
+Read-Only:
+
+- `segments` (Map of String) Upstream `Segments`.
+
+
+
+<a id="nestedatt--volumes--cluster_volume--spec--access_mode--capacity_range"></a>
+### Nested Schema for `volumes.cluster_volume.spec.access_mode.capacity_range`
+
+Read-Only:
+
+- `limit_bytes` (Number) Upstream `LimitBytes`.
+- `required_bytes` (Number) Upstream `RequiredBytes`.
+
+
+<a id="nestedatt--volumes--cluster_volume--spec--access_mode--secrets"></a>
+### Nested Schema for `volumes.cluster_volume.spec.access_mode.secrets`
+
+Read-Only:
+
+- `key` (String) Upstream `Key`.
+- `secret` (String) Upstream `Secret`.
+
+
+
+
+<a id="nestedatt--volumes--cluster_volume--version"></a>
+### Nested Schema for `volumes.cluster_volume.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.
+
+
+
+<a id="nestedatt--volumes--usage_data"></a>
+### Nested Schema for `volumes.usage_data`
+
+Read-Only:
+
+- `ref_count` (Number) Upstream `RefCount`.
+- `size` (Number) Upstream `Size`.

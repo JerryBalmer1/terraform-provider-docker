@@ -222,7 +222,7 @@ resource "docker_service" "migrate" {
 - `placement` (Block, Optional) Where tasks may run. (see [below for nested schema](#nestedblock--placement))
 - `privileges` (Block, Optional) Security options of the task containers (`ContainerSpec.Privileges`). Updated in place. (see [below for nested schema](#nestedblock--privileges))
 - `read_only` (Boolean) Mount the task containers' root filesystem read-only (`ContainerSpec.ReadOnly`). Updated in place.
-- `replicas` (Number) Number of tasks for `replicated` mode (default 1). Only valid with `mode = "replicated"` (or unset): setting it with `global`, `global_job` or `replicated_job` is an error, as with `docker service create --replicas` (use `total_completions` for `replicated_job`). Updated in place.
+- `replicas` (Number) Number of tasks for `replicated` mode (default 1). Only valid with `mode = "replicated"` (or unset): setting it with `global`, `global_job` or `replicated_job` is an error, as with `docker service create --replicas` (use `total_completions` for `replicated_job`). Updated in place. Null in state for the other modes.
 - `resources` (Block, Optional) CPU and memory limits and reservations per task. (see [below for nested schema](#nestedblock--resources))
 - `restart_policy` (Block, Optional) When Swarm restarts tasks that exit. (see [below for nested schema](#nestedblock--restart_policy))
 - `rollback_config` (Block, Optional) How a failed update rolls back. (see [below for nested schema](#nestedblock--rollback_config))
@@ -241,7 +241,8 @@ resource "docker_service" "migrate" {
 
 - `compose_go_version` (String) compose-go version that loads, interpolates, merges and validates the project (v2.16.2, from go.mod).
 - `compose_spec_version` (String) Pinned compose-spec commit the structured fields follow (main @ 3a4a699...).
-- `content_sha256` (String) SHA-256 of inspect_json; changes whenever the object changes.
+- `config_sha256` (String) SHA-256 (hex) of the configuration part of inspect_json only (Spec; never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch.
+- `content_sha256` (String) SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes.
 - `deploy` (Attributes) The service's normalized `deploy` section (mode, replicas, resources, restart/update/rollback policy, placement, labels). (see [below for nested schema](#nestedatt--deploy))
 - `docker_server_version` (String) Docker Engine version of the daemon the provider talked to (GET /version Version).
 - `engine_api_version` (String) Engine API version the provider negotiated with the daemon (GET /version ApiVersion, capped by the client's max).
@@ -612,7 +613,7 @@ Read-Only:
 
 - `constraints` (List of String) Upstream `constraints`.
 - `max_replicas_per_node` (Number) Upstream `max_replicas_per_node`.
-- `preferences` (List of String) Upstream `preferences`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `preferences` (List of String) Upstream `preferences`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 
 
 <a id="nestedatt--deploy--resources"></a>
@@ -620,8 +621,8 @@ Read-Only:
 
 Read-Only:
 
-- `limits` (Dynamic) Upstream `limits`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
-- `reservations` (Dynamic) Upstream `reservations`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `limits` (Dynamic) Upstream `limits`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here).
+- `reservations` (Dynamic) Upstream `reservations`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here).
 
 
 <a id="nestedatt--deploy--restart_policy"></a>
@@ -796,8 +797,8 @@ Read-Only:
 
 Read-Only:
 
-- `global` (Dynamic) Upstream `Global`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
-- `global_job` (Dynamic) Upstream `GlobalJob`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `global` (Dynamic) Upstream `Global`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here).
+- `global_job` (Dynamic) Upstream `GlobalJob`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here).
 - `replicated` (Attributes) Upstream `Replicated`. (see [below for nested schema](#nestedatt--inspect--spec--mode--replicated))
 - `replicated_job` (Attributes) Upstream `ReplicatedJob`. (see [below for nested schema](#nestedatt--inspect--spec--mode--replicated_job))
 
@@ -900,7 +901,7 @@ Read-Only:
 - `config_id` (String) Upstream `ConfigID`.
 - `config_name` (String) Upstream `ConfigName`.
 - `file` (Attributes) Upstream `File`. (see [below for nested schema](#nestedatt--inspect--spec--task_template--container_spec--configs--file))
-- `runtime` (String) Upstream `Runtime`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `runtime` (String) Upstream `Runtime`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 
 <a id="nestedatt--inspect--spec--task_template--container_spec--configs--file"></a>
 ### Nested Schema for `inspect.spec.task_template.container_spec.configs.file`
@@ -949,7 +950,7 @@ Read-Only:
 - `source` (String) Upstream `Source`.
 - `target` (String) Upstream `Target`.
 - `tmpfs_options` (Attributes) Upstream `TmpfsOptions`. (see [below for nested schema](#nestedatt--inspect--spec--task_template--container_spec--mounts--tmpfs_options))
-- `type` (String) Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `type` (String) Upstream `Type`.
 - `volume_options` (Attributes) Upstream `VolumeOptions`. (see [below for nested schema](#nestedatt--inspect--spec--task_template--container_spec--mounts--volume_options))
 
 <a id="nestedatt--inspect--spec--task_template--container_spec--mounts--bind_options"></a>

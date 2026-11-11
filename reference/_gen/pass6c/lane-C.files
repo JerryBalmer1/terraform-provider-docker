@@ -1,0 +1,14 @@
+examples/resources/docker_buildx_builder/docker_buildx_builder.tests.ps1
+examples/resources/docker_buildx_builder/resource.tf
+internal/provider/buildkit_cloud.go
+internal/provider/buildkit_cloud_p6c_c_test.go
+internal/provider/buildkit_conn.go
+internal/provider/buildx_builder_cloud.go
+internal/provider/buildx_builder_cloud_p6c_c_acc_test.go
+internal/provider/buildx_builder_remote.go
+internal/provider/buildx_builder_resource.go
+internal/provider/img_buildx_outputs.go
+reference/_gen/deferred.d/acceptance.json
+reference/_gen/deferred.d/examples.json
+reference/_gen/pass6c/lane-C.md
+tools/climap/commands.json

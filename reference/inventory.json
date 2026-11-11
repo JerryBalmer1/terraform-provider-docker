@@ -5,7 +5,7 @@
     "engine_api": "1.56 (moby api/v1.56.1 @ 14ebc602124e280ef4ae3e1a8e688dac1255baa6)",
     "compose_spec": "main @ 3a4a6995e4a971f6173dff9130cb3e38e6738651",
     "compose_go": "v2.16.2 @ ddbe099a5404149d75fe774b30de7bd0befd3bd3",
-    "compose_cli": "v5.1.4 @ 4732a2ed20a49c43a7b44bb4928259162c3ae3be",
+    "compose_cli": "v5.7.0 @ 5bceecf985347fcf6dd23029ce440b502a0d4301",
     "docker_cli": "v29.5.3 @ d1c06ef6b41d88d76866aea43c246cd7c63d04fa",
     "dockerfile": "dockerfile/1.28.0 @ f5b59a1f2fb25a0cb7072c398cab9aed7835da4e",
     "buildx": "v0.38.2 @ 3c4cbd35852fc1a476923627a780a7836c28b654"
@@ -1920,8 +1920,23 @@
           "known_after_apply": true,
           "sensitive": false,
           "hash_of": "inspect_json",
-          "description": "sha256 of inspect_json.",
+          "description": "SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes.",
           "provided": false
+        },
+        {
+          "name": "config_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "inspect_json",
+            "how": "hex sha256 of the canonical JSON (keys sorted) of the configuration part of inspect_json: Name, Image, Platform, Config, HostConfig and, per network in NetworkSettings.Networks, the requested endpoint settings (IPAMConfig, Links, Aliases, DriverOpts, GwPriority)"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "hash_of": "inspect_json",
+          "description": "SHA-256 (hex) of the configuration part of inspect_json only (Name, Image, Platform, Config, HostConfig and, per network in NetworkSettings.Networks, the requested endpoint settings (IPAMConfig, Links, Aliases, DriverOpts, GwPriority); never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch.",
+          "provided": true
         }
       ],
       "outputs_status": "partial",
@@ -2733,9 +2748,9 @@
                 {
                   "name": "exposed_ports",
                   "upstream": "ExposedPorts",
-                  "tf_type": "list(string)",
+                  "tf_type": "map(object({}))",
                   "pointer": "#/definitions/ImageConfig/properties/ExposedPorts",
-                  "description": "Map keys (`<port>/<proto>`) as a list."
+                  "description": "ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list)."
                 },
                 {
                   "name": "env",
@@ -2803,9 +2818,9 @@
                 {
                   "name": "volumes",
                   "upstream": "Volumes",
-                  "tf_type": "list(string)",
+                  "tf_type": "map(object({}))",
                   "pointer": "#/definitions/ImageConfig/properties/Volumes",
-                  "description": "Map keys as a list."
+                  "description": "Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list)."
                 },
                 {
                   "name": "working_dir",
@@ -3364,8 +3379,23 @@
           "known_after_apply": true,
           "sensitive": false,
           "hash_of": "inspect_json",
-          "description": "sha256 of inspect_json.",
+          "description": "SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes.",
           "provided": false
+        },
+        {
+          "name": "config_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "inspect_json",
+            "how": "hex sha256 of the canonical JSON (keys sorted) of the configuration part of inspect_json: Name, Driver, Scope, EnableIPv4, EnableIPv6, IPAM, Internal, Attachable, Ingress, ConfigFrom, ConfigOnly, Options and Labels"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "hash_of": "inspect_json",
+          "description": "SHA-256 (hex) of the configuration part of inspect_json only (Name, Driver, Scope, EnableIPv4, EnableIPv6, IPAM, Internal, Attachable, Ingress, ConfigFrom, ConfigOnly, Options and Labels; never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch.",
+          "provided": true
         }
       ],
       "outputs_status": "partial",
@@ -4823,8 +4853,23 @@
           "known_after_apply": true,
           "sensitive": false,
           "hash_of": "inspect_json",
-          "description": "sha256 of inspect_json.",
+          "description": "SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes.",
           "provided": false
+        },
+        {
+          "name": "config_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "inspect_json",
+            "how": "hex sha256 of the canonical JSON (keys sorted) of the configuration part of inspect_json: Name, Driver, Scope, Labels, Options and ClusterVolume.Spec"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "hash_of": "inspect_json",
+          "description": "SHA-256 (hex) of the configuration part of inspect_json only (Name, Driver, Scope, Labels, Options and ClusterVolume.Spec; never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch.",
+          "provided": true
         }
       ],
       "outputs_status": "partial",
@@ -7722,9 +7767,9 @@
             {
               "name": "exposed_ports",
               "upstream": "ExposedPorts",
-              "tf_type": "list(string)",
+              "tf_type": "map(object({}))",
               "pointer": "#/definitions/ImageConfig/properties/ExposedPorts",
-              "description": "Map keys (`<port>/<proto>`) as a list."
+              "description": "ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list)."
             },
             {
               "name": "env",
@@ -7792,9 +7837,9 @@
             {
               "name": "volumes",
               "upstream": "Volumes",
-              "tf_type": "list(string)",
+              "tf_type": "map(object({}))",
               "pointer": "#/definitions/ImageConfig/properties/Volumes",
-              "description": "Map keys as a list."
+              "description": "Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list)."
             },
             {
               "name": "working_dir",
@@ -8164,9 +8209,9 @@
                 {
                   "name": "exposed_ports",
                   "upstream": "ExposedPorts",
-                  "tf_type": "list(string)",
+                  "tf_type": "map(object({}))",
                   "pointer": "#/definitions/ImageConfig/properties/ExposedPorts",
-                  "description": "Map keys (`<port>/<proto>`) as a list."
+                  "description": "ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list)."
                 },
                 {
                   "name": "env",
@@ -8234,9 +8279,9 @@
                 {
                   "name": "volumes",
                   "upstream": "Volumes",
-                  "tf_type": "list(string)",
+                  "tf_type": "map(object({}))",
                   "pointer": "#/definitions/ImageConfig/properties/Volumes",
-                  "description": "Map keys as a list."
+                  "description": "Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list)."
                 },
                 {
                   "name": "working_dir",
@@ -11367,9 +11412,9 @@
             {
               "name": "exposed_ports",
               "upstream": "ExposedPorts",
-              "tf_type": "list(string)",
+              "tf_type": "map(object({}))",
               "pointer": "#/definitions/ImageConfig/properties/ExposedPorts",
-              "description": "Map keys (`<port>/<proto>`) as a list."
+              "description": "ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list)."
             },
             {
               "name": "env",
@@ -11437,9 +11482,9 @@
             {
               "name": "volumes",
               "upstream": "Volumes",
-              "tf_type": "list(string)",
+              "tf_type": "map(object({}))",
               "pointer": "#/definitions/ImageConfig/properties/Volumes",
-              "description": "Map keys as a list."
+              "description": "Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list)."
             },
             {
               "name": "working_dir",
@@ -19913,9 +19958,24 @@
           },
           "known_after_apply": true,
           "sensitive": false,
-          "description": "SHA-256 of inspect_json; changes whenever the object changes.",
+          "description": "SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes.",
           "hash_of": "inspect_json",
           "provided": false
+        },
+        {
+          "name": "config_sha256",
+          "tf_type": "string",
+          "category": "hash",
+          "source": {
+            "type": "derived",
+            "from": "inspect_json",
+            "how": "hex sha256 of the canonical JSON (keys sorted) of the configuration part of inspect_json: Spec"
+          },
+          "known_after_apply": true,
+          "sensitive": false,
+          "hash_of": "inspect_json",
+          "description": "SHA-256 (hex) of the configuration part of inspect_json only (Spec; never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch.",
+          "provided": true
         },
         {
           "name": "id",
@@ -41988,7 +42048,7 @@
             },
             {
               "name": "container_name",
-              "upstream": "Names",
+              "upstream": "Names[0] (leading \"/\" removed; the ID when Names is empty)",
               "tf_type": "string",
               "pointer": "#/definitions/ContainerSummary/properties/Names"
             },
@@ -51553,9 +51613,10 @@
       "uses_cli": false,
       "outputs_lane": "E",
       "status": "partial",
-      "status_note": "the kubernetes driver needs the Kubernetes API (k8s.io/client-go, not a dependency); the buildx instance store (`docker buildx ls`, `--use`) is buildx-private client files (github.com/docker/buildx/store, not a dependency), not BuildKit or Engine API",
+      "status_note": "not verified against the live service (driver = \"cloud\", Docker Build Cloud); the kubernetes driver needs the Kubernetes API (k8s.io/client-go, not a dependency); the buildx instance store (`docker buildx ls`, `--use`) is buildx-private client files (github.com/docker/buildx/store, not a dependency), not BuildKit or Engine API",
       "registered": "docker_buildx_builder",
       "stub_files": [
+        "buildx_builder_cloud.go",
         "buildx_builder_resource.go"
       ],
       "lane": "Z3"

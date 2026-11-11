@@ -9052,7 +9052,7 @@
             },
             {
               "name": "container_name",
-              "upstream": "Names",
+              "upstream": "Names[0] (leading \"/\" removed; the ID when Names is empty)",
               "tf_type": "string",
               "pointer": "#/definitions/ContainerSummary/properties/Names"
             },

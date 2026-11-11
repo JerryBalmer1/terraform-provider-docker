@@ -49,6 +49,8 @@ nested attribute, map(object). Upstream `configs`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `content` | `string` | computed |  | yes | Upstream `content`. Sensitive. |
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `driver_opts`. |
 | `environment` | `string` | computed |  | yes | Upstream `environment`. Sensitive. |
 | `external` | `bool` | computed |  |  | Upstream `external`. |
 | `file` | `string` | computed |  |  | Upstream `file`. |
@@ -73,14 +75,14 @@ nested attribute, map(object). Upstream `jobs`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
-| `blkio_config` | `string` | computed |  |  | Upstream `blkio_config`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `blkio_config` | `object` | computed |  |  | Upstream `blkio_config`. |
 | `build` | `object` | computed |  |  | Upstream `build`. |
 | `cap_add` | `list(string)` | computed |  |  | Upstream `cap_add`. |
 | `cap_drop` | `list(string)` | computed |  |  | Upstream `cap_drop`. |
 | `cgroup` | `string` | computed |  |  | Upstream `cgroup`. |
 | `cgroup_parent` | `string` | computed |  |  | Upstream `cgroup_parent`. |
 | `command` | `list(string)` | computed |  |  | Upstream `command`. |
-| `configs` | `list(string)` | computed |  |  | Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `configs` | `list(object)` | computed |  |  | Upstream `configs`. |
 | `cpu_count` | `number` | computed |  |  | Upstream `cpu_count`. |
 | `cpu_percent` | `number` | computed |  |  | Upstream `cpu_percent`. |
 | `cpu_period` | `number` | computed |  |  | Upstream `cpu_period`. |
@@ -90,21 +92,22 @@ nested attribute, map(object). Upstream `jobs`.
 | `cpu_shares` | `number` | computed |  |  | Upstream `cpu_shares`. |
 | `cpus` | `number` | computed |  |  | Upstream `cpus`. |
 | `cpuset` | `string` | computed |  |  | Upstream `cpuset`. |
-| `credential_spec` | `string` | computed |  |  | Upstream `credential_spec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `depends_on` | `map(string)` | computed |  |  | Upstream `depends_on`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `credential_spec` | `object` | computed |  |  | Upstream `credential_spec`. |
+| `depends_on` | `map(object)` | computed |  |  | Upstream `depends_on`. |
 | `device_cgroup_rules` | `list(string)` | computed |  |  | Upstream `device_cgroup_rules`. |
-| `devices` | `list(string)` | computed |  |  | Upstream `devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `devices` | `list(object)` | computed |  |  | Upstream `devices`. |
 | `dns` | `list(string)` | computed |  |  | Upstream `dns`. |
 | `dns_opt` | `list(string)` | computed |  |  | Upstream `dns_opt`. |
 | `dns_search` | `list(string)` | computed |  |  | Upstream `dns_search`. |
+| `dockerfile` | `string` | computed |  |  | Upstream `dockerfile`. |
 | `domainname` | `string` | computed |  |  | Upstream `domainname`. |
 | `entrypoint` | `list(string)` | computed |  |  | Upstream `entrypoint`. |
-| `env_file` | `list(string)` | computed |  | yes | Upstream `env_file`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `env_file` | `list(object)` | computed |  | yes | Upstream `env_file`. Sensitive. |
 | `environment` | `map(string)` | computed |  | yes | Upstream `environment`. Sensitive. |
 | `expose` | `list(string)` | computed |  |  | Upstream `expose`. |
-| `extends` | `string` | computed |  |  | Upstream `extends`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `extends` | `string` | computed |  |  | Upstream `extends`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `extra_hosts` | `map(list(string))` | computed |  |  | Upstream `extra_hosts`. |
-| `gpus` | `list(string)` | computed |  |  | Upstream `gpus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `gpus` | `list(object)` | computed |  |  | Upstream `gpus`. |
 | `group_add` | `list(string)` | computed |  |  | Upstream `group_add`. |
 | `healthcheck` | `object` | computed |  |  | Upstream `healthcheck`. |
 | `hostname` | `string` | computed |  |  | Upstream `hostname`. |
@@ -114,15 +117,17 @@ nested attribute, map(object). Upstream `jobs`.
 | `isolation` | `string` | computed |  |  | Upstream `isolation`. |
 | `label_file` | `list(string)` | computed |  |  | Upstream `label_file`. |
 | `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
-| `logging` | `string` | computed |  |  | Upstream `logging`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `log_driver` | `string` | computed |  |  | Upstream `log_driver`. |
+| `log_opt` | `map(string)` | computed |  |  | Upstream `log_opt`. |
+| `logging` | `object` | computed |  |  | Upstream `logging`. |
 | `mac_address` | `string` | computed |  |  | Upstream `mac_address`. |
-| `mem_limit` | `number` | computed |  |  | Upstream `mem_limit`. |
-| `mem_reservation` | `number` | computed |  |  | Upstream `mem_reservation`. |
-| `mem_swappiness` | `number` | computed |  |  | Upstream `mem_swappiness`. |
-| `memswap_limit` | `number` | computed |  |  | Upstream `memswap_limit`. |
-| `models` | `map(string)` | computed |  |  | Upstream `models`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `mem_limit` | `string` | computed |  |  | Upstream `mem_limit`. |
+| `mem_reservation` | `string` | computed |  |  | Upstream `mem_reservation`. |
+| `mem_swappiness` | `string` | computed |  |  | Upstream `mem_swappiness`. |
+| `memswap_limit` | `string` | computed |  |  | Upstream `memswap_limit`. |
+| `models` | `map(object)` | computed |  |  | Upstream `models`. |
 | `network_mode` | `string` | computed |  |  | Upstream `network_mode`. |
-| `networks` | `map(string)` | computed |  |  | Upstream `networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `networks` | `map(object)` | computed |  |  | Upstream `networks`. |
 | `oom_kill_disable` | `bool` | computed |  |  | Upstream `oom_kill_disable`. |
 | `oom_score_adj` | `number` | computed |  |  | Upstream `oom_score_adj`. |
 | `pid` | `string` | computed |  |  | Upstream `pid`. |
@@ -135,26 +140,85 @@ nested attribute, map(object). Upstream `jobs`.
 | `pull_refresh_after` | `string` | computed |  |  | Upstream `pull_refresh_after`. |
 | `read_only` | `bool` | computed |  |  | Upstream `read_only`. |
 | `runtime` | `string` | computed |  |  | Upstream `runtime`. |
-| `secrets` | `list(string)` | computed |  | yes | Upstream `secrets`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `secrets` | `list(object)` | computed |  | yes | Upstream `secrets`. Sensitive. |
 | `security_opt` | `list(string)` | computed |  |  | Upstream `security_opt`. |
-| `shm_size` | `number` | computed |  |  | Upstream `shm_size`. |
+| `shm_size` | `string` | computed |  |  | Upstream `shm_size`. |
 | `stdin_open` | `bool` | computed |  |  | Upstream `stdin_open`. |
 | `stop_grace_period` | `string` | computed |  |  | Upstream `stop_grace_period`. |
 | `stop_signal` | `string` | computed |  |  | Upstream `stop_signal`. |
 | `storage_opt` | `map(string)` | computed |  |  | Upstream `storage_opt`. |
 | `sysctls` | `map(string)` | computed |  |  | Upstream `sysctls`. |
 | `tmpfs` | `list(string)` | computed |  |  | Upstream `tmpfs`. |
-| `triggers` | `string` | computed |  |  | Upstream `triggers`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `triggers` | `object` | computed |  |  | Upstream `triggers`. |
 | `tty` | `bool` | computed |  |  | Upstream `tty`. |
-| `ulimits` | `map(string)` | computed |  |  | Upstream `ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `umask` | `string` | computed |  |  | Upstream `umask`. |
+| `ulimits` | `map(object)` | computed |  |  | Upstream `ulimits`. |
+| `umask` | `number` | computed |  |  | Upstream `umask`. |
 | `use_api_socket` | `bool` | computed |  |  | Upstream `use_api_socket`. |
 | `user` | `string` | computed |  |  | Upstream `user`. |
 | `userns_mode` | `string` | computed |  |  | Upstream `userns_mode`. |
 | `uts` | `string` | computed |  |  | Upstream `uts`. |
+| `volume_driver` | `string` | computed |  |  | Upstream `volume_driver`. |
 | `volumes` | `list(object)` | computed |  |  | Upstream `volumes`. |
 | `volumes_from` | `list(string)` | computed |  |  | Upstream `volumes_from`. |
 | `working_dir` | `string` | computed |  |  | Upstream `working_dir`. |
+
+### `project.jobs.blkio_config`
+
+nested attribute, object. Upstream `blkio_config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `device_read_bps` | `list(object)` | computed |  |  | Upstream `device_read_bps`. |
+| `device_read_iops` | `list(object)` | computed |  |  | Upstream `device_read_iops`. |
+| `device_write_bps` | `list(object)` | computed |  |  | Upstream `device_write_bps`. |
+| `device_write_iops` | `list(object)` | computed |  |  | Upstream `device_write_iops`. |
+| `weight` | `number` | computed |  |  | Upstream `weight`. |
+| `weight_device` | `list(object)` | computed |  |  | Upstream `weight_device`. |
+
+### `project.jobs.blkio_config.device_read_bps`
+
+nested attribute, list(object). Upstream `device_read_bps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.jobs.blkio_config.device_read_iops`
+
+nested attribute, list(object). Upstream `device_read_iops`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.jobs.blkio_config.device_write_bps`
+
+nested attribute, list(object). Upstream `device_write_bps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.jobs.blkio_config.device_write_iops`
+
+nested attribute, list(object). Upstream `device_write_iops`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.jobs.blkio_config.weight_device`
+
+nested attribute, list(object). Upstream `weight_device`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `weight` | `number` | computed |  |  | Upstream `Weight`. |
 
 ### `project.jobs.build`
 
@@ -178,12 +242,12 @@ nested attribute, object. Upstream `build`.
 | `no_cache_filter` | `list(string)` | computed |  |  | Upstream `no_cache_filter`. |
 | `platforms` | `list(string)` | computed |  |  | Upstream `platforms`. |
 | `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
-| `provenance` | `bool` | computed |  |  | Upstream `provenance`. |
+| `provenance` | `string` | computed |  |  | Upstream `provenance`. |
 | `pull` | `bool` | computed |  |  | Upstream `pull`. |
-| `sbom` | `bool` | computed |  |  | Upstream `sbom`. |
+| `sbom` | `string` | computed |  |  | Upstream `sbom`. |
 | `secrets` | `list(object)` | computed |  | yes | Upstream `secrets`. Sensitive. |
-| `shm_size` | `number` | computed |  |  | Upstream `shm_size`. |
-| `ssh` | `map(string)` | computed |  | yes | Upstream `ssh`. Sensitive. |
+| `shm_size` | `string` | computed |  |  | Upstream `shm_size`. |
+| `ssh` | `list(string)` | computed |  | yes | Upstream `ssh`. Sensitive. |
 | `tags` | `list(string)` | computed |  |  | Upstream `tags`. |
 | `target` | `string` | computed |  |  | Upstream `target`. |
 | `ulimits` | `map(object)` | computed |  |  | Upstream `ulimits`. |
@@ -195,7 +259,7 @@ nested attribute, list(object). Upstream `secrets`. Sensitive.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `gid` | `string` | computed |  | yes | Upstream `gid`. |
-| `mode` | `number` | computed |  | yes | Upstream `mode`. |
+| `mode` | `string` | computed |  | yes | Upstream `mode`. |
 | `source` | `string` | computed |  | yes | Upstream `source`. |
 | `target` | `string` | computed |  | yes | Upstream `target`. |
 | `uid` | `string` | computed |  | yes | Upstream `uid`. |
@@ -207,7 +271,72 @@ nested attribute, map(object). Upstream `ulimits`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `hard` | `number` | computed |  |  | Upstream `hard`. |
+| `single` | `number` | computed |  |  | Upstream `single`. |
 | `soft` | `number` | computed |  |  | Upstream `soft`. |
+
+### `project.jobs.configs`
+
+nested attribute, list(object). Upstream `configs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  |  | Upstream `gid`. |
+| `mode` | `string` | computed |  |  | Upstream `mode`. |
+| `source` | `string` | computed |  |  | Upstream `source`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+| `uid` | `string` | computed |  |  | Upstream `uid`. |
+
+### `project.jobs.credential_spec`
+
+nested attribute, object. Upstream `credential_spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `string` | computed |  |  | Upstream `config`. |
+| `file` | `string` | computed |  |  | Upstream `file`. |
+| `registry` | `string` | computed |  |  | Upstream `registry`. |
+
+### `project.jobs.depends_on`
+
+nested attribute, map(object). Upstream `depends_on`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `condition` | `string` | computed |  |  | Upstream `condition`. |
+| `required` | `bool` | computed |  |  | Upstream `required`. |
+| `restart` | `bool` | computed |  |  | Upstream `restart`. |
+
+### `project.jobs.devices`
+
+nested attribute, list(object). Upstream `devices`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `permissions` | `string` | computed |  |  | Upstream `permissions`. |
+| `source` | `string` | computed |  |  | Upstream `source`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+
+### `project.jobs.env_file`
+
+nested attribute, list(object). Upstream `env_file`. Sensitive.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `format` | `string` | computed |  | yes | Upstream `format`. |
+| `path` | `string` | computed |  | yes | Upstream `path`. |
+| `required` | `bool` | computed |  | yes | Upstream `required`. |
+
+### `project.jobs.gpus`
+
+nested attribute, list(object). Upstream `gpus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `capabilities` | `list(string)` | computed |  |  | Upstream `capabilities`. |
+| `count` | `number` | computed |  |  | Upstream `count`. |
+| `device_ids` | `list(string)` | computed |  |  | Upstream `device_ids`. |
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `options`. |
 
 ### `project.jobs.healthcheck`
 
@@ -223,6 +352,41 @@ nested attribute, object. Upstream `healthcheck`.
 | `test` | `list(string)` | computed |  |  | Upstream `test`. |
 | `timeout` | `string` | computed |  |  | Upstream `timeout`. |
 
+### `project.jobs.logging`
+
+nested attribute, object. Upstream `logging`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `options`. |
+
+### `project.jobs.models`
+
+nested attribute, map(object). Upstream `models`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `endpoint_var` | `string` | computed |  |  | Upstream `endpoint_var`. |
+| `model_var` | `string` | computed |  |  | Upstream `model_var`. |
+
+### `project.jobs.networks`
+
+nested attribute, map(object). Upstream `networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  |  | Upstream `aliases`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `driver_opts`. |
+| `gw_priority` | `number` | computed |  |  | Upstream `gw_priority`. |
+| `interface_name` | `string` | computed |  |  | Upstream `interface_name`. |
+| `ipv4_address` | `string` | computed |  |  | Upstream `ipv4_address`. |
+| `ipv6_address` | `string` | computed |  |  | Upstream `ipv6_address`. |
+| `link_local_ips` | `list(string)` | computed |  |  | Upstream `link_local_ips`. |
+| `mac_address` | `string` | computed |  |  | Upstream `mac_address`. |
+| `priority` | `number` | computed |  |  | Upstream `priority`. |
+| `use_service_name_alias` | `bool` | computed |  |  | Upstream `use_service_name_alias`. |
+
 ### `project.jobs.ports`
 
 nested attribute, list(object). Upstream `ports`.
@@ -234,8 +398,50 @@ nested attribute, list(object). Upstream `ports`.
 | `mode` | `string` | computed |  |  | Upstream `mode`. |
 | `name` | `string` | computed |  |  | Upstream `name`. |
 | `protocol` | `string` | computed |  |  | Upstream `protocol`. |
-| `published` | `number` | computed |  |  | Upstream `published`. |
+| `published` | `string` | computed |  |  | Upstream `published`. |
 | `target` | `number` | computed |  |  | Upstream `target`. |
+
+### `project.jobs.secrets`
+
+nested attribute, list(object). Upstream `secrets`. Sensitive.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  | yes | Upstream `gid`. |
+| `mode` | `string` | computed |  | yes | Upstream `mode`. |
+| `source` | `string` | computed |  | yes | Upstream `source`. |
+| `target` | `string` | computed |  | yes | Upstream `target`. |
+| `uid` | `string` | computed |  | yes | Upstream `uid`. |
+
+### `project.jobs.triggers`
+
+nested attribute, object. Upstream `triggers`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `manual` | `bool` | computed |  |  | Upstream `manual`. |
+| `schedule` | `list(object)` | computed |  |  | Upstream `schedule`. |
+
+### `project.jobs.triggers.schedule`
+
+nested attribute, list(object). Upstream `schedule`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `concurrency` | `string` | computed |  |  | Upstream `concurrency`. |
+| `cron` | `string` | computed |  |  | Upstream `cron`. |
+| `missed_fires` | `string` | computed |  |  | Upstream `missed_fires`. |
+| `timezone` | `string` | computed |  |  | Upstream `timezone`. |
+
+### `project.jobs.ulimits`
+
+nested attribute, map(object). Upstream `ulimits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `hard` | `number` | computed |  |  | Upstream `hard`. |
+| `single` | `number` | computed |  |  | Upstream `single`. |
+| `soft` | `number` | computed |  |  | Upstream `soft`. |
 
 ### `project.jobs.volumes`
 
@@ -279,7 +485,7 @@ nested attribute, object. Upstream `tmpfs`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `mode` | `number` | computed |  |  | Upstream `mode`. |
-| `size` | `number` | computed |  |  | Upstream `size`. |
+| `size` | `string` | computed |  |  | Upstream `size`. |
 
 ### `project.jobs.volumes.volume`
 
@@ -325,9 +531,20 @@ nested attribute, object. Upstream `ipam`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `config` | `list(string)` | computed |  |  | Upstream `config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `config` | `list(object)` | computed |  |  | Upstream `config`. |
 | `driver` | `string` | computed |  |  | Upstream `driver`. |
 | `options` | `map(string)` | computed |  |  | Upstream `options`. |
+
+### `project.networks.ipam.config`
+
+nested attribute, list(object). Upstream `config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aux_addresses` | `map(string)` | computed |  |  | Upstream `aux_addresses`. |
+| `gateway` | `string` | computed |  |  | Upstream `gateway`. |
+| `ip_range` | `string` | computed |  |  | Upstream `ip_range`. |
+| `subnet` | `string` | computed |  |  | Upstream `subnet`. |
 
 ### `project.secrets`
 
@@ -335,6 +552,7 @@ nested attribute, map(object). Upstream `secrets`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
+| `content` | `string` | computed |  | yes | Upstream `content`. Sensitive. |
 | `driver` | `string` | computed |  |  | Upstream `driver`. |
 | `driver_opts` | `map(string)` | computed |  |  | Upstream `driver_opts`. |
 | `environment` | `string` | computed |  | yes | Upstream `environment`. Sensitive. |
@@ -352,14 +570,14 @@ nested attribute, map(object). Upstream `services`.
 |---|---|---|---|---|---|
 | `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
 | `attach` | `bool` | computed |  |  | Upstream `attach`. |
-| `blkio_config` | `string` | computed |  |  | Upstream `blkio_config`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `blkio_config` | `object` | computed |  |  | Upstream `blkio_config`. |
 | `build` | `object` | computed |  |  | Upstream `build`. |
 | `cap_add` | `list(string)` | computed |  |  | Upstream `cap_add`. |
 | `cap_drop` | `list(string)` | computed |  |  | Upstream `cap_drop`. |
 | `cgroup` | `string` | computed |  |  | Upstream `cgroup`. |
 | `cgroup_parent` | `string` | computed |  |  | Upstream `cgroup_parent`. |
 | `command` | `list(string)` | computed |  |  | Upstream `command`. |
-| `configs` | `list(string)` | computed |  |  | Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `configs` | `list(object)` | computed |  |  | Upstream `configs`. |
 | `container_name` | `string` | computed |  |  | Upstream `container_name`. |
 | `cpu_count` | `number` | computed |  |  | Upstream `cpu_count`. |
 | `cpu_percent` | `number` | computed |  |  | Upstream `cpu_percent`. |
@@ -370,24 +588,25 @@ nested attribute, map(object). Upstream `services`.
 | `cpu_shares` | `number` | computed |  |  | Upstream `cpu_shares`. |
 | `cpus` | `number` | computed |  |  | Upstream `cpus`. |
 | `cpuset` | `string` | computed |  |  | Upstream `cpuset`. |
-| `credential_spec` | `string` | computed |  |  | Upstream `credential_spec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `depends_on` | `map(string)` | computed |  |  | Upstream `depends_on`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `credential_spec` | `object` | computed |  |  | Upstream `credential_spec`. |
+| `depends_on` | `map(object)` | computed |  |  | Upstream `depends_on`. |
 | `deploy` | `object` | computed |  |  | Upstream `deploy`. |
-| `develop` | `string` | computed |  |  | Upstream `develop`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `develop` | `object` | computed |  |  | Upstream `develop`. |
 | `device_cgroup_rules` | `list(string)` | computed |  |  | Upstream `device_cgroup_rules`. |
-| `devices` | `list(string)` | computed |  |  | Upstream `devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `devices` | `list(object)` | computed |  |  | Upstream `devices`. |
 | `dns` | `list(string)` | computed |  |  | Upstream `dns`. |
 | `dns_opt` | `list(string)` | computed |  |  | Upstream `dns_opt`. |
 | `dns_search` | `list(string)` | computed |  |  | Upstream `dns_search`. |
+| `dockerfile` | `string` | computed |  |  | Upstream `dockerfile`. |
 | `domainname` | `string` | computed |  |  | Upstream `domainname`. |
 | `entrypoint` | `list(string)` | computed |  |  | Upstream `entrypoint`. |
-| `env_file` | `list(string)` | computed |  | yes | Upstream `env_file`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `env_file` | `list(object)` | computed |  | yes | Upstream `env_file`. Sensitive. |
 | `environment` | `map(string)` | computed |  | yes | Upstream `environment`. Sensitive. |
 | `expose` | `list(string)` | computed |  |  | Upstream `expose`. |
-| `extends` | `string` | computed |  |  | Upstream `extends`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `extends` | `object` | computed |  |  | Upstream `extends`. |
 | `external_links` | `list(string)` | computed |  |  | Upstream `external_links`. |
 | `extra_hosts` | `map(list(string))` | computed |  |  | Upstream `extra_hosts`. |
-| `gpus` | `list(string)` | computed |  |  | Upstream `gpus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `gpus` | `list(object)` | computed |  |  | Upstream `gpus`. |
 | `group_add` | `list(string)` | computed |  |  | Upstream `group_add`. |
 | `healthcheck` | `object` | computed |  |  | Upstream `healthcheck`. |
 | `hostname` | `string` | computed |  |  | Upstream `hostname`. |
@@ -398,36 +617,39 @@ nested attribute, map(object). Upstream `services`.
 | `label_file` | `list(string)` | computed |  |  | Upstream `label_file`. |
 | `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
 | `links` | `list(string)` | computed |  |  | Upstream `links`. |
-| `logging` | `string` | computed |  |  | Upstream `logging`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `log_driver` | `string` | computed |  |  | Upstream `log_driver`. |
+| `log_opt` | `map(string)` | computed |  |  | Upstream `log_opt`. |
+| `logging` | `object` | computed |  |  | Upstream `logging`. |
 | `mac_address` | `string` | computed |  |  | Upstream `mac_address`. |
-| `mem_limit` | `number` | computed |  |  | Upstream `mem_limit`. |
-| `mem_reservation` | `number` | computed |  |  | Upstream `mem_reservation`. |
-| `mem_swappiness` | `number` | computed |  |  | Upstream `mem_swappiness`. |
-| `memswap_limit` | `number` | computed |  |  | Upstream `memswap_limit`. |
-| `models` | `map(string)` | computed |  |  | Upstream `models`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `mem_limit` | `string` | computed |  |  | Upstream `mem_limit`. |
+| `mem_reservation` | `string` | computed |  |  | Upstream `mem_reservation`. |
+| `mem_swappiness` | `string` | computed |  |  | Upstream `mem_swappiness`. |
+| `memswap_limit` | `string` | computed |  |  | Upstream `memswap_limit`. |
+| `models` | `map(object)` | computed |  |  | Upstream `models`. |
+| `net` | `string` | computed |  |  | Upstream `net`. |
 | `network_mode` | `string` | computed |  |  | Upstream `network_mode`. |
-| `networks` | `map(string)` | computed |  |  | Upstream `networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `networks` | `map(object)` | computed |  |  | Upstream `networks`. |
 | `oom_kill_disable` | `bool` | computed |  |  | Upstream `oom_kill_disable`. |
 | `oom_score_adj` | `number` | computed |  |  | Upstream `oom_score_adj`. |
 | `pid` | `string` | computed |  |  | Upstream `pid`. |
 | `pids_limit` | `number` | computed |  |  | Upstream `pids_limit`. |
 | `platform` | `string` | computed |  |  | Upstream `platform`. |
 | `ports` | `list(object)` | computed |  |  | Upstream `ports`. |
-| `post_start` | `list(string)` | computed |  |  | Upstream `post_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `pre_start` | `list(string)` | computed |  |  | Upstream `pre_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `pre_stop` | `list(string)` | computed |  |  | Upstream `pre_stop`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `post_start` | `list(object)` | computed |  |  | Upstream `post_start`. |
+| `pre_start` | `list(object)` | computed |  |  | Upstream `pre_start`. |
+| `pre_stop` | `list(object)` | computed |  |  | Upstream `pre_stop`. |
 | `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
 | `profiles` | `list(string)` | computed |  |  | Upstream `profiles`. |
-| `provider` | `string` | computed |  |  | Upstream `provider`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `provider` | `object` | computed |  |  | Upstream `provider`. |
 | `pull_policy` | `string` | computed |  |  | Upstream `pull_policy`. |
 | `pull_refresh_after` | `string` | computed |  |  | Upstream `pull_refresh_after`. |
 | `read_only` | `bool` | computed |  |  | Upstream `read_only`. |
 | `restart` | `string` | computed |  |  | Upstream `restart`. |
 | `runtime` | `string` | computed |  |  | Upstream `runtime`. |
 | `scale` | `number` | computed |  |  | Upstream `scale`. |
-| `secrets` | `list(string)` | computed |  | yes | Upstream `secrets`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `secrets` | `list(object)` | computed |  | yes | Upstream `secrets`. Sensitive. |
 | `security_opt` | `list(string)` | computed |  |  | Upstream `security_opt`. |
-| `shm_size` | `number` | computed |  |  | Upstream `shm_size`. |
+| `shm_size` | `string` | computed |  |  | Upstream `shm_size`. |
 | `stdin_open` | `bool` | computed |  |  | Upstream `stdin_open`. |
 | `stop_grace_period` | `string` | computed |  |  | Upstream `stop_grace_period`. |
 | `stop_signal` | `string` | computed |  |  | Upstream `stop_signal`. |
@@ -435,15 +657,74 @@ nested attribute, map(object). Upstream `services`.
 | `sysctls` | `map(string)` | computed |  |  | Upstream `sysctls`. |
 | `tmpfs` | `list(string)` | computed |  |  | Upstream `tmpfs`. |
 | `tty` | `bool` | computed |  |  | Upstream `tty`. |
-| `ulimits` | `map(string)` | computed |  |  | Upstream `ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `umask` | `string` | computed |  |  | Upstream `umask`. |
+| `ulimits` | `map(object)` | computed |  |  | Upstream `ulimits`. |
+| `umask` | `number` | computed |  |  | Upstream `umask`. |
 | `use_api_socket` | `bool` | computed |  |  | Upstream `use_api_socket`. |
 | `user` | `string` | computed |  |  | Upstream `user`. |
 | `userns_mode` | `string` | computed |  |  | Upstream `userns_mode`. |
 | `uts` | `string` | computed |  |  | Upstream `uts`. |
+| `volume_driver` | `string` | computed |  |  | Upstream `volume_driver`. |
 | `volumes` | `list(object)` | computed |  |  | Upstream `volumes`. |
 | `volumes_from` | `list(string)` | computed |  |  | Upstream `volumes_from`. |
 | `working_dir` | `string` | computed |  |  | Upstream `working_dir`. |
+
+### `project.services.blkio_config`
+
+nested attribute, object. Upstream `blkio_config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `device_read_bps` | `list(object)` | computed |  |  | Upstream `device_read_bps`. |
+| `device_read_iops` | `list(object)` | computed |  |  | Upstream `device_read_iops`. |
+| `device_write_bps` | `list(object)` | computed |  |  | Upstream `device_write_bps`. |
+| `device_write_iops` | `list(object)` | computed |  |  | Upstream `device_write_iops`. |
+| `weight` | `number` | computed |  |  | Upstream `weight`. |
+| `weight_device` | `list(object)` | computed |  |  | Upstream `weight_device`. |
+
+### `project.services.blkio_config.device_read_bps`
+
+nested attribute, list(object). Upstream `device_read_bps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.services.blkio_config.device_read_iops`
+
+nested attribute, list(object). Upstream `device_read_iops`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.services.blkio_config.device_write_bps`
+
+nested attribute, list(object). Upstream `device_write_bps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.services.blkio_config.device_write_iops`
+
+nested attribute, list(object). Upstream `device_write_iops`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.services.blkio_config.weight_device`
+
+nested attribute, list(object). Upstream `weight_device`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `weight` | `number` | computed |  |  | Upstream `Weight`. |
 
 ### `project.services.build`
 
@@ -467,12 +748,12 @@ nested attribute, object. Upstream `build`.
 | `no_cache_filter` | `list(string)` | computed |  |  | Upstream `no_cache_filter`. |
 | `platforms` | `list(string)` | computed |  |  | Upstream `platforms`. |
 | `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
-| `provenance` | `bool` | computed |  |  | Upstream `provenance`. |
+| `provenance` | `string` | computed |  |  | Upstream `provenance`. |
 | `pull` | `bool` | computed |  |  | Upstream `pull`. |
-| `sbom` | `bool` | computed |  |  | Upstream `sbom`. |
+| `sbom` | `string` | computed |  |  | Upstream `sbom`. |
 | `secrets` | `list(object)` | computed |  | yes | Upstream `secrets`. Sensitive. |
-| `shm_size` | `number` | computed |  |  | Upstream `shm_size`. |
-| `ssh` | `map(string)` | computed |  | yes | Upstream `ssh`. Sensitive. |
+| `shm_size` | `string` | computed |  |  | Upstream `shm_size`. |
+| `ssh` | `list(string)` | computed |  | yes | Upstream `ssh`. Sensitive. |
 | `tags` | `list(string)` | computed |  |  | Upstream `tags`. |
 | `target` | `string` | computed |  |  | Upstream `target`. |
 | `ulimits` | `map(object)` | computed |  |  | Upstream `ulimits`. |
@@ -484,7 +765,7 @@ nested attribute, list(object). Upstream `secrets`. Sensitive.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `gid` | `string` | computed |  | yes | Upstream `gid`. |
-| `mode` | `number` | computed |  | yes | Upstream `mode`. |
+| `mode` | `string` | computed |  | yes | Upstream `mode`. |
 | `source` | `string` | computed |  | yes | Upstream `source`. |
 | `target` | `string` | computed |  | yes | Upstream `target`. |
 | `uid` | `string` | computed |  | yes | Upstream `uid`. |
@@ -496,7 +777,40 @@ nested attribute, map(object). Upstream `ulimits`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `hard` | `number` | computed |  |  | Upstream `hard`. |
+| `single` | `number` | computed |  |  | Upstream `single`. |
 | `soft` | `number` | computed |  |  | Upstream `soft`. |
+
+### `project.services.configs`
+
+nested attribute, list(object). Upstream `configs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  |  | Upstream `gid`. |
+| `mode` | `string` | computed |  |  | Upstream `mode`. |
+| `source` | `string` | computed |  |  | Upstream `source`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+| `uid` | `string` | computed |  |  | Upstream `uid`. |
+
+### `project.services.credential_spec`
+
+nested attribute, object. Upstream `credential_spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `string` | computed |  |  | Upstream `config`. |
+| `file` | `string` | computed |  |  | Upstream `file`. |
+| `registry` | `string` | computed |  |  | Upstream `registry`. |
+
+### `project.services.depends_on`
+
+nested attribute, map(object). Upstream `depends_on`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `condition` | `string` | computed |  |  | Upstream `condition`. |
+| `required` | `bool` | computed |  |  | Upstream `required`. |
+| `restart` | `bool` | computed |  |  | Upstream `restart`. |
 
 ### `project.services.deploy`
 
@@ -522,7 +836,15 @@ nested attribute, object. Upstream `placement`.
 |---|---|---|---|---|---|
 | `constraints` | `list(string)` | computed |  |  | Upstream `constraints`. |
 | `max_replicas_per_node` | `number` | computed |  |  | Upstream `max_replicas_per_node`. |
-| `preferences` | `list(string)` | computed |  |  | Upstream `preferences`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `preferences` | `list(object)` | computed |  |  | Upstream `preferences`. |
+
+### `project.services.deploy.placement.preferences`
+
+nested attribute, list(object). Upstream `preferences`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `spread` | `string` | computed |  |  | Upstream `spread`. |
 
 ### `project.services.deploy.resources`
 
@@ -530,8 +852,90 @@ nested attribute, object. Upstream `resources`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `limits` | `string` | computed |  |  | Upstream `limits`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `reservations` | `string` | computed |  |  | Upstream `reservations`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `limits` | `object` | computed |  |  | Upstream `limits`. |
+| `reservations` | `object` | computed |  |  | Upstream `reservations`. |
+
+### `project.services.deploy.resources.limits`
+
+nested attribute, object. Upstream `limits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `cpus` | `number` | computed |  |  | Upstream `cpus`. |
+| `devices` | `list(object)` | computed |  |  | Upstream `devices`. |
+| `generic_resources` | `list(object)` | computed |  |  | Upstream `generic_resources`. |
+| `memory` | `string` | computed |  |  | Upstream `memory`. |
+| `pids` | `number` | computed |  |  | Upstream `pids`. |
+
+### `project.services.deploy.resources.limits.devices`
+
+nested attribute, list(object). Upstream `devices`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `capabilities` | `list(string)` | computed |  |  | Upstream `capabilities`. |
+| `count` | `number` | computed |  |  | Upstream `count`. |
+| `device_ids` | `list(string)` | computed |  |  | Upstream `device_ids`. |
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `options`. |
+
+### `project.services.deploy.resources.limits.generic_resources`
+
+nested attribute, list(object). Upstream `generic_resources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `discrete_resource_spec` | `object` | computed |  |  | Upstream `discrete_resource_spec`. |
+
+### `project.services.deploy.resources.limits.generic_resources.discrete_resource_spec`
+
+nested attribute, object. Upstream `discrete_resource_spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `kind`. |
+| `value` | `number` | computed |  |  | Upstream `value`. |
+
+### `project.services.deploy.resources.reservations`
+
+nested attribute, object. Upstream `reservations`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `cpus` | `number` | computed |  |  | Upstream `cpus`. |
+| `devices` | `list(object)` | computed |  |  | Upstream `devices`. |
+| `generic_resources` | `list(object)` | computed |  |  | Upstream `generic_resources`. |
+| `memory` | `string` | computed |  |  | Upstream `memory`. |
+| `pids` | `number` | computed |  |  | Upstream `pids`. |
+
+### `project.services.deploy.resources.reservations.devices`
+
+nested attribute, list(object). Upstream `devices`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `capabilities` | `list(string)` | computed |  |  | Upstream `capabilities`. |
+| `count` | `number` | computed |  |  | Upstream `count`. |
+| `device_ids` | `list(string)` | computed |  |  | Upstream `device_ids`. |
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `options`. |
+
+### `project.services.deploy.resources.reservations.generic_resources`
+
+nested attribute, list(object). Upstream `generic_resources`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `discrete_resource_spec` | `object` | computed |  |  | Upstream `discrete_resource_spec`. |
+
+### `project.services.deploy.resources.reservations.generic_resources.discrete_resource_spec`
+
+nested attribute, object. Upstream `discrete_resource_spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `kind`. |
+| `value` | `number` | computed |  |  | Upstream `value`. |
 
 ### `project.services.deploy.restart_policy`
 
@@ -570,6 +974,81 @@ nested attribute, object. Upstream `update_config`.
 | `order` | `string` | computed |  |  | Upstream `order`. |
 | `parallelism` | `number` | computed |  |  | Upstream `parallelism`. |
 
+### `project.services.develop`
+
+nested attribute, object. Upstream `develop`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `watch` | `list(object)` | computed |  |  | Upstream `watch`. |
+
+### `project.services.develop.watch`
+
+nested attribute, list(object). Upstream `watch`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `action` | `string` | computed |  |  | Upstream `action`. |
+| `exec` | `object` | computed |  |  | Upstream `exec`. |
+| `ignore` | `list(string)` | computed |  |  | Upstream `ignore`. |
+| `include` | `list(string)` | computed |  |  | Upstream `include`. |
+| `initial_sync` | `bool` | computed |  |  | Upstream `initial_sync`. |
+| `path` | `string` | computed |  |  | Upstream `path`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+
+### `project.services.develop.watch.exec`
+
+nested attribute, object. Upstream `exec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `command` | `list(string)` | computed |  |  | Upstream `command`. |
+| `environment` | `map(string)` | computed |  | yes | Upstream `environment`. Sensitive. |
+| `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
+| `user` | `string` | computed |  |  | Upstream `user`. |
+| `working_dir` | `string` | computed |  |  | Upstream `working_dir`. |
+
+### `project.services.devices`
+
+nested attribute, list(object). Upstream `devices`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `permissions` | `string` | computed |  |  | Upstream `permissions`. |
+| `source` | `string` | computed |  |  | Upstream `source`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+
+### `project.services.env_file`
+
+nested attribute, list(object). Upstream `env_file`. Sensitive.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `format` | `string` | computed |  | yes | Upstream `format`. |
+| `path` | `string` | computed |  | yes | Upstream `path`. |
+| `required` | `bool` | computed |  | yes | Upstream `required`. |
+
+### `project.services.extends`
+
+nested attribute, object. Upstream `extends`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `file` | `string` | computed |  |  | Upstream `file`. |
+| `service` | `string` | computed |  |  | Upstream `service`. |
+
+### `project.services.gpus`
+
+nested attribute, list(object). Upstream `gpus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `capabilities` | `list(string)` | computed |  |  | Upstream `capabilities`. |
+| `count` | `number` | computed |  |  | Upstream `count`. |
+| `device_ids` | `list(string)` | computed |  |  | Upstream `device_ids`. |
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `options`. |
+
 ### `project.services.healthcheck`
 
 nested attribute, object. Upstream `healthcheck`.
@@ -584,6 +1063,41 @@ nested attribute, object. Upstream `healthcheck`.
 | `test` | `list(string)` | computed |  |  | Upstream `test`. |
 | `timeout` | `string` | computed |  |  | Upstream `timeout`. |
 
+### `project.services.logging`
+
+nested attribute, object. Upstream `logging`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `options`. |
+
+### `project.services.models`
+
+nested attribute, map(object). Upstream `models`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `endpoint_var` | `string` | computed |  |  | Upstream `endpoint_var`. |
+| `model_var` | `string` | computed |  |  | Upstream `model_var`. |
+
+### `project.services.networks`
+
+nested attribute, map(object). Upstream `networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  |  | Upstream `aliases`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `driver_opts`. |
+| `gw_priority` | `number` | computed |  |  | Upstream `gw_priority`. |
+| `interface_name` | `string` | computed |  |  | Upstream `interface_name`. |
+| `ipv4_address` | `string` | computed |  |  | Upstream `ipv4_address`. |
+| `ipv6_address` | `string` | computed |  |  | Upstream `ipv6_address`. |
+| `link_local_ips` | `list(string)` | computed |  |  | Upstream `link_local_ips`. |
+| `mac_address` | `string` | computed |  |  | Upstream `mac_address`. |
+| `priority` | `number` | computed |  |  | Upstream `priority`. |
+| `use_service_name_alias` | `bool` | computed |  |  | Upstream `use_service_name_alias`. |
+
 ### `project.services.ports`
 
 nested attribute, list(object). Upstream `ports`.
@@ -595,8 +1109,370 @@ nested attribute, list(object). Upstream `ports`.
 | `mode` | `string` | computed |  |  | Upstream `mode`. |
 | `name` | `string` | computed |  |  | Upstream `name`. |
 | `protocol` | `string` | computed |  |  | Upstream `protocol`. |
-| `published` | `number` | computed |  |  | Upstream `published`. |
+| `published` | `string` | computed |  |  | Upstream `published`. |
 | `target` | `number` | computed |  |  | Upstream `target`. |
+
+### `project.services.post_start`
+
+nested attribute, list(object). Upstream `post_start`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `command` | `list(string)` | computed |  |  | Upstream `command`. |
+| `environment` | `map(string)` | computed |  | yes | Upstream `environment`. Sensitive. |
+| `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
+| `user` | `string` | computed |  |  | Upstream `user`. |
+| `working_dir` | `string` | computed |  |  | Upstream `working_dir`. |
+
+### `project.services.pre_start`
+
+nested attribute, list(object). Upstream `pre_start`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `blkio_config` | `object` | computed |  |  | Upstream `blkio_config`. |
+| `cap_add` | `list(string)` | computed |  |  | Upstream `cap_add`. |
+| `cap_drop` | `list(string)` | computed |  |  | Upstream `cap_drop`. |
+| `cgroup` | `string` | computed |  |  | Upstream `cgroup`. |
+| `cgroup_parent` | `string` | computed |  |  | Upstream `cgroup_parent`. |
+| `command` | `list(string)` | computed |  |  | Upstream `command`. |
+| `configs` | `list(object)` | computed |  |  | Upstream `configs`. |
+| `cpu_count` | `number` | computed |  |  | Upstream `cpu_count`. |
+| `cpu_percent` | `number` | computed |  |  | Upstream `cpu_percent`. |
+| `cpu_period` | `number` | computed |  |  | Upstream `cpu_period`. |
+| `cpu_quota` | `number` | computed |  |  | Upstream `cpu_quota`. |
+| `cpu_rt_period` | `number` | computed |  |  | Upstream `cpu_rt_period`. |
+| `cpu_rt_runtime` | `number` | computed |  |  | Upstream `cpu_rt_runtime`. |
+| `cpu_shares` | `number` | computed |  |  | Upstream `cpu_shares`. |
+| `cpus` | `number` | computed |  |  | Upstream `cpus`. |
+| `cpuset` | `string` | computed |  |  | Upstream `cpuset`. |
+| `credential_spec` | `object` | computed |  |  | Upstream `credential_spec`. |
+| `device_cgroup_rules` | `list(string)` | computed |  |  | Upstream `device_cgroup_rules`. |
+| `devices` | `list(object)` | computed |  |  | Upstream `devices`. |
+| `dns` | `list(string)` | computed |  |  | Upstream `dns`. |
+| `dns_opt` | `list(string)` | computed |  |  | Upstream `dns_opt`. |
+| `dns_search` | `list(string)` | computed |  |  | Upstream `dns_search`. |
+| `domainname` | `string` | computed |  |  | Upstream `domainname`. |
+| `entrypoint` | `list(string)` | computed |  |  | Upstream `entrypoint`. |
+| `env_file` | `list(object)` | computed |  | yes | Upstream `env_file`. Sensitive. |
+| `environment` | `map(string)` | computed |  | yes | Upstream `environment`. Sensitive. |
+| `extra_hosts` | `map(list(string))` | computed |  |  | Upstream `extra_hosts`. |
+| `gpus` | `list(object)` | computed |  |  | Upstream `gpus`. |
+| `group_add` | `list(string)` | computed |  |  | Upstream `group_add`. |
+| `hostname` | `string` | computed |  |  | Upstream `hostname`. |
+| `image` | `string` | computed |  |  | Upstream `image`. |
+| `init` | `bool` | computed |  |  | Upstream `init`. |
+| `ipc` | `string` | computed |  |  | Upstream `ipc`. |
+| `isolation` | `string` | computed |  |  | Upstream `isolation`. |
+| `label_file` | `list(string)` | computed |  |  | Upstream `label_file`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `log_driver` | `string` | computed |  |  | Upstream `log_driver`. |
+| `log_opt` | `map(string)` | computed |  |  | Upstream `log_opt`. |
+| `logging` | `object` | computed |  |  | Upstream `logging`. |
+| `mac_address` | `string` | computed |  |  | Upstream `mac_address`. |
+| `mem_limit` | `string` | computed |  |  | Upstream `mem_limit`. |
+| `mem_reservation` | `string` | computed |  |  | Upstream `mem_reservation`. |
+| `mem_swappiness` | `string` | computed |  |  | Upstream `mem_swappiness`. |
+| `memswap_limit` | `string` | computed |  |  | Upstream `memswap_limit`. |
+| `models` | `map(object)` | computed |  |  | Upstream `models`. |
+| `network_mode` | `string` | computed |  |  | Upstream `network_mode`. |
+| `networks` | `map(object)` | computed |  |  | Upstream `networks`. |
+| `oom_kill_disable` | `bool` | computed |  |  | Upstream `oom_kill_disable`. |
+| `oom_score_adj` | `number` | computed |  |  | Upstream `oom_score_adj`. |
+| `per_replica` | `bool` | computed |  |  | Upstream `per_replica`. |
+| `pid` | `string` | computed |  |  | Upstream `pid`. |
+| `pids_limit` | `number` | computed |  |  | Upstream `pids_limit`. |
+| `platform` | `string` | computed |  |  | Upstream `platform`. |
+| `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
+| `pull_policy` | `string` | computed |  |  | Upstream `pull_policy`. |
+| `pull_refresh_after` | `string` | computed |  |  | Upstream `pull_refresh_after`. |
+| `read_only` | `bool` | computed |  |  | Upstream `read_only`. |
+| `runtime` | `string` | computed |  |  | Upstream `runtime`. |
+| `secrets` | `list(object)` | computed |  |  | Upstream `secrets`. |
+| `security_opt` | `list(string)` | computed |  |  | Upstream `security_opt`. |
+| `shm_size` | `string` | computed |  |  | Upstream `shm_size`. |
+| `stop_grace_period` | `string` | computed |  |  | Upstream `stop_grace_period`. |
+| `stop_signal` | `string` | computed |  |  | Upstream `stop_signal`. |
+| `storage_opt` | `map(string)` | computed |  |  | Upstream `storage_opt`. |
+| `sysctls` | `map(string)` | computed |  |  | Upstream `sysctls`. |
+| `tmpfs` | `list(string)` | computed |  |  | Upstream `tmpfs`. |
+| `ulimits` | `map(object)` | computed |  |  | Upstream `ulimits`. |
+| `umask` | `number` | computed |  |  | Upstream `umask`. |
+| `use_api_socket` | `bool` | computed |  |  | Upstream `use_api_socket`. |
+| `user` | `string` | computed |  |  | Upstream `user`. |
+| `userns_mode` | `string` | computed |  |  | Upstream `userns_mode`. |
+| `uts` | `string` | computed |  |  | Upstream `uts`. |
+| `volume_driver` | `string` | computed |  |  | Upstream `volume_driver`. |
+| `volumes` | `list(object)` | computed |  |  | Upstream `volumes`. |
+| `volumes_from` | `list(string)` | computed |  |  | Upstream `volumes_from`. |
+| `working_dir` | `string` | computed |  |  | Upstream `working_dir`. |
+
+### `project.services.pre_start.blkio_config`
+
+nested attribute, object. Upstream `blkio_config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `device_read_bps` | `list(object)` | computed |  |  | Upstream `device_read_bps`. |
+| `device_read_iops` | `list(object)` | computed |  |  | Upstream `device_read_iops`. |
+| `device_write_bps` | `list(object)` | computed |  |  | Upstream `device_write_bps`. |
+| `device_write_iops` | `list(object)` | computed |  |  | Upstream `device_write_iops`. |
+| `weight` | `number` | computed |  |  | Upstream `weight`. |
+| `weight_device` | `list(object)` | computed |  |  | Upstream `weight_device`. |
+
+### `project.services.pre_start.blkio_config.device_read_bps`
+
+nested attribute, list(object). Upstream `device_read_bps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.services.pre_start.blkio_config.device_read_iops`
+
+nested attribute, list(object). Upstream `device_read_iops`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.services.pre_start.blkio_config.device_write_bps`
+
+nested attribute, list(object). Upstream `device_write_bps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.services.pre_start.blkio_config.device_write_iops`
+
+nested attribute, list(object). Upstream `device_write_iops`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `rate` | `string` | computed |  |  | Upstream `Rate`. |
+
+### `project.services.pre_start.blkio_config.weight_device`
+
+nested attribute, list(object). Upstream `weight_device`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `weight` | `number` | computed |  |  | Upstream `Weight`. |
+
+### `project.services.pre_start.configs`
+
+nested attribute, list(object). Upstream `configs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  |  | Upstream `gid`. |
+| `mode` | `string` | computed |  |  | Upstream `mode`. |
+| `source` | `string` | computed |  |  | Upstream `source`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+| `uid` | `string` | computed |  |  | Upstream `uid`. |
+
+### `project.services.pre_start.credential_spec`
+
+nested attribute, object. Upstream `credential_spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `config` | `string` | computed |  |  | Upstream `config`. |
+| `file` | `string` | computed |  |  | Upstream `file`. |
+| `registry` | `string` | computed |  |  | Upstream `registry`. |
+
+### `project.services.pre_start.devices`
+
+nested attribute, list(object). Upstream `devices`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `permissions` | `string` | computed |  |  | Upstream `permissions`. |
+| `source` | `string` | computed |  |  | Upstream `source`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+
+### `project.services.pre_start.env_file`
+
+nested attribute, list(object). Upstream `env_file`. Sensitive.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `format` | `string` | computed |  | yes | Upstream `format`. |
+| `path` | `string` | computed |  | yes | Upstream `path`. |
+| `required` | `bool` | computed |  | yes | Upstream `required`. |
+
+### `project.services.pre_start.gpus`
+
+nested attribute, list(object). Upstream `gpus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `capabilities` | `list(string)` | computed |  |  | Upstream `capabilities`. |
+| `count` | `number` | computed |  |  | Upstream `count`. |
+| `device_ids` | `list(string)` | computed |  |  | Upstream `device_ids`. |
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `options`. |
+
+### `project.services.pre_start.logging`
+
+nested attribute, object. Upstream `logging`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `driver` | `string` | computed |  |  | Upstream `driver`. |
+| `options` | `map(string)` | computed |  |  | Upstream `options`. |
+
+### `project.services.pre_start.models`
+
+nested attribute, map(object). Upstream `models`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `endpoint_var` | `string` | computed |  |  | Upstream `endpoint_var`. |
+| `model_var` | `string` | computed |  |  | Upstream `model_var`. |
+
+### `project.services.pre_start.networks`
+
+nested attribute, map(object). Upstream `networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  |  | Upstream `aliases`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `driver_opts`. |
+| `gw_priority` | `number` | computed |  |  | Upstream `gw_priority`. |
+| `interface_name` | `string` | computed |  |  | Upstream `interface_name`. |
+| `ipv4_address` | `string` | computed |  |  | Upstream `ipv4_address`. |
+| `ipv6_address` | `string` | computed |  |  | Upstream `ipv6_address`. |
+| `link_local_ips` | `list(string)` | computed |  |  | Upstream `link_local_ips`. |
+| `mac_address` | `string` | computed |  |  | Upstream `mac_address`. |
+| `priority` | `number` | computed |  |  | Upstream `priority`. |
+| `use_service_name_alias` | `bool` | computed |  |  | Upstream `use_service_name_alias`. |
+
+### `project.services.pre_start.secrets`
+
+nested attribute, list(object). Upstream `secrets`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  |  | Upstream `gid`. |
+| `mode` | `string` | computed |  |  | Upstream `mode`. |
+| `source` | `string` | computed |  |  | Upstream `source`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+| `uid` | `string` | computed |  |  | Upstream `uid`. |
+
+### `project.services.pre_start.ulimits`
+
+nested attribute, map(object). Upstream `ulimits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `hard` | `number` | computed |  |  | Upstream `hard`. |
+| `single` | `number` | computed |  |  | Upstream `single`. |
+| `soft` | `number` | computed |  |  | Upstream `soft`. |
+
+### `project.services.pre_start.volumes`
+
+nested attribute, list(object). Upstream `volumes`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `bind` | `object` | computed |  |  | Upstream `bind`. |
+| `consistency` | `string` | computed |  |  | Upstream `consistency`. |
+| `image` | `object` | computed |  |  | Upstream `image`. |
+| `read_only` | `bool` | computed |  |  | Upstream `read_only`. |
+| `source` | `string` | computed |  |  | Upstream `source`. |
+| `target` | `string` | computed |  |  | Upstream `target`. |
+| `tmpfs` | `object` | computed |  |  | Upstream `tmpfs`. |
+| `type` | `string` | computed |  |  | Upstream `type`. |
+| `volume` | `object` | computed |  |  | Upstream `volume`. |
+
+### `project.services.pre_start.volumes.bind`
+
+nested attribute, object. Upstream `bind`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `create_host_path` | `bool` | computed |  |  | Upstream `create_host_path`. |
+| `propagation` | `string` | computed |  |  | Upstream `propagation`. |
+| `recursive` | `string` | computed |  |  | Upstream `recursive`. |
+| `selinux` | `string` | computed |  |  | Upstream `selinux`. |
+
+### `project.services.pre_start.volumes.image`
+
+nested attribute, object. Upstream `image`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `subpath` | `string` | computed |  |  | Upstream `subpath`. |
+
+### `project.services.pre_start.volumes.tmpfs`
+
+nested attribute, object. Upstream `tmpfs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mode` | `number` | computed |  |  | Upstream `mode`. |
+| `size` | `string` | computed |  |  | Upstream `size`. |
+
+### `project.services.pre_start.volumes.volume`
+
+nested attribute, object. Upstream `volume`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `labels` | `map(string)` | computed |  |  | Upstream `labels`. |
+| `nocopy` | `bool` | computed |  |  | Upstream `nocopy`. |
+| `subpath` | `string` | computed |  |  | Upstream `subpath`. |
+
+### `project.services.pre_stop`
+
+nested attribute, list(object). Upstream `pre_stop`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `command` | `list(string)` | computed |  |  | Upstream `command`. |
+| `environment` | `map(string)` | computed |  | yes | Upstream `environment`. Sensitive. |
+| `privileged` | `bool` | computed |  |  | Upstream `privileged`. |
+| `user` | `string` | computed |  |  | Upstream `user`. |
+| `working_dir` | `string` | computed |  |  | Upstream `working_dir`. |
+
+### `project.services.provider`
+
+nested attribute, object. Upstream `provider`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `options` | `map(list(string))` | computed |  |  | Upstream `options`. |
+| `type` | `string` | computed |  |  | Upstream `type`. |
+
+### `project.services.secrets`
+
+nested attribute, list(object). Upstream `secrets`. Sensitive.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `string` | computed |  | yes | Upstream `gid`. |
+| `mode` | `string` | computed |  | yes | Upstream `mode`. |
+| `source` | `string` | computed |  | yes | Upstream `source`. |
+| `target` | `string` | computed |  | yes | Upstream `target`. |
+| `uid` | `string` | computed |  | yes | Upstream `uid`. |
+
+### `project.services.ulimits`
+
+nested attribute, map(object). Upstream `ulimits`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `hard` | `number` | computed |  |  | Upstream `hard`. |
+| `single` | `number` | computed |  |  | Upstream `single`. |
+| `soft` | `number` | computed |  |  | Upstream `soft`. |
 
 ### `project.services.volumes`
 
@@ -640,7 +1516,7 @@ nested attribute, object. Upstream `tmpfs`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `mode` | `number` | computed |  |  | Upstream `mode`. |
-| `size` | `number` | computed |  |  | Upstream `size`. |
+| `size` | `string` | computed |  |  | Upstream `size`. |
 
 ### `project.services.volumes.volume`
 

@@ -13,7 +13,8 @@ A Docker volume (`VolumeCreate`). Volumes cannot be changed after creation, so e
 | `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `cluster_volume_id` | `string` | computed |  |  | Swarm object ID of a cluster volume (`ClusterVolume.ID`); null for a local volume. |
 | `cluster_volume_spec` | `object` | optional | yes |  | Swarm cluster (CSI) volume specification (`ClusterVolumeSpec`, API 1.42+); setting it creates a cluster volume through the Swarm manager instead of a local volume, so the provider must point at a manager and `driver` must name an installed CSI plugin. Changing anything except `availability` forces replacement. |
-| `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
+| `config_sha256` | `string` | computed |  |  | SHA-256 (hex) of the configuration part of inspect_json only (Name, Driver, Scope, Labels, Options and ClusterVolume.Spec; never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes. |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |
 | `driver` | `string` | optional, computed | yes |  | Volume driver. Default `local`. Changing this forces a new resource. |
 | `driver_opts` | `map(string)` | optional | yes |  | Driver options, e.g. `{ type = "nfs", o = "addr=10.0.0.1,rw", device = ":/export" }` for `local`. Changing this forces a new resource. |
@@ -99,7 +100,7 @@ nested attribute, object. The GET /volumes/{name} response as a nested object, f
 | `name` | `string` | computed |  |  | Upstream `Name`. |
 | `options` | `map(string)` | computed |  | yes | Upstream `Options`. Sensitive. |
 | `scope` | `string` | computed |  |  | Upstream `Scope`. |
-| `status` | `dynamic` | computed |  |  | Upstream `Status`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `status` | `map(string)` | computed |  |  | Upstream `Status`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `usage_data` | `object` | computed |  |  | Upstream `UsageData`. |
 
 ### `inspect.cluster_volume`
@@ -110,11 +111,114 @@ nested attribute, object. Upstream `ClusterVolume`.
 |---|---|---|---|---|---|
 | `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
 | `id` | `string` | computed |  |  | Upstream `ID`. |
-| `info` | `dynamic` | computed |  |  | Upstream `Info`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
-| `publish_status` | `list(string)` | computed |  |  | Upstream `PublishStatus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `spec` | `dynamic` | computed |  |  | Upstream `Spec`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `info` | `object` | computed |  |  | Upstream `Info`. |
+| `publish_status` | `list(object)` | computed |  |  | Upstream `PublishStatus`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
 | `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
-| `version` | `dynamic` | computed |  |  | Upstream `Version`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `inspect.cluster_volume.info`
+
+nested attribute, object. Upstream `Info`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `accessible_topology` | `list(object)` | computed |  |  | Upstream `AccessibleTopology`. |
+| `capacity_bytes` | `number` | computed |  |  | Upstream `CapacityBytes`. |
+| `volume_context` | `map(string)` | computed |  |  | Upstream `VolumeContext`. |
+| `volume_id` | `string` | computed |  |  | Upstream `VolumeID`. |
+
+### `inspect.cluster_volume.info.accessible_topology`
+
+nested attribute, list(object). Upstream `AccessibleTopology`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `segments` | `map(string)` | computed |  |  | Upstream `Segments`. |
+
+### `inspect.cluster_volume.publish_status`
+
+nested attribute, list(object). Upstream `PublishStatus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `node_id` | `string` | computed |  |  | Upstream `NodeID`. |
+| `publish_context` | `map(string)` | computed |  |  | Upstream `PublishContext`. |
+| `state` | `string` | computed |  |  | Upstream `State`. |
+
+### `inspect.cluster_volume.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `access_mode` | `object` | computed |  |  | Upstream `AccessMode`. |
+| `group` | `string` | computed |  |  | Upstream `Group`. |
+
+### `inspect.cluster_volume.spec.access_mode`
+
+nested attribute, object. Upstream `AccessMode`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `accessibility_requirements` | `object` | computed |  |  | Upstream `AccessibilityRequirements`. |
+| `availability` | `string` | computed |  |  | Upstream `Availability`. |
+| `capacity_range` | `object` | computed |  |  | Upstream `CapacityRange`. |
+| `mount_volume` | `dynamic` | computed |  |  | Upstream `MountVolume`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here). |
+| `scope` | `string` | computed |  |  | Upstream `Scope`. |
+| `secrets` | `list(object)` | computed |  |  | Upstream `Secrets`. |
+| `sharing` | `string` | computed |  |  | Upstream `Sharing`. |
+
+### `inspect.cluster_volume.spec.access_mode.accessibility_requirements`
+
+nested attribute, object. Upstream `AccessibilityRequirements`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `preferred` | `list(object)` | computed |  |  | Upstream `Preferred`. |
+| `requisite` | `list(object)` | computed |  |  | Upstream `Requisite`. |
+
+### `inspect.cluster_volume.spec.access_mode.accessibility_requirements.preferred`
+
+nested attribute, list(object). Upstream `Preferred`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `segments` | `map(string)` | computed |  |  | Upstream `Segments`. |
+
+### `inspect.cluster_volume.spec.access_mode.accessibility_requirements.requisite`
+
+nested attribute, list(object). Upstream `Requisite`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `segments` | `map(string)` | computed |  |  | Upstream `Segments`. |
+
+### `inspect.cluster_volume.spec.access_mode.capacity_range`
+
+nested attribute, object. Upstream `CapacityRange`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `limit_bytes` | `number` | computed |  |  | Upstream `LimitBytes`. |
+| `required_bytes` | `number` | computed |  |  | Upstream `RequiredBytes`. |
+
+### `inspect.cluster_volume.spec.access_mode.secrets`
+
+nested attribute, list(object). Upstream `Secrets`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `key` | `string` | computed |  |  | Upstream `Key`. |
+| `secret` | `string` | computed |  |  | Upstream `Secret`. |
+
+### `inspect.cluster_volume.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
 
 ### `inspect.usage_data`
 

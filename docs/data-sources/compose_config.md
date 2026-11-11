@@ -80,6 +80,8 @@ Read-Only:
 Read-Only:
 
 - `content` (String, Sensitive) Upstream `content`. Sensitive.
+- `driver` (String) Upstream `driver`.
+- `driver_opts` (Map of String) Upstream `driver_opts`.
 - `environment` (String, Sensitive) Upstream `environment`. Sensitive.
 - `external` (Boolean) Upstream `external`.
 - `file` (String) Upstream `file`.
@@ -104,14 +106,14 @@ Read-Only:
 Read-Only:
 
 - `annotations` (Map of String) Upstream `annotations`.
-- `blkio_config` (String) Upstream `blkio_config`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `blkio_config` (Attributes) Upstream `blkio_config`. (see [below for nested schema](#nestedatt--project--jobs--blkio_config))
 - `build` (Attributes) Upstream `build`. (see [below for nested schema](#nestedatt--project--jobs--build))
 - `cap_add` (List of String) Upstream `cap_add`.
 - `cap_drop` (List of String) Upstream `cap_drop`.
 - `cgroup` (String) Upstream `cgroup`.
 - `cgroup_parent` (String) Upstream `cgroup_parent`.
 - `command` (List of String) Upstream `command`.
-- `configs` (List of String) Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `configs` (Attributes List) Upstream `configs`. (see [below for nested schema](#nestedatt--project--jobs--configs))
 - `cpu_count` (Number) Upstream `cpu_count`.
 - `cpu_percent` (Number) Upstream `cpu_percent`.
 - `cpu_period` (Number) Upstream `cpu_period`.
@@ -121,21 +123,22 @@ Read-Only:
 - `cpu_shares` (Number) Upstream `cpu_shares`.
 - `cpus` (Number) Upstream `cpus`.
 - `cpuset` (String) Upstream `cpuset`.
-- `credential_spec` (String) Upstream `credential_spec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `depends_on` (Map of String) Upstream `depends_on`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `credential_spec` (Attributes) Upstream `credential_spec`. (see [below for nested schema](#nestedatt--project--jobs--credential_spec))
+- `depends_on` (Attributes Map) Upstream `depends_on`. (see [below for nested schema](#nestedatt--project--jobs--depends_on))
 - `device_cgroup_rules` (List of String) Upstream `device_cgroup_rules`.
-- `devices` (List of String) Upstream `devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `devices` (Attributes List) Upstream `devices`. (see [below for nested schema](#nestedatt--project--jobs--devices))
 - `dns` (List of String) Upstream `dns`.
 - `dns_opt` (List of String) Upstream `dns_opt`.
 - `dns_search` (List of String) Upstream `dns_search`.
+- `dockerfile` (String) Upstream `dockerfile`.
 - `domainname` (String) Upstream `domainname`.
 - `entrypoint` (List of String) Upstream `entrypoint`.
-- `env_file` (List of String, Sensitive) Upstream `env_file`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `env_file` (Attributes List, Sensitive) Upstream `env_file`. Sensitive. (see [below for nested schema](#nestedatt--project--jobs--env_file))
 - `environment` (Map of String, Sensitive) Upstream `environment`. Sensitive.
 - `expose` (List of String) Upstream `expose`.
-- `extends` (String) Upstream `extends`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `extends` (String) Upstream `extends`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `extra_hosts` (Map of List of String) Upstream `extra_hosts`.
-- `gpus` (List of String) Upstream `gpus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `gpus` (Attributes List) Upstream `gpus`. (see [below for nested schema](#nestedatt--project--jobs--gpus))
 - `group_add` (List of String) Upstream `group_add`.
 - `healthcheck` (Attributes) Upstream `healthcheck`. (see [below for nested schema](#nestedatt--project--jobs--healthcheck))
 - `hostname` (String) Upstream `hostname`.
@@ -145,15 +148,17 @@ Read-Only:
 - `isolation` (String) Upstream `isolation`.
 - `label_file` (List of String) Upstream `label_file`.
 - `labels` (Map of String) Upstream `labels`.
-- `logging` (String) Upstream `logging`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `log_driver` (String) Upstream `log_driver`.
+- `log_opt` (Map of String) Upstream `log_opt`.
+- `logging` (Attributes) Upstream `logging`. (see [below for nested schema](#nestedatt--project--jobs--logging))
 - `mac_address` (String) Upstream `mac_address`.
-- `mem_limit` (Number) Upstream `mem_limit`.
-- `mem_reservation` (Number) Upstream `mem_reservation`.
-- `mem_swappiness` (Number) Upstream `mem_swappiness`.
-- `memswap_limit` (Number) Upstream `memswap_limit`.
-- `models` (Map of String) Upstream `models`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `mem_limit` (String) Upstream `mem_limit`.
+- `mem_reservation` (String) Upstream `mem_reservation`.
+- `mem_swappiness` (String) Upstream `mem_swappiness`.
+- `memswap_limit` (String) Upstream `memswap_limit`.
+- `models` (Attributes Map) Upstream `models`. (see [below for nested schema](#nestedatt--project--jobs--models))
 - `network_mode` (String) Upstream `network_mode`.
-- `networks` (Map of String) Upstream `networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `networks` (Attributes Map) Upstream `networks`. (see [below for nested schema](#nestedatt--project--jobs--networks))
 - `oom_kill_disable` (Boolean) Upstream `oom_kill_disable`.
 - `oom_score_adj` (Number) Upstream `oom_score_adj`.
 - `pid` (String) Upstream `pid`.
@@ -166,26 +171,85 @@ Read-Only:
 - `pull_refresh_after` (String) Upstream `pull_refresh_after`.
 - `read_only` (Boolean) Upstream `read_only`.
 - `runtime` (String) Upstream `runtime`.
-- `secrets` (List of String, Sensitive) Upstream `secrets`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `secrets` (Attributes List, Sensitive) Upstream `secrets`. Sensitive. (see [below for nested schema](#nestedatt--project--jobs--secrets))
 - `security_opt` (List of String) Upstream `security_opt`.
-- `shm_size` (Number) Upstream `shm_size`.
+- `shm_size` (String) Upstream `shm_size`.
 - `stdin_open` (Boolean) Upstream `stdin_open`.
 - `stop_grace_period` (String) Upstream `stop_grace_period`.
 - `stop_signal` (String) Upstream `stop_signal`.
 - `storage_opt` (Map of String) Upstream `storage_opt`.
 - `sysctls` (Map of String) Upstream `sysctls`.
 - `tmpfs` (List of String) Upstream `tmpfs`.
-- `triggers` (String) Upstream `triggers`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `triggers` (Attributes) Upstream `triggers`. (see [below for nested schema](#nestedatt--project--jobs--triggers))
 - `tty` (Boolean) Upstream `tty`.
-- `ulimits` (Map of String) Upstream `ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `umask` (String) Upstream `umask`.
+- `ulimits` (Attributes Map) Upstream `ulimits`. (see [below for nested schema](#nestedatt--project--jobs--ulimits))
+- `umask` (Number) Upstream `umask`.
 - `use_api_socket` (Boolean) Upstream `use_api_socket`.
 - `user` (String) Upstream `user`.
 - `userns_mode` (String) Upstream `userns_mode`.
 - `uts` (String) Upstream `uts`.
+- `volume_driver` (String) Upstream `volume_driver`.
 - `volumes` (Attributes List) Upstream `volumes`. (see [below for nested schema](#nestedatt--project--jobs--volumes))
 - `volumes_from` (List of String) Upstream `volumes_from`.
 - `working_dir` (String) Upstream `working_dir`.
+
+<a id="nestedatt--project--jobs--blkio_config"></a>
+### Nested Schema for `project.jobs.blkio_config`
+
+Read-Only:
+
+- `device_read_bps` (Attributes List) Upstream `device_read_bps`. (see [below for nested schema](#nestedatt--project--jobs--blkio_config--device_read_bps))
+- `device_read_iops` (Attributes List) Upstream `device_read_iops`. (see [below for nested schema](#nestedatt--project--jobs--blkio_config--device_read_iops))
+- `device_write_bps` (Attributes List) Upstream `device_write_bps`. (see [below for nested schema](#nestedatt--project--jobs--blkio_config--device_write_bps))
+- `device_write_iops` (Attributes List) Upstream `device_write_iops`. (see [below for nested schema](#nestedatt--project--jobs--blkio_config--device_write_iops))
+- `weight` (Number) Upstream `weight`.
+- `weight_device` (Attributes List) Upstream `weight_device`. (see [below for nested schema](#nestedatt--project--jobs--blkio_config--weight_device))
+
+<a id="nestedatt--project--jobs--blkio_config--device_read_bps"></a>
+### Nested Schema for `project.jobs.blkio_config.device_read_bps`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--jobs--blkio_config--device_read_iops"></a>
+### Nested Schema for `project.jobs.blkio_config.device_read_iops`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--jobs--blkio_config--device_write_bps"></a>
+### Nested Schema for `project.jobs.blkio_config.device_write_bps`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--jobs--blkio_config--device_write_iops"></a>
+### Nested Schema for `project.jobs.blkio_config.device_write_iops`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--jobs--blkio_config--weight_device"></a>
+### Nested Schema for `project.jobs.blkio_config.weight_device`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `weight` (Number) Upstream `Weight`.
+
+
 
 <a id="nestedatt--project--jobs--build"></a>
 ### Nested Schema for `project.jobs.build`
@@ -208,12 +272,12 @@ Read-Only:
 - `no_cache_filter` (List of String) Upstream `no_cache_filter`.
 - `platforms` (List of String) Upstream `platforms`.
 - `privileged` (Boolean) Upstream `privileged`.
-- `provenance` (Boolean) Upstream `provenance`.
+- `provenance` (String) Upstream `provenance`.
 - `pull` (Boolean) Upstream `pull`.
-- `sbom` (Boolean) Upstream `sbom`.
+- `sbom` (String) Upstream `sbom`.
 - `secrets` (Attributes List, Sensitive) Upstream `secrets`. Sensitive. (see [below for nested schema](#nestedatt--project--jobs--build--secrets))
-- `shm_size` (Number) Upstream `shm_size`.
-- `ssh` (Map of String, Sensitive) Upstream `ssh`. Sensitive.
+- `shm_size` (String) Upstream `shm_size`.
+- `ssh` (List of String, Sensitive) Upstream `ssh`. Sensitive.
 - `tags` (List of String) Upstream `tags`.
 - `target` (String) Upstream `target`.
 - `ulimits` (Attributes Map) Upstream `ulimits`. (see [below for nested schema](#nestedatt--project--jobs--build--ulimits))
@@ -224,7 +288,7 @@ Read-Only:
 Read-Only:
 
 - `gid` (String, Sensitive) Upstream `gid`.
-- `mode` (Number, Sensitive) Upstream `mode`.
+- `mode` (String, Sensitive) Upstream `mode`.
 - `source` (String, Sensitive) Upstream `source`.
 - `target` (String, Sensitive) Upstream `target`.
 - `uid` (String, Sensitive) Upstream `uid`.
@@ -236,8 +300,73 @@ Read-Only:
 Read-Only:
 
 - `hard` (Number) Upstream `hard`.
+- `single` (Number) Upstream `single`.
 - `soft` (Number) Upstream `soft`.
 
+
+
+<a id="nestedatt--project--jobs--configs"></a>
+### Nested Schema for `project.jobs.configs`
+
+Read-Only:
+
+- `gid` (String) Upstream `gid`.
+- `mode` (String) Upstream `mode`.
+- `source` (String) Upstream `source`.
+- `target` (String) Upstream `target`.
+- `uid` (String) Upstream `uid`.
+
+
+<a id="nestedatt--project--jobs--credential_spec"></a>
+### Nested Schema for `project.jobs.credential_spec`
+
+Read-Only:
+
+- `config` (String) Upstream `config`.
+- `file` (String) Upstream `file`.
+- `registry` (String) Upstream `registry`.
+
+
+<a id="nestedatt--project--jobs--depends_on"></a>
+### Nested Schema for `project.jobs.depends_on`
+
+Read-Only:
+
+- `condition` (String) Upstream `condition`.
+- `required` (Boolean) Upstream `required`.
+- `restart` (Boolean) Upstream `restart`.
+
+
+<a id="nestedatt--project--jobs--devices"></a>
+### Nested Schema for `project.jobs.devices`
+
+Read-Only:
+
+- `permissions` (String) Upstream `permissions`.
+- `source` (String) Upstream `source`.
+- `target` (String) Upstream `target`.
+
+
+<a id="nestedatt--project--jobs--env_file"></a>
+### Nested Schema for `project.jobs.env_file`
+
+Read-Only:
+
+- `format` (String, Sensitive) Upstream `format`.
+- `path` (String, Sensitive) Upstream `path`.
+- `required` (Boolean, Sensitive) Upstream `required`.
+
+
+<a id="nestedatt--project--jobs--gpus"></a>
+### Nested Schema for `project.jobs.gpus`
+
+Read-Only:
+
+- `capabilities` (List of String) Upstream `capabilities`.
+- `count` (Number) Upstream `count`.
+- `device_ids` (List of String) Upstream `device_ids`.
+- `driver` (String) Upstream `driver`.
+- `options` (Map of String) Upstream `options`.
 
 
 <a id="nestedatt--project--jobs--healthcheck"></a>
@@ -254,6 +383,41 @@ Read-Only:
 - `timeout` (String) Upstream `timeout`.
 
 
+<a id="nestedatt--project--jobs--logging"></a>
+### Nested Schema for `project.jobs.logging`
+
+Read-Only:
+
+- `driver` (String) Upstream `driver`.
+- `options` (Map of String) Upstream `options`.
+
+
+<a id="nestedatt--project--jobs--models"></a>
+### Nested Schema for `project.jobs.models`
+
+Read-Only:
+
+- `endpoint_var` (String) Upstream `endpoint_var`.
+- `model_var` (String) Upstream `model_var`.
+
+
+<a id="nestedatt--project--jobs--networks"></a>
+### Nested Schema for `project.jobs.networks`
+
+Read-Only:
+
+- `aliases` (List of String) Upstream `aliases`.
+- `driver_opts` (Map of String) Upstream `driver_opts`.
+- `gw_priority` (Number) Upstream `gw_priority`.
+- `interface_name` (String) Upstream `interface_name`.
+- `ipv4_address` (String) Upstream `ipv4_address`.
+- `ipv6_address` (String) Upstream `ipv6_address`.
+- `link_local_ips` (List of String) Upstream `link_local_ips`.
+- `mac_address` (String) Upstream `mac_address`.
+- `priority` (Number) Upstream `priority`.
+- `use_service_name_alias` (Boolean) Upstream `use_service_name_alias`.
+
+
 <a id="nestedatt--project--jobs--ports"></a>
 ### Nested Schema for `project.jobs.ports`
 
@@ -264,8 +428,50 @@ Read-Only:
 - `mode` (String) Upstream `mode`.
 - `name` (String) Upstream `name`.
 - `protocol` (String) Upstream `protocol`.
-- `published` (Number) Upstream `published`.
+- `published` (String) Upstream `published`.
 - `target` (Number) Upstream `target`.
+
+
+<a id="nestedatt--project--jobs--secrets"></a>
+### Nested Schema for `project.jobs.secrets`
+
+Read-Only:
+
+- `gid` (String, Sensitive) Upstream `gid`.
+- `mode` (String, Sensitive) Upstream `mode`.
+- `source` (String, Sensitive) Upstream `source`.
+- `target` (String, Sensitive) Upstream `target`.
+- `uid` (String, Sensitive) Upstream `uid`.
+
+
+<a id="nestedatt--project--jobs--triggers"></a>
+### Nested Schema for `project.jobs.triggers`
+
+Read-Only:
+
+- `manual` (Boolean) Upstream `manual`.
+- `schedule` (Attributes List) Upstream `schedule`. (see [below for nested schema](#nestedatt--project--jobs--triggers--schedule))
+
+<a id="nestedatt--project--jobs--triggers--schedule"></a>
+### Nested Schema for `project.jobs.triggers.schedule`
+
+Read-Only:
+
+- `concurrency` (String) Upstream `concurrency`.
+- `cron` (String) Upstream `cron`.
+- `missed_fires` (String) Upstream `missed_fires`.
+- `timezone` (String) Upstream `timezone`.
+
+
+
+<a id="nestedatt--project--jobs--ulimits"></a>
+### Nested Schema for `project.jobs.ulimits`
+
+Read-Only:
+
+- `hard` (Number) Upstream `hard`.
+- `single` (Number) Upstream `single`.
+- `soft` (Number) Upstream `soft`.
 
 
 <a id="nestedatt--project--jobs--volumes"></a>
@@ -308,7 +514,7 @@ Read-Only:
 Read-Only:
 
 - `mode` (Number) Upstream `mode`.
-- `size` (Number) Upstream `size`.
+- `size` (String) Upstream `size`.
 
 
 <a id="nestedatt--project--jobs--volumes--volume"></a>
@@ -355,9 +561,20 @@ Read-Only:
 
 Read-Only:
 
-- `config` (List of String) Upstream `config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `config` (Attributes List) Upstream `config`. (see [below for nested schema](#nestedatt--project--networks--ipam--config))
 - `driver` (String) Upstream `driver`.
 - `options` (Map of String) Upstream `options`.
+
+<a id="nestedatt--project--networks--ipam--config"></a>
+### Nested Schema for `project.networks.ipam.config`
+
+Read-Only:
+
+- `aux_addresses` (Map of String) Upstream `aux_addresses`.
+- `gateway` (String) Upstream `gateway`.
+- `ip_range` (String) Upstream `ip_range`.
+- `subnet` (String) Upstream `subnet`.
+
 
 
 
@@ -366,6 +583,7 @@ Read-Only:
 
 Read-Only:
 
+- `content` (String, Sensitive) Upstream `content`. Sensitive.
 - `driver` (String) Upstream `driver`.
 - `driver_opts` (Map of String) Upstream `driver_opts`.
 - `environment` (String, Sensitive) Upstream `environment`. Sensitive.
@@ -383,14 +601,14 @@ Read-Only:
 
 - `annotations` (Map of String) Upstream `annotations`.
 - `attach` (Boolean) Upstream `attach`.
-- `blkio_config` (String) Upstream `blkio_config`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `blkio_config` (Attributes) Upstream `blkio_config`. (see [below for nested schema](#nestedatt--project--services--blkio_config))
 - `build` (Attributes) Upstream `build`. (see [below for nested schema](#nestedatt--project--services--build))
 - `cap_add` (List of String) Upstream `cap_add`.
 - `cap_drop` (List of String) Upstream `cap_drop`.
 - `cgroup` (String) Upstream `cgroup`.
 - `cgroup_parent` (String) Upstream `cgroup_parent`.
 - `command` (List of String) Upstream `command`.
-- `configs` (List of String) Upstream `configs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `configs` (Attributes List) Upstream `configs`. (see [below for nested schema](#nestedatt--project--services--configs))
 - `container_name` (String) Upstream `container_name`.
 - `cpu_count` (Number) Upstream `cpu_count`.
 - `cpu_percent` (Number) Upstream `cpu_percent`.
@@ -401,24 +619,25 @@ Read-Only:
 - `cpu_shares` (Number) Upstream `cpu_shares`.
 - `cpus` (Number) Upstream `cpus`.
 - `cpuset` (String) Upstream `cpuset`.
-- `credential_spec` (String) Upstream `credential_spec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `depends_on` (Map of String) Upstream `depends_on`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `credential_spec` (Attributes) Upstream `credential_spec`. (see [below for nested schema](#nestedatt--project--services--credential_spec))
+- `depends_on` (Attributes Map) Upstream `depends_on`. (see [below for nested schema](#nestedatt--project--services--depends_on))
 - `deploy` (Attributes) Upstream `deploy`. (see [below for nested schema](#nestedatt--project--services--deploy))
-- `develop` (String) Upstream `develop`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `develop` (Attributes) Upstream `develop`. (see [below for nested schema](#nestedatt--project--services--develop))
 - `device_cgroup_rules` (List of String) Upstream `device_cgroup_rules`.
-- `devices` (List of String) Upstream `devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `devices` (Attributes List) Upstream `devices`. (see [below for nested schema](#nestedatt--project--services--devices))
 - `dns` (List of String) Upstream `dns`.
 - `dns_opt` (List of String) Upstream `dns_opt`.
 - `dns_search` (List of String) Upstream `dns_search`.
+- `dockerfile` (String) Upstream `dockerfile`.
 - `domainname` (String) Upstream `domainname`.
 - `entrypoint` (List of String) Upstream `entrypoint`.
-- `env_file` (List of String, Sensitive) Upstream `env_file`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `env_file` (Attributes List, Sensitive) Upstream `env_file`. Sensitive. (see [below for nested schema](#nestedatt--project--services--env_file))
 - `environment` (Map of String, Sensitive) Upstream `environment`. Sensitive.
 - `expose` (List of String) Upstream `expose`.
-- `extends` (String) Upstream `extends`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `extends` (Attributes) Upstream `extends`. (see [below for nested schema](#nestedatt--project--services--extends))
 - `external_links` (List of String) Upstream `external_links`.
 - `extra_hosts` (Map of List of String) Upstream `extra_hosts`.
-- `gpus` (List of String) Upstream `gpus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `gpus` (Attributes List) Upstream `gpus`. (see [below for nested schema](#nestedatt--project--services--gpus))
 - `group_add` (List of String) Upstream `group_add`.
 - `healthcheck` (Attributes) Upstream `healthcheck`. (see [below for nested schema](#nestedatt--project--services--healthcheck))
 - `hostname` (String) Upstream `hostname`.
@@ -429,36 +648,39 @@ Read-Only:
 - `label_file` (List of String) Upstream `label_file`.
 - `labels` (Map of String) Upstream `labels`.
 - `links` (List of String) Upstream `links`.
-- `logging` (String) Upstream `logging`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `log_driver` (String) Upstream `log_driver`.
+- `log_opt` (Map of String) Upstream `log_opt`.
+- `logging` (Attributes) Upstream `logging`. (see [below for nested schema](#nestedatt--project--services--logging))
 - `mac_address` (String) Upstream `mac_address`.
-- `mem_limit` (Number) Upstream `mem_limit`.
-- `mem_reservation` (Number) Upstream `mem_reservation`.
-- `mem_swappiness` (Number) Upstream `mem_swappiness`.
-- `memswap_limit` (Number) Upstream `memswap_limit`.
-- `models` (Map of String) Upstream `models`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `mem_limit` (String) Upstream `mem_limit`.
+- `mem_reservation` (String) Upstream `mem_reservation`.
+- `mem_swappiness` (String) Upstream `mem_swappiness`.
+- `memswap_limit` (String) Upstream `memswap_limit`.
+- `models` (Attributes Map) Upstream `models`. (see [below for nested schema](#nestedatt--project--services--models))
+- `net` (String) Upstream `net`.
 - `network_mode` (String) Upstream `network_mode`.
-- `networks` (Map of String) Upstream `networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `networks` (Attributes Map) Upstream `networks`. (see [below for nested schema](#nestedatt--project--services--networks))
 - `oom_kill_disable` (Boolean) Upstream `oom_kill_disable`.
 - `oom_score_adj` (Number) Upstream `oom_score_adj`.
 - `pid` (String) Upstream `pid`.
 - `pids_limit` (Number) Upstream `pids_limit`.
 - `platform` (String) Upstream `platform`.
 - `ports` (Attributes List) Upstream `ports`. (see [below for nested schema](#nestedatt--project--services--ports))
-- `post_start` (List of String) Upstream `post_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `pre_start` (List of String) Upstream `pre_start`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `pre_stop` (List of String) Upstream `pre_stop`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `post_start` (Attributes List) Upstream `post_start`. (see [below for nested schema](#nestedatt--project--services--post_start))
+- `pre_start` (Attributes List) Upstream `pre_start`. (see [below for nested schema](#nestedatt--project--services--pre_start))
+- `pre_stop` (Attributes List) Upstream `pre_stop`. (see [below for nested schema](#nestedatt--project--services--pre_stop))
 - `privileged` (Boolean) Upstream `privileged`.
 - `profiles` (List of String) Upstream `profiles`.
-- `provider` (String) Upstream `provider`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `provider` (Attributes) Upstream `provider`. (see [below for nested schema](#nestedatt--project--services--provider))
 - `pull_policy` (String) Upstream `pull_policy`.
 - `pull_refresh_after` (String) Upstream `pull_refresh_after`.
 - `read_only` (Boolean) Upstream `read_only`.
 - `restart` (String) Upstream `restart`.
 - `runtime` (String) Upstream `runtime`.
 - `scale` (Number) Upstream `scale`.
-- `secrets` (List of String, Sensitive) Upstream `secrets`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `secrets` (Attributes List, Sensitive) Upstream `secrets`. Sensitive. (see [below for nested schema](#nestedatt--project--services--secrets))
 - `security_opt` (List of String) Upstream `security_opt`.
-- `shm_size` (Number) Upstream `shm_size`.
+- `shm_size` (String) Upstream `shm_size`.
 - `stdin_open` (Boolean) Upstream `stdin_open`.
 - `stop_grace_period` (String) Upstream `stop_grace_period`.
 - `stop_signal` (String) Upstream `stop_signal`.
@@ -466,15 +688,74 @@ Read-Only:
 - `sysctls` (Map of String) Upstream `sysctls`.
 - `tmpfs` (List of String) Upstream `tmpfs`.
 - `tty` (Boolean) Upstream `tty`.
-- `ulimits` (Map of String) Upstream `ulimits`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `umask` (String) Upstream `umask`.
+- `ulimits` (Attributes Map) Upstream `ulimits`. (see [below for nested schema](#nestedatt--project--services--ulimits))
+- `umask` (Number) Upstream `umask`.
 - `use_api_socket` (Boolean) Upstream `use_api_socket`.
 - `user` (String) Upstream `user`.
 - `userns_mode` (String) Upstream `userns_mode`.
 - `uts` (String) Upstream `uts`.
+- `volume_driver` (String) Upstream `volume_driver`.
 - `volumes` (Attributes List) Upstream `volumes`. (see [below for nested schema](#nestedatt--project--services--volumes))
 - `volumes_from` (List of String) Upstream `volumes_from`.
 - `working_dir` (String) Upstream `working_dir`.
+
+<a id="nestedatt--project--services--blkio_config"></a>
+### Nested Schema for `project.services.blkio_config`
+
+Read-Only:
+
+- `device_read_bps` (Attributes List) Upstream `device_read_bps`. (see [below for nested schema](#nestedatt--project--services--blkio_config--device_read_bps))
+- `device_read_iops` (Attributes List) Upstream `device_read_iops`. (see [below for nested schema](#nestedatt--project--services--blkio_config--device_read_iops))
+- `device_write_bps` (Attributes List) Upstream `device_write_bps`. (see [below for nested schema](#nestedatt--project--services--blkio_config--device_write_bps))
+- `device_write_iops` (Attributes List) Upstream `device_write_iops`. (see [below for nested schema](#nestedatt--project--services--blkio_config--device_write_iops))
+- `weight` (Number) Upstream `weight`.
+- `weight_device` (Attributes List) Upstream `weight_device`. (see [below for nested schema](#nestedatt--project--services--blkio_config--weight_device))
+
+<a id="nestedatt--project--services--blkio_config--device_read_bps"></a>
+### Nested Schema for `project.services.blkio_config.device_read_bps`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--services--blkio_config--device_read_iops"></a>
+### Nested Schema for `project.services.blkio_config.device_read_iops`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--services--blkio_config--device_write_bps"></a>
+### Nested Schema for `project.services.blkio_config.device_write_bps`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--services--blkio_config--device_write_iops"></a>
+### Nested Schema for `project.services.blkio_config.device_write_iops`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--services--blkio_config--weight_device"></a>
+### Nested Schema for `project.services.blkio_config.weight_device`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `weight` (Number) Upstream `Weight`.
+
+
 
 <a id="nestedatt--project--services--build"></a>
 ### Nested Schema for `project.services.build`
@@ -497,12 +778,12 @@ Read-Only:
 - `no_cache_filter` (List of String) Upstream `no_cache_filter`.
 - `platforms` (List of String) Upstream `platforms`.
 - `privileged` (Boolean) Upstream `privileged`.
-- `provenance` (Boolean) Upstream `provenance`.
+- `provenance` (String) Upstream `provenance`.
 - `pull` (Boolean) Upstream `pull`.
-- `sbom` (Boolean) Upstream `sbom`.
+- `sbom` (String) Upstream `sbom`.
 - `secrets` (Attributes List, Sensitive) Upstream `secrets`. Sensitive. (see [below for nested schema](#nestedatt--project--services--build--secrets))
-- `shm_size` (Number) Upstream `shm_size`.
-- `ssh` (Map of String, Sensitive) Upstream `ssh`. Sensitive.
+- `shm_size` (String) Upstream `shm_size`.
+- `ssh` (List of String, Sensitive) Upstream `ssh`. Sensitive.
 - `tags` (List of String) Upstream `tags`.
 - `target` (String) Upstream `target`.
 - `ulimits` (Attributes Map) Upstream `ulimits`. (see [below for nested schema](#nestedatt--project--services--build--ulimits))
@@ -513,7 +794,7 @@ Read-Only:
 Read-Only:
 
 - `gid` (String, Sensitive) Upstream `gid`.
-- `mode` (Number, Sensitive) Upstream `mode`.
+- `mode` (String, Sensitive) Upstream `mode`.
 - `source` (String, Sensitive) Upstream `source`.
 - `target` (String, Sensitive) Upstream `target`.
 - `uid` (String, Sensitive) Upstream `uid`.
@@ -525,8 +806,41 @@ Read-Only:
 Read-Only:
 
 - `hard` (Number) Upstream `hard`.
+- `single` (Number) Upstream `single`.
 - `soft` (Number) Upstream `soft`.
 
+
+
+<a id="nestedatt--project--services--configs"></a>
+### Nested Schema for `project.services.configs`
+
+Read-Only:
+
+- `gid` (String) Upstream `gid`.
+- `mode` (String) Upstream `mode`.
+- `source` (String) Upstream `source`.
+- `target` (String) Upstream `target`.
+- `uid` (String) Upstream `uid`.
+
+
+<a id="nestedatt--project--services--credential_spec"></a>
+### Nested Schema for `project.services.credential_spec`
+
+Read-Only:
+
+- `config` (String) Upstream `config`.
+- `file` (String) Upstream `file`.
+- `registry` (String) Upstream `registry`.
+
+
+<a id="nestedatt--project--services--depends_on"></a>
+### Nested Schema for `project.services.depends_on`
+
+Read-Only:
+
+- `condition` (String) Upstream `condition`.
+- `required` (Boolean) Upstream `required`.
+- `restart` (Boolean) Upstream `restart`.
 
 
 <a id="nestedatt--project--services--deploy"></a>
@@ -551,7 +865,15 @@ Read-Only:
 
 - `constraints` (List of String) Upstream `constraints`.
 - `max_replicas_per_node` (Number) Upstream `max_replicas_per_node`.
-- `preferences` (List of String) Upstream `preferences`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `preferences` (Attributes List) Upstream `preferences`. (see [below for nested schema](#nestedatt--project--services--deploy--placement--preferences))
+
+<a id="nestedatt--project--services--deploy--placement--preferences"></a>
+### Nested Schema for `project.services.deploy.placement.preferences`
+
+Read-Only:
+
+- `spread` (String) Upstream `spread`.
+
 
 
 <a id="nestedatt--project--services--deploy--resources"></a>
@@ -559,8 +881,90 @@ Read-Only:
 
 Read-Only:
 
-- `limits` (String) Upstream `limits`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `reservations` (String) Upstream `reservations`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `limits` (Attributes) Upstream `limits`. (see [below for nested schema](#nestedatt--project--services--deploy--resources--limits))
+- `reservations` (Attributes) Upstream `reservations`. (see [below for nested schema](#nestedatt--project--services--deploy--resources--reservations))
+
+<a id="nestedatt--project--services--deploy--resources--limits"></a>
+### Nested Schema for `project.services.deploy.resources.limits`
+
+Read-Only:
+
+- `cpus` (Number) Upstream `cpus`.
+- `devices` (Attributes List) Upstream `devices`. (see [below for nested schema](#nestedatt--project--services--deploy--resources--limits--devices))
+- `generic_resources` (Attributes List) Upstream `generic_resources`. (see [below for nested schema](#nestedatt--project--services--deploy--resources--limits--generic_resources))
+- `memory` (String) Upstream `memory`.
+- `pids` (Number) Upstream `pids`.
+
+<a id="nestedatt--project--services--deploy--resources--limits--devices"></a>
+### Nested Schema for `project.services.deploy.resources.limits.devices`
+
+Read-Only:
+
+- `capabilities` (List of String) Upstream `capabilities`.
+- `count` (Number) Upstream `count`.
+- `device_ids` (List of String) Upstream `device_ids`.
+- `driver` (String) Upstream `driver`.
+- `options` (Map of String) Upstream `options`.
+
+
+<a id="nestedatt--project--services--deploy--resources--limits--generic_resources"></a>
+### Nested Schema for `project.services.deploy.resources.limits.generic_resources`
+
+Read-Only:
+
+- `discrete_resource_spec` (Attributes) Upstream `discrete_resource_spec`. (see [below for nested schema](#nestedatt--project--services--deploy--resources--limits--generic_resources--discrete_resource_spec))
+
+<a id="nestedatt--project--services--deploy--resources--limits--generic_resources--discrete_resource_spec"></a>
+### Nested Schema for `project.services.deploy.resources.limits.generic_resources.discrete_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `kind`.
+- `value` (Number) Upstream `value`.
+
+
+
+
+<a id="nestedatt--project--services--deploy--resources--reservations"></a>
+### Nested Schema for `project.services.deploy.resources.reservations`
+
+Read-Only:
+
+- `cpus` (Number) Upstream `cpus`.
+- `devices` (Attributes List) Upstream `devices`. (see [below for nested schema](#nestedatt--project--services--deploy--resources--reservations--devices))
+- `generic_resources` (Attributes List) Upstream `generic_resources`. (see [below for nested schema](#nestedatt--project--services--deploy--resources--reservations--generic_resources))
+- `memory` (String) Upstream `memory`.
+- `pids` (Number) Upstream `pids`.
+
+<a id="nestedatt--project--services--deploy--resources--reservations--devices"></a>
+### Nested Schema for `project.services.deploy.resources.reservations.devices`
+
+Read-Only:
+
+- `capabilities` (List of String) Upstream `capabilities`.
+- `count` (Number) Upstream `count`.
+- `device_ids` (List of String) Upstream `device_ids`.
+- `driver` (String) Upstream `driver`.
+- `options` (Map of String) Upstream `options`.
+
+
+<a id="nestedatt--project--services--deploy--resources--reservations--generic_resources"></a>
+### Nested Schema for `project.services.deploy.resources.reservations.generic_resources`
+
+Read-Only:
+
+- `discrete_resource_spec` (Attributes) Upstream `discrete_resource_spec`. (see [below for nested schema](#nestedatt--project--services--deploy--resources--reservations--generic_resources--discrete_resource_spec))
+
+<a id="nestedatt--project--services--deploy--resources--reservations--generic_resources--discrete_resource_spec"></a>
+### Nested Schema for `project.services.deploy.resources.reservations.generic_resources.discrete_resource_spec`
+
+Read-Only:
+
+- `kind` (String) Upstream `kind`.
+- `value` (Number) Upstream `value`.
+
+
+
 
 
 <a id="nestedatt--project--services--deploy--restart_policy"></a>
@@ -601,6 +1005,81 @@ Read-Only:
 
 
 
+<a id="nestedatt--project--services--develop"></a>
+### Nested Schema for `project.services.develop`
+
+Read-Only:
+
+- `watch` (Attributes List) Upstream `watch`. (see [below for nested schema](#nestedatt--project--services--develop--watch))
+
+<a id="nestedatt--project--services--develop--watch"></a>
+### Nested Schema for `project.services.develop.watch`
+
+Read-Only:
+
+- `action` (String) Upstream `action`.
+- `exec` (Attributes) Upstream `exec`. (see [below for nested schema](#nestedatt--project--services--develop--watch--exec))
+- `ignore` (List of String) Upstream `ignore`.
+- `include` (List of String) Upstream `include`.
+- `initial_sync` (Boolean) Upstream `initial_sync`.
+- `path` (String) Upstream `path`.
+- `target` (String) Upstream `target`.
+
+<a id="nestedatt--project--services--develop--watch--exec"></a>
+### Nested Schema for `project.services.develop.watch.exec`
+
+Read-Only:
+
+- `command` (List of String) Upstream `command`.
+- `environment` (Map of String, Sensitive) Upstream `environment`. Sensitive.
+- `privileged` (Boolean) Upstream `privileged`.
+- `user` (String) Upstream `user`.
+- `working_dir` (String) Upstream `working_dir`.
+
+
+
+
+<a id="nestedatt--project--services--devices"></a>
+### Nested Schema for `project.services.devices`
+
+Read-Only:
+
+- `permissions` (String) Upstream `permissions`.
+- `source` (String) Upstream `source`.
+- `target` (String) Upstream `target`.
+
+
+<a id="nestedatt--project--services--env_file"></a>
+### Nested Schema for `project.services.env_file`
+
+Read-Only:
+
+- `format` (String, Sensitive) Upstream `format`.
+- `path` (String, Sensitive) Upstream `path`.
+- `required` (Boolean, Sensitive) Upstream `required`.
+
+
+<a id="nestedatt--project--services--extends"></a>
+### Nested Schema for `project.services.extends`
+
+Read-Only:
+
+- `file` (String) Upstream `file`.
+- `service` (String) Upstream `service`.
+
+
+<a id="nestedatt--project--services--gpus"></a>
+### Nested Schema for `project.services.gpus`
+
+Read-Only:
+
+- `capabilities` (List of String) Upstream `capabilities`.
+- `count` (Number) Upstream `count`.
+- `device_ids` (List of String) Upstream `device_ids`.
+- `driver` (String) Upstream `driver`.
+- `options` (Map of String) Upstream `options`.
+
+
 <a id="nestedatt--project--services--healthcheck"></a>
 ### Nested Schema for `project.services.healthcheck`
 
@@ -615,6 +1094,41 @@ Read-Only:
 - `timeout` (String) Upstream `timeout`.
 
 
+<a id="nestedatt--project--services--logging"></a>
+### Nested Schema for `project.services.logging`
+
+Read-Only:
+
+- `driver` (String) Upstream `driver`.
+- `options` (Map of String) Upstream `options`.
+
+
+<a id="nestedatt--project--services--models"></a>
+### Nested Schema for `project.services.models`
+
+Read-Only:
+
+- `endpoint_var` (String) Upstream `endpoint_var`.
+- `model_var` (String) Upstream `model_var`.
+
+
+<a id="nestedatt--project--services--networks"></a>
+### Nested Schema for `project.services.networks`
+
+Read-Only:
+
+- `aliases` (List of String) Upstream `aliases`.
+- `driver_opts` (Map of String) Upstream `driver_opts`.
+- `gw_priority` (Number) Upstream `gw_priority`.
+- `interface_name` (String) Upstream `interface_name`.
+- `ipv4_address` (String) Upstream `ipv4_address`.
+- `ipv6_address` (String) Upstream `ipv6_address`.
+- `link_local_ips` (List of String) Upstream `link_local_ips`.
+- `mac_address` (String) Upstream `mac_address`.
+- `priority` (Number) Upstream `priority`.
+- `use_service_name_alias` (Boolean) Upstream `use_service_name_alias`.
+
+
 <a id="nestedatt--project--services--ports"></a>
 ### Nested Schema for `project.services.ports`
 
@@ -625,8 +1139,370 @@ Read-Only:
 - `mode` (String) Upstream `mode`.
 - `name` (String) Upstream `name`.
 - `protocol` (String) Upstream `protocol`.
-- `published` (Number) Upstream `published`.
+- `published` (String) Upstream `published`.
 - `target` (Number) Upstream `target`.
+
+
+<a id="nestedatt--project--services--post_start"></a>
+### Nested Schema for `project.services.post_start`
+
+Read-Only:
+
+- `command` (List of String) Upstream `command`.
+- `environment` (Map of String, Sensitive) Upstream `environment`. Sensitive.
+- `privileged` (Boolean) Upstream `privileged`.
+- `user` (String) Upstream `user`.
+- `working_dir` (String) Upstream `working_dir`.
+
+
+<a id="nestedatt--project--services--pre_start"></a>
+### Nested Schema for `project.services.pre_start`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `blkio_config` (Attributes) Upstream `blkio_config`. (see [below for nested schema](#nestedatt--project--services--pre_start--blkio_config))
+- `cap_add` (List of String) Upstream `cap_add`.
+- `cap_drop` (List of String) Upstream `cap_drop`.
+- `cgroup` (String) Upstream `cgroup`.
+- `cgroup_parent` (String) Upstream `cgroup_parent`.
+- `command` (List of String) Upstream `command`.
+- `configs` (Attributes List) Upstream `configs`. (see [below for nested schema](#nestedatt--project--services--pre_start--configs))
+- `cpu_count` (Number) Upstream `cpu_count`.
+- `cpu_percent` (Number) Upstream `cpu_percent`.
+- `cpu_period` (Number) Upstream `cpu_period`.
+- `cpu_quota` (Number) Upstream `cpu_quota`.
+- `cpu_rt_period` (Number) Upstream `cpu_rt_period`.
+- `cpu_rt_runtime` (Number) Upstream `cpu_rt_runtime`.
+- `cpu_shares` (Number) Upstream `cpu_shares`.
+- `cpus` (Number) Upstream `cpus`.
+- `cpuset` (String) Upstream `cpuset`.
+- `credential_spec` (Attributes) Upstream `credential_spec`. (see [below for nested schema](#nestedatt--project--services--pre_start--credential_spec))
+- `device_cgroup_rules` (List of String) Upstream `device_cgroup_rules`.
+- `devices` (Attributes List) Upstream `devices`. (see [below for nested schema](#nestedatt--project--services--pre_start--devices))
+- `dns` (List of String) Upstream `dns`.
+- `dns_opt` (List of String) Upstream `dns_opt`.
+- `dns_search` (List of String) Upstream `dns_search`.
+- `domainname` (String) Upstream `domainname`.
+- `entrypoint` (List of String) Upstream `entrypoint`.
+- `env_file` (Attributes List, Sensitive) Upstream `env_file`. Sensitive. (see [below for nested schema](#nestedatt--project--services--pre_start--env_file))
+- `environment` (Map of String, Sensitive) Upstream `environment`. Sensitive.
+- `extra_hosts` (Map of List of String) Upstream `extra_hosts`.
+- `gpus` (Attributes List) Upstream `gpus`. (see [below for nested schema](#nestedatt--project--services--pre_start--gpus))
+- `group_add` (List of String) Upstream `group_add`.
+- `hostname` (String) Upstream `hostname`.
+- `image` (String) Upstream `image`.
+- `init` (Boolean) Upstream `init`.
+- `ipc` (String) Upstream `ipc`.
+- `isolation` (String) Upstream `isolation`.
+- `label_file` (List of String) Upstream `label_file`.
+- `labels` (Map of String) Upstream `labels`.
+- `log_driver` (String) Upstream `log_driver`.
+- `log_opt` (Map of String) Upstream `log_opt`.
+- `logging` (Attributes) Upstream `logging`. (see [below for nested schema](#nestedatt--project--services--pre_start--logging))
+- `mac_address` (String) Upstream `mac_address`.
+- `mem_limit` (String) Upstream `mem_limit`.
+- `mem_reservation` (String) Upstream `mem_reservation`.
+- `mem_swappiness` (String) Upstream `mem_swappiness`.
+- `memswap_limit` (String) Upstream `memswap_limit`.
+- `models` (Attributes Map) Upstream `models`. (see [below for nested schema](#nestedatt--project--services--pre_start--models))
+- `network_mode` (String) Upstream `network_mode`.
+- `networks` (Attributes Map) Upstream `networks`. (see [below for nested schema](#nestedatt--project--services--pre_start--networks))
+- `oom_kill_disable` (Boolean) Upstream `oom_kill_disable`.
+- `oom_score_adj` (Number) Upstream `oom_score_adj`.
+- `per_replica` (Boolean) Upstream `per_replica`.
+- `pid` (String) Upstream `pid`.
+- `pids_limit` (Number) Upstream `pids_limit`.
+- `platform` (String) Upstream `platform`.
+- `privileged` (Boolean) Upstream `privileged`.
+- `pull_policy` (String) Upstream `pull_policy`.
+- `pull_refresh_after` (String) Upstream `pull_refresh_after`.
+- `read_only` (Boolean) Upstream `read_only`.
+- `runtime` (String) Upstream `runtime`.
+- `secrets` (Attributes List) Upstream `secrets`. (see [below for nested schema](#nestedatt--project--services--pre_start--secrets))
+- `security_opt` (List of String) Upstream `security_opt`.
+- `shm_size` (String) Upstream `shm_size`.
+- `stop_grace_period` (String) Upstream `stop_grace_period`.
+- `stop_signal` (String) Upstream `stop_signal`.
+- `storage_opt` (Map of String) Upstream `storage_opt`.
+- `sysctls` (Map of String) Upstream `sysctls`.
+- `tmpfs` (List of String) Upstream `tmpfs`.
+- `ulimits` (Attributes Map) Upstream `ulimits`. (see [below for nested schema](#nestedatt--project--services--pre_start--ulimits))
+- `umask` (Number) Upstream `umask`.
+- `use_api_socket` (Boolean) Upstream `use_api_socket`.
+- `user` (String) Upstream `user`.
+- `userns_mode` (String) Upstream `userns_mode`.
+- `uts` (String) Upstream `uts`.
+- `volume_driver` (String) Upstream `volume_driver`.
+- `volumes` (Attributes List) Upstream `volumes`. (see [below for nested schema](#nestedatt--project--services--pre_start--volumes))
+- `volumes_from` (List of String) Upstream `volumes_from`.
+- `working_dir` (String) Upstream `working_dir`.
+
+<a id="nestedatt--project--services--pre_start--blkio_config"></a>
+### Nested Schema for `project.services.pre_start.blkio_config`
+
+Read-Only:
+
+- `device_read_bps` (Attributes List) Upstream `device_read_bps`. (see [below for nested schema](#nestedatt--project--services--pre_start--blkio_config--device_read_bps))
+- `device_read_iops` (Attributes List) Upstream `device_read_iops`. (see [below for nested schema](#nestedatt--project--services--pre_start--blkio_config--device_read_iops))
+- `device_write_bps` (Attributes List) Upstream `device_write_bps`. (see [below for nested schema](#nestedatt--project--services--pre_start--blkio_config--device_write_bps))
+- `device_write_iops` (Attributes List) Upstream `device_write_iops`. (see [below for nested schema](#nestedatt--project--services--pre_start--blkio_config--device_write_iops))
+- `weight` (Number) Upstream `weight`.
+- `weight_device` (Attributes List) Upstream `weight_device`. (see [below for nested schema](#nestedatt--project--services--pre_start--blkio_config--weight_device))
+
+<a id="nestedatt--project--services--pre_start--blkio_config--device_read_bps"></a>
+### Nested Schema for `project.services.pre_start.blkio_config.device_read_bps`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--services--pre_start--blkio_config--device_read_iops"></a>
+### Nested Schema for `project.services.pre_start.blkio_config.device_read_iops`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--services--pre_start--blkio_config--device_write_bps"></a>
+### Nested Schema for `project.services.pre_start.blkio_config.device_write_bps`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--services--pre_start--blkio_config--device_write_iops"></a>
+### Nested Schema for `project.services.pre_start.blkio_config.device_write_iops`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `rate` (String) Upstream `Rate`.
+
+
+<a id="nestedatt--project--services--pre_start--blkio_config--weight_device"></a>
+### Nested Schema for `project.services.pre_start.blkio_config.weight_device`
+
+Read-Only:
+
+- `path` (String) Upstream `Path`.
+- `weight` (Number) Upstream `Weight`.
+
+
+
+<a id="nestedatt--project--services--pre_start--configs"></a>
+### Nested Schema for `project.services.pre_start.configs`
+
+Read-Only:
+
+- `gid` (String) Upstream `gid`.
+- `mode` (String) Upstream `mode`.
+- `source` (String) Upstream `source`.
+- `target` (String) Upstream `target`.
+- `uid` (String) Upstream `uid`.
+
+
+<a id="nestedatt--project--services--pre_start--credential_spec"></a>
+### Nested Schema for `project.services.pre_start.credential_spec`
+
+Read-Only:
+
+- `config` (String) Upstream `config`.
+- `file` (String) Upstream `file`.
+- `registry` (String) Upstream `registry`.
+
+
+<a id="nestedatt--project--services--pre_start--devices"></a>
+### Nested Schema for `project.services.pre_start.devices`
+
+Read-Only:
+
+- `permissions` (String) Upstream `permissions`.
+- `source` (String) Upstream `source`.
+- `target` (String) Upstream `target`.
+
+
+<a id="nestedatt--project--services--pre_start--env_file"></a>
+### Nested Schema for `project.services.pre_start.env_file`
+
+Read-Only:
+
+- `format` (String, Sensitive) Upstream `format`.
+- `path` (String, Sensitive) Upstream `path`.
+- `required` (Boolean, Sensitive) Upstream `required`.
+
+
+<a id="nestedatt--project--services--pre_start--gpus"></a>
+### Nested Schema for `project.services.pre_start.gpus`
+
+Read-Only:
+
+- `capabilities` (List of String) Upstream `capabilities`.
+- `count` (Number) Upstream `count`.
+- `device_ids` (List of String) Upstream `device_ids`.
+- `driver` (String) Upstream `driver`.
+- `options` (Map of String) Upstream `options`.
+
+
+<a id="nestedatt--project--services--pre_start--logging"></a>
+### Nested Schema for `project.services.pre_start.logging`
+
+Read-Only:
+
+- `driver` (String) Upstream `driver`.
+- `options` (Map of String) Upstream `options`.
+
+
+<a id="nestedatt--project--services--pre_start--models"></a>
+### Nested Schema for `project.services.pre_start.models`
+
+Read-Only:
+
+- `endpoint_var` (String) Upstream `endpoint_var`.
+- `model_var` (String) Upstream `model_var`.
+
+
+<a id="nestedatt--project--services--pre_start--networks"></a>
+### Nested Schema for `project.services.pre_start.networks`
+
+Read-Only:
+
+- `aliases` (List of String) Upstream `aliases`.
+- `driver_opts` (Map of String) Upstream `driver_opts`.
+- `gw_priority` (Number) Upstream `gw_priority`.
+- `interface_name` (String) Upstream `interface_name`.
+- `ipv4_address` (String) Upstream `ipv4_address`.
+- `ipv6_address` (String) Upstream `ipv6_address`.
+- `link_local_ips` (List of String) Upstream `link_local_ips`.
+- `mac_address` (String) Upstream `mac_address`.
+- `priority` (Number) Upstream `priority`.
+- `use_service_name_alias` (Boolean) Upstream `use_service_name_alias`.
+
+
+<a id="nestedatt--project--services--pre_start--secrets"></a>
+### Nested Schema for `project.services.pre_start.secrets`
+
+Read-Only:
+
+- `gid` (String) Upstream `gid`.
+- `mode` (String) Upstream `mode`.
+- `source` (String) Upstream `source`.
+- `target` (String) Upstream `target`.
+- `uid` (String) Upstream `uid`.
+
+
+<a id="nestedatt--project--services--pre_start--ulimits"></a>
+### Nested Schema for `project.services.pre_start.ulimits`
+
+Read-Only:
+
+- `hard` (Number) Upstream `hard`.
+- `single` (Number) Upstream `single`.
+- `soft` (Number) Upstream `soft`.
+
+
+<a id="nestedatt--project--services--pre_start--volumes"></a>
+### Nested Schema for `project.services.pre_start.volumes`
+
+Read-Only:
+
+- `bind` (Attributes) Upstream `bind`. (see [below for nested schema](#nestedatt--project--services--pre_start--volumes--bind))
+- `consistency` (String) Upstream `consistency`.
+- `image` (Attributes) Upstream `image`. (see [below for nested schema](#nestedatt--project--services--pre_start--volumes--image))
+- `read_only` (Boolean) Upstream `read_only`.
+- `source` (String) Upstream `source`.
+- `target` (String) Upstream `target`.
+- `tmpfs` (Attributes) Upstream `tmpfs`. (see [below for nested schema](#nestedatt--project--services--pre_start--volumes--tmpfs))
+- `type` (String) Upstream `type`.
+- `volume` (Attributes) Upstream `volume`. (see [below for nested schema](#nestedatt--project--services--pre_start--volumes--volume))
+
+<a id="nestedatt--project--services--pre_start--volumes--bind"></a>
+### Nested Schema for `project.services.pre_start.volumes.bind`
+
+Read-Only:
+
+- `create_host_path` (Boolean) Upstream `create_host_path`.
+- `propagation` (String) Upstream `propagation`.
+- `recursive` (String) Upstream `recursive`.
+- `selinux` (String) Upstream `selinux`.
+
+
+<a id="nestedatt--project--services--pre_start--volumes--image"></a>
+### Nested Schema for `project.services.pre_start.volumes.image`
+
+Read-Only:
+
+- `subpath` (String) Upstream `subpath`.
+
+
+<a id="nestedatt--project--services--pre_start--volumes--tmpfs"></a>
+### Nested Schema for `project.services.pre_start.volumes.tmpfs`
+
+Read-Only:
+
+- `mode` (Number) Upstream `mode`.
+- `size` (String) Upstream `size`.
+
+
+<a id="nestedatt--project--services--pre_start--volumes--volume"></a>
+### Nested Schema for `project.services.pre_start.volumes.volume`
+
+Read-Only:
+
+- `labels` (Map of String) Upstream `labels`.
+- `nocopy` (Boolean) Upstream `nocopy`.
+- `subpath` (String) Upstream `subpath`.
+
+
+
+
+<a id="nestedatt--project--services--pre_stop"></a>
+### Nested Schema for `project.services.pre_stop`
+
+Read-Only:
+
+- `command` (List of String) Upstream `command`.
+- `environment` (Map of String, Sensitive) Upstream `environment`. Sensitive.
+- `privileged` (Boolean) Upstream `privileged`.
+- `user` (String) Upstream `user`.
+- `working_dir` (String) Upstream `working_dir`.
+
+
+<a id="nestedatt--project--services--provider"></a>
+### Nested Schema for `project.services.provider`
+
+Read-Only:
+
+- `options` (Map of List of String) Upstream `options`.
+- `type` (String) Upstream `type`.
+
+
+<a id="nestedatt--project--services--secrets"></a>
+### Nested Schema for `project.services.secrets`
+
+Read-Only:
+
+- `gid` (String, Sensitive) Upstream `gid`.
+- `mode` (String, Sensitive) Upstream `mode`.
+- `source` (String, Sensitive) Upstream `source`.
+- `target` (String, Sensitive) Upstream `target`.
+- `uid` (String, Sensitive) Upstream `uid`.
+
+
+<a id="nestedatt--project--services--ulimits"></a>
+### Nested Schema for `project.services.ulimits`
+
+Read-Only:
+
+- `hard` (Number) Upstream `hard`.
+- `single` (Number) Upstream `single`.
+- `soft` (Number) Upstream `soft`.
 
 
 <a id="nestedatt--project--services--volumes"></a>
@@ -669,7 +1545,7 @@ Read-Only:
 Read-Only:
 
 - `mode` (Number) Upstream `mode`.
-- `size` (Number) Upstream `size`.
+- `size` (String) Upstream `size`.
 
 
 <a id="nestedatt--project--services--volumes--volume"></a>

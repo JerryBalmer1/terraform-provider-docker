@@ -47,9 +47,21 @@ nested attribute, object. Upstream `Descriptor`.
 | `data` | `string` | computed |  |  | Upstream `data`. |
 | `digest` | `string` | computed |  |  | Upstream `digest`. |
 | `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
-| `platform` | `dynamic` | computed |  |  | Upstream `platform`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `platform` | `object` | computed |  |  | Upstream `platform`. |
 | `size` | `number` | computed |  |  | Upstream `size`. |
 | `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `distribution.descriptor.platform`
+
+nested attribute, object. Upstream `platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
 
 ### `distribution.platforms`
 

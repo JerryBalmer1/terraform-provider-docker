@@ -39,21 +39,114 @@ nested attribute, object. Upstream `Config`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `args` | `string` | computed |  |  | Upstream `Args`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `args` | `object` | computed |  |  | Upstream `Args`. |
 | `description` | `string` | computed |  |  | Upstream `Description`. |
 | `documentation` | `string` | computed |  |  | Upstream `Documentation`. |
 | `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
-| `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `interface` | `string` | computed |  |  | Upstream `Interface`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `env` | `list(object)` | computed |  | yes | Upstream `Env`. Sensitive. |
+| `interface` | `object` | computed |  |  | Upstream `Interface`. |
 | `ipc_host` | `bool` | computed |  |  | Upstream `IpcHost`. |
-| `linux` | `string` | computed |  |  | Upstream `Linux`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `mounts` | `list(string)` | computed |  |  | Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `network` | `string` | computed |  |  | Upstream `Network`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `linux` | `object` | computed |  |  | Upstream `Linux`. |
+| `mounts` | `list(object)` | computed |  |  | Upstream `Mounts`. |
+| `network` | `object` | computed |  |  | Upstream `Network`. |
 | `pid_host` | `bool` | computed |  |  | Upstream `PidHost`. |
 | `propagated_mount` | `string` | computed |  |  | Upstream `PropagatedMount`. |
-| `rootfs` | `string` | computed |  |  | Upstream `rootfs`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `user` | `string` | computed |  |  | Upstream `User`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `rootfs` | `object` | computed |  |  | Upstream `rootfs`. |
+| `user` | `object` | computed |  |  | Upstream `User`. |
 | `work_dir` | `string` | computed |  |  | Upstream `WorkDir`. |
+
+### `plugins.config.args`
+
+nested attribute, object. Upstream `Args`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `description` | `string` | computed |  |  | Upstream `Description`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `settable` | `list(string)` | computed |  |  | Upstream `Settable`. |
+| `value` | `list(string)` | computed |  |  | Upstream `Value`. |
+
+### `plugins.config.env`
+
+nested attribute, list(object). Upstream `Env`. Sensitive.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `description` | `string` | computed |  | yes | Upstream `Description`. |
+| `name` | `string` | computed |  | yes | Upstream `Name`. |
+| `settable` | `list(string)` | computed |  | yes | Upstream `Settable`. |
+| `value` | `string` | computed |  | yes | Upstream `Value`. Sensitive. |
+
+### `plugins.config.interface`
+
+nested attribute, object. Upstream `Interface`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `protocol_scheme` | `string` | computed |  |  | Upstream `ProtocolScheme`. |
+| `socket` | `string` | computed |  |  | Upstream `Socket`. |
+| `types` | `list(string)` | computed |  |  | Upstream `Types`. |
+
+### `plugins.config.linux`
+
+nested attribute, object. Upstream `Linux`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `allow_all_devices` | `bool` | computed |  |  | Upstream `AllowAllDevices`. |
+| `capabilities` | `list(string)` | computed |  |  | Upstream `Capabilities`. |
+| `devices` | `list(object)` | computed |  |  | Upstream `Devices`. |
+
+### `plugins.config.linux.devices`
+
+nested attribute, list(object). Upstream `Devices`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `description` | `string` | computed |  |  | Upstream `Description`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `settable` | `list(string)` | computed |  |  | Upstream `Settable`. |
+
+### `plugins.config.mounts`
+
+nested attribute, list(object). Upstream `Mounts`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `description` | `string` | computed |  |  | Upstream `Description`. |
+| `destination` | `string` | computed |  |  | Upstream `Destination`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `list(string)` | computed |  |  | Upstream `Options`. |
+| `settable` | `list(string)` | computed |  |  | Upstream `Settable`. |
+| `source` | `string` | computed |  |  | Upstream `Source`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+
+### `plugins.config.network`
+
+nested attribute, object. Upstream `Network`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+
+### `plugins.config.rootfs`
+
+nested attribute, object. Upstream `rootfs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `diff_ids` | `list(string)` | computed |  |  | Upstream `diff_ids`. |
+| `type` | `string` | computed |  |  | Upstream `type`. |
+
+### `plugins.config.user`
+
+nested attribute, object. Upstream `User`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `gid` | `number` | computed |  |  | Upstream `GID`. |
+| `uid` | `number` | computed |  |  | Upstream `UID`. |
 
 ### `plugins.settings`
 
@@ -62,9 +155,34 @@ nested attribute, object. Upstream `Settings`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `args` | `list(string)` | computed |  |  | Upstream `Args`. |
-| `devices` | `list(string)` | computed |  |  | Upstream `Devices`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `devices` | `list(object)` | computed |  |  | Upstream `Devices`. |
 | `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
-| `mounts` | `list(string)` | computed |  |  | Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `mounts` | `list(object)` | computed |  |  | Upstream `Mounts`. |
+
+### `plugins.settings.devices`
+
+nested attribute, list(object). Upstream `Devices`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `description` | `string` | computed |  |  | Upstream `Description`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `path` | `string` | computed |  |  | Upstream `Path`. |
+| `settable` | `list(string)` | computed |  |  | Upstream `Settable`. |
+
+### `plugins.settings.mounts`
+
+nested attribute, list(object). Upstream `Mounts`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `description` | `string` | computed |  |  | Upstream `Description`. |
+| `destination` | `string` | computed |  |  | Upstream `Destination`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `list(string)` | computed |  |  | Upstream `Options`. |
+| `settable` | `list(string)` | computed |  |  | Upstream `Settable`. |
+| `source` | `string` | computed |  |  | Upstream `Source`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
 
 ## Example
 

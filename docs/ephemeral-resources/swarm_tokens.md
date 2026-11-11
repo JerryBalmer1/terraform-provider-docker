@@ -48,5 +48,5 @@ resource "docker_secret" "worker_join_token" {
 
 Read-Only:
 
-- `manager` (String, Sensitive) Upstream `Manager`.
-- `worker` (String, Sensitive) Upstream `Worker`.
+- `manager` (String, Sensitive) Upstream `Manager`. Sensitive.
+- `worker` (String, Sensitive) Upstream `Worker`. Sensitive.

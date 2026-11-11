@@ -24,7 +24,7 @@ nested attribute, list(object). The project's volumes.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `cluster_volume` | `string` | computed |  |  | Upstream `ClusterVolume`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cluster_volume` | `object` | computed |  |  | Upstream `ClusterVolume`. |
 | `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
 | `driver` | `string` | computed |  |  | Upstream `Driver`. |
 | `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
@@ -32,8 +32,134 @@ nested attribute, list(object). The project's volumes.
 | `name` | `string` | computed |  |  | Upstream `Name`. |
 | `options` | `map(string)` | computed |  |  | Upstream `Options`. |
 | `scope` | `string` | computed |  |  | Upstream `Scope`. |
-| `status` | `map(string)` | computed |  |  | Upstream `Status`. |
-| `usage_data` | `string` | computed |  |  | Upstream `UsageData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `status` | `map(string)` | computed |  |  | Upstream `Status`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `usage_data` | `object` | computed |  |  | Upstream `UsageData`. |
+
+### `volumes.cluster_volume`
+
+nested attribute, object. Upstream `ClusterVolume`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `info` | `object` | computed |  |  | Upstream `Info`. |
+| `publish_status` | `list(object)` | computed |  |  | Upstream `PublishStatus`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `volumes.cluster_volume.info`
+
+nested attribute, object. Upstream `Info`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `accessible_topology` | `list(object)` | computed |  |  | Upstream `AccessibleTopology`. |
+| `capacity_bytes` | `number` | computed |  |  | Upstream `CapacityBytes`. |
+| `volume_context` | `map(string)` | computed |  |  | Upstream `VolumeContext`. |
+| `volume_id` | `string` | computed |  |  | Upstream `VolumeID`. |
+
+### `volumes.cluster_volume.info.accessible_topology`
+
+nested attribute, list(object). Upstream `AccessibleTopology`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `segments` | `map(string)` | computed |  |  | Upstream `Segments`. |
+
+### `volumes.cluster_volume.publish_status`
+
+nested attribute, list(object). Upstream `PublishStatus`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `node_id` | `string` | computed |  |  | Upstream `NodeID`. |
+| `publish_context` | `map(string)` | computed |  |  | Upstream `PublishContext`. |
+| `state` | `string` | computed |  |  | Upstream `State`. |
+
+### `volumes.cluster_volume.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `access_mode` | `object` | computed |  |  | Upstream `AccessMode`. |
+| `group` | `string` | computed |  |  | Upstream `Group`. |
+
+### `volumes.cluster_volume.spec.access_mode`
+
+nested attribute, object. Upstream `AccessMode`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `accessibility_requirements` | `object` | computed |  |  | Upstream `AccessibilityRequirements`. |
+| `availability` | `string` | computed |  |  | Upstream `Availability`. |
+| `capacity_range` | `object` | computed |  |  | Upstream `CapacityRange`. |
+| `mount_volume` | `string` | computed |  |  | Upstream `MountVolume`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `scope` | `string` | computed |  |  | Upstream `Scope`. |
+| `secrets` | `list(object)` | computed |  |  | Upstream `Secrets`. |
+| `sharing` | `string` | computed |  |  | Upstream `Sharing`. |
+
+### `volumes.cluster_volume.spec.access_mode.accessibility_requirements`
+
+nested attribute, object. Upstream `AccessibilityRequirements`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `preferred` | `list(object)` | computed |  |  | Upstream `Preferred`. |
+| `requisite` | `list(object)` | computed |  |  | Upstream `Requisite`. |
+
+### `volumes.cluster_volume.spec.access_mode.accessibility_requirements.preferred`
+
+nested attribute, list(object). Upstream `Preferred`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `segments` | `map(string)` | computed |  |  | Upstream `Segments`. |
+
+### `volumes.cluster_volume.spec.access_mode.accessibility_requirements.requisite`
+
+nested attribute, list(object). Upstream `Requisite`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `segments` | `map(string)` | computed |  |  | Upstream `Segments`. |
+
+### `volumes.cluster_volume.spec.access_mode.capacity_range`
+
+nested attribute, object. Upstream `CapacityRange`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `limit_bytes` | `number` | computed |  |  | Upstream `LimitBytes`. |
+| `required_bytes` | `number` | computed |  |  | Upstream `RequiredBytes`. |
+
+### `volumes.cluster_volume.spec.access_mode.secrets`
+
+nested attribute, list(object). Upstream `Secrets`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `key` | `string` | computed |  |  | Upstream `Key`. |
+| `secret` | `string` | computed |  |  | Upstream `Secret`. |
+
+### `volumes.cluster_volume.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
+
+### `volumes.usage_data`
+
+nested attribute, object. Upstream `UsageData`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ref_count` | `number` | computed |  |  | Upstream `RefCount`. |
+| `size` | `number` | computed |  |  | Upstream `Size`. |
 
 ## Example
 

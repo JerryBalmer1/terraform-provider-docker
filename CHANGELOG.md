@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-This section covers build passes 5, 5.1, 5.2, 5.3, 6a and 6b (the log of each pass is in [BUILD_REPORT.md](BUILD_REPORT.md)). Pass 6b comes first, then 6a and 5.3; the sections after them are passes 5 to 5.2.
+## [0.1.0]
+
+The first release. This section covers build passes 5, 5.1, 5.2, 5.3, 6a, 6b and 6c (the log of each pass is in [BUILD_REPORT.md](BUILD_REPORT.md)). Pass 6c comes first, then 6b, 6a and 5.3; the sections after them are passes 5 to 5.2.
+
+### Pass 6c
+
+#### Breaking
+
+- Structured outputs now mirror the Engine response shape, derived from the pinned swagger by `tools/contractgen`: objects with `additionalProperties` are maps, arrays of objects are lists of nested objects, enums are plain strings. 141 fields that were JSON strings or dynamic values are now typed attributes (23 outputs on 23 items), 23 fields changed their declared type and 469 nested fields are now addressable, e.g. `inspect.network_settings.networks["n"].ip_address`, `inspect.host_config.port_bindings["80/tcp"][0].host_port`, `inspect.config.exposed_ports` (a map; it was dropped before). Schema versions of `docker_container` (2), `docker_image`, `docker_tag`, `docker_network`, `docker_volume`, `docker_plugin` and `docker_service` (1) were bumped; the state upgrader nulls the old outputs and the next refresh fills them.
+- Swagger-cited fields of provider-shaped outputs are typed too (Pass 6c verification): `data.docker_image` and `data.docker_registry_image` `config.exposed_ports` / `config.volumes` are maps (`list(string)` before; the data source dropped the whole `config` with "Outputs contract value dropped"); `docker_stack` `service_status[].spec` and `data.docker_stack` `services[].spec` are the ServiceSpec object (a JSON string before); `docker_registry_image` `distribution.descriptor.platform` and `data.docker_image_attestations` `descriptor.platform` are objects; `data.docker_compose_containers` `containers` `health` / `host_config` / `network_settings` / `mounts` / `image_manifest_descriptor`, `data.docker_compose_volumes` `status` / `cluster_volume` / `usage_data` and the container action results' `state.health.log` are typed nested attributes. Schema versions of `docker_stack` and `docker_registry_image` were bumped to 1 with the same nulling upgrader.
+- The structured `project` output of `docker_compose` and `data.docker_compose_config` takes its shape from compose-go v2.16.2's Go types (what `json.Marshal(types.Project)` writes): ports `published` is a string (it may be a range), byte sizes (`mem_limit`, `shm_size`, ...) and durations are strings, `cpus` is a number, `extra_hosts` is host -> addresses, `ulimits` entries are `{single, soft, hard}`. `published` was a number and was dropped.
+- Keys of user-data maps (labels, options, driver options, sysctls, annotations, log config) are no longer snake_cased: `log_config.config["max-file"]`, not `max_file`. Only schema field names are renamed.
+- `docker_service.replicas` is null in state for every mode except `replicated` (it was 1), so config generated for a global service (`terraform plan -generate-config-out`) is valid.
+
+#### Added
+
+- `config_sha256` on `docker_container`, `docker_service`, `docker_network` and `docker_volume`: the hash of the configuration part of the inspect only (never State, timestamps, PIDs, health logs or daemon-assigned addresses). It is the hash a downstream consumer should watch; `content_sha256` remains the hash of the whole raw output and changes whenever runtime state changes (reference/CONTRACT.md, "Which hash to watch").
+- `docker_buildx_builder`: `driver = "cloud"` with `endpoint = "<org>/<builder>"` (Docker Build Cloud): a token from auth.docker.io through the provider's credential chain, then BuildKit over build-cloud.docker.com:443. The token lives in memory for the connection only. Implemented against fakes, not yet verified against the live service (`TestAccBuildxBuilderCloud_live`, `TF_ACC_BUILD_CLOUD=1`).
+- `docker_exec`: `stdin_path`, read at invoke time; the way to pass a secret to an action (actions cannot mark `stdin` sensitive). Conflicts with `stdin`, `tty` and `detach`.
+- Preflight diagnostics for plain HTTP sent to a TLS port and for an SSH host that cannot be reached, at Configure and on every later operation. The cases still not covered are listed in `deferred.json` (kind `diagnostic`).
+- Example tests, manual tasks and PairwiseTest install the provider from a local filesystem mirror (a real `terraform init`, lock file written and checksums verified) instead of `dev_overrides`; Terraform 1.14.9 init works.
+- `Invoke-Build Clean` removes every `%TEMP%\tpd-*` folder earlier tasks created and lists them. PairwiseTest and DriftCheck write under `test/harness/.logs`; manual scenario working copies live in `test/harness/.work/manual/<scenario>`; `_Apply` / `_Destroy` run unattended and `-Prompt` asks.
+- README.md rewritten; every number in it is generated by `tools/doccounts` and checked by `DocCountsCheck`. The registry landing page (docs/index.md) covers configuration, authentication order, owner labels, `min_api_version` and the structured outputs.
+
+#### Fixed
+
+- Strings inside a JSON fallback were encoded twice (`inspect.mounts[].type` was `"\"tmpfs\""`).
+- Health check output (`state.health.log[].output`), env values, plugin env, secret data and image history `created_by` are sensitive wherever a structured output carries them.
+- "Outputs contract value dropped" is an error under `TF_ACC` and fails ExampleTests and PairwiseTest, so a structured output cannot lose a value silently.
 
 ### Pass 6b
 

@@ -36,7 +36,7 @@ nested attribute, object. Upstream `BuildCacheUsage`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `active_count` | `number` | computed |  |  | Upstream `ActiveCount`. |
-| `items` | `list(string)` | computed |  |  | Upstream `Items`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `items` | `list(string)` | computed |  |  | Upstream `Items`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `reclaimable` | `number` | computed |  |  | Upstream `Reclaimable`. |
 | `total_count` | `number` | computed |  |  | Upstream `TotalCount`. |
 | `total_size` | `number` | computed |  |  | Upstream `TotalSize`. |
@@ -48,7 +48,7 @@ nested attribute, object. Upstream `ContainerUsage`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `active_count` | `number` | computed |  |  | Upstream `ActiveCount`. |
-| `items` | `list(string)` | computed |  |  | Upstream `Items`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `items` | `list(string)` | computed |  |  | Upstream `Items`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `reclaimable` | `number` | computed |  |  | Upstream `Reclaimable`. |
 | `total_count` | `number` | computed |  |  | Upstream `TotalCount`. |
 | `total_size` | `number` | computed |  |  | Upstream `TotalSize`. |
@@ -60,7 +60,7 @@ nested attribute, object. Upstream `ImageUsage`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `active_count` | `number` | computed |  |  | Upstream `ActiveCount`. |
-| `items` | `list(string)` | computed |  |  | Upstream `Items`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `items` | `list(string)` | computed |  |  | Upstream `Items`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `reclaimable` | `number` | computed |  |  | Upstream `Reclaimable`. |
 | `total_count` | `number` | computed |  |  | Upstream `TotalCount`. |
 | `total_size` | `number` | computed |  |  | Upstream `TotalSize`. |
@@ -72,7 +72,7 @@ nested attribute, object. Upstream `VolumeUsage`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `active_count` | `number` | computed |  |  | Upstream `ActiveCount`. |
-| `items` | `list(string)` | computed |  |  | Upstream `Items`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `items` | `list(string)` | computed |  |  | Upstream `Items`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `reclaimable` | `number` | computed |  |  | Upstream `Reclaimable`. |
 | `total_count` | `number` | computed |  |  | Upstream `TotalCount`. |
 | `total_size` | `number` | computed |  |  | Upstream `TotalSize`. |

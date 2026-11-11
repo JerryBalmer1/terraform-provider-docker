@@ -76,6 +76,7 @@ func (r *pluginResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (r *pluginResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		Version: 1, // Pass 6c: structured outputs changed shape (state_upgrade_p6c_z.go)
 		MarkdownDescription: "A managed Docker Engine plugin installed from a registry, like `docker plugin install`. " +
 			"The privileges the plugin asks for (`GET /plugins/privileges`) must be granted with `grant_all_permissions` or " +
 			"`grant_permissions` blocks, otherwise install fails and lists them. `enabled` and `env` change in place (the plugin is " +

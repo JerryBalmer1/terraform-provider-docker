@@ -56,7 +56,7 @@ Read-Only:
 - `name` (String) Upstream `Name`.
 - `options` (Map of String, Sensitive) Upstream `Options`. Sensitive.
 - `scope` (String) Upstream `Scope`.
-- `status` (Dynamic) Upstream `Status`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `status` (Map of String) Upstream `Status`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `usage_data` (Attributes) Upstream `UsageData`. (see [below for nested schema](#nestedatt--inspect--usage_data))
 
 <a id="nestedatt--inspect--cluster_volume"></a>
@@ -66,11 +66,114 @@ Read-Only:
 
 - `created_at` (String) Upstream `CreatedAt`.
 - `id` (String) Upstream `ID`.
-- `info` (Dynamic) Upstream `Info`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
-- `publish_status` (List of String) Upstream `PublishStatus`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `spec` (Dynamic) Upstream `Spec`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `info` (Attributes) Upstream `Info`. (see [below for nested schema](#nestedatt--inspect--cluster_volume--info))
+- `publish_status` (Attributes List) Upstream `PublishStatus`. (see [below for nested schema](#nestedatt--inspect--cluster_volume--publish_status))
+- `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--inspect--cluster_volume--spec))
 - `updated_at` (String) Upstream `UpdatedAt`.
-- `version` (Dynamic) Upstream `Version`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).
+- `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--inspect--cluster_volume--version))
+
+<a id="nestedatt--inspect--cluster_volume--info"></a>
+### Nested Schema for `inspect.cluster_volume.info`
+
+Read-Only:
+
+- `accessible_topology` (Attributes List) Upstream `AccessibleTopology`. (see [below for nested schema](#nestedatt--inspect--cluster_volume--info--accessible_topology))
+- `capacity_bytes` (Number) Upstream `CapacityBytes`.
+- `volume_context` (Map of String) Upstream `VolumeContext`.
+- `volume_id` (String) Upstream `VolumeID`.
+
+<a id="nestedatt--inspect--cluster_volume--info--accessible_topology"></a>
+### Nested Schema for `inspect.cluster_volume.info.accessible_topology`
+
+Read-Only:
+
+- `segments` (Map of String) Upstream `Segments`.
+
+
+
+<a id="nestedatt--inspect--cluster_volume--publish_status"></a>
+### Nested Schema for `inspect.cluster_volume.publish_status`
+
+Read-Only:
+
+- `node_id` (String) Upstream `NodeID`.
+- `publish_context` (Map of String) Upstream `PublishContext`.
+- `state` (String) Upstream `State`.
+
+
+<a id="nestedatt--inspect--cluster_volume--spec"></a>
+### Nested Schema for `inspect.cluster_volume.spec`
+
+Read-Only:
+
+- `access_mode` (Attributes) Upstream `AccessMode`. (see [below for nested schema](#nestedatt--inspect--cluster_volume--spec--access_mode))
+- `group` (String) Upstream `Group`.
+
+<a id="nestedatt--inspect--cluster_volume--spec--access_mode"></a>
+### Nested Schema for `inspect.cluster_volume.spec.access_mode`
+
+Read-Only:
+
+- `accessibility_requirements` (Attributes) Upstream `AccessibilityRequirements`. (see [below for nested schema](#nestedatt--inspect--cluster_volume--spec--access_mode--accessibility_requirements))
+- `availability` (String) Upstream `Availability`.
+- `capacity_range` (Attributes) Upstream `CapacityRange`. (see [below for nested schema](#nestedatt--inspect--cluster_volume--spec--access_mode--capacity_range))
+- `mount_volume` (Dynamic) Upstream `MountVolume`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here).
+- `scope` (String) Upstream `Scope`.
+- `secrets` (Attributes List) Upstream `Secrets`. (see [below for nested schema](#nestedatt--inspect--cluster_volume--spec--access_mode--secrets))
+- `sharing` (String) Upstream `Sharing`.
+
+<a id="nestedatt--inspect--cluster_volume--spec--access_mode--accessibility_requirements"></a>
+### Nested Schema for `inspect.cluster_volume.spec.access_mode.accessibility_requirements`
+
+Read-Only:
+
+- `preferred` (Attributes List) Upstream `Preferred`. (see [below for nested schema](#nestedatt--inspect--cluster_volume--spec--access_mode--accessibility_requirements--preferred))
+- `requisite` (Attributes List) Upstream `Requisite`. (see [below for nested schema](#nestedatt--inspect--cluster_volume--spec--access_mode--accessibility_requirements--requisite))
+
+<a id="nestedatt--inspect--cluster_volume--spec--access_mode--accessibility_requirements--preferred"></a>
+### Nested Schema for `inspect.cluster_volume.spec.access_mode.accessibility_requirements.preferred`
+
+Read-Only:
+
+- `segments` (Map of String) Upstream `Segments`.
+
+
+<a id="nestedatt--inspect--cluster_volume--spec--access_mode--accessibility_requirements--requisite"></a>
+### Nested Schema for `inspect.cluster_volume.spec.access_mode.accessibility_requirements.requisite`
+
+Read-Only:
+
+- `segments` (Map of String) Upstream `Segments`.
+
+
+
+<a id="nestedatt--inspect--cluster_volume--spec--access_mode--capacity_range"></a>
+### Nested Schema for `inspect.cluster_volume.spec.access_mode.capacity_range`
+
+Read-Only:
+
+- `limit_bytes` (Number) Upstream `LimitBytes`.
+- `required_bytes` (Number) Upstream `RequiredBytes`.
+
+
+<a id="nestedatt--inspect--cluster_volume--spec--access_mode--secrets"></a>
+### Nested Schema for `inspect.cluster_volume.spec.access_mode.secrets`
+
+Read-Only:
+
+- `key` (String) Upstream `Key`.
+- `secret` (String) Upstream `Secret`.
+
+
+
+
+<a id="nestedatt--inspect--cluster_volume--version"></a>
+### Nested Schema for `inspect.cluster_volume.version`
+
+Read-Only:
+
+- `index` (Number) Upstream `Index`.
+
 
 
 <a id="nestedatt--inspect--usage_data"></a>

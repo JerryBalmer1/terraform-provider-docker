@@ -76,9 +76,21 @@ nested attribute, object. Upstream `ImageManifestDescriptor`.
 | `data` | `string` | computed |  |  | Upstream `data`. |
 | `digest` | `string` | computed |  |  | Upstream `digest`. |
 | `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
-| `platform` | `string` | computed |  |  | Upstream `platform`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `platform` | `object` | computed |  |  | Upstream `platform`. |
 | `size` | `number` | computed |  |  | Upstream `size`. |
 | `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `containers.image_manifest_descriptor.platform`
+
+nested attribute, object. Upstream `platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
 
 ### `containers.mounts`
 
@@ -93,7 +105,7 @@ nested attribute, list(object). Upstream `Mounts`.
 | `propagation` | `string` | computed |  |  | Upstream `Propagation`. |
 | `rw` | `bool` | computed |  |  | Upstream `RW`. |
 | `source` | `string` | computed |  |  | Upstream `Source`. |
-| `type` | `string` | computed |  |  | Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
 
 ### `containers.network_settings`
 
@@ -101,7 +113,39 @@ nested attribute, object. Upstream `NetworkSettings`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `networks` | `map(string)` | computed |  |  | Upstream `Networks`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `networks` | `map(object)` | computed |  |  | Upstream `Networks`. |
+
+### `containers.network_settings.networks`
+
+nested attribute, map(object). Upstream `Networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  |  | Upstream `Aliases`. |
+| `dns_names` | `list(string)` | computed |  |  | Upstream `DNSNames`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `DriverOpts`. |
+| `endpoint_id` | `string` | computed |  |  | Upstream `EndpointID`. |
+| `gateway` | `string` | computed |  |  | Upstream `Gateway`. |
+| `global_ipv6_address` | `string` | computed |  |  | Upstream `GlobalIPv6Address`. |
+| `global_ipv6_prefix_len` | `number` | computed |  |  | Upstream `GlobalIPv6PrefixLen`. |
+| `gw_priority` | `number` | computed |  |  | Upstream `GwPriority`. |
+| `ip_address` | `string` | computed |  |  | Upstream `IPAddress`. |
+| `ip_prefix_len` | `number` | computed |  |  | Upstream `IPPrefixLen`. |
+| `ipam_config` | `object` | computed |  |  | Upstream `IPAMConfig`. |
+| `ipv6_gateway` | `string` | computed |  |  | Upstream `IPv6Gateway`. |
+| `links` | `list(string)` | computed |  |  | Upstream `Links`. |
+| `mac_address` | `string` | computed |  |  | Upstream `MacAddress`. |
+| `network_id` | `string` | computed |  |  | Upstream `NetworkID`. |
+
+### `containers.network_settings.networks.ipam_config`
+
+nested attribute, object. Upstream `IPAMConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ipv4_address` | `string` | computed |  |  | Upstream `IPv4Address`. |
+| `ipv6_address` | `string` | computed |  |  | Upstream `IPv6Address`. |
+| `link_local_ips` | `list(string)` | computed |  |  | Upstream `LinkLocalIPs`. |
 
 ### `containers.ports`
 

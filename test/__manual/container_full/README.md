@@ -6,6 +6,7 @@ After apply, look at:
 
 - `terraform output`: `web_ip_front` is `10.77.0.10`; `web_health` turns `healthy` within a few seconds
   (re-run `_Plan`, which refreshes); `web_processes` lists nginx master and workers.
+- `image_exposed_ports` is the nginx image's `{ "80/tcp" = {} }` map (a map, not a list or a JSON string).
 - `docker -H tcp://127.0.0.1:12375 inspect manual-web`: `HostConfig.Ulimits`, `HostConfig.Memory` 268435456,
   `HostConfig.NanoCpus`, `HostConfig.CapDrop` NET_RAW, `HostConfig.Init` true, `HostConfig.Sysctls`,
   `Config.Labels` (scenario, tier), `HostConfig.Annotations`, `NetworkSettings.Networks` (manual-front with

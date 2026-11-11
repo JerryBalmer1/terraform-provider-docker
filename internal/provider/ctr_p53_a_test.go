@@ -69,7 +69,7 @@ func ctrRunModelPlan() containerResourceModel {
 
 func TestCtrP53Schema(t *testing.T) {
 	sr := ctrSchema(t)
-	if sr.Schema.Version != 1 {
+	if sr.Schema.Version != 2 { // Pass 6c: 1 -> 2, structured output shapes
 		t.Errorf("version = %d", sr.Schema.Version)
 	}
 	a := sr.Schema.Attributes

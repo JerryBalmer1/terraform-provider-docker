@@ -167,3 +167,8 @@ output "once_logs" {
   value     = docker_container.once.logs
   sensitive = true
 }
+
+# The image's exposed ports as the Engine returns them: a map keyed by "<port>/<proto>".
+output "image_exposed_ports" {
+  value = docker_image.nginx.inspect.config.exposed_ports
+}

@@ -28,16 +28,16 @@ nested attribute, list(object). The project's containers, ContainerSummary field
 |---|---|---|---|---|---|
 | `command` | `string` | computed |  |  | Upstream `Command`. |
 | `created` | `number` | computed |  |  | Upstream `Created`. |
-| `health` | `string` | computed |  |  | Upstream `Health`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `host_config` | `string` | computed |  |  | Upstream `HostConfig`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `health` | `object` | computed |  |  | Upstream `Health`. |
+| `host_config` | `object` | computed |  |  | Upstream `HostConfig`. |
 | `id` | `string` | computed |  |  | Upstream `Id`. |
 | `image` | `string` | computed |  |  | Upstream `Image`. |
 | `image_id` | `string` | computed |  |  | Upstream `ImageID`. |
-| `image_manifest_descriptor` | `string` | computed |  |  | Upstream `ImageManifestDescriptor`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `image_manifest_descriptor` | `object` | computed |  |  | Upstream `ImageManifestDescriptor`. |
 | `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
-| `mounts` | `list(string)` | computed |  |  | Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `mounts` | `list(object)` | computed |  |  | Upstream `Mounts`. |
 | `names` | `list(string)` | computed |  |  | Upstream `Names`. |
-| `network_settings` | `string` | computed |  |  | Upstream `NetworkSettings`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `network_settings` | `object` | computed |  |  | Upstream `NetworkSettings`. |
 | `number` | `number` | computed |  |  | Upstream `Labels[com.docker.compose.container-number]`. |
 | `ports` | `list(object)` | computed |  |  | Upstream `Ports`. |
 | `service` | `string` | computed |  |  | Upstream `Labels[com.docker.compose.service]`. |
@@ -45,6 +45,106 @@ nested attribute, list(object). The project's containers, ContainerSummary field
 | `size_rw` | `number` | computed |  |  | Upstream `SizeRw`. |
 | `state` | `string` | computed |  |  | Upstream `State`. |
 | `status` | `string` | computed |  |  | Upstream `Status`. |
+
+### `containers.health`
+
+nested attribute, object. Upstream `Health`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `failing_streak` | `number` | computed |  |  | Upstream `FailingStreak`. |
+| `status` | `string` | computed |  |  | Upstream `Status`. |
+
+### `containers.host_config`
+
+nested attribute, object. Upstream `HostConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `Annotations`. |
+| `network_mode` | `string` | computed |  |  | Upstream `NetworkMode`. |
+
+### `containers.image_manifest_descriptor`
+
+nested attribute, object. Upstream `ImageManifestDescriptor`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `annotations` | `map(string)` | computed |  |  | Upstream `annotations`. |
+| `artifact_type` | `string` | computed |  |  | Upstream `artifactType`. |
+| `data` | `string` | computed |  |  | Upstream `data`. |
+| `digest` | `string` | computed |  |  | Upstream `digest`. |
+| `media_type` | `string` | computed |  |  | Upstream `mediaType`. |
+| `platform` | `object` | computed |  |  | Upstream `platform`. |
+| `size` | `number` | computed |  |  | Upstream `size`. |
+| `urls` | `list(string)` | computed |  |  | Upstream `urls`. |
+
+### `containers.image_manifest_descriptor.platform`
+
+nested attribute, object. Upstream `platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
+
+### `containers.mounts`
+
+nested attribute, list(object). Upstream `Mounts`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `destination` | `string` | computed |  |  | Upstream `Destination`. |
+| `driver` | `string` | computed |  |  | Upstream `Driver`. |
+| `mode` | `string` | computed |  |  | Upstream `Mode`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `propagation` | `string` | computed |  |  | Upstream `Propagation`. |
+| `rw` | `bool` | computed |  |  | Upstream `RW`. |
+| `source` | `string` | computed |  |  | Upstream `Source`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+
+### `containers.network_settings`
+
+nested attribute, object. Upstream `NetworkSettings`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `networks` | `map(object)` | computed |  |  | Upstream `Networks`. |
+
+### `containers.network_settings.networks`
+
+nested attribute, map(object). Upstream `Networks`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `aliases` | `list(string)` | computed |  |  | Upstream `Aliases`. |
+| `dns_names` | `list(string)` | computed |  |  | Upstream `DNSNames`. |
+| `driver_opts` | `map(string)` | computed |  |  | Upstream `DriverOpts`. |
+| `endpoint_id` | `string` | computed |  |  | Upstream `EndpointID`. |
+| `gateway` | `string` | computed |  |  | Upstream `Gateway`. |
+| `global_ipv6_address` | `string` | computed |  |  | Upstream `GlobalIPv6Address`. |
+| `global_ipv6_prefix_len` | `number` | computed |  |  | Upstream `GlobalIPv6PrefixLen`. |
+| `gw_priority` | `number` | computed |  |  | Upstream `GwPriority`. |
+| `ip_address` | `string` | computed |  |  | Upstream `IPAddress`. |
+| `ip_prefix_len` | `number` | computed |  |  | Upstream `IPPrefixLen`. |
+| `ipam_config` | `object` | computed |  |  | Upstream `IPAMConfig`. |
+| `ipv6_gateway` | `string` | computed |  |  | Upstream `IPv6Gateway`. |
+| `links` | `list(string)` | computed |  |  | Upstream `Links`. |
+| `mac_address` | `string` | computed |  |  | Upstream `MacAddress`. |
+| `network_id` | `string` | computed |  |  | Upstream `NetworkID`. |
+
+### `containers.network_settings.networks.ipam_config`
+
+nested attribute, object. Upstream `IPAMConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ipv4_address` | `string` | computed |  |  | Upstream `IPv4Address`. |
+| `ipv6_address` | `string` | computed |  |  | Upstream `IPv6Address`. |
+| `link_local_ips` | `list(string)` | computed |  |  | Upstream `LinkLocalIPs`. |
 
 ### `containers.ports`
 

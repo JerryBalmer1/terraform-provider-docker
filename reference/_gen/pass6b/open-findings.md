@@ -1,5 +1,7 @@
 # Pass 6b open findings
 
+All five findings below are closed in Pass 6c; the current list is [../pass6c/open-findings.md](../pass6c/open-findings.md).
+
 Findings this pass found but did not close, each with what reproduces it. Everything handed to Lane Z that is not
 listed here was fixed (BUILD_REPORT.md, Pass 6b).
 

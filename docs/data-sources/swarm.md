@@ -50,12 +50,22 @@ Read-Only:
 - `data_path_port` (Number) Upstream `DataPathPort`.
 - `default_addr_pool` (List of String) Upstream `DefaultAddrPool`.
 - `id` (String) Upstream `ID`.
+- `join_tokens` (Attributes) Upstream `JoinTokens`. (see [below for nested schema](#nestedatt--inspect--join_tokens))
 - `root_rotation_in_progress` (Boolean) Upstream `RootRotationInProgress`.
 - `spec` (Attributes) Upstream `Spec`. (see [below for nested schema](#nestedatt--inspect--spec))
 - `subnet_size` (Number) Upstream `SubnetSize`.
 - `tls_info` (Attributes) Upstream `TLSInfo`. (see [below for nested schema](#nestedatt--inspect--tls_info))
 - `updated_at` (String) Upstream `UpdatedAt`.
 - `version` (Attributes) Upstream `Version`. (see [below for nested schema](#nestedatt--inspect--version))
+
+<a id="nestedatt--inspect--join_tokens"></a>
+### Nested Schema for `inspect.join_tokens`
+
+Read-Only:
+
+- `manager` (String, Sensitive) Upstream `Manager`. Sensitive.
+- `worker` (String, Sensitive) Upstream `Worker`. Sensitive.
+
 
 <a id="nestedatt--inspect--spec"></a>
 ### Nested Schema for `inspect.spec`
@@ -172,5 +182,5 @@ Read-Only:
 
 Read-Only:
 
-- `manager` (String, Sensitive) Upstream `Manager`.
-- `worker` (String, Sensitive) Upstream `Worker`.
+- `manager` (String, Sensitive) Upstream `Manager`. Sensitive.
+- `worker` (String, Sensitive) Upstream `Worker`. Sensitive.

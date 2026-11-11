@@ -46,9 +46,9 @@ nested attribute, object. The build result field by field (dotted metadata keys 
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `buildx_build_provenance` | `dynamic` | computed |  | yes | Upstream `buildx.build.provenance`. Sensitive. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `buildx_build_provenance` | `dynamic` | computed |  | yes | Upstream `buildx.build.provenance`. Sensitive. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here). |
 | `buildx_build_ref` | `string` | computed |  |  | Upstream `buildx.build.ref`. |
-| `buildx_build_warnings` | `dynamic` | computed |  |  | Upstream `buildx.build.warnings`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `buildx_build_warnings` | `dynamic` | computed |  |  | Upstream `buildx.build.warnings`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here). |
 | `containerimage_config_digest` | `string` | computed |  |  | Upstream `containerimage.config.digest`. |
 | `containerimage_descriptor` | `object` | computed |  |  | Upstream `containerimage.descriptor`. |
 | `containerimage_digest` | `string` | computed |  |  | Upstream `containerimage.digest`. |
@@ -99,15 +99,19 @@ nested attribute, object. Upstream `Config`.
 | `cmd` | `list(string)` | computed |  |  | Upstream `Cmd`. |
 | `entrypoint` | `list(string)` | computed |  |  | Upstream `Entrypoint`. |
 | `env` | `list(string)` | computed |  | yes | Upstream `Env`. Sensitive. |
-| `exposed_ports` | `list(string)` | computed |  |  | Map keys (`<port>/<proto>`) as a list. |
+| `exposed_ports` | `map(object)` | computed |  |  | ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list). |
 | `healthcheck` | `object` | computed |  |  | Upstream `Healthcheck`. |
 | `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
 | `on_build` | `list(string)` | computed |  |  | Upstream `OnBuild`. |
 | `shell` | `list(string)` | computed |  |  | Upstream `Shell`. |
 | `stop_signal` | `string` | computed |  |  | Upstream `StopSignal`. |
 | `user` | `string` | computed |  |  | Upstream `User`. |
-| `volumes` | `list(string)` | computed |  |  | Map keys as a list. |
+| `volumes` | `map(object)` | computed |  |  | Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list). |
 | `working_dir` | `string` | computed |  |  | Upstream `WorkingDir`. |
+
+### `inspect.config.exposed_ports`
+
+nested attribute, map(object). ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list).
 
 ### `inspect.config.healthcheck`
 
@@ -121,6 +125,10 @@ nested attribute, object. Upstream `Healthcheck`.
 | `start_period` | `number` | computed |  |  | Upstream `StartPeriod`. |
 | `test` | `list(string)` | computed |  |  | Upstream `Test`. |
 | `timeout` | `number` | computed |  |  | Upstream `Timeout`. |
+
+### `inspect.config.volumes`
+
+nested attribute, map(object). Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list).
 
 ### `inspect.descriptor`
 
@@ -164,9 +172,75 @@ nested attribute, object. Upstream `Identity`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `build` | `list(string)` | computed |  |  | Upstream `Build`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `pull` | `list(string)` | computed |  |  | Upstream `Pull`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `signature` | `list(string)` | computed |  |  | Upstream `Signature`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `build` | `list(object)` | computed |  |  | Upstream `Build`. |
+| `pull` | `list(object)` | computed |  |  | Upstream `Pull`. |
+| `signature` | `list(object)` | computed |  |  | Upstream `Signature`. |
+
+### `inspect.identity.build`
+
+nested attribute, list(object). Upstream `Build`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `ref` | `string` | computed |  |  | Upstream `Ref`. |
+
+### `inspect.identity.pull`
+
+nested attribute, list(object). Upstream `Pull`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `repository` | `string` | computed |  |  | Upstream `Repository`. |
+
+### `inspect.identity.signature`
+
+nested attribute, list(object). Upstream `Signature`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `docker_reference` | `string` | computed |  |  | Upstream `DockerReference`. |
+| `error` | `string` | computed |  |  | Upstream `Error`. |
+| `known_signer` | `string` | computed |  |  | Upstream `KnownSigner`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `signature_type` | `string` | computed |  |  | Upstream `SignatureType`. |
+| `signer` | `object` | computed |  |  | Upstream `Signer`. |
+| `timestamps` | `list(object)` | computed |  |  | Upstream `Timestamps`. |
+| `warnings` | `list(string)` | computed |  |  | Upstream `Warnings`. |
+
+### `inspect.identity.signature.signer`
+
+nested attribute, object. Upstream `Signer`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `build_config_digest` | `string` | computed |  |  | Upstream `BuildConfigDigest`. |
+| `build_config_uri` | `string` | computed |  |  | Upstream `BuildConfigURI`. |
+| `build_signer_digest` | `string` | computed |  |  | Upstream `BuildSignerDigest`. |
+| `build_signer_uri` | `string` | computed |  |  | Upstream `BuildSignerURI`. |
+| `build_trigger` | `string` | computed |  |  | Upstream `BuildTrigger`. |
+| `certificate_issuer` | `string` | computed |  |  | Upstream `CertificateIssuer`. |
+| `issuer` | `string` | computed |  |  | Upstream `Issuer`. |
+| `run_invocation_uri` | `string` | computed |  |  | Upstream `RunInvocationURI`. |
+| `runner_environment` | `string` | computed |  |  | Upstream `RunnerEnvironment`. |
+| `source_repository_digest` | `string` | computed |  |  | Upstream `SourceRepositoryDigest`. |
+| `source_repository_identifier` | `string` | computed |  |  | Upstream `SourceRepositoryIdentifier`. |
+| `source_repository_owner_identifier` | `string` | computed |  |  | Upstream `SourceRepositoryOwnerIdentifier`. |
+| `source_repository_owner_uri` | `string` | computed |  |  | Upstream `SourceRepositoryOwnerURI`. |
+| `source_repository_ref` | `string` | computed |  |  | Upstream `SourceRepositoryRef`. |
+| `source_repository_uri` | `string` | computed |  |  | Upstream `SourceRepositoryURI`. |
+| `source_repository_visibility_at_signing` | `string` | computed |  |  | Upstream `SourceRepositoryVisibilityAtSigning`. |
+| `subject_alternative_name` | `string` | computed |  |  | Upstream `SubjectAlternativeName`. |
+
+### `inspect.identity.signature.timestamps`
+
+nested attribute, list(object). Upstream `Timestamps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `timestamp` | `string` | computed |  |  | Upstream `Timestamp`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+| `uri` | `string` | computed |  |  | Upstream `URI`. |
 
 ### `inspect.manifests`
 
@@ -174,13 +248,21 @@ nested attribute, list(object). Only with a multi-platform (containerd) image st
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `attestation_data` | `string` | computed |  |  | Upstream `AttestationData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `attestation_data` | `object` | computed |  |  | Upstream `AttestationData`. |
 | `available` | `bool` | computed |  |  | Upstream `Available`. |
 | `descriptor` | `object` | computed |  |  | Upstream `Descriptor`. |
 | `id` | `string` | computed |  |  | Upstream `ID`. |
-| `image_data` | `string` | computed |  |  | Upstream `ImageData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `image_data` | `object` | computed |  |  | Upstream `ImageData`. |
 | `kind` | `string` | computed |  |  | Upstream `Kind`. |
 | `size` | `object` | computed |  |  | Upstream `Size`. |
+
+### `inspect.manifests.attestation_data`
+
+nested attribute, object. Upstream `AttestationData`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `for` | `string` | computed |  |  | Upstream `For`. |
 
 ### `inspect.manifests.descriptor`
 
@@ -208,6 +290,113 @@ nested attribute, object. Upstream `platform`.
 | `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
 | `os_version` | `string` | computed |  |  | Upstream `os.version`. |
 | `variant` | `string` | computed |  |  | Upstream `variant`. |
+
+### `inspect.manifests.image_data`
+
+nested attribute, object. Upstream `ImageData`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `containers` | `list(string)` | computed |  |  | Upstream `Containers`. |
+| `identity` | `object` | computed |  |  | Upstream `Identity`. |
+| `platform` | `object` | computed |  |  | Upstream `Platform`. |
+| `size` | `object` | computed |  |  | Upstream `Size`. |
+
+### `inspect.manifests.image_data.identity`
+
+nested attribute, object. Upstream `Identity`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `build` | `list(object)` | computed |  |  | Upstream `Build`. |
+| `pull` | `list(object)` | computed |  |  | Upstream `Pull`. |
+| `signature` | `list(object)` | computed |  |  | Upstream `Signature`. |
+
+### `inspect.manifests.image_data.identity.build`
+
+nested attribute, list(object). Upstream `Build`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `ref` | `string` | computed |  |  | Upstream `Ref`. |
+
+### `inspect.manifests.image_data.identity.pull`
+
+nested attribute, list(object). Upstream `Pull`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `repository` | `string` | computed |  |  | Upstream `Repository`. |
+
+### `inspect.manifests.image_data.identity.signature`
+
+nested attribute, list(object). Upstream `Signature`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `docker_reference` | `string` | computed |  |  | Upstream `DockerReference`. |
+| `error` | `string` | computed |  |  | Upstream `Error`. |
+| `known_signer` | `string` | computed |  |  | Upstream `KnownSigner`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `signature_type` | `string` | computed |  |  | Upstream `SignatureType`. |
+| `signer` | `object` | computed |  |  | Upstream `Signer`. |
+| `timestamps` | `list(object)` | computed |  |  | Upstream `Timestamps`. |
+| `warnings` | `list(string)` | computed |  |  | Upstream `Warnings`. |
+
+### `inspect.manifests.image_data.identity.signature.signer`
+
+nested attribute, object. Upstream `Signer`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `build_config_digest` | `string` | computed |  |  | Upstream `BuildConfigDigest`. |
+| `build_config_uri` | `string` | computed |  |  | Upstream `BuildConfigURI`. |
+| `build_signer_digest` | `string` | computed |  |  | Upstream `BuildSignerDigest`. |
+| `build_signer_uri` | `string` | computed |  |  | Upstream `BuildSignerURI`. |
+| `build_trigger` | `string` | computed |  |  | Upstream `BuildTrigger`. |
+| `certificate_issuer` | `string` | computed |  |  | Upstream `CertificateIssuer`. |
+| `issuer` | `string` | computed |  |  | Upstream `Issuer`. |
+| `run_invocation_uri` | `string` | computed |  |  | Upstream `RunInvocationURI`. |
+| `runner_environment` | `string` | computed |  |  | Upstream `RunnerEnvironment`. |
+| `source_repository_digest` | `string` | computed |  |  | Upstream `SourceRepositoryDigest`. |
+| `source_repository_identifier` | `string` | computed |  |  | Upstream `SourceRepositoryIdentifier`. |
+| `source_repository_owner_identifier` | `string` | computed |  |  | Upstream `SourceRepositoryOwnerIdentifier`. |
+| `source_repository_owner_uri` | `string` | computed |  |  | Upstream `SourceRepositoryOwnerURI`. |
+| `source_repository_ref` | `string` | computed |  |  | Upstream `SourceRepositoryRef`. |
+| `source_repository_uri` | `string` | computed |  |  | Upstream `SourceRepositoryURI`. |
+| `source_repository_visibility_at_signing` | `string` | computed |  |  | Upstream `SourceRepositoryVisibilityAtSigning`. |
+| `subject_alternative_name` | `string` | computed |  |  | Upstream `SubjectAlternativeName`. |
+
+### `inspect.manifests.image_data.identity.signature.timestamps`
+
+nested attribute, list(object). Upstream `Timestamps`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `timestamp` | `string` | computed |  |  | Upstream `Timestamp`. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
+| `uri` | `string` | computed |  |  | Upstream `URI`. |
+
+### `inspect.manifests.image_data.platform`
+
+nested attribute, object. Upstream `Platform`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `architecture` | `string` | computed |  |  | Upstream `architecture`. |
+| `os` | `string` | computed |  |  | Upstream `os`. |
+| `os_features` | `list(string)` | computed |  |  | Upstream `os.features`. |
+| `os_version` | `string` | computed |  |  | Upstream `os.version`. |
+| `variant` | `string` | computed |  |  | Upstream `variant`. |
+
+### `inspect.manifests.image_data.size`
+
+nested attribute, object. Upstream `Size`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `unpacked` | `number` | computed |  |  | Upstream `Unpacked`. |
 
 ### `inspect.manifests.size`
 
@@ -256,31 +445,31 @@ nested attribute, list(object). Upstream `(instructions after FROM)`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `add` | `string` | computed |  |  | Set when keyword = ADD; shape = the `add` output of dockerfile:ADD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `arg` | `string` | computed |  | yes | Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `cmd` | `string` | computed |  |  | Set when keyword = CMD; shape = the `cmd` output of dockerfile:CMD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `add` | `string` | computed |  |  | Set when keyword = ADD; shape = the `add` output of dockerfile:ADD. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `arg` | `string` | computed |  | yes | Set when keyword = ARG; shape = the `arg` output of dockerfile:ARG. Sensitive. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `cmd` | `string` | computed |  |  | Set when keyword = CMD; shape = the `cmd` output of dockerfile:CMD. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `comment` | `string` | computed |  |  | Upstream `Comment`. |
-| `copy` | `string` | computed |  |  | Set when keyword = COPY; shape = the `copy` output of dockerfile:COPY. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `copy` | `string` | computed |  |  | Set when keyword = COPY; shape = the `copy` output of dockerfile:COPY. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `created` | `number` | computed |  |  | Image mode only: Unix time of the history entry. |
 | `created_by` | `string` | computed |  | yes | Image mode only: the history entry this instruction was reconstructed from. Sensitive. |
 | `dockerfile` | `string` | computed |  |  | Upstream `(rendered instruction text)`. |
-| `entrypoint` | `string` | computed |  |  | Set when keyword = ENTRYPOINT; shape = the `entrypoint` output of dockerfile:ENTRYPOINT. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `env` | `string` | computed |  | yes | Set when keyword = ENV; shape = the `env` output of dockerfile:ENV. Sensitive. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `expose` | `string` | computed |  |  | Set when keyword = EXPOSE; shape = the `expose` output of dockerfile:EXPOSE. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `healthcheck` | `string` | computed |  |  | Set when keyword = HEALTHCHECK; shape = the `healthcheck` output of dockerfile:HEALTHCHECK. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `entrypoint` | `string` | computed |  |  | Set when keyword = ENTRYPOINT; shape = the `entrypoint` output of dockerfile:ENTRYPOINT. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `env` | `string` | computed |  | yes | Set when keyword = ENV; shape = the `env` output of dockerfile:ENV. Sensitive. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `expose` | `string` | computed |  |  | Set when keyword = EXPOSE; shape = the `expose` output of dockerfile:EXPOSE. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `healthcheck` | `string` | computed |  |  | Set when keyword = HEALTHCHECK; shape = the `healthcheck` output of dockerfile:HEALTHCHECK. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `index` | `number` | computed |  |  | Upstream `(position in stage)`. |
 | `keyword` | `string` | computed |  |  | Upstream `INSTRUCTION`. |
-| `label` | `string` | computed |  |  | Set when keyword = LABEL; shape = the `label` output of dockerfile:LABEL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `label` | `string` | computed |  |  | Set when keyword = LABEL; shape = the `label` output of dockerfile:LABEL. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 | `layer_size` | `number` | computed |  |  | Upstream `Size`. |
 | `line` | `number` | computed |  |  | 1-based start line; null in image mode. |
-| `maintainer` | `string` | computed |  |  | Set when keyword = MAINTAINER; shape = the `maintainer` output of dockerfile:MAINTAINER. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `onbuild` | `string` | computed |  |  | Set when keyword = ONBUILD; shape = the `onbuild` output of dockerfile:ONBUILD. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `run` | `string` | computed |  |  | Set when keyword = RUN; shape = the `run` output of dockerfile:RUN. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `shell` | `string` | computed |  |  | Set when keyword = SHELL; shape = the `shell` output of dockerfile:SHELL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `stopsignal` | `string` | computed |  |  | Set when keyword = STOPSIGNAL; shape = the `stopsignal` output of dockerfile:STOPSIGNAL. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `user` | `string` | computed |  |  | Set when keyword = USER; shape = the `user` output of dockerfile:USER. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `volume` | `string` | computed |  |  | Set when keyword = VOLUME; shape = the `volume` output of dockerfile:VOLUME. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `workdir` | `string` | computed |  |  | Set when keyword = WORKDIR; shape = the `workdir` output of dockerfile:WORKDIR. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `maintainer` | `string` | computed |  |  | Set when keyword = MAINTAINER; shape = the `maintainer` output of dockerfile:MAINTAINER. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `onbuild` | `string` | computed |  |  | Set when keyword = ONBUILD; shape = the `onbuild` output of dockerfile:ONBUILD. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `run` | `string` | computed |  |  | Set when keyword = RUN; shape = the `run` output of dockerfile:RUN. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `shell` | `string` | computed |  |  | Set when keyword = SHELL; shape = the `shell` output of dockerfile:SHELL. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `stopsignal` | `string` | computed |  |  | Set when keyword = STOPSIGNAL; shape = the `stopsignal` output of dockerfile:STOPSIGNAL. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `user` | `string` | computed |  |  | Set when keyword = USER; shape = the `user` output of dockerfile:USER. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `volume` | `string` | computed |  |  | Set when keyword = VOLUME; shape = the `volume` output of dockerfile:VOLUME. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `workdir` | `string` | computed |  |  | Set when keyword = WORKDIR; shape = the `workdir` output of dockerfile:WORKDIR. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 
 ### `build`
 
@@ -291,7 +480,7 @@ single block. Build the image instead of pulling it, like `docker build`. Changi
 | `additional_contexts` | `map(string)` | optional | yes |  | BuildKit only. Named build contexts (`--build-context name=value`): a local directory, `docker-image://ref` or a URL, used by `FROM name` / `COPY --from=name`. Forces replacement. |
 | `args` | `map(string)` | optional | yes |  | Build arguments (`--build-arg`). Forces replacement. |
 | `attestations` | `list(string)` | optional | yes |  | BuildKit only. Extra attestation specs (`--attest`), e.g. `type=sbom,generator=image`; `provenance` and `sbom` cover the common cases. Forces replacement. |
-| `builder` | `string` | optional | yes |  | Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit), the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`) or a BuildKit address (`tcp://`, `unix://`, `docker-container://`, e.g. a remote-driver builder's endpoint). With BuildKit the build runs with a session (serving `secrets`, `ssh` and `registry_auth` credentials) so Dockerfile features such as `RUN --mount=type=secret` and heredocs work, and `cache_to`, `ssh`, `outputs`, `attestations`, `provenance`, `sbom` and `no_cache_filter` become available. Requires a daemon with BuildKit enabled (default since Docker 23). Forces replacement. |
+| `builder` | `string` | optional | yes |  | Builder backend: `classic` (default; the legacy Engine builder, `DOCKER_BUILDKIT=0`), `buildkit` (the daemon's embedded BuildKit), the name of a buildx builder (`docker_buildx_builder`, like `docker buildx build --builder <name>`) or a BuildKit address (`tcp://`, `unix://`, `docker-container://`, e.g. a remote-driver builder's endpoint), or a Docker Build Cloud builder as `cloud://<org>/<builder>` or `<org>/<builder>` (a `docker_buildx_builder` with `driver = "cloud"`, its `id`). With BuildKit the build runs with a session (serving `secrets`, `ssh` and `registry_auth` credentials) so Dockerfile features such as `RUN --mount=type=secret` and heredocs work, and `cache_to`, `ssh`, `outputs`, `attestations`, `provenance`, `sbom` and `no_cache_filter` become available. Requires a daemon with BuildKit enabled (default since Docker 23). Forces replacement. |
 | `cache_from` | `list(string)` | optional | yes |  | BuildKit only. Cache sources (`--cache-from`): image references carrying inline cache metadata, or buildx cache specs such as `type=registry,ref=...`. Forces replacement. |
 | `cache_to` | `list(string)` | optional | yes |  | BuildKit only. Cache export specs (`--cache-to`), e.g. `type=inline` or `type=registry,ref=registry.example.com/app:cache`. Forces replacement. |
 | `cgroup_parent` | `string` | optional | yes |  | Classic builder only. Parent cgroup for the `RUN` containers (`--cgroup-parent`). Forces replacement. |

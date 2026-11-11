@@ -85,6 +85,16 @@ func composeServiceFixups(svc map[string]any) {
 			svc[k] = m
 		}
 	}
+	// ulimits: compose-go's UlimitsConfig.MarshalJSON writes `single` as a bare
+	// number (nofile: 1024) and {soft, hard} otherwise; the contract has the
+	// struct shape {single, soft, hard} (tools/contractgen/composego.go).
+	if m, ok := svc["ulimits"].(map[string]any); ok {
+		for k, v := range m {
+			if n, ok := v.(json.Number); ok {
+				m[k] = map[string]any{"single": n}
+			}
+		}
+	}
 	// environment values may be null (variable without value).
 	if m, ok := svc["environment"].(map[string]any); ok {
 		for k, v := range m {

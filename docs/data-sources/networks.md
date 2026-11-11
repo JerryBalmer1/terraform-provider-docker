@@ -88,9 +88,20 @@ Read-Only:
 
 Read-Only:
 
-- `config` (List of String) Upstream `Config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `config` (Attributes List) Upstream `Config`. (see [below for nested schema](#nestedatt--networks--ipam--config))
 - `driver` (String) Upstream `Driver`.
 - `options` (Map of String) Upstream `Options`.
+
+<a id="nestedatt--networks--ipam--config"></a>
+### Nested Schema for `networks.ipam.config`
+
+Read-Only:
+
+- `auxiliary_addresses` (Map of String) Upstream `AuxiliaryAddresses`.
+- `gateway` (String) Upstream `Gateway`.
+- `ip_range` (String) Upstream `IPRange`.
+- `subnet` (String) Upstream `Subnet`.
+
 
 
 <a id="nestedatt--networks--peers"></a>

@@ -40,5 +40,5 @@ resource "docker_swarm_node" "worker2" {
 
 Read-Only:
 
-- `manager` (String, Sensitive) Upstream `Manager`.
-- `worker` (String, Sensitive) Upstream `Worker`.
+- `manager` (String, Sensitive) Upstream `Manager`. Sensitive.
+- `worker` (String, Sensitive) Upstream `Worker`. Sensitive.

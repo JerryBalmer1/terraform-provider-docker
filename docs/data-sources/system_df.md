@@ -57,7 +57,7 @@ Read-Only:
 Read-Only:
 
 - `active_count` (Number) Upstream `ActiveCount`.
-- `items` (List of String) Upstream `Items`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `items` (List of String) Upstream `Items`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `reclaimable` (Number) Upstream `Reclaimable`.
 - `total_count` (Number) Upstream `TotalCount`.
 - `total_size` (Number) Upstream `TotalSize`.
@@ -69,7 +69,7 @@ Read-Only:
 Read-Only:
 
 - `active_count` (Number) Upstream `ActiveCount`.
-- `items` (List of String) Upstream `Items`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `items` (List of String) Upstream `Items`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `reclaimable` (Number) Upstream `Reclaimable`.
 - `total_count` (Number) Upstream `TotalCount`.
 - `total_size` (Number) Upstream `TotalSize`.
@@ -81,7 +81,7 @@ Read-Only:
 Read-Only:
 
 - `active_count` (Number) Upstream `ActiveCount`.
-- `items` (List of String) Upstream `Items`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `items` (List of String) Upstream `Items`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `reclaimable` (Number) Upstream `Reclaimable`.
 - `total_count` (Number) Upstream `TotalCount`.
 - `total_size` (Number) Upstream `TotalSize`.
@@ -93,7 +93,7 @@ Read-Only:
 Read-Only:
 
 - `active_count` (Number) Upstream `ActiveCount`.
-- `items` (List of String) Upstream `Items`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `items` (List of String) Upstream `Items`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
 - `reclaimable` (Number) Upstream `Reclaimable`.
 - `total_count` (Number) Upstream `TotalCount`.
 - `total_size` (Number) Upstream `TotalSize`.

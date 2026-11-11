@@ -51,16 +51,16 @@ Read-Only:
 
 - `command` (String) Upstream `Command`.
 - `created` (Number) Upstream `Created`.
-- `health` (String) Upstream `Health`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
-- `host_config` (String) Upstream `HostConfig`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `health` (Attributes) Upstream `Health`. (see [below for nested schema](#nestedatt--containers--health))
+- `host_config` (Attributes) Upstream `HostConfig`. (see [below for nested schema](#nestedatt--containers--host_config))
 - `id` (String) Upstream `Id`.
 - `image` (String) Upstream `Image`.
 - `image_id` (String) Upstream `ImageID`.
-- `image_manifest_descriptor` (String) Upstream `ImageManifestDescriptor`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `image_manifest_descriptor` (Attributes) Upstream `ImageManifestDescriptor`. (see [below for nested schema](#nestedatt--containers--image_manifest_descriptor))
 - `labels` (Map of String) Upstream `Labels`.
-- `mounts` (List of String) Upstream `Mounts`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `mounts` (Attributes List) Upstream `Mounts`. (see [below for nested schema](#nestedatt--containers--mounts))
 - `names` (List of String) Upstream `Names`.
-- `network_settings` (String) Upstream `NetworkSettings`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `network_settings` (Attributes) Upstream `NetworkSettings`. (see [below for nested schema](#nestedatt--containers--network_settings))
 - `number` (Number) Upstream `Labels[com.docker.compose.container-number]`.
 - `ports` (Attributes List) Upstream `Ports`. (see [below for nested schema](#nestedatt--containers--ports))
 - `service` (String) Upstream `Labels[com.docker.compose.service]`.
@@ -68,6 +68,106 @@ Read-Only:
 - `size_rw` (Number) Upstream `SizeRw`.
 - `state` (String) Upstream `State`.
 - `status` (String) Upstream `Status`.
+
+<a id="nestedatt--containers--health"></a>
+### Nested Schema for `containers.health`
+
+Read-Only:
+
+- `failing_streak` (Number) Upstream `FailingStreak`.
+- `status` (String) Upstream `Status`.
+
+
+<a id="nestedatt--containers--host_config"></a>
+### Nested Schema for `containers.host_config`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `Annotations`.
+- `network_mode` (String) Upstream `NetworkMode`.
+
+
+<a id="nestedatt--containers--image_manifest_descriptor"></a>
+### Nested Schema for `containers.image_manifest_descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `artifact_type` (String) Upstream `artifactType`.
+- `data` (String) Upstream `data`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--containers--image_manifest_descriptor--platform))
+- `size` (Number) Upstream `size`.
+- `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--containers--image_manifest_descriptor--platform"></a>
+### Nested Schema for `containers.image_manifest_descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
+
+
+<a id="nestedatt--containers--mounts"></a>
+### Nested Schema for `containers.mounts`
+
+Read-Only:
+
+- `destination` (String) Upstream `Destination`.
+- `driver` (String) Upstream `Driver`.
+- `mode` (String) Upstream `Mode`.
+- `name` (String) Upstream `Name`.
+- `propagation` (String) Upstream `Propagation`.
+- `rw` (Boolean) Upstream `RW`.
+- `source` (String) Upstream `Source`.
+- `type` (String) Upstream `Type`.
+
+
+<a id="nestedatt--containers--network_settings"></a>
+### Nested Schema for `containers.network_settings`
+
+Read-Only:
+
+- `networks` (Attributes Map) Upstream `Networks`. (see [below for nested schema](#nestedatt--containers--network_settings--networks))
+
+<a id="nestedatt--containers--network_settings--networks"></a>
+### Nested Schema for `containers.network_settings.networks`
+
+Read-Only:
+
+- `aliases` (List of String) Upstream `Aliases`.
+- `dns_names` (List of String) Upstream `DNSNames`.
+- `driver_opts` (Map of String) Upstream `DriverOpts`.
+- `endpoint_id` (String) Upstream `EndpointID`.
+- `gateway` (String) Upstream `Gateway`.
+- `global_ipv6_address` (String) Upstream `GlobalIPv6Address`.
+- `global_ipv6_prefix_len` (Number) Upstream `GlobalIPv6PrefixLen`.
+- `gw_priority` (Number) Upstream `GwPriority`.
+- `ip_address` (String) Upstream `IPAddress`.
+- `ip_prefix_len` (Number) Upstream `IPPrefixLen`.
+- `ipam_config` (Attributes) Upstream `IPAMConfig`. (see [below for nested schema](#nestedatt--containers--network_settings--networks--ipam_config))
+- `ipv6_gateway` (String) Upstream `IPv6Gateway`.
+- `links` (List of String) Upstream `Links`.
+- `mac_address` (String) Upstream `MacAddress`.
+- `network_id` (String) Upstream `NetworkID`.
+
+<a id="nestedatt--containers--network_settings--networks--ipam_config"></a>
+### Nested Schema for `containers.network_settings.networks.ipam_config`
+
+Read-Only:
+
+- `ipv4_address` (String) Upstream `IPv4Address`.
+- `ipv6_address` (String) Upstream `IPv6Address`.
+- `link_local_ips` (List of String) Upstream `LinkLocalIPs`.
+
+
+
 
 <a id="nestedatt--containers--ports"></a>
 ### Nested Schema for `containers.ports`

@@ -10,84 +10,135 @@ description: |-
 
 # docker Provider
 
-Owns the whole Docker chain through the Docker Engine API: image build and push, single-host networks, volumes and containers, Swarm init and node join, and Swarm secrets, configs, services and stacks. Compose files are parsed in-process (docker_compose) and never handed to the compose plugin; no docker CLI is involved; SSH hosts are reached in pure Go. The one external program the provider can run is a docker credential helper (`docker-credential-<name>`, over the credential-helper protocol), only when a docker `config.json` names it and only with `allow_credential_helpers = true`.
+The `docker` provider manages the whole Docker chain, from image builds to Swarm stacks, through the Docker Engine
+API. It never runs the `docker` CLI or the compose plugin: compose files are parsed in-process by `docker_compose`,
+SSH hosts are reached in pure Go, and the only external program it can start is a docker credential helper, and only
+with `allow_credential_helpers = true` (see [Registry credentials](#registry-credentials)).
 
-Registry credential precedence, per registry: a `registry_auth` block for it (its `username`/`password`, then `DOCKER_REGISTRY_USER`/`DOCKER_REGISTRY_PASS`, then its docker config); with no block, the default docker config (`DOCKER_CONFIG`, else `~/.docker/config.json`); else anonymous. Inside a docker config: `credHelpers[<registry>]`, then `credsStore` (both need `allow_credential_helpers`), then `auths`.
-
-Endpoint precedence: `host`, then the `ssh` block's `host`, then `context`, then `DOCKER_HOST`, then `DOCKER_CONTEXT`, then `currentContext` in the docker `config.json`, then `unix:///var/run/docker.sock`.
-
-Daemon check: unless `disable_docker_daemon_check = true`, Configure pings the daemon once (`GET /_ping`, 5s timeout). A daemon that does not answer is a *warning*, never an error, so validate and plan work offline; the warning says which of these it was: not reachable (naming the host and where it came from: `host`, the `ssh` block, a Docker context, `DOCKER_HOST` or the built-in default), permission denied on the unix socket or Windows named pipe, or a TLS failure (with the TLS settings in effect). A daemon whose Engine API is below `min_api_version` is an *error* naming both versions. The ping is skipped while a `tls` or `ssh` value (or `disable_docker_daemon_check`) is unknown until apply.
-
-The provider talks to the Docker Engine API directly. Compose files are parsed
-in-process by `docker_compose` (never handed to the compose plugin), and it never
-shells out to the `docker` CLI. Resources fall into four layers:
+Types fall into four layers. Create them in this order; destroy runs in reverse.
 
 | Layer | Resources | Data sources |
 |---|---|---|
-| 1. Image | `docker_image`, `docker_registry_image` | `docker_image`, `docker_registry_image` |
-| 2. Single-host primitives | `docker_network`, `docker_volume`, `docker_container` | `docker_network`, `docker_volume` |
+| 1. Image | `docker_image`, `docker_tag`, `docker_registry_image`, `docker_buildx_builder` | `docker_image`, `docker_registry_image` |
+| 2. Single host | `docker_network`, `docker_volume`, `docker_container`, `docker_plugin`, `docker_compose` (local mode) | `docker_network`, `docker_volume`, `docker_container` |
 | 3. Swarm topology | `docker_swarm_init`, `docker_swarm_node` | `docker_swarm_tokens`, `docker_node`, `docker_nodes` |
-| 4. Swarm workload | `docker_secret`, `docker_config`, `docker_service`, `docker_stack` | |
+| 4. Swarm workload | `docker_secret`, `docker_config`, `docker_service`, `docker_stack`, `docker_compose` (swarm mode) | `docker_secret`, `docker_config`, `docker_service`, `docker_stack` |
 
-Create the layers in that order. `docker_swarm_init` must exist before overlay
-networks, secrets, configs and services; `docker_swarm_node` joins extra hosts
-with the tokens `docker_swarm_init` exports. Destroy runs in reverse.
+`docker_swarm_init` must exist before overlay networks, secrets, configs and services; `docker_swarm_node` joins
+further hosts with the tokens `docker_swarm_init` exports.
+
+Actions and list resources need Terraform >= 1.14, write-only `*_wo` arguments >= 1.11, and ephemeral resources
+>= 1.10.
+
+`docker_buildx_builder` with `driver = "cloud"` (Docker Build Cloud) is implemented but not yet verified against the
+live Build Cloud service.
 
 ## Connecting to the daemon
 
-The endpoint is chosen in this order: `host`; the `ssh` block's `host`;
-`context`; `DOCKER_HOST`; `DOCKER_CONTEXT`; `currentContext` in the docker
-`config.json` (under `DOCKER_CONFIG`, default `~/.docker`); and finally
+The endpoint is chosen in this order: `host`; the `ssh` block's `host`; `context`; `DOCKER_HOST`; `DOCKER_CONTEXT`;
+`currentContext` in the docker `config.json` (under `DOCKER_CONFIG`, default `~/.docker`); and finally
 `unix:///var/run/docker.sock`. The context named `default` means "no context".
 
-- **Docker contexts.** `context = "staging"` reads the context store written by
-  `docker context create`, through docker/cli's context store package. The
-  context supplies the host, its TLS material and `skip-tls-verify`. An
+- **Docker contexts.** `context = "staging"` reads the context store written by `docker context create`, through
+  docker/cli's context store package. The context supplies the host, its TLS material and `skip-tls-verify`. An
   `ssh://` context host uses the SSH transport below.
-- **TLS.** Give the `tls` block (PEM content or paths), or `cert_path`, a
-  directory holding `ca.pem`, `cert.pem` and `key.pem`. You can't set both;
-  plan rejects that. With neither set, TLS material comes from the context,
-  or from `DOCKER_CERT_PATH` when `DOCKER_TLS_VERIFY` is set.
-- **SSH.** An `ssh://user@host[:port]` host, or an `ssh` block, reaches the
-  daemon over SSH in pure Go (golang.org/x/crypto/ssh). No `ssh` binary runs.
-  The provider opens one connection per distinct configuration, reuses it for
-  every API call, and opens a `direct-streamlocal@openssh.com` channel to
-  `remote_socket` for each one. Authentication can use `identity_file`, the
-  SSH agent (`identity_agent`: `SSH_AUTH_SOCK`, or the Windows OpenSSH agent
-  pipe) and `password` / `password_wo`. Host keys are checked against
-  `known_hosts_file` unless `strict_host_key_checking = false`. `proxy_jump`
-  chains through one or more bastions. `docker_swarm_node` takes the same
-  `ssh` block for each joining node.
-- **Daemon check.** Configure pings the daemon once. If the daemon doesn't
-  answer, you get a *warning*: validate and plan never fail because a daemon
-  is missing. Set `disable_docker_daemon_check = true` to skip the ping.
-  Either way, the client makes no other call until a resource needs the
-  daemon.
+- **TLS.** Give the `tls` block (PEM content or paths), or `cert_path`, a directory holding `ca.pem`, `cert.pem` and
+  `key.pem`. You can't set both; plan rejects that. With neither set, TLS material comes from the context, or from
+  `DOCKER_CERT_PATH` when `DOCKER_TLS_VERIFY` is set.
+- **SSH.** An `ssh://user@host[:port]` host, or an `ssh` block, reaches the daemon over SSH in pure Go
+  (golang.org/x/crypto/ssh). No `ssh` binary runs. The provider opens one connection per distinct configuration,
+  reuses it for every API call, and opens a `direct-streamlocal@openssh.com` channel to `remote_socket` for each one.
+  Authentication can use `identity_file`, the SSH agent (`identity_agent`: `SSH_AUTH_SOCK`, or the Windows OpenSSH
+  agent pipe) and `password` / `password_wo`. Host keys are checked against `known_hosts_file` unless
+  `strict_host_key_checking = false`. `proxy_jump` chains through one or more bastions. `docker_swarm_node` takes the
+  same `ssh` block for each joining node.
+- **Daemon check.** Configure pings the daemon once. If the daemon doesn't answer, you get a *warning* that says why
+  (not reachable, permission denied on the socket or pipe, or a TLS failure): validate and plan never fail because a
+  daemon is missing. Set `disable_docker_daemon_check = true` to skip the ping. Either way, the client makes no other
+  call until a resource or data source needs the daemon.
+
+## Engine API floor: `min_api_version`
+
+`min_api_version` is the oldest Docker Engine API version the provider accepts, in the form `1.NN`. The default is
+`1.44` (Docker Engine 25.0). It cannot be above the newest version the provider speaks.
+
+- When Configure pings the daemon and the negotiated version is older, configuration fails with an error naming both
+  versions. With `disable_docker_daemon_check = true`, or when the daemon could not be reached at plan time, the same
+  error comes from the first operation that asks for the version.
+- A pinned `api_version` below `min_api_version` is rejected.
+- There is no environment variable for it: the docker CLI has no API floor setting to mirror.
 
 ## Registry credentials
 
-Each `registry_auth` block takes its credentials from the first of these
-sources that is set:
+For one registry, credentials come from the first of these that matches:
 
-1. `username` with `password` (or `password_wo`).
-2. `DOCKER_REGISTRY_USER` / `DOCKER_REGISTRY_PASS`, used only when the block
-   names no config file.
-3. `config_file_content`.
-4. `config_file`.
-5. The default config: `DOCKER_CONFIG` (a directory or a file), else
-   `~/.docker/config.json`.
+| # | Source | Notes |
+|---|---|---|
+| 1 | A `registry_auth` block for the registry: `username` with `password` (or `password_wo`) | |
+| 2 | The same block: `DOCKER_REGISTRY_USER` / `DOCKER_REGISTRY_PASS` | Only when the block names no config file. |
+| 3 | The same block: its docker config (`config_file_content`, else `config_file`, else the default config) | Looked up as below. A block that resolves to nothing is an error. |
+| 4 | No block: the default docker config (`DOCKER_CONFIG`, a directory or a file, else `~/.docker/config.json`) | Read on first use and cached per registry. Nothing found means anonymous, never an error. |
+| 5 | Anonymous | |
 
-Config files are read like the docker CLI reads them: `credHelpers` for the
-registry, then `credsStore`, then `auths`. The `docker-credential-<name>`
-helpers are external programs. Running them is the provider's only exception
-to "nothing shells out", and it needs `allow_credential_helpers = true`.
-Without that setting, a usable `auths` entry is still used. A registry whose
-credentials live only in a helper gives an error that names the setting.
-`auth_disabled = true` makes a registry anonymous.
+Inside a docker config the order is the docker CLI's: `credHelpers[<registry>]`, then `credsStore`, then `auths`.
 
-A generated agent skill with dependency rules, the attributes that force
-replacement and a worked cold-start example lives in
-`.claude/skills/terraform-provider-docker/SKILL.md` in the provider repository (Claude Code loads it from there).
+- `credHelpers` and `credsStore` both run a `docker-credential-<name>` helper found on `PATH`. That is the provider's
+  only exception to "nothing shells out", and it needs `allow_credential_helpers = true` (default `false`).
+- A helper that answers "credentials not found", fails, or is not allowed falls back to the `auths` entry for the
+  registry when there is one. A registry whose credentials live only in a disallowed helper gives an error that names
+  the setting.
+- Docker Hub is looked up under `https://index.docker.io/v1/`, other registries under their bare `host[:port]`.
+- `auth_disabled = true` on a block makes that registry anonymous.
+
+The provider's own registry reads (`docker_registry_image` delete, the registry data sources and the
+`docker_registry_token` ephemeral resource) use the same resolution.
+
+## Owner labels
+
+Set `owner` and every object the provider creates carries the label `io.terraform.provider.owner=<owner>`. Unset (the
+default), nothing is labelled and nothing is checked.
+
+- **Resources** (`docker_container`, `docker_network`, `docker_volume`, `docker_image` builds,
+  `docker_buildx_builder`, `docker_secret`, `docker_config`, `docker_service`, `docker_stack`, `docker_swarm_init`,
+  `docker_swarm_node`, `docker_compose`) add the label, and create fails with an error naming both owners when an
+  object of the same name already carries a different owner label. Managing such an object (after `terraform
+  import`, for example) needs `adopt = true` on the resource; without it the plan fails. The label is kept out of the
+  `labels` attribute, so it never shows as drift.
+- **Actions** that create objects (`docker_container_run`, `docker_image_commit`, `docker_image_import`,
+  `docker_compose_run`, `docker_buildx_bake`, `docker_compose_build`, `docker_compose_commit`,
+  `docker_compose_scale`) add the label for forensics only: an action owns nothing in state, so it runs no conflict
+  check and takes no `adopt`.
+- **No label**, by design: `docker_image_load` (images load exactly as saved), `docker_node` (manages an existing
+  node), `docker_plugin` and `docker_plugin_create` (plugins have no labels), `docker_tag`, `docker_registry_image` and
+  `docker_registry_manifest_list` (registry objects carry no Docker labels).
+
+## Outputs for downstream consumers
+
+Every resource and data source exposes its full result as computed attributes, so another module or provider can
+consume one field or the whole object. On `docker_container`, `docker_service`, `docker_network` and `docker_volume`:
+
+| Attribute | What it is | Changes when |
+|---|---|---|
+| `inspect` | The Engine API inspect response as a nested object, field by field in snake_case (`inspect.state.status`, `inspect.host_config.memory`). | Anything in the inspect response changes. |
+| `inspect_json` | The inspect response body exactly as the Engine returned it (surrounding whitespace trimmed). Sensitive where a secret channel (env, driver options) can reach it. | Anything in the inspect response changes. |
+| `content_sha256` | sha256 of `inspect_json`. | Anything changes, including runtime state: a restart, a new IP, a health check result, a task update. |
+| `config_sha256` | sha256 of the configuration part of the inspect response only. | The object's configuration changes. Runtime state does not move it. |
+
+Watch `config_sha256` to trigger downstream work (a `terraform_data` replacement, a config-management run) on a real
+configuration change; `content_sha256` also moves on every restart or state change. Sensitivity is per field: only
+fields a secret can reach (env, driver options, build args, tokens) are marked, so image names, ports and labels stay
+readable in plans. Version outputs (`engine_api_version`, `docker_server_version`) say which daemon produced the
+result.
+
+## Guides
+
+- [Container state: running, created, exited](https://registry.terraform.io/providers/JerryBalmer1/docker/latest/docs/guides/container-state):
+  how `docker_container` keeps a container running, created or exited, and how one-shot runs work.
+- [Migrating from kreuzwerker/docker](https://registry.terraform.io/providers/JerryBalmer1/docker/latest/docs/guides/migrating-from-kreuzwerker):
+  every kreuzwerker/docker v4.6.0 type and attribute mapped to its counterpart here, or dropped with a reason.
+
+A generated agent skill with the dependency rules, the attributes that force replacement and a worked cold-start
+example lives in `.claude/skills/terraform-provider-docker/SKILL.md` in the provider repository.
 
 ## Example Usage
 

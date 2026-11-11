@@ -37,7 +37,8 @@ action "docker_exec" "<name>" {
 | `privileged` | `bool` | optional |  |  | Give the command extended privileges. Default `false`. |
 | `result_path` | `string` | optional |  |  | Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails. |
 | `service_id` | `string` | optional |  |  | A Swarm service, by name: the command runs in one running task container of it on the provider's daemon (the first by name). Pin the service to that node with a placement constraint. Exactly one of `container_id` and `service_id`. |
-| `stdin` | `string` | optional |  |  | Data written to the command's standard input, which is then closed, like `echo ... \| docker exec -i`. Unset (the default), the command gets no stdin. It is never logged or written to `result_path`, but action arguments cannot be marked sensitive or write-only (terraform-plugin-framework v1.19), so pass secrets through `docker_exec_output`, whose `stdin` is sensitive. Not with `tty` or `detach`. |
+| `stdin` | `string` | optional |  |  | Data written to the command's standard input, which is then closed, like `echo ... \| docker exec -i`. Unset (the default), the command gets no stdin. It is never logged or written to `result_path`, but action arguments cannot be marked sensitive or write-only (terraform-plugin-framework v1.19), so the value shows in plan output: pass secrets with `stdin_path` (or `docker_exec_output`, whose `stdin` is sensitive) instead. Not with `stdin_path`, `tty` or `detach`. |
+| `stdin_path` | `string` | optional |  |  | A local file, on the machine running Terraform, whose bytes are written to the command's standard input, which is then closed, like `docker exec -i ... < file`. The file is read at invoke time, so only its path shows in plan output: this is the way to pass a secret to `docker_exec` (action arguments cannot be marked sensitive). The content is never logged or written to `result_path`. Not with `stdin`, `tty` or `detach`. |
 | `timeout` | `string` | optional |  |  | How long the command may run, as a Go duration (`30s`, `10m`). Default `5m`. On timeout the action fails; the process keeps running in the container. |
 | `tty` | `bool` | optional |  |  | Allocate a pseudo-TTY (`docker exec --tty`). Default `false`. With a TTY, stdout and stderr arrive merged in `stdout`. |
 | `user` | `string` | optional |  |  | User (and optional group) to run as, `name\|uid[:group\|gid]`. Default: the container's user. |
@@ -66,8 +67,9 @@ action "docker_exec" "migrate" {
     container_id = docker_container.db.id
     command      = ["sh", "-c", "until pg_isready -U postgres; do sleep 1; done; psql -U postgres -v ON_ERROR_STOP=1"]
     # The SQL script on standard input (`docker exec -i`); psql reads it to
-    # end of file. stdin may show in plan output: read secrets with the
-    # docker_exec_output ephemeral resource instead.
+    # end of file. stdin shows in plan output (action arguments cannot be
+    # sensitive): pass a secret with stdin_path instead, a local file read at
+    # invoke time, e.g. stdin_path = "${path.module}/secret.sql".
     stdin   = <<-EOT
       CREATE TABLE IF NOT EXISTS t (id int);
       INSERT INTO t VALUES (1);

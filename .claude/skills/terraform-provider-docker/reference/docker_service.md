@@ -17,8 +17,9 @@ A Swarm service: a desired number of tasks (containers) of one image scheduled a
 | `command` | `list(string)` | optional |  |  | Command to run (overrides the image `ENTRYPOINT`). |
 | `compose_go_version` | `string` | computed |  |  | compose-go version that loads, interpolates, merges and validates the project (v2.16.2, from go.mod). |
 | `compose_spec_version` | `string` | computed |  |  | Pinned compose-spec commit the structured fields follow (main @ 3a4a699...). |
+| `config_sha256` | `string` | computed |  |  | SHA-256 (hex) of the configuration part of inspect_json only (Spec; never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch. |
 | `container_labels` | `map(string)` | optional |  |  | Labels on the task containers. |
-| `content_sha256` | `string` | computed |  |  | SHA-256 of inspect_json; changes whenever the object changes. |
+| `content_sha256` | `string` | computed |  |  | SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes. |
 | `deploy` | `object` | computed |  |  | The service's normalized `deploy` section (mode, replicas, resources, restart/update/rollback policy, placement, labels). |
 | `dir` | `string` | optional |  |  | Working directory of the task process. Unset uses the image's. Updated in place. |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version of the daemon the provider talked to (GET /version Version). |
@@ -44,7 +45,7 @@ A Swarm service: a desired number of tasks (containers) of one image scheduled a
 | `open_stdin` | `bool` | optional |  |  | Keep the task containers' standard input open (`ContainerSpec.OpenStdin`). Updated in place. |
 | `published_ports` | `list(object)` | computed |  |  | Endpoint.Ports: the ports actually published, after the manager assigned any PublishedPort. Non-sensitive copy for handoff. |
 | `read_only` | `bool` | optional |  |  | Mount the task containers' root filesystem read-only (`ContainerSpec.ReadOnly`). Updated in place. |
-| `replicas` | `number` | optional, computed |  |  | Number of tasks for `replicated` mode (default 1). Only valid with `mode = "replicated"` (or unset): setting it with `global`, `global_job` or `replicated_job` is an error, as with `docker service create --replicas` (use `total_completions` for `replicated_job`). Updated in place. |
+| `replicas` | `number` | optional, computed |  |  | Number of tasks for `replicated` mode (default 1). Only valid with `mode = "replicated"` (or unset): setting it with `global`, `global_job` or `replicated_job` is an error, as with `docker service create --replicas` (use `total_completions` for `replicated_job`). Updated in place. Null in state for the other modes. |
 | `runtime` | `string` | optional |  |  | Runtime of the tasks (`TaskTemplate.Runtime`). Only `container` (the default) is useful here: this type always sends a `ContainerSpec`, and the `plugin` and `attachment` runtimes need a plugin or network-attachment spec instead. Updated in place. |
 | `stop_grace_period` | `string` | optional |  |  | Time to wait after the stop signal before killing a task (Go duration, e.g. `30s`; daemon default 10s). Updated in place. |
 | `stop_signal` | `string` | optional |  |  | Signal that stops the task containers, e.g. `SIGTERM` (`ContainerSpec.StopSignal`). Unset uses the image's. Updated in place. |
@@ -80,7 +81,7 @@ nested attribute, object. Upstream `placement`.
 |---|---|---|---|---|---|
 | `constraints` | `list(string)` | computed |  |  | Upstream `constraints`. |
 | `max_replicas_per_node` | `number` | computed |  |  | Upstream `max_replicas_per_node`. |
-| `preferences` | `list(string)` | computed |  |  | Upstream `preferences`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `preferences` | `list(string)` | computed |  |  | Upstream `preferences`. Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 
 ### `deploy.resources`
 
@@ -88,8 +89,8 @@ nested attribute, object. Upstream `resources`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `limits` | `dynamic` | computed |  |  | Upstream `limits`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
-| `reservations` | `dynamic` | computed |  |  | Upstream `reservations`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `limits` | `dynamic` | computed |  |  | Upstream `limits`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here). |
+| `reservations` | `dynamic` | computed |  |  | Upstream `reservations`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here). |
 
 ### `deploy.restart_policy`
 
@@ -265,8 +266,8 @@ nested attribute, object. Upstream `Mode`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `global` | `dynamic` | computed |  |  | Upstream `Global`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
-| `global_job` | `dynamic` | computed |  |  | Upstream `GlobalJob`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `global` | `dynamic` | computed |  |  | Upstream `Global`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here). |
+| `global_job` | `dynamic` | computed |  |  | Upstream `GlobalJob`. Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here). |
 | `replicated` | `object` | computed |  |  | Upstream `Replicated`. |
 | `replicated_job` | `object` | computed |  |  | Upstream `ReplicatedJob`. |
 
@@ -371,7 +372,7 @@ nested attribute, list(object). Upstream `Configs`.
 | `config_id` | `string` | computed |  |  | Upstream `ConfigID`. |
 | `config_name` | `string` | computed |  |  | Upstream `ConfigName`. |
 | `file` | `object` | computed |  |  | Upstream `File`. |
-| `runtime` | `string` | computed |  |  | Upstream `Runtime`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `runtime` | `string` | computed |  |  | Upstream `Runtime`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 
 ### `inspect.spec.task_template.container_spec.configs.file`
 
@@ -420,7 +421,7 @@ nested attribute, list(object). Upstream `Mounts`.
 | `source` | `string` | computed |  |  | Upstream `Source`. |
 | `target` | `string` | computed |  |  | Upstream `Target`. |
 | `tmpfs_options` | `object` | computed |  |  | Upstream `TmpfsOptions`. |
-| `type` | `string` | computed |  |  | Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
 | `volume_options` | `object` | computed |  |  | Upstream `VolumeOptions`. |
 
 ### `inspect.spec.task_template.container_spec.mounts.bind_options`

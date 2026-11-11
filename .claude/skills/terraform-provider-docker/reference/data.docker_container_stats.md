@@ -46,14 +46,102 @@ nested attribute, object. Upstream `blkio_stats`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `io_merged_recursive` | `list(string)` | computed |  |  | Upstream `io_merged_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `io_queue_recursive` | `list(string)` | computed |  |  | Upstream `io_queue_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `io_service_bytes_recursive` | `list(string)` | computed |  |  | Upstream `io_service_bytes_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `io_service_time_recursive` | `list(string)` | computed |  |  | Upstream `io_service_time_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `io_serviced_recursive` | `list(string)` | computed |  |  | Upstream `io_serviced_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `io_time_recursive` | `list(string)` | computed |  |  | Upstream `io_time_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `io_wait_time_recursive` | `list(string)` | computed |  |  | Upstream `io_wait_time_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `sectors_recursive` | `list(string)` | computed |  |  | Upstream `sectors_recursive`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `io_merged_recursive` | `list(object)` | computed |  |  | Upstream `io_merged_recursive`. |
+| `io_queue_recursive` | `list(object)` | computed |  |  | Upstream `io_queue_recursive`. |
+| `io_service_bytes_recursive` | `list(object)` | computed |  |  | Upstream `io_service_bytes_recursive`. |
+| `io_service_time_recursive` | `list(object)` | computed |  |  | Upstream `io_service_time_recursive`. |
+| `io_serviced_recursive` | `list(object)` | computed |  |  | Upstream `io_serviced_recursive`. |
+| `io_time_recursive` | `list(object)` | computed |  |  | Upstream `io_time_recursive`. |
+| `io_wait_time_recursive` | `list(object)` | computed |  |  | Upstream `io_wait_time_recursive`. |
+| `sectors_recursive` | `list(object)` | computed |  |  | Upstream `sectors_recursive`. |
+
+### `stats.blkio_stats.io_merged_recursive`
+
+nested attribute, list(object). Upstream `io_merged_recursive`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `major` | `number` | computed |  |  | Upstream `major`. |
+| `minor` | `number` | computed |  |  | Upstream `minor`. |
+| `op` | `string` | computed |  |  | Upstream `op`. |
+| `value` | `number` | computed |  |  | Upstream `value`. |
+
+### `stats.blkio_stats.io_queue_recursive`
+
+nested attribute, list(object). Upstream `io_queue_recursive`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `major` | `number` | computed |  |  | Upstream `major`. |
+| `minor` | `number` | computed |  |  | Upstream `minor`. |
+| `op` | `string` | computed |  |  | Upstream `op`. |
+| `value` | `number` | computed |  |  | Upstream `value`. |
+
+### `stats.blkio_stats.io_service_bytes_recursive`
+
+nested attribute, list(object). Upstream `io_service_bytes_recursive`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `major` | `number` | computed |  |  | Upstream `major`. |
+| `minor` | `number` | computed |  |  | Upstream `minor`. |
+| `op` | `string` | computed |  |  | Upstream `op`. |
+| `value` | `number` | computed |  |  | Upstream `value`. |
+
+### `stats.blkio_stats.io_service_time_recursive`
+
+nested attribute, list(object). Upstream `io_service_time_recursive`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `major` | `number` | computed |  |  | Upstream `major`. |
+| `minor` | `number` | computed |  |  | Upstream `minor`. |
+| `op` | `string` | computed |  |  | Upstream `op`. |
+| `value` | `number` | computed |  |  | Upstream `value`. |
+
+### `stats.blkio_stats.io_serviced_recursive`
+
+nested attribute, list(object). Upstream `io_serviced_recursive`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `major` | `number` | computed |  |  | Upstream `major`. |
+| `minor` | `number` | computed |  |  | Upstream `minor`. |
+| `op` | `string` | computed |  |  | Upstream `op`. |
+| `value` | `number` | computed |  |  | Upstream `value`. |
+
+### `stats.blkio_stats.io_time_recursive`
+
+nested attribute, list(object). Upstream `io_time_recursive`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `major` | `number` | computed |  |  | Upstream `major`. |
+| `minor` | `number` | computed |  |  | Upstream `minor`. |
+| `op` | `string` | computed |  |  | Upstream `op`. |
+| `value` | `number` | computed |  |  | Upstream `value`. |
+
+### `stats.blkio_stats.io_wait_time_recursive`
+
+nested attribute, list(object). Upstream `io_wait_time_recursive`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `major` | `number` | computed |  |  | Upstream `major`. |
+| `minor` | `number` | computed |  |  | Upstream `minor`. |
+| `op` | `string` | computed |  |  | Upstream `op`. |
+| `value` | `number` | computed |  |  | Upstream `value`. |
+
+### `stats.blkio_stats.sectors_recursive`
+
+nested attribute, list(object). Upstream `sectors_recursive`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `major` | `number` | computed |  |  | Upstream `major`. |
+| `minor` | `number` | computed |  |  | Upstream `minor`. |
+| `op` | `string` | computed |  |  | Upstream `op`. |
+| `value` | `number` | computed |  |  | Upstream `value`. |
 
 ### `stats.cpu_stats`
 
@@ -61,10 +149,31 @@ nested attribute, object. Upstream `cpu_stats`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `cpu_usage` | `dynamic` | computed |  |  | Upstream `cpu_usage`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `cpu_usage` | `object` | computed |  |  | Upstream `cpu_usage`. |
 | `online_cpus` | `number` | computed |  |  | Upstream `online_cpus`. |
 | `system_cpu_usage` | `number` | computed |  |  | Upstream `system_cpu_usage`. |
-| `throttling_data` | `dynamic` | computed |  |  | Upstream `throttling_data`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `throttling_data` | `object` | computed |  |  | Upstream `throttling_data`. |
+
+### `stats.cpu_stats.cpu_usage`
+
+nested attribute, object. Upstream `cpu_usage`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `percpu_usage` | `list(number)` | computed |  |  | Upstream `percpu_usage`. |
+| `total_usage` | `number` | computed |  |  | Upstream `total_usage`. |
+| `usage_in_kernelmode` | `number` | computed |  |  | Upstream `usage_in_kernelmode`. |
+| `usage_in_usermode` | `number` | computed |  |  | Upstream `usage_in_usermode`. |
+
+### `stats.cpu_stats.throttling_data`
+
+nested attribute, object. Upstream `throttling_data`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `periods` | `number` | computed |  |  | Upstream `periods`. |
+| `throttled_periods` | `number` | computed |  |  | Upstream `throttled_periods`. |
+| `throttled_time` | `number` | computed |  |  | Upstream `throttled_time`. |
 
 ### `stats.memory_stats`
 
@@ -113,10 +222,31 @@ nested attribute, object. Upstream `precpu_stats`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `cpu_usage` | `dynamic` | computed |  |  | Upstream `cpu_usage`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `cpu_usage` | `object` | computed |  |  | Upstream `cpu_usage`. |
 | `online_cpus` | `number` | computed |  |  | Upstream `online_cpus`. |
 | `system_cpu_usage` | `number` | computed |  |  | Upstream `system_cpu_usage`. |
-| `throttling_data` | `dynamic` | computed |  |  | Upstream `throttling_data`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `throttling_data` | `object` | computed |  |  | Upstream `throttling_data`. |
+
+### `stats.precpu_stats.cpu_usage`
+
+nested attribute, object. Upstream `cpu_usage`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `percpu_usage` | `list(number)` | computed |  |  | Upstream `percpu_usage`. |
+| `total_usage` | `number` | computed |  |  | Upstream `total_usage`. |
+| `usage_in_kernelmode` | `number` | computed |  |  | Upstream `usage_in_kernelmode`. |
+| `usage_in_usermode` | `number` | computed |  |  | Upstream `usage_in_usermode`. |
+
+### `stats.precpu_stats.throttling_data`
+
+nested attribute, object. Upstream `throttling_data`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `periods` | `number` | computed |  |  | Upstream `periods`. |
+| `throttled_periods` | `number` | computed |  |  | Upstream `throttled_periods`. |
+| `throttled_time` | `number` | computed |  |  | Upstream `throttled_time`. |
 
 ### `stats.storage_stats`
 

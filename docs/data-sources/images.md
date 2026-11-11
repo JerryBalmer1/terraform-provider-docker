@@ -73,9 +73,21 @@ Read-Only:
 - `data` (String) Upstream `data`.
 - `digest` (String) Upstream `digest`.
 - `media_type` (String) Upstream `mediaType`.
-- `platform` (String) Upstream `platform`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--images--descriptor--platform))
 - `size` (Number) Upstream `size`.
 - `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--images--descriptor--platform"></a>
+### Nested Schema for `images.descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
 
 
 <a id="nestedatt--images--manifests"></a>
@@ -83,10 +95,160 @@ Read-Only:
 
 Read-Only:
 
-- `attestation_data` (String) Upstream `AttestationData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `attestation_data` (Attributes) Upstream `AttestationData`. (see [below for nested schema](#nestedatt--images--manifests--attestation_data))
 - `available` (Boolean) Upstream `Available`.
-- `descriptor` (String) Upstream `Descriptor`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `descriptor` (Attributes) Upstream `Descriptor`. (see [below for nested schema](#nestedatt--images--manifests--descriptor))
 - `id` (String) Upstream `ID`.
-- `image_data` (String) Upstream `ImageData`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `image_data` (Attributes) Upstream `ImageData`. (see [below for nested schema](#nestedatt--images--manifests--image_data))
 - `kind` (String) Upstream `Kind`.
-- `size` (String) Upstream `Size`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.
+- `size` (Attributes) Upstream `Size`. (see [below for nested schema](#nestedatt--images--manifests--size))
+
+<a id="nestedatt--images--manifests--attestation_data"></a>
+### Nested Schema for `images.manifests.attestation_data`
+
+Read-Only:
+
+- `for` (String) Upstream `For`.
+
+
+<a id="nestedatt--images--manifests--descriptor"></a>
+### Nested Schema for `images.manifests.descriptor`
+
+Read-Only:
+
+- `annotations` (Map of String) Upstream `annotations`.
+- `artifact_type` (String) Upstream `artifactType`.
+- `data` (String) Upstream `data`.
+- `digest` (String) Upstream `digest`.
+- `media_type` (String) Upstream `mediaType`.
+- `platform` (Attributes) Upstream `platform`. (see [below for nested schema](#nestedatt--images--manifests--descriptor--platform))
+- `size` (Number) Upstream `size`.
+- `urls` (List of String) Upstream `urls`.
+
+<a id="nestedatt--images--manifests--descriptor--platform"></a>
+### Nested Schema for `images.manifests.descriptor.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
+
+
+<a id="nestedatt--images--manifests--image_data"></a>
+### Nested Schema for `images.manifests.image_data`
+
+Read-Only:
+
+- `containers` (List of String) Upstream `Containers`.
+- `identity` (Attributes) Upstream `Identity`. (see [below for nested schema](#nestedatt--images--manifests--image_data--identity))
+- `platform` (Attributes) Upstream `Platform`. (see [below for nested schema](#nestedatt--images--manifests--image_data--platform))
+- `size` (Attributes) Upstream `Size`. (see [below for nested schema](#nestedatt--images--manifests--image_data--size))
+
+<a id="nestedatt--images--manifests--image_data--identity"></a>
+### Nested Schema for `images.manifests.image_data.identity`
+
+Read-Only:
+
+- `build` (Attributes List) Upstream `Build`. (see [below for nested schema](#nestedatt--images--manifests--image_data--identity--build))
+- `pull` (Attributes List) Upstream `Pull`. (see [below for nested schema](#nestedatt--images--manifests--image_data--identity--pull))
+- `signature` (Attributes List) Upstream `Signature`. (see [below for nested schema](#nestedatt--images--manifests--image_data--identity--signature))
+
+<a id="nestedatt--images--manifests--image_data--identity--build"></a>
+### Nested Schema for `images.manifests.image_data.identity.build`
+
+Read-Only:
+
+- `created_at` (String) Upstream `CreatedAt`.
+- `ref` (String) Upstream `Ref`.
+
+
+<a id="nestedatt--images--manifests--image_data--identity--pull"></a>
+### Nested Schema for `images.manifests.image_data.identity.pull`
+
+Read-Only:
+
+- `repository` (String) Upstream `Repository`.
+
+
+<a id="nestedatt--images--manifests--image_data--identity--signature"></a>
+### Nested Schema for `images.manifests.image_data.identity.signature`
+
+Read-Only:
+
+- `docker_reference` (String) Upstream `DockerReference`.
+- `error` (String) Upstream `Error`.
+- `known_signer` (String) Upstream `KnownSigner`.
+- `name` (String) Upstream `Name`.
+- `signature_type` (String) Upstream `SignatureType`.
+- `signer` (Attributes) Upstream `Signer`. (see [below for nested schema](#nestedatt--images--manifests--image_data--identity--signature--signer))
+- `timestamps` (Attributes List) Upstream `Timestamps`. (see [below for nested schema](#nestedatt--images--manifests--image_data--identity--signature--timestamps))
+- `warnings` (List of String) Upstream `Warnings`.
+
+<a id="nestedatt--images--manifests--image_data--identity--signature--signer"></a>
+### Nested Schema for `images.manifests.image_data.identity.signature.signer`
+
+Read-Only:
+
+- `build_config_digest` (String) Upstream `BuildConfigDigest`.
+- `build_config_uri` (String) Upstream `BuildConfigURI`.
+- `build_signer_digest` (String) Upstream `BuildSignerDigest`.
+- `build_signer_uri` (String) Upstream `BuildSignerURI`.
+- `build_trigger` (String) Upstream `BuildTrigger`.
+- `certificate_issuer` (String) Upstream `CertificateIssuer`.
+- `issuer` (String) Upstream `Issuer`.
+- `run_invocation_uri` (String) Upstream `RunInvocationURI`.
+- `runner_environment` (String) Upstream `RunnerEnvironment`.
+- `source_repository_digest` (String) Upstream `SourceRepositoryDigest`.
+- `source_repository_identifier` (String) Upstream `SourceRepositoryIdentifier`.
+- `source_repository_owner_identifier` (String) Upstream `SourceRepositoryOwnerIdentifier`.
+- `source_repository_owner_uri` (String) Upstream `SourceRepositoryOwnerURI`.
+- `source_repository_ref` (String) Upstream `SourceRepositoryRef`.
+- `source_repository_uri` (String) Upstream `SourceRepositoryURI`.
+- `source_repository_visibility_at_signing` (String) Upstream `SourceRepositoryVisibilityAtSigning`.
+- `subject_alternative_name` (String) Upstream `SubjectAlternativeName`.
+
+
+<a id="nestedatt--images--manifests--image_data--identity--signature--timestamps"></a>
+### Nested Schema for `images.manifests.image_data.identity.signature.timestamps`
+
+Read-Only:
+
+- `timestamp` (String) Upstream `Timestamp`.
+- `type` (String) Upstream `Type`.
+- `uri` (String) Upstream `URI`.
+
+
+
+
+<a id="nestedatt--images--manifests--image_data--platform"></a>
+### Nested Schema for `images.manifests.image_data.platform`
+
+Read-Only:
+
+- `architecture` (String) Upstream `architecture`.
+- `os` (String) Upstream `os`.
+- `os_features` (List of String) Upstream `os.features`.
+- `os_version` (String) Upstream `os.version`.
+- `variant` (String) Upstream `variant`.
+
+
+<a id="nestedatt--images--manifests--image_data--size"></a>
+### Nested Schema for `images.manifests.image_data.size`
+
+Read-Only:
+
+- `unpacked` (Number) Upstream `Unpacked`.
+
+
+
+<a id="nestedatt--images--manifests--size"></a>
+### Nested Schema for `images.manifests.size`
+
+Read-Only:
+
+- `content` (Number) Upstream `Content`.
+- `total` (Number) Upstream `Total`.

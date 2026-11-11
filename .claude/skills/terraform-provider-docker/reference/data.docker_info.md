@@ -94,7 +94,16 @@ nested attribute, object. Upstream `Containerd`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `address` | `string` | computed |  |  | Upstream `Address`. |
-| `namespaces` | `dynamic` | computed |  |  | Upstream `Namespaces`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `namespaces` | `object` | computed |  |  | Upstream `Namespaces`. |
+
+### `info.containerd.namespaces`
+
+nested attribute, object. Upstream `Namespaces`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `containers` | `string` | computed |  |  | Upstream `Containers`. |
+| `plugins` | `string` | computed |  |  | Upstream `Plugins`. |
 
 ### `info.containerd_commit`
 
@@ -137,8 +146,26 @@ nested attribute, list(object). Upstream `GenericResources`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `discrete_resource_spec` | `string` | computed |  |  | Upstream `DiscreteResourceSpec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
-| `named_resource_spec` | `string` | computed |  |  | Upstream `NamedResourceSpec`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `discrete_resource_spec` | `object` | computed |  |  | Upstream `DiscreteResourceSpec`. |
+| `named_resource_spec` | `object` | computed |  |  | Upstream `NamedResourceSpec`. |
+
+### `info.generic_resources.discrete_resource_spec`
+
+nested attribute, object. Upstream `DiscreteResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `number` | computed |  |  | Upstream `Value`. |
+
+### `info.generic_resources.named_resource_spec`
+
+nested attribute, object. Upstream `NamedResourceSpec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `kind` | `string` | computed |  |  | Upstream `Kind`. |
+| `value` | `string` | computed |  |  | Upstream `Value`. |
 
 ### `info.init_commit`
 
@@ -173,9 +200,20 @@ nested attribute, object. Upstream `RegistryConfig`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `index_configs` | `map(string)` | computed |  |  | Upstream `IndexConfigs`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `index_configs` | `map(object)` | computed |  |  | Upstream `IndexConfigs`. |
 | `insecure_registry_cid_rs` | `list(string)` | computed |  |  | Upstream `InsecureRegistryCIDRs`. |
 | `mirrors` | `list(string)` | computed |  |  | Upstream `Mirrors`. |
+
+### `info.registry_config.index_configs`
+
+nested attribute, map(object). Upstream `IndexConfigs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `mirrors` | `list(string)` | computed |  |  | Upstream `Mirrors`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `official` | `bool` | computed |  |  | Upstream `Official`. |
+| `secure` | `bool` | computed |  |  | Upstream `Secure`. |
 
 ### `info.runc_commit`
 
@@ -201,7 +239,7 @@ nested attribute, object. Upstream `Swarm`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `cluster` | `dynamic` | computed |  |  | Upstream `Cluster`. Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here). |
+| `cluster` | `object` | computed |  |  | Upstream `Cluster`. |
 | `control_available` | `bool` | computed |  |  | Upstream `ControlAvailable`. |
 | `error` | `string` | computed |  |  | Upstream `Error`. |
 | `local_node_state` | `string` | computed |  |  | Upstream `LocalNodeState`. |
@@ -209,7 +247,142 @@ nested attribute, object. Upstream `Swarm`.
 | `node_addr` | `string` | computed |  |  | Upstream `NodeAddr`. |
 | `node_id` | `string` | computed |  |  | Upstream `NodeID`. |
 | `nodes` | `number` | computed |  |  | Upstream `Nodes`. |
-| `remote_managers` | `list(string)` | computed |  |  | Upstream `RemoteManagers`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `remote_managers` | `list(object)` | computed |  |  | Upstream `RemoteManagers`. |
+
+### `info.swarm.cluster`
+
+nested attribute, object. Upstream `Cluster`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `created_at` | `string` | computed |  |  | Upstream `CreatedAt`. |
+| `data_path_port` | `number` | computed |  |  | Upstream `DataPathPort`. |
+| `default_addr_pool` | `list(string)` | computed |  |  | Upstream `DefaultAddrPool`. |
+| `id` | `string` | computed |  |  | Upstream `ID`. |
+| `root_rotation_in_progress` | `bool` | computed |  |  | Upstream `RootRotationInProgress`. |
+| `spec` | `object` | computed |  |  | Upstream `Spec`. |
+| `subnet_size` | `number` | computed |  |  | Upstream `SubnetSize`. |
+| `tls_info` | `object` | computed |  |  | Upstream `TLSInfo`. |
+| `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
+| `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `info.swarm.cluster.spec`
+
+nested attribute, object. Upstream `Spec`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ca_config` | `object` | computed |  |  | Upstream `CAConfig`. |
+| `dispatcher` | `object` | computed |  |  | Upstream `Dispatcher`. |
+| `encryption_config` | `object` | computed |  |  | Upstream `EncryptionConfig`. |
+| `labels` | `map(string)` | computed |  |  | Upstream `Labels`. |
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `orchestration` | `object` | computed |  |  | Upstream `Orchestration`. |
+| `raft` | `object` | computed |  |  | Upstream `Raft`. |
+| `task_defaults` | `object` | computed |  |  | Upstream `TaskDefaults`. |
+
+### `info.swarm.cluster.spec.ca_config`
+
+nested attribute, object. Upstream `CAConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `external_cas` | `list(object)` | computed |  |  | Upstream `ExternalCAs`. |
+| `force_rotate` | `number` | computed |  |  | Upstream `ForceRotate`. |
+| `node_cert_expiry` | `number` | computed |  |  | Upstream `NodeCertExpiry`. |
+| `signing_ca_cert` | `string` | computed |  |  | Upstream `SigningCACert`. |
+| `signing_ca_key` | `string` | computed |  |  | Upstream `SigningCAKey`. |
+
+### `info.swarm.cluster.spec.ca_config.external_cas`
+
+nested attribute, list(object). Upstream `ExternalCAs`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `ca_cert` | `string` | computed |  |  | Upstream `CACert`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+| `protocol` | `string` | computed |  |  | Upstream `Protocol`. |
+| `url` | `string` | computed |  |  | Upstream `URL`. |
+
+### `info.swarm.cluster.spec.dispatcher`
+
+nested attribute, object. Upstream `Dispatcher`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `heartbeat_period` | `number` | computed |  |  | Upstream `HeartbeatPeriod`. |
+
+### `info.swarm.cluster.spec.encryption_config`
+
+nested attribute, object. Upstream `EncryptionConfig`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `auto_lock_managers` | `bool` | computed |  |  | Upstream `AutoLockManagers`. |
+
+### `info.swarm.cluster.spec.orchestration`
+
+nested attribute, object. Upstream `Orchestration`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `task_history_retention_limit` | `number` | computed |  |  | Upstream `TaskHistoryRetentionLimit`. |
+
+### `info.swarm.cluster.spec.raft`
+
+nested attribute, object. Upstream `Raft`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `election_tick` | `number` | computed |  |  | Upstream `ElectionTick`. |
+| `heartbeat_tick` | `number` | computed |  |  | Upstream `HeartbeatTick`. |
+| `keep_old_snapshots` | `number` | computed |  |  | Upstream `KeepOldSnapshots`. |
+| `log_entries_for_slow_followers` | `number` | computed |  |  | Upstream `LogEntriesForSlowFollowers`. |
+| `snapshot_interval` | `number` | computed |  |  | Upstream `SnapshotInterval`. |
+
+### `info.swarm.cluster.spec.task_defaults`
+
+nested attribute, object. Upstream `TaskDefaults`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `log_driver` | `object` | computed |  |  | Upstream `LogDriver`. |
+
+### `info.swarm.cluster.spec.task_defaults.log_driver`
+
+nested attribute, object. Upstream `LogDriver`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `name` | `string` | computed |  |  | Upstream `Name`. |
+| `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `info.swarm.cluster.tls_info`
+
+nested attribute, object. Upstream `TLSInfo`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `cert_issuer_public_key` | `string` | computed |  |  | Upstream `CertIssuerPublicKey`. |
+| `cert_issuer_subject` | `string` | computed |  |  | Upstream `CertIssuerSubject`. |
+| `trust_root` | `string` | computed |  |  | Upstream `TrustRoot`. |
+
+### `info.swarm.cluster.version`
+
+nested attribute, object. Upstream `Version`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `index` | `number` | computed |  |  | Upstream `Index`. |
+
+### `info.swarm.remote_managers`
+
+nested attribute, list(object). Upstream `RemoteManagers`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `addr` | `string` | computed |  |  | Upstream `Addr`. |
+| `node_id` | `string` | computed |  |  | Upstream `NodeID`. |
 
 ## Example
 

@@ -28,7 +28,7 @@ nested attribute, list(object). Images used by project containers: service, cont
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `architecture` | `string` | computed |  |  | Upstream `Architecture`. |
-| `container_name` | `string` | computed |  |  | Upstream `Names`. |
+| `container_name` | `string` | computed |  |  | Upstream `Names[0] (leading "/" removed; the ID when Names is empty)`. |
 | `created` | `string` | computed |  |  | Upstream `Created`. |
 | `id` | `string` | computed |  |  | Upstream `Id`. |
 | `os` | `string` | computed |  |  | Upstream `Os`. |

@@ -67,15 +67,19 @@ Read-Only:
 - `cmd` (List of String) Upstream `Cmd`.
 - `entrypoint` (List of String) Upstream `Entrypoint`.
 - `env` (List of String, Sensitive) Upstream `Env`. Sensitive.
-- `exposed_ports` (List of String) Map keys (`<port>/<proto>`) as a list.
+- `exposed_ports` (Attributes Map) ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list). (see [below for nested schema](#nestedatt--config--exposed_ports))
 - `healthcheck` (Attributes) Upstream `Healthcheck`. (see [below for nested schema](#nestedatt--config--healthcheck))
 - `labels` (Map of String) Upstream `Labels`.
 - `on_build` (List of String) Upstream `OnBuild`.
 - `shell` (List of String) Upstream `Shell`.
 - `stop_signal` (String) Upstream `StopSignal`.
 - `user` (String) Upstream `User`.
-- `volumes` (List of String) Map keys as a list.
+- `volumes` (Attributes Map) Volumes as the Engine returns it: a map keyed by the container path with empty objects as values (keys verbatim; use `keys(...)` for a list). (see [below for nested schema](#nestedatt--config--volumes))
 - `working_dir` (String) Upstream `WorkingDir`.
+
+<a id="nestedatt--config--exposed_ports"></a>
+### Nested Schema for `config.exposed_ports`
+
 
 <a id="nestedatt--config--healthcheck"></a>
 ### Nested Schema for `config.healthcheck`
@@ -88,6 +92,10 @@ Read-Only:
 - `start_period` (Number) Upstream `StartPeriod`.
 - `test` (List of String) Upstream `Test`.
 - `timeout` (Number) Upstream `Timeout`.
+
+
+<a id="nestedatt--config--volumes"></a>
+### Nested Schema for `config.volumes`
 
 
 

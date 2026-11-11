@@ -62,9 +62,20 @@ nested attribute, object. Upstream `IPAM`.
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `config` | `list(string)` | computed |  |  | Upstream `Config`. Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `config` | `list(object)` | computed |  |  | Upstream `Config`. |
 | `driver` | `string` | computed |  |  | Upstream `Driver`. |
 | `options` | `map(string)` | computed |  |  | Upstream `Options`. |
+
+### `networks.ipam.config`
+
+nested attribute, list(object). Upstream `Config`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `auxiliary_addresses` | `map(string)` | computed |  |  | Upstream `AuxiliaryAddresses`. |
+| `gateway` | `string` | computed |  |  | Upstream `Gateway`. |
+| `ip_range` | `string` | computed |  |  | Upstream `IPRange`. |
+| `subnet` | `string` | computed |  |  | Upstream `Subnet`. |
 
 ### `networks.peers`
 

@@ -212,7 +212,7 @@ nested attribute, list(object). Upstream `Configs`.
 | `config_id` | `string` | computed |  |  | Upstream `ConfigID`. |
 | `config_name` | `string` | computed |  |  | Upstream `ConfigName`. |
 | `file` | `object` | computed |  |  | Upstream `File`. |
-| `runtime` | `string` | computed |  |  | Upstream `Runtime`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `runtime` | `string` | computed |  |  | Upstream `Runtime`. Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
 
 ### `inspect.spec.container_spec.configs.file`
 
@@ -261,7 +261,7 @@ nested attribute, list(object). Upstream `Mounts`.
 | `source` | `string` | computed |  |  | Upstream `Source`. |
 | `target` | `string` | computed |  |  | Upstream `Target`. |
 | `tmpfs_options` | `object` | computed |  |  | Upstream `TmpfsOptions`. |
-| `type` | `string` | computed |  |  | Upstream `Type`. Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map. |
+| `type` | `string` | computed |  |  | Upstream `Type`. |
 | `volume_options` | `object` | computed |  |  | Upstream `VolumeOptions`. |
 
 ### `inspect.spec.container_spec.mounts.bind_options`

@@ -348,7 +348,7 @@ inv = {
         "engine_api": "1.56 (moby api/v1.56.1 @ 14ebc602124e280ef4ae3e1a8e688dac1255baa6)",
         "compose_spec": "main @ 3a4a6995e4a971f6173dff9130cb3e38e6738651",
         "compose_go": "v2.16.2 @ ddbe099a5404149d75fe774b30de7bd0befd3bd3",
-        "compose_cli": "v5.1.4 @ 4732a2ed20a49c43a7b44bb4928259162c3ae3be",
+        "compose_cli": "v5.7.0 @ 5bceecf985347fcf6dd23029ce440b502a0d4301",
         "docker_cli": "v29.5.3 @ d1c06ef6b41d88d76866aea43c246cd7c63d04fa",
         "dockerfile": "dockerfile/1.28.0 @ f5b59a1f2fb25a0cb7072c398cab9aed7835da4e",
         "buildx": "v0.38.2 @ 3c4cbd35852fc1a476923627a780a7836c28b654",

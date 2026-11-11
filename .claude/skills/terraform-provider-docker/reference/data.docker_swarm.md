@@ -32,12 +32,22 @@ nested attribute, object. The swarm (its ClusterInfo part) inspect response as a
 | `data_path_port` | `number` | computed |  |  | Upstream `DataPathPort`. |
 | `default_addr_pool` | `list(string)` | computed |  |  | Upstream `DefaultAddrPool`. |
 | `id` | `string` | computed |  |  | Upstream `ID`. |
+| `join_tokens` | `object` | computed |  |  | Upstream `JoinTokens`. |
 | `root_rotation_in_progress` | `bool` | computed |  |  | Upstream `RootRotationInProgress`. |
 | `spec` | `object` | computed |  |  | Upstream `Spec`. |
 | `subnet_size` | `number` | computed |  |  | Upstream `SubnetSize`. |
 | `tls_info` | `object` | computed |  |  | Upstream `TLSInfo`. |
 | `updated_at` | `string` | computed |  |  | Upstream `UpdatedAt`. |
 | `version` | `object` | computed |  |  | Upstream `Version`. |
+
+### `inspect.join_tokens`
+
+nested attribute, object. Upstream `JoinTokens`.
+
+| Name | Type | Status | Forces replacement | Sensitive | Description |
+|---|---|---|---|---|---|
+| `manager` | `string` | computed |  | yes | Upstream `Manager`. Sensitive. |
+| `worker` | `string` | computed |  | yes | Upstream `Worker`. Sensitive. |
 
 ### `inspect.spec`
 
@@ -154,8 +164,8 @@ nested attribute, object. Swarm.JoinTokens (worker and manager join tokens). Sen
 
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
-| `manager` | `string` | computed |  | yes | Upstream `Manager`. |
-| `worker` | `string` | computed |  | yes | Upstream `Worker`. |
+| `manager` | `string` | computed |  | yes | Upstream `Manager`. Sensitive. |
+| `worker` | `string` | computed |  | yes | Upstream `Worker`. Sensitive. |
 
 ## Example
 
