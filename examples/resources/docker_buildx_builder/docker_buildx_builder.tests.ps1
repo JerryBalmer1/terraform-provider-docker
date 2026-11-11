@@ -4,7 +4,8 @@ BeforeAll { Import-Module (Join-Path $PSScriptRoot '../../../test/TfDockerTest')
 
 Describe 'examples/resources/docker_buildx_builder' -Tag 'example', 'resources' {
     It 'applies, re-plans empty and destroys' -Skip:(-not (Test-TfHarness)) {
-        # The remote builder needs a BuildKit daemon reachable from the provider over TLS: removed (see examples.json).
-        Invoke-TfExample -Path $PSScriptRoot -RemoveBlock '^resource "docker_buildx_builder" "remote"'
+        # The remote builder needs a BuildKit daemon reachable from the provider over TLS, and the cloud builder
+        # (with its output) Docker Build Cloud and Hub credentials: both removed (see examples.json).
+        Invoke-TfExample -Path $PSScriptRoot -RemoveBlock '^resource "docker_buildx_builder" "remote"', '^resource "docker_buildx_builder" "cloud"', '^output "cloud_builder"'
     }
 }

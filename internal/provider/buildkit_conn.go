@@ -15,6 +15,8 @@ package provider
 //   - an explicit BuildKit endpoint: docker-container://<container>, or
 //     tcp://, unix:// and npipe:// addresses dialled directly (buildx's
 //     `remote` driver).
+//   - a Docker Build Cloud builder: cloud://<account>/<builder> (buildx's
+//     `cloud` driver, buildkit_cloud.go).
 // buildx's client-side store (~/.docker/buildx/instances) is never read.
 
 import (
@@ -88,6 +90,10 @@ var bkOpen = bkOpenNode
 
 // bkOpenNode dials node's BuildKit.
 func bkOpenNode(ctx context.Context, pd *providerData, node bkNode) (*bkclient.Client, error) {
+	if node.Driver == bkDriverCloud || strings.HasPrefix(node.Endpoint, bkCloudEndpointPrefix) {
+		// Docker Build Cloud (buildkit_cloud.go): no Docker daemon involved.
+		return bkCloudOpen(ctx, pd, node)
+	}
 	if pd == nil || pd.Client == nil {
 		return nil, fmt.Errorf("provider not configured")
 	}
@@ -216,6 +222,9 @@ func bkBuilderNodes(ctx context.Context, pd *providerData, builder string) ([]bk
 func bkNodeForRef(ctx context.Context, pd *providerData, ref seamBuilderRef) (bkNode, error) {
 	if ep := strings.TrimSpace(ref.Endpoint); ep != "" {
 		name := ref.Name
+		if strings.HasPrefix(ep, bkCloudEndpointPrefix) {
+			return bkCloudNode(name, ep)
+		}
 		if strings.HasPrefix(ep, bkDockerContainerEP) {
 			cname := strings.TrimPrefix(ep, bkDockerContainerEP)
 			if name == "" {

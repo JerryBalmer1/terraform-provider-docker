@@ -52,3 +52,27 @@ resource "docker_buildx_builder" "remote" {
     servername = "buildkit.internal"
   }
 }
+
+# A Docker Build Cloud builder (docker buildx create --driver cloud myorg/default).
+# The provider logs in at auth.docker.io with its Docker Hub credential
+# (registry_auth for docker.io, else the docker config) and reaches BuildKit at
+# build-cloud.docker.com:443; the access token stays in memory, never in state.
+resource "docker_buildx_builder" "cloud" {
+  name     = "cloud"
+  driver   = "cloud"
+  endpoint = "myorg/default"
+}
+
+# Build several platforms at once on the cloud builder, e.g. in docker_image:
+#
+#   build {
+#     context   = "${path.module}/app"
+#     builder   = docker_buildx_builder.cloud.id # cloud://myorg/default
+#     platforms = ["linux/amd64", "linux/arm64"]
+#     outputs   = ["type=registry"] # push the image index
+#   }
+#
+# Loading a multi-platform result into the daemon needs its containerd image store.
+output "cloud_builder" {
+  value = docker_buildx_builder.cloud.id
+}

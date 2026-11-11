@@ -182,11 +182,14 @@ func (r *buildxBuilderResource) Schema(_ context.Context, _ resource.SchemaReque
 		},
 		"driver": schema.StringAttribute{
 			Optional: true, Computed: true, Default: stringdefault.StaticString(bxbDriverDockerContainer),
-			MarkdownDescription: "Builder driver: `docker-container` (default), a BuildKit container on the provider's daemon, or `remote`, a " +
-				"BuildKit daemon run elsewhere and reached at `endpoint` (TLS in the `remote` block). `docker` is the daemon's built-in builder " +
-				"(use `docker_image` without `build.builder`); `kubernetes` is not supported (it needs the Kubernetes API). Forces replacement.",
+			MarkdownDescription: "Builder driver: `docker-container` (default), `remote` or `cloud`. `docker-container` runs BuildKit in a " +
+				"container on the provider's daemon; `remote` is a BuildKit daemon run elsewhere and reached at `endpoint` (TLS in the " +
+				"`remote` block); `cloud` is a Docker Build Cloud builder named by `endpoint` (`<org>/<builder>`), reached at " +
+				"build-cloud.docker.com:443 with a token from auth.docker.io obtained with the provider's Docker Hub credential " +
+				"(`registry_auth` for docker.io, else the docker config). `docker` is the daemon's built-in builder (use `docker_image` " +
+				"without `build.builder`); `kubernetes` is not supported (it needs the Kubernetes API). Forces replacement.",
 			PlanModifiers: rr,
-			Validators:    []validator.String{stringvalidator.OneOf(bxbDriverDockerContainer, bxbDriverRemote)},
+			Validators:    []validator.String{stringvalidator.OneOf(bxbDriverDockerContainer, bxbDriverRemote, bxbDriverCloud)},
 		},
 		"platform": schema.ListAttribute{
 			ElementType: types.StringType, Optional: true,
@@ -233,7 +236,10 @@ func (r *buildxBuilderResource) Schema(_ context.Context, _ resource.SchemaReque
 			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()},
 			MarkdownDescription: "BuildKit address of the builder, for `buildctl --addr` and `docker_image.build.builder`. With `driver = \"remote\"` " +
 				"it is required: the remote BuildKit's `tcp://host:port` or `unix:///path` (the `docker buildx create --driver remote` " +
-				"endpoint argument). With `docker-container` it is computed: `docker-container://buildx_buildkit_<node>`. Forces replacement.",
+				"endpoint argument). With `driver = \"cloud\"` it is required: the Docker Build Cloud builder as `<org>/<builder>` " +
+				"(`cloud://<org>/<builder>` is also accepted), the `docker buildx create --driver cloud` endpoint argument; `id` is then " +
+				"`cloud://<org>/<builder>`, which `docker_image.build.builder` and `docker_buildx_bake.builder` accept. With " +
+				"`docker-container` it is computed: `docker-container://buildx_buildkit_<node>`. Forces replacement.",
 		},
 		"adopt": ownerAdoptAttribute(),
 		"tcp_address": schema.StringAttribute{
@@ -270,7 +276,8 @@ func (r *buildxBuilderResource) Schema(_ context.Context, _ resource.SchemaReque
 			"instance list (`~/.docker/buildx/instances`) is not written, so `docker buildx ls` does not show the builder until " +
 			"`docker buildx create --name <name> --driver docker-container` is run, which adopts the same container. Only the `docker-container` " +
 			"driver creates a container; the `remote` driver only checks and reports a BuildKit daemon run elsewhere, selected in builds by its " +
-			"`endpoint`. With the provider's `owner` set, the node container and state volume carry the owner label. Every argument except " +
+			"`endpoint`; the `cloud` driver checks and reports a Docker Build Cloud builder, whose access token lives only in memory for " +
+			"the connection. With the provider's `owner` set, the node container and state volume carry the owner label. Every argument except " +
 			"`keep_state` and `adopt` forces a new resource.",
 		Attributes: attrs,
 		Blocks: map[string]schema.Block{
@@ -633,7 +640,7 @@ func (r *buildxBuilderResource) Create(ctx context.Context, req resource.CreateR
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	if plan.Driver.ValueString() == bxbDriverRemote {
+	if bxbDirectDriver(plan.Driver.ValueString()) {
 		resp.Diagnostics.Append(r.bxbRemoteCreate(ctx, &plan)...)
 		if !resp.Diagnostics.HasError() {
 			resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -780,7 +787,7 @@ func (r *buildxBuilderResource) Read(ctx context.Context, req resource.ReadReque
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	if state.Driver.ValueString() == bxbDriverRemote {
+	if bxbDirectDriver(state.Driver.ValueString()) {
 		n := bxbRemoteNode(state)
 		ws, err := bxbRemoteWorkers(ctx, r.pd, n)
 		if err != nil {
@@ -904,7 +911,7 @@ func (r *buildxBuilderResource) Delete(ctx context.Context, req resource.DeleteR
 	if resp.Diagnostics.HasError() || r.pd == nil {
 		return
 	}
-	if state.Driver.ValueString() == bxbDriverRemote {
+	if bxbDirectDriver(state.Driver.ValueString()) {
 		return // nothing was created on the daemon
 	}
 	_, err := r.pd.Client.ContainerRemove(ctx, state.ID.ValueString(), client.ContainerRemoveOptions{Force: true, RemoveVolumes: false})

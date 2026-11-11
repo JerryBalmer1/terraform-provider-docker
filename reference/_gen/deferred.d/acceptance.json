@@ -5,6 +5,11 @@
       "test": "TestAccNpipeSmoke",
       "file": "internal/provider/i_npipe_acc_test.go",
       "reason": "Windows named-pipe transport against Docker Desktop; the harness is Linux dind over TCP. Run by hand with TF_ACC_NPIPE=1 (CLAUDE.md Build and test)."
+    },
+    {
+      "test": "TestAccBuildxBuilderCloud_live",
+      "file": "internal/provider/buildx_builder_cloud_p6c_c_acc_test.go",
+      "reason": "Needs the live Docker Build Cloud service (auth.docker.io, build-cloud.docker.com:443), Docker Hub credentials and a Build Cloud builder the account may use; the dind harness has none. Covered against a fake auth server and a fake BuildKit proxy by TestBuildxBuilderCloud and TestBKCloudLogin; run by hand with TF_ACC=1 TF_ACC_BUILD_CLOUD=1 TF_ACC_BUILD_CLOUD_BUILDER=<org>/<builder> DOCKER_REGISTRY_USER DOCKER_REGISTRY_PASS. Until it has run, buildx:builder carries PARTIAL(pass5) not verified against the live service."
     }
   ]
 }

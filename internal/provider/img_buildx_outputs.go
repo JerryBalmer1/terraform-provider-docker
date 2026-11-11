@@ -145,6 +145,11 @@ func imgSeamBuilder(b *imageBuildModel) seamBuilderRef {
 		// A BuildKit address (docker_buildx_builder.endpoint): a remote
 		// driver builder, or a docker-container node by container name.
 		return seamBuilderRef{Endpoint: v}
+	} else if strings.Contains(v, "/") {
+		// <account>/<builder>: a Docker Build Cloud builder
+		// (docker_buildx_builder with driver = "cloud"); builder names
+		// cannot contain '/'.
+		return seamBuilderRef{Endpoint: bkCloudEndpointPrefix + v}
 	} else if v != imgBuilderBuildKit {
 		return seamBuilderRef{Name: v}
 	}

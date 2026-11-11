@@ -85,6 +85,10 @@ func bxbValidateRemote(m bxbModel, diags *diag.Diagnostics) {
 	if m.Driver.IsUnknown() {
 		return
 	}
+	if m.Driver.ValueString() == bxbDriverCloud {
+		bxbValidateCloud(m, diags)
+		return
+	}
 	remote := m.Driver.ValueString() == bxbDriverRemote
 	if remote {
 		ep, ok := knownString(m.Endpoint)
@@ -112,16 +116,28 @@ func bxbValidateRemote(m bxbModel, diags *diag.Diagnostics) {
 	}
 	if !m.Endpoint.IsNull() && !m.Endpoint.IsUnknown() {
 		diags.AddAttributeError(path.Root("endpoint"), "Endpoint is computed for docker-container",
-			"endpoint is only set with driver = \"remote\"; a docker-container builder reports docker-container://buildx_buildkit_<node>.")
+			"endpoint is only set with driver = \"remote\" or \"cloud\"; a docker-container builder reports docker-container://buildx_buildkit_<node>.")
 	}
 	if m.Remote != nil {
 		diags.AddAttributeError(path.Root("remote"), "Only for the remote driver", "The remote block configures driver = \"remote\".")
 	}
 }
 
-// bxbRemoteNode is the bkNode of a remote builder.
+// bxbDirectDriver reports a driver whose BuildKit runs elsewhere (remote,
+// cloud): nothing is created on the daemon, Create checks it, Read reports
+// it, Delete forgets it.
+func bxbDirectDriver(driver string) bool {
+	return driver == bxbDriverRemote || driver == bxbDriverCloud
+}
+
+// bxbRemoteNode is the bkNode of a remote or cloud builder.
 func bxbRemoteNode(m bxbModel) bkNode {
 	name := m.Name.ValueString()
+	if m.Driver.ValueString() == bxbDriverCloud {
+		if n, err := bkCloudNode(name, m.Endpoint.ValueString()); err == nil {
+			return n
+		}
+	}
 	return bkNode{
 		Builder: name, Name: name + "0", Driver: bkDriverRemote, Endpoint: m.Endpoint.ValueString(),
 		Status: bkStatusRunning, DriverOpts: bxbRemoteDriverOpts(m.Remote),
@@ -176,7 +192,11 @@ func (r *buildxBuilderResource) bxbRemoteCreate(ctx context.Context, plan *bxbMo
 		var err error
 		ws, err = bxbRemoteWorkers(ctx, r.pd, n)
 		if err != nil {
-			diags.AddAttributeError(path.Root("endpoint"), "Cannot reach the remote BuildKit", fmt.Sprintf("%s: %v", n.Endpoint, err))
+			what := "Cannot reach the remote BuildKit"
+			if n.Driver == bkDriverCloud {
+				what = "Cannot reach the Docker Build Cloud builder"
+			}
+			diags.AddAttributeError(path.Root("endpoint"), what, fmt.Sprintf("%s: %v", n.Endpoint, err))
 			return diags
 		}
 	}

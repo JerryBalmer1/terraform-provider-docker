@@ -22,12 +22,18 @@
       "reason": "Needs a BuildKit daemon reachable from the provider process over TCP with TLS; the harness has none (a docker-container builder's port is only published inside the dind manager)."
     },
     {
+      "example": "resources/docker_buildx_builder",
+      "part": "resource.docker_buildx_builder.cloud and output.cloud_builder",
+      "reason": "Needs the live Docker Build Cloud service and Docker Hub credentials (TestAccBuildxBuilderCloud_live in acceptance.json, same reason); the harness has neither. The test removes both blocks and applies the rest."
+    },
+    {
       "example": "resources/docker_container",
       "part": "docker_container.web blkio_weight",
       "reason": "The dind harness nodes run on a cgroup v2 hierarchy without io.weight, so runc fails to start a container with a block-IO weight; the test comments the argument out. Unit tests cover the update path."
     },
     {
-      "example": "resources/docker_registry_image",      "part": "resource.docker_registry_image.app_arm64",
+      "example": "resources/docker_registry_image",
+      "part": "resource.docker_registry_image.app_arm64",
       "reason": "Pushing one variant of a local multi-platform image needs the containerd image store and a registry the node and the provider reach under the same name; cdnode (containerd store) cannot reach the harness registry at 127.0.0.1:12380."
     }
   ]
