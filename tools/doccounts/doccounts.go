@@ -138,7 +138,7 @@ func phraseKind(phrase string) string {
 
 // Check returns every problem in doc (CLAUDE.md, README.md):
 //   - a generated block that differs from Block(r) (or is missing when requireBlock);
-//   - outside the block, a "<n> <kind>" count that differs from the registry;
+//   - outside the generated blocks, a "<n> <kind>" count that differs from the registry;
 //   - anywhere, a backticked `docker_*` name that no kind registers.
 func Check(doc string, r Registry, requireBlock bool) []Problem {
 	var probs []Problem
@@ -156,9 +156,11 @@ func Check(doc string, r Registry, requireBlock bool) []Problem {
 		}
 	}
 	names := r.all()
+	evStart, evEnd := evidenceRange(lines)
 	for i, line := range lines {
 		inBlock := start >= 0 && end >= 0 && i >= start && i <= end
-		if !inBlock {
+		inEvidence := evStart >= 0 && evEnd >= 0 && i >= evStart && i <= evEnd
+		if !inBlock && !inEvidence {
 			for _, m := range countRe.FindAllStringSubmatch(line, -1) {
 				n, _ := strconv.Atoi(m[2])
 				key := phraseKind(m[3])

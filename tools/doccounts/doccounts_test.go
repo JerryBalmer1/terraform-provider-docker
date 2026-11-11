@@ -165,16 +165,16 @@ func TestRun(t *testing.T) {
 	if err := os.WriteFile(doc, []byte("x\n"+beginLine+"\n"+endMarker+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if rc := run(reg, []string{doc}, []string{doc}, false); rc != 1 {
+	if rc := run(reg, []string{doc}, []string{doc}, nil, EvidenceSources{}, false); rc != 1 {
 		t.Errorf("check of a stale doc: rc %d, want 1", rc)
 	}
-	if rc := run(reg, []string{doc}, []string{doc}, true); rc != 0 {
+	if rc := run(reg, []string{doc}, []string{doc}, nil, EvidenceSources{}, true); rc != 0 {
 		t.Errorf("write: rc %d, want 0", rc)
 	}
-	if rc := run(reg, []string{doc}, []string{doc}, false); rc != 0 {
+	if rc := run(reg, []string{doc}, []string{doc}, nil, EvidenceSources{}, false); rc != 0 {
 		t.Errorf("check after write: rc %d, want 0", rc)
 	}
-	if rc := run(filepath.Join(dir, "missing.go"), []string{doc}, nil, false); rc != 2 {
+	if rc := run(filepath.Join(dir, "missing.go"), []string{doc}, nil, nil, EvidenceSources{}, false); rc != 2 {
 		t.Errorf("missing registry: rc %d, want 2", rc)
 	}
 }
