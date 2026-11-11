@@ -1,0 +1,43 @@
+{
+  "type": "docker_volume",
+  "about": "Pairwise model for docker_volume (Pass 6b Lane W), local driver (plain harness pass). Each attribute is checked against GET /volumes/{name} through the contract's inspect field map. null = attribute not set. The writable surface of a local volume is small: cluster_volume_spec needs a CSI volume plugin, which the harness does not have, so it is not modelled.",
+  "seed": 1,
+  "inspect": {"item": "engine:volume", "endpoint": "/volumes/{id}", "id_attr": "name"},
+  "fixed": {},
+  "attributes": {
+    "name": {
+      "match": "none",
+      "no_inspect_reason": "the volume is looked up by this name; a generated name is checked by the lookup succeeding",
+      "values": [{"$hcl": "local.prefix", "$label": "prefix"}, null]
+    },
+    "driver": {
+      "inspect": "driver",
+      "values": [null, "local"]
+    },
+    "driver_opts": {
+      "inspect": "options",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": {"type": "tmpfs", "device": "tmpfs"}, "$label": "tmpfs"},
+        {"$set": {"type": "tmpfs", "device": "tmpfs", "o": "size=16m,uid=1000"}, "$label": "tmpfs-size-uid"},
+        {"$set": {"type": "none", "device": "/tmp", "o": "bind"}, "$label": "bind-tmp"}
+      ]
+    },
+    "labels": {
+      "inspect": "labels",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": {"pw.a": "1"}, "$label": "one"},
+        {"$set": {"pw.a": "1", "pw.b": "x y"}, "$label": "two"}
+      ]
+    },
+    "adopt": {
+      "match": "none",
+      "no_inspect_reason": "provider-side switch (take over an existing volume of the same name); nothing in inspect",
+      "values": [null, true, false]
+    }
+  },
+  "constraints": []
+}

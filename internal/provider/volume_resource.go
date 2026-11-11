@@ -118,11 +118,50 @@ func volumeFromInspect(v volume.Volume, prior volumeResourceModel) volumeResourc
 	out := prior
 	out.ID = types.StringValue(v.Name)
 	out.Name = types.StringValue(v.Name)
-	out.Driver = types.StringValue(v.Driver)
+	out.Driver = volumeDriverValue(prior.Driver, v.Driver)
 	out.DriverOpts = containerMapValue(prior.DriverOpts, v.Options)
-	out.Labels = containerMapValue(prior.Labels, ownerStrip(userLabels(v.Labels, false)))
+	out.Labels = containerMapValue(prior.Labels, volumeStripAnonymous(ownerStrip(userLabels(v.Labels, false)), prior.Labels))
 	out.Mountpoint = types.StringValue(v.Mountpoint)
 	out.ClusterVolumeSpec, out.ClusterVolumeID = objClusterVolumeState(prior.ClusterVolumeSpec, v.ClusterVolume)
+	return out
+}
+
+// volumeDriverValue keeps the configured driver when the daemon reports
+// the same one in another spelling. A managed plugin driver is reported
+// with its tag ("sshfs" configured, VolumeInspect says "sshfs:latest"),
+// as the plugin store names plugins by their normalized reference; both
+// name the same plugin (pluginFamiliar), so the prior value stays and
+// apply is consistent. Any other difference is drift and is read.
+func volumeDriverValue(prior types.String, reported string) types.String {
+	if p, ok := knownString(prior); ok && p != reported && pluginFamiliar(p) == pluginFamiliar(reported) {
+		return prior
+	}
+	return types.StringValue(reported)
+}
+
+// volumeAnonymousLabel is the label the Engine adds to a volume created
+// without a name (POST /volumes/create with Name ""): an anonymous volume.
+const volumeAnonymousLabel = "com.docker.volume.anonymous"
+
+// volumeStripAnonymous drops the Engine's anonymous-volume label unless the
+// configuration (prior) sets it. Pass 6b Lane W pairwise finding: with name
+// unset, apply failed with "Provider produced inconsistent result after
+// apply: .labels: new element \"com.docker.volume.anonymous\" has appeared".
+func volumeStripAnonymous(labels map[string]string, prior types.Map) map[string]string {
+	if _, ok := labels[volumeAnonymousLabel]; !ok {
+		return labels
+	}
+	if !prior.IsNull() && !prior.IsUnknown() {
+		if _, set := prior.Elements()[volumeAnonymousLabel]; set {
+			return labels
+		}
+	}
+	out := make(map[string]string, len(labels))
+	for k, v := range labels {
+		if k != volumeAnonymousLabel {
+			out[k] = v
+		}
+	}
 	return out
 }
 

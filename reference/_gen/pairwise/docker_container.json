@@ -1,0 +1,117 @@
+{
+  "type": "docker_container",
+  "about": "Pairwise model for docker_container (Pass 6b Lane W). Every pair of values of two different attributes appears in at least one generated config; tools/pairwise checks each attribute against GET /containers/{id}/json through the contract's inspect field map. null = attribute not set.",
+  "seed": 1,
+  "inspect": {"item": "engine:container", "endpoint": "/containers/{id}/json", "id_attr": "id"},
+  "fixed": {
+    "name": {"$hcl": "local.prefix"},
+    "image": {"$hcl": "\"${var.pw_registry}busybox:1.36\""},
+    "command": ["sleep", "3600"]
+  },
+  "attributes": {
+    "restart": {
+      "inspect": "host_config.restart_policy",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": "unless-stopped", "$expect": {"Name": "unless-stopped"}},
+        {"$set": "on-failure", "$expect": {"Name": "on-failure"}},
+        {"$set": "always", "$expect": {"Name": "always"}}
+      ]
+    },
+    "memory": {
+      "inspect": "host_config.memory",
+      "values": [null, 67108864, 134217728]
+    },
+    "cpu_shares": {
+      "inspect": "host_config.cpu_shares",
+      "values": [null, 512, 1024]
+    },
+    "env": {
+      "inspect": "config.env",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": {"PW_A": "1"}, "$expect": ["PW_A=1"], "$label": "one"},
+        {"$set": {"PW_A": "1", "PW_B": "two words"}, "$expect": ["PW_A=1", "PW_B=two words"], "$label": "two"}
+      ]
+    },
+    "labels": {
+      "inspect": "config.labels",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": {"pw.a": "1"}, "$label": "one"},
+        {"$set": {"pw.a": "1", "pw.b": "x y"}, "$label": "two"}
+      ]
+    },
+    "ports": {
+      "inspect": "host_config.port_bindings",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": [{"container_port": 80}], "$expect": {"80/tcp": [{}]}, "$label": "80-ephemeral"},
+        {"$set": [{"container_port": 80, "host_port": 18080}], "$expect": {"80/tcp": [{"HostPort": "18080"}]}, "$label": "80-to-18080"},
+        {"$set": [{"container_port": 53, "protocol": "udp", "host_port": 18053}], "$expect": {"53/udp": [{"HostPort": "18053"}]}, "$label": "53udp-to-18053"}
+      ]
+    },
+    "healthcheck": {
+      "inspect": "config.healthcheck",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": {"test": ["CMD", "true"], "interval": "10s", "retries": 3}, "$expect": {"Test": ["CMD", "true"], "Interval": 10000000000, "Retries": 3}, "$label": "cmd-10s-3"},
+        {"$set": {"test": ["CMD-SHELL", "exit 0"], "timeout": "5s", "start_period": "2s"}, "$expect": {"Test": ["CMD-SHELL", "exit 0"], "Timeout": 5000000000, "StartPeriod": 2000000000}, "$label": "shell-timeout-start"}
+      ]
+    },
+    "mounts": {
+      "inspect": "host_config.mounts",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": [{"type": "tmpfs", "target": "/scratch", "tmpfs_options": {"size_bytes": 1048576}}], "$expect": [{"Type": "tmpfs", "Target": "/scratch", "TmpfsOptions": {"SizeBytes": 1048576}}], "$label": "tmpfs"},
+        {"$set": [{"type": "bind", "source": "/tmp", "target": "/hosttmp", "read_only": true}], "$expect": [{"Type": "bind", "Source": "/tmp", "Target": "/hosttmp", "ReadOnly": true}], "$label": "bind-ro"}
+      ]
+    },
+    "init": {
+      "inspect": "host_config.init",
+      "values": [null, true, false]
+    },
+    "read_only": {
+      "inspect": "host_config.readonly_rootfs",
+      "values": [null, true]
+    },
+    "user": {
+      "inspect": "config.user",
+      "values": [null, "nobody", "1000:1000"]
+    },
+    "cap_add": {
+      "inspect": "host_config.cap_add",
+      "match": "subset",
+      "note": "the Engine stores capabilities in canonical CAP_ form (NET_ADMIN -> CAP_NET_ADMIN); the provider keeps the configured spelling in state",
+      "values": [null, {"$set": ["NET_ADMIN"], "$expect": ["CAP_NET_ADMIN"], "$label": "NET_ADMIN"}]
+    },
+    "logging": {
+      "inspect": "host_config.log_config",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": {"driver": "json-file", "options": {"max-size": "1m"}}, "$expect": {"Type": "json-file", "Config": {"max-size": "1m"}}, "$label": "json-file-1m"},
+        {"$set": {"driver": "none"}, "$expect": {"Type": "none"}, "$label": "none"}
+      ]
+    },
+    "ulimits": {
+      "inspect": "host_config.ulimits",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": [{"name": "nofile", "soft": 1024, "hard": 2048}], "$expect": [{"Name": "nofile", "Soft": 1024, "Hard": 2048}], "$label": "nofile"}
+      ]
+    },
+    "network_mode": {
+      "inspect": "host_config.network_mode",
+      "values": [null, "bridge", "none"]
+    }
+  },
+  "constraints": []
+}

@@ -1,0 +1,84 @@
+{
+  "type": "docker_network",
+  "about": "Pairwise model for docker_network (Pass 6b Lane W), local scope (plain harness pass, no swarm). Each attribute is checked against GET /networks/{id} through the contract's inspect field map. null = attribute not set. Subnets are fixed per value; configs run one at a time, so they never overlap.",
+  "seed": 1,
+  "inspect": {"item": "engine:network", "endpoint": "/networks/{id}", "id_attr": "id"},
+  "fixed": {
+    "name": {"$hcl": "local.prefix"}
+  },
+  "attributes": {
+    "driver": {
+      "inspect": "driver",
+      "values": [null, "bridge", "macvlan"]
+    },
+    "internal": {
+      "inspect": "internal",
+      "values": [null, true, false]
+    },
+    "attachable": {
+      "inspect": "attachable",
+      "values": [null, true, false]
+    },
+    "enable_ipv4": {
+      "inspect": "enable_ipv4",
+      "values": [null, true, false]
+    },
+    "enable_ipv6": {
+      "inspect": "enable_ipv6",
+      "values": [null, true, false]
+    },
+    "ipam_config": {
+      "inspect": "ipam.config",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": [{"subnet": "10.231.0.0/24", "gateway": "10.231.0.1"}], "$expect": [{"Subnet": "10.231.0.0/24", "Gateway": "10.231.0.1"}], "$label": "subnet-gateway"},
+        {"$set": [{"subnet": "10.232.0.0/24", "ip_range": "10.232.0.128/25", "aux_address": {"reserved": "10.232.0.10"}}], "$expect": [{"Subnet": "10.232.0.0/24", "IPRange": "10.232.0.128/25", "AuxiliaryAddresses": {"reserved": "10.232.0.10"}}], "$label": "subnet-range-aux"}
+      ]
+    },
+    "ipam_driver": {
+      "inspect": "ipam.driver",
+      "values": [null, "default"]
+    },
+    "ipam_options": {
+      "inspect": "ipam.options",
+      "match": "subset",
+      "values": [null, {"pw.ipam": "1"}]
+    },
+    "options": {
+      "inspect": "options",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": {"com.docker.network.driver.mtu": "1400"}, "$label": "mtu-1400"},
+        {"$set": {"com.docker.network.bridge.enable_icc": "false"}, "$label": "icc-false"}
+      ]
+    },
+    "labels": {
+      "inspect": "labels",
+      "match": "subset",
+      "values": [
+        null,
+        {"$set": {"pw.a": "1"}, "$label": "one"},
+        {"$set": {"pw.a": "1", "pw.b": "x y"}, "$label": "two"}
+      ]
+    },
+    "scope": {
+      "inspect": "scope",
+      "values": [null, "local"]
+    }
+  },
+  "constraints": [
+    {
+      "when": {"enable_ipv4": [false]},
+      "requires": {"enable_ipv6": [true]},
+      "reason": "a network needs IPv4 or IPv6; with enable_ipv4 = false, enable_ipv6 must be true (unset is false). Seen in Pass 6b run 1, configs pw-network-01 and pw-network-14.",
+      "daemon_error": "Error response from daemon: IPv4 or IPv6 must be enabled"
+    },
+    {
+      "when": {"enable_ipv4": [false]},
+      "forbid": {"ipam_config": ["subnet-gateway", "subnet-range-aux"]},
+      "reason": "the Engine accepts an IPv4 pool with enable_ipv4 = false and silently drops it (no daemon error; pw-network-04/07/11 in Pass 6b run 1 ended in 'Provider produced inconsistent result after apply: .ipam_config: block count changed from 1 to 0'). Fixed in Pass 6b: docker_network ValidateConfig now rejects the combination ('IPv4 pool on a network with IPv4 disabled'), so it is excluded here."
+    }
+  ]
+}
