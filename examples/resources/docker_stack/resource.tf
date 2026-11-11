@@ -21,7 +21,7 @@ resource "docker_stack" "shop" {
 
   config {
     name = "nginx"
-    data = base64encode("server { listen 80; location / { proxy_pass http://api:8080; } }")
+    data = base64encode("server { listen 80; location / { return 200 \"ok\n\"; } }")
   }
 
   service {

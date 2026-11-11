@@ -1,0 +1,35 @@
+@{
+    RootModule        = 'TfDockerTest.psm1'
+    ModuleVersion     = '0.1.0'
+    GUID              = '5d2a7c1e-3f0b-4b8e-9a51-6c0f2d7e8b41'
+    Author            = 'terraform-provider-docker'
+    Description       = 'Runs the examples/ folders of terraform-provider-docker against the dind harness (init, apply, empty re-plan, destroy) with the locally built provider, and checks Terraform state against the Docker Engine API.'
+    PowerShellVersion = '7.0'
+    FunctionsToExport = @(
+        'Invoke-TfExample'
+        'Get-DockerObject'
+        'Assert-TfState'
+        'Invoke-DockerApi'
+        'Get-DockerSnapshot'
+        'Clear-DockerSnapshotDiff'
+        'Initialize-TfDevProvider'
+        'New-TfDevOverrideConfig'
+        'Get-TfTerraformPath'
+        'Invoke-TfCli'
+        'Edit-TfExampleText'
+        'Remove-HclBlock'
+        'Get-TfExampleAllowlist'
+        'Test-TfHarness'
+        'Get-DockerSwarmJoinToken'
+        'Set-DockerNode'
+        'Update-DockerServiceEnv'
+        'Save-DockerImageArchive'
+        'New-TarArchive'
+        'Remove-DockerSwarmMember'
+        'New-DockerPluginFromDir'
+        'Get-TfFixture'
+    )
+    CmdletsToExport   = @()
+    VariablesToExport = @()
+    AliasesToExport   = @()
+}

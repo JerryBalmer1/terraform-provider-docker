@@ -29,6 +29,11 @@ func fixture(t *testing.T) string {
 	writeFile(t, root, "reference/inventory.json", `{"items":[{"id":"engine:attach","kind":"skip","skip_reason":"stream"},{"id":"engine:x","kind":"resource"}]}`)
 	writeFile(t, root, "internal/provider/a_acc_test.go", "package p\nfunc TestAccA(t *testing.T) {}\n")
 	writeFile(t, root, "reference/_gen/deferred.d/acceptance.json", `{"tests":[{"test":"TestAccA","file":"internal/provider/a_acc_test.go","reason":"Windows only"}]}`)
+	writeFile(t, root, "examples/data-sources/docker_x/data-source.tf", "data \"docker_x\" \"a\" {}\n")
+	writeFile(t, root, "examples/resources/docker_y/resource.tf", "resource \"docker_y\" \"a\" {}\n")
+	writeFile(t, root, "reference/_gen/deferred.d/examples.json", `{"examples":[
+		{"example":"data-sources/docker_x","reason":"needs a GPU"},
+		{"example":"resources/docker_y","part":"resource.docker_y.remote","reason":"needs an external host"}]}`)
 	return root
 }
 
@@ -37,13 +42,13 @@ func TestCollect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]int{"field_skip": 1, "field_partial": 1, "partial_marker": 1, "inventory_skip": 1, "acceptance": 1}
+	want := map[string]int{"field_skip": 1, "field_partial": 1, "partial_marker": 1, "inventory_skip": 1, "acceptance": 1, "example": 2}
 	for k, n := range want {
 		if d.Totals[k] != n {
 			t.Errorf("%s = %d, want %d (items %+v)", k, d.Totals[k], n, d.Items)
 		}
 	}
-	if d.Items[0].Kind != "field_skip" || d.Items[len(d.Items)-1].Kind != "acceptance" {
+	if d.Items[0].Kind != "field_skip" || d.Items[len(d.Items)-1].Kind != "example" {
 		t.Errorf("items not in kind order: %+v", d.Items)
 	}
 	for _, it := range d.Items {
@@ -53,6 +58,9 @@ func TestCollect(t *testing.T) {
 		if it.Kind == "partial_marker" && (it.ID != "buildx:bake" || it.Source != "internal/provider/x.go") {
 			t.Errorf("marker %+v", it)
 		}
+		if it.Kind == "example" && it.ID != "data-sources/docker_x" && it.ID != "resources/docker_y (resource.docker_y.remote)" {
+			t.Errorf("example item %+v", it)
+		}
 	}
 }
 
@@ -61,6 +69,22 @@ func TestAcceptanceMissingTest(t *testing.T) {
 	writeFile(t, root, "reference/_gen/deferred.d/acceptance.json", `{"tests":[{"test":"TestAccGone","file":"internal/provider/a_acc_test.go","reason":"r"}]}`)
 	if _, err := Collect(root); err == nil || !strings.Contains(err.Error(), "TestAccGone") {
 		t.Fatalf("want an error naming TestAccGone, got %v", err)
+	}
+}
+
+func TestExampleMissingFolder(t *testing.T) {
+	root := fixture(t)
+	writeFile(t, root, "reference/_gen/deferred.d/examples.json", `{"examples":[{"example":"resources/docker_gone","reason":"r"}]}`)
+	if _, err := Collect(root); err == nil || !strings.Contains(err.Error(), "resources/docker_gone") {
+		t.Fatalf("want an error naming resources/docker_gone, got %v", err)
+	}
+}
+
+func TestExampleNoReason(t *testing.T) {
+	root := fixture(t)
+	writeFile(t, root, "reference/_gen/deferred.d/examples.json", `{"examples":[{"example":"resources/docker_y","reason":""}]}`)
+	if _, err := Collect(root); err == nil || !strings.Contains(err.Error(), "no reason") {
+		t.Fatalf("want a no-reason error, got %v", err)
 	}
 }
 

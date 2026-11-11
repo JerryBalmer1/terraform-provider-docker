@@ -60,7 +60,7 @@ resource "docker_image" "remote" {
   name = "example/hello:git"
 
   build {
-    remote     = "https://github.com/docker-library/hello-world.git#master:amd64/hello-world"
+    remote     = "https://github.com/docker-library/hello-world.git#master:amd64"
     dockerfile = "Dockerfile"
   }
 }

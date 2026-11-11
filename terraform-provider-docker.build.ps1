@@ -7,13 +7,22 @@
     which picks up this *.build.ps1 file automatically:
 
         Invoke-Build ?                  # list tasks with their synopses
-        Invoke-Build                    # default task: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage
+        Invoke-Build                    # default task: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage, ExampleCoverage, ManualTaskCheck
         Invoke-Build Test
         Invoke-Build Build, Vet, GenSkillCheck
         Invoke-Build Compose2Stack -In docker-compose.yml -Out stack.tf -Mode swarm
         Invoke-Build PreRelease         # every pre-release gate, one summary table (build/prerelease.tasks.ps1)
         Invoke-Build DriftCheck         # upstream drift vs reference/SOURCES.md
         Invoke-Build ReleaseCheck       # release matrix + cross-compiles; Release: local goreleaser snapshot
+        Invoke-Build ExampleTests       # every examples/ folder on the dind harness (build/examples.tasks.ps1)
+
+    Manual tasks for a person at the keyboard (names start with '_', listed first by Invoke-Build ?; no gate
+    may depend on them, ManualTaskCheck fails otherwise). Scenarios live in test/__manual/<name>/:
+
+        Invoke-Build _List                          # scenarios and what each shows
+        Invoke-Build _Up [-Swarm]                   # harness up (and swarm init)
+        Invoke-Build _Init -Scenario container_full # then _Plan, _Apply, _Destroy with the same -Scenario
+        Invoke-Build _Down                          # harness down
 
     Install once: Install-Module InvokeBuild -Scope CurrentUser
 
@@ -38,6 +47,15 @@
 
 .PARAMETER Mode
     Compose2Stack: conversion mode, swarm or local (default swarm).
+
+.PARAMETER Scenario
+    Manual tasks (_Init, _Plan, _Apply, _Destroy): the folder name under test/__manual (Invoke-Build _List).
+
+.PARAMETER Swarm
+    _Up: also run test/harness/scripts/harness-swarm-init.ps1 (the manager becomes a swarm manager, worker4 joins).
+
+.PARAMETER Invoke
+    _Apply: run only this action (terraform apply -invoke=action.<type>.<name>).
 #>
 param(
     [string]$Go = $(if ($env:GO) { $env:GO } else { 'go' }),
@@ -45,7 +63,13 @@ param(
     [string]$In = 'docker-compose.yml',
     [string]$Out = 'stack.tf',
     [ValidateSet('swarm', 'local')]
-    [string]$Mode = 'swarm'
+    [string]$Mode = 'swarm',
+    [string]$Scenario = '',
+    [switch]$Swarm,
+    [string]$Invoke = '',
+    # ExampleTests / ExampleValidate: comma-separated wildcards on the example path (resources/docker_tag, actions/*)
+    # or its folder name (docker_tag); overrides TPD_EXAMPLE_INCLUDE.
+    [string]$Filter = ''
 )
 
 if ($MyInvocation.ScriptName -notlike '*Invoke-Build.ps1') {
@@ -86,8 +110,8 @@ $ReferenceSources = @(
     @{ Name = 'moby'; Url = 'https://github.com/moby/moby'; Sha = '14ebc602124e280ef4ae3e1a8e688dac1255baa6'; Local = 'engine-api'; Exclude = @('docs.docker.com-v1.56.yaml') }
     @{ Name = 'compose-spec'; Url = 'https://github.com/compose-spec/compose-spec'; Sha = '3a4a6995e4a971f6173dff9130cb3e38e6738651'; Local = 'compose-spec'; Exclude = @('compose-go-embedded.json') }
     @{ Name = 'compose-go'; Url = 'https://github.com/compose-spec/compose-go'; Sha = 'ddbe099a5404149d75fe774b30de7bd0befd3bd3'; Files = @{ 'compose-spec/compose-go-embedded.json' = 'schema/compose-spec.json' } }
-    @{ Name = 'compose'; Url = 'https://github.com/docker/compose'; Sha = '4732a2ed20a49c43a7b44bb4928259162c3ae3be'; Local = 'compose-cli' }
-    @{ Name = 'docker-cli'; Url = 'https://github.com/docker/cli'; Sha = 'd1c06ef6b41d88d76866aea43c246cd7c63d04fa'; Local = 'docker-cli' }
+    @{ Name = 'compose'; Url = 'https://github.com/docker/compose'; Sha = '5bceecf985347fcf6dd23029ce440b502a0d4301'; Local = 'compose-cli' }
+    @{ Name = 'docker-cli'; Url = 'https://github.com/docker/cli'; Sha = '5457199aa57c45e990c59c89cab5f02b817238d7'; Local = 'docker-cli' }
     @{ Name = 'buildkit'; Url = 'https://github.com/moby/buildkit'; Sha = 'f5b59a1f2fb25a0cb7072c398cab9aed7835da4e'; Local = 'dockerfile' }
     @{ Name = 'buildx'; Url = 'https://github.com/docker/buildx'; Sha = '3c4cbd35852fc1a476923627a780a7836c28b654'; Local = 'buildx' }
 )
@@ -133,6 +157,100 @@ function Get-LocalBlobShas([string[]]$FullPaths) {
     if ($LASTEXITCODE) { throw "git hash-object exited with code $LASTEXITCODE" }
 }
 
+# ---------------------------------------------------------------------------- manual tasks (a person at the keyboard)
+# Defined first so `Invoke-Build ?` lists them at the top. They stream plain terraform output (no log capture) and are
+# never part of a gate: ManualTaskCheck (default task) fails when the default task, PreRelease or CI reaches one.
+# Each copies test/__manual/<Scenario> into <temp>/tpd-manual/<Scenario> (state, .terraform and the lock file stay
+# there, never in the repository), builds the provider into <temp>/tpd-manual/provider, writes a dev_overrides CLI
+# configuration, and loads test/harness/.env. They refuse to run unless DOCKER_HOST is the harness manager.
+
+$ManualDir = Join-Path $BuildRoot 'test/__manual'
+$ManualStateRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'tpd-manual'
+$HarnessScripts = Join-Path $BuildRoot 'test/harness/scripts'
+
+# Loads test/harness/.env into this process (export NAME=value lines), as Invoke-E2E.ps1 does.
+function Import-HarnessEnv {
+    $envFile = Join-Path $BuildRoot 'test/harness/.env'
+    if (-not (Test-Path -LiteralPath $envFile)) { throw 'test/harness/.env is missing: run Invoke-Build _Up first.' }
+    foreach ($line in [System.IO.File]::ReadAllLines($envFile)) {
+        if ($line -match '^\s*export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$') { Set-Item -Path "Env:$($Matches[1])" -Value $Matches[2].Trim().Trim('"', "'") }
+    }
+    if ($env:DOCKER_HOST -ne 'tcp://127.0.0.1:12375') { throw "DOCKER_HOST is '$env:DOCKER_HOST', not the harness manager: refusing to run a manual scenario." }
+}
+
+# Prepares a manual scenario run and returns @{ Work; Terraform }: harness env, provider build, dev_overrides config,
+# a fresh copy of the scenario's files beside its kept state.
+function Enter-ManualScenario {
+    if (-not $Scenario) { throw 'Give -Scenario <name> (Invoke-Build _List shows them).' }
+    $src = Join-Path $ManualDir $Scenario
+    if (-not (Test-Path -LiteralPath (Join-Path $src 'main.tf'))) { throw "No scenario test/__manual/$Scenario (Invoke-Build _List shows them)." }
+    Import-HarnessEnv
+    Import-Module (Join-Path $BuildRoot 'test/TfDockerTest') -Force
+    $providerDir = Initialize-TfDevProvider -ProviderDir (Join-Path $ManualStateRoot 'provider') -Force
+    $env:TF_CLI_CONFIG_FILE = New-TfDevOverrideConfig -ProviderDir $providerDir -Path (Join-Path $ManualStateRoot 'dev.tfrc')
+    $work = Join-Path $ManualStateRoot $Scenario
+    $null = New-Item -ItemType Directory -Force $work
+    Get-ChildItem -LiteralPath $src -Force | Where-Object { $_.Name -notin 'README.md', 'prepare.ps1' } | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $work -Recurse -Force
+    }
+    # Write-Host, not print: print writes to the output stream, which is this function's return value.
+    Write-Host -ForegroundColor Cyan "scenario $Scenario`: working copy $work (state kept there), provider $providerDir, DOCKER_HOST $env:DOCKER_HOST"
+    # terraform on PATH first: Terraform before 1.15 (the harness copy is 1.14) fails init for a dev-overridden provider.
+    $tf = Get-Command terraform -CommandType Application -ErrorAction Ignore | Select-Object -First 1
+    @{ Work = $work; Terraform = $(if ($tf) { $tf.Source } else { Get-TfTerraformPath }); Source = $src }
+}
+
+# Synopsis: List the manual scenarios (test/__manual/<name>) with the first line of each README.md.
+task _List {
+    foreach ($d in Get-ChildItem -LiteralPath $ManualDir -Directory | Sort-Object Name) {
+        $readme = Join-Path $d.FullName 'README.md'
+        $first = if (Test-Path -LiteralPath $readme) { ([System.IO.File]::ReadAllLines($readme) | Where-Object { $_.Trim() } | Select-Object -First 1) -replace '^#+\s*', '' } else { '(no README.md)' }
+        Write-Build Cyan ('{0,-28} {1}' -f $d.Name, $first)
+    }
+    Write-Build Gray 'Invoke-Build _Up [-Swarm]; Invoke-Build _Init, _Plan, _Apply, _Destroy -Scenario <name>; Invoke-Build _Down'
+}
+
+# Synopsis: Bring the dind harness up (test/harness/scripts/harness-up.ps1); -Swarm also runs harness-swarm-init.ps1.
+task _Up {
+    & (Join-Path $HarnessScripts 'harness-up.ps1')
+    if ($Swarm) { & (Join-Path $HarnessScripts 'harness-swarm-init.ps1') }
+}
+
+# Synopsis: terraform init for -Scenario <name> (runs the scenario's prepare.ps1 first when it has one and no state yet).
+task _Init {
+    $s = Enter-ManualScenario
+    $prepare = Join-Path $s.Source 'prepare.ps1'
+    if ((Test-Path -LiteralPath $prepare) -and -not (Test-Path -LiteralPath (Join-Path $s.Work 'terraform.tfstate'))) {
+        Write-Build Cyan "running $prepare"
+        & $prepare -WorkDir $s.Work
+    }
+    exec { & $s.Terraform "-chdir=$($s.Work)" init -input=false }
+}
+
+# Synopsis: terraform plan for -Scenario <name>.
+task _Plan {
+    $s = Enter-ManualScenario
+    exec { & $s.Terraform "-chdir=$($s.Work)" plan }
+}
+
+# Synopsis: terraform apply for -Scenario <name> (asks for approval); -Invoke action.<type>.<name> runs only that action.
+task _Apply {
+    $s = Enter-ManualScenario
+    if ($Invoke) { exec { & $s.Terraform "-chdir=$($s.Work)" apply "-invoke=$Invoke" } }
+    else { exec { & $s.Terraform "-chdir=$($s.Work)" apply } }
+}
+
+# Synopsis: terraform destroy for -Scenario <name> (asks for approval).
+task _Destroy {
+    $s = Enter-ManualScenario
+    exec { & $s.Terraform "-chdir=$($s.Work)" destroy }
+}
+
+# Synopsis: Tear the dind harness down (test/harness/scripts/harness-down.ps1) and forget every manual scenario's state.
+task _Down {
+    & (Join-Path $HarnessScripts 'harness-down.ps1')
+    Get-ChildItem -LiteralPath $ManualStateRoot -Directory -ErrorAction Ignore | Where-Object Name -ne 'provider' | Remove-Item -Recurse -Force -ErrorAction Ignore
+}
 # ---------------------------------------------------------------------------- build
 
 # Synopsis: go build ./..., then the provider binary into the repo root.
@@ -251,7 +369,7 @@ task FmtCheck {
 task Check ?FmtCheck, ?Vet, ?GenSkillCheck, ?GenSkillStrict, ?DocsValidate, {
     $failed = @('FmtCheck', 'Vet', 'GenSkillCheck', 'GenSkillStrict', 'DocsValidate' | Where-Object { error $_ })
     assert ($failed.Count -eq 0) "Check failed: $($failed -join ', ')"
-    print Green 'Check: all steps passed'
+    Write-Build Green 'Check: all steps passed'
 }
 
 # ---------------------------------------------------------------------------- tools
@@ -320,7 +438,7 @@ task Inventory {
     requires -Variable PythonExe
     requires -Path (Join-Path $RefDir '_gen/merge.py')
     $ver = exec { & $PythonExe -I --version }
-    print Cyan "Inventory: $ver ($PythonExe)"
+    Write-Build Cyan "Inventory: $ver ($PythonExe)"
     exec { & $PythonExe -I (Join-Path $RefDir '_gen/merge.py') } -ErrorMessage 'merge.py reported validation errors (ERR lines above).'
 }
 
@@ -328,7 +446,7 @@ task Inventory {
 task InventoryCheck Inventory, {
     requires -Variable GitExe
     exec { & $GitExe diff --exit-code --stat -- @InventoryFiles } -ErrorMessage 'Generated inventory differs from git. Edit fragments, run Invoke-Build Inventory, stage both files.'
-    print Green 'InventoryCheck: inventory.json and INVENTORY.md match the fragments'
+    Write-Build Green 'InventoryCheck: inventory.json and INVENTORY.md match the fragments'
 }
 
 # Synopsis: Inventory, then check the outputs contract (V1 identity+version, V2 raw+structured, V3 registered version names + uses_cli, V4 fields, V5 per-field sensitivity, V6 action result, L1 bounded logs; reference/_gen/SCHEMA.md); violations fail unless listed in reference/_gen/allowed-violations.txt.
@@ -383,7 +501,7 @@ task ReferenceVerify {
             elseif ($want -ne $shas[$i]) { $problems.Add("$($src.Name): $rel MISMATCH (local $($shas[$i]), upstream $want)") }
             else { $ok++ }
         }
-        print Gray ("{0,-13} {1} ok={2} of {3}" -f $src.Name, $src.Sha.Substring(0, 12), $ok, $pairs.Count)
+        Write-Build Gray ("{0,-13} {1} ok={2} of {3}" -f $src.Name, $src.Sha.Substring(0, 12), $ok, $pairs.Count)
     }
 
     foreach ($rel in $ReferenceSha256.Keys) {
@@ -393,7 +511,7 @@ task ReferenceVerify {
         if (-not $all.ContainsKey($rel)) { $problems.Add("$rel`: missing"); continue }
         $got = (Get-FileHash -Algorithm SHA256 -LiteralPath $all[$rel]).Hash.ToLowerInvariant()
         if ($got -ne $want) { $problems.Add("$rel`: sha256 MISMATCH (local $got, pinned $want)") }
-        else { print Gray ("{0,-13} sha256 ok" -f $rel) }
+        else { Write-Build Gray ("{0,-13} sha256 ok" -f $rel) }
     }
 
     foreach ($rel in @($all.Keys | Where-Object { -not $covered.ContainsKey($_) } | Sort-Object)) {
@@ -401,10 +519,10 @@ task ReferenceVerify {
     }
 
     $skipped = @($covered.Values | Where-Object { $_ -eq 'skip' }).Count
-    print Gray "files: $($all.Count) total, $($all.Count - $skipped) verified, $skipped skipped (local capture: $($ReferenceSkip -join ', '))"
-    if ($problems.Count) { $problems | ForEach-Object { print Red "  $_" } }
+    Write-Build Gray "files: $($all.Count) total, $($all.Count - $skipped) verified, $skipped skipped (local capture: $($ReferenceSkip -join ', '))"
+    if ($problems.Count) { $problems | ForEach-Object { Write-Build Red "  $_" } }
     assert ($problems.Count -eq 0) "ReferenceVerify: $($problems.Count) problem(s)"
-    print Green 'ReferenceVerify: every upstream file matches its pinned source'
+    Write-Build Green 'ReferenceVerify: every upstream file matches its pinned source'
 }
 
 # ---------------------------------------------------------------------------- registration (Pass 5)
@@ -433,13 +551,13 @@ task StubReport {
             Select-String -Pattern '//[ \t]*(STUB|PARTIAL)\(pass5\)[ \t]+(\S+)[ \t]*(.*)$' -CaseSensitive)
     $stubs = @($hits | Where-Object { $_.Matches[0].Groups[1].Value -eq 'STUB' })
     $partials = @($hits | Where-Object { $_.Matches[0].Groups[1].Value -eq 'PARTIAL' })
-    print Cyan ("Stubs ({0}):" -f $stubs.Count)
-    foreach ($h in ($stubs | Sort-Object Filename, LineNumber)) { print Gray ("  {0}  ({1}:{2})" -f $h.Matches[0].Groups[2].Value, $h.Filename, $h.LineNumber) }
-    print Cyan ("Partials ({0}):" -f $partials.Count)
-    foreach ($h in ($partials | Sort-Object { $_.Matches[0].Groups[2].Value }, Filename, LineNumber)) { $m = $h.Matches[0]; print Gray ("  {0}  {1}  ({2}:{3})" -f $m.Groups[2].Value, $m.Groups[3].Value.Trim(), $h.Filename, $h.LineNumber) }
+    Write-Build Cyan ("Stubs ({0}):" -f $stubs.Count)
+    foreach ($h in ($stubs | Sort-Object Filename, LineNumber)) { Write-Build Gray ("  {0}  ({1}:{2})" -f $h.Matches[0].Groups[2].Value, $h.Filename, $h.LineNumber) }
+    Write-Build Cyan ("Partials ({0}):" -f $partials.Count)
+    foreach ($h in ($partials | Sort-Object { $_.Matches[0].Groups[2].Value }, Filename, LineNumber)) { $m = $h.Matches[0]; Write-Build Gray ("  {0}  {1}  ({2}:{3})" -f $m.Groups[2].Value, $m.Groups[3].Value.Trim(), $h.Filename, $h.LineNumber) }
     $msg = "StubReport: {0} stubs, {1} partials" -f $stubs.Count, $partials.Count
     if ($stubs.Count) { throw "$msg. Stubs fail: implement each one (reference/inventory.json shows them as missing)." }
-    print $(if ($partials.Count) { 'Yellow' } else { 'Green' }) $msg
+    Write-Build $(if ($partials.Count) { 'Yellow' } else { 'Green' }) $msg
 }
 
 # Synopsis: Regenerate internal/provider/contract_gen.go (outputs-contract tables + per-item model structs) from reference/inventory.json (tools/contractgen).
@@ -494,12 +612,15 @@ task DeferredCheck {
 }
 
 # ---------------------------------------------------------------------------- task files
-# Release tasks (Release) and pre-release tasks (DriftCheck, PreRelease) live in their own files, dot-sourced here so
-# they share this script's variables and helpers.
-foreach ($taskFile in 'build/release.tasks.ps1', 'build/prerelease.tasks.ps1') {
+# Release tasks (Release), pre-release tasks (DriftCheck, PreRelease), example tests (ExampleTests, ExampleCoverage) and
+# pairwise tests (PairwiseTest) live in their own files, dot-sourced here so they share this script's variables and
+# helpers.
+foreach ($taskFile in 'build/release.tasks.ps1', 'build/prerelease.tasks.ps1', 'build/examples.tasks.ps1', 'build/pairwise.tasks.ps1') {
     . (Join-Path $BuildRoot $taskFile)
 }
 
-# Synopsis: Default (and CI's first step): Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage.
+# Synopsis: Default (and CI's first step): Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage, ExampleCoverage, ManualTaskCheck.
 # FieldCoverage runs in enforce mode (Pass 5.3): any unmapped writable upstream field fails the default task.
-task . Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage
+# ExampleCoverage and ManualTaskCheck (Pass 6b) need no harness: every registered type has a tested example, and no gate
+# reaches an underscore (manual) task.
+task . Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage, ExampleCoverage, ManualTaskCheck

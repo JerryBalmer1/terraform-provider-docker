@@ -16,6 +16,9 @@
 //	inventory_skip     reference/inventory.json items of kind "skip" (upstream operations with no provider type)
 //	acceptance         reference/_gen/deferred.d/acceptance.json: acceptance tests (or test paths) that cannot run
 //	                   for real on the dind harness; each names its test function and file, which must exist
+//	example            reference/_gen/deferred.d/examples.json: examples/ folders whose test only validates them, or
+//	                   parts of an example the test rewrites or removes before applying it on the harness; each
+//	                   folder must exist
 //
 // Every item has kind, id, reason and source (a repository path, no line
 // numbers, so unrelated edits do not make the file stale). Items are sorted
