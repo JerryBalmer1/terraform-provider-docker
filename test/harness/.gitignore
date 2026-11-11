@@ -7,3 +7,5 @@
 /.bin/
 # Invoke-E2E logs.
 /last-*.log
+# Pass worktrees, scratch and manual scenario working copies (never %TEMP%).
+/.work/
