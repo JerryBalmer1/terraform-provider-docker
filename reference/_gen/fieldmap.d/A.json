@@ -14,7 +14,7 @@
       "skip": "the provider never attaches to a container's streams (no ContainerAttach call; swagger.yaml:1361-1400): a run's output is read afterwards with ContainerLogs (docker_container state = \"exited\", docker_container_run), so the attach flags would have no effect"
     },
     "engine:ContainerCreate/HostConfig/ContainerIDFile": {
-      "skip": "client-side option: the docker CLI itself creates the --cidfile and writes the ID (docker-cli docs container_run.md:175-187, 'Docker closes this file when docker run exits'); the daemon only stores the path (swagger.yaml:1028); the container ID is the resource's id output"
+      "skip": "client-side option: the docker CLI itself creates the --cidfile and writes the ID (docker-cli docs container_run.md:176-190, 'Docker closes this file when docker run exits'); the daemon only stores the path (swagger.yaml:1028); the container ID is the resource's id output"
     },
     "engine:ContainerCreate/NetworkingConfig/EndpointsConfig/{}/DNSNames": {
       "skip": "daemon-computed output (swagger.yaml:3451-3463; api/docs/CHANGELOG.md:421-423, v1.44): built from the container name, aliases, short ID and hostname; set it through networks.aliases, name and hostname"
@@ -48,9 +48,6 @@
     },
     "engine:ContainerCreate/StdinOnce": {
       "skip": "closes stdin when an attached client disconnects (swagger.yaml:1397); the provider never attaches to a container's streams (no ContainerAttach call; swagger.yaml:1361-1400): a run's output is read afterwards with ContainerLogs (docker_container state = \"exited\", docker_container_run), so the attach flags would have no effect"
-    },
-    "engine:ContainerExec/AttachStdin": {
-      "skip": "docker_exec and docker_exec_output have no stdin input: the command never receives data on stdin, and an attached stdin with nothing to write would leave commands that read it blocked"
     },
     "engine:ContainerExec/DetachKeys": {
       "skip": "detach key sequence only matters to an interactive client attached to a TTY that types it (swagger.yaml:8970-8976, 11244-11249); the provider never attaches interactively"

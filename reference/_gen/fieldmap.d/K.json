@@ -25,25 +25,25 @@
    "item": "compose:configs"
   },
   "compose:include/env_file": {
-   "skip": "resolved by compose-go's loader before the project reaches the provider: include merges the env files of the included project into the project (compose-go v2.16.2 loader/loader.go:518-524 ApplyInclude, loader/include.go:99)"
+   "skip": "resolved by compose-go's loader before the project reaches the provider: include's env_file is the interpolation environment of the included files, read while they are loaded (compose-go v2.16.2 loader/loader.go:518-524 ApplyInclude, loader/include.go:99, :160-191)"
   },
   "compose:include/path": {
    "skip": "resolved by compose-go's loader before the project reaches the provider: include merges the included compose files into the project (compose-go v2.16.2 loader/loader.go:518-524 ApplyInclude, loader/include.go:99)"
   },
   "compose:include/project_directory": {
-   "skip": "resolved by compose-go's loader before the project reaches the provider: include merges the included project's directory into the project (compose-go v2.16.2 loader/loader.go:518-524 ApplyInclude, loader/include.go:99)"
+   "skip": "resolved by compose-go's loader before the project reaches the provider: include's project_directory is the base directory the included files' relative paths are resolved against while they are loaded (compose-go v2.16.2 loader/loader.go:518-524 ApplyInclude, loader/include.go:99, :125-137)"
   },
   "compose:model/context_size": {
    "item": "compose:models",
-   "partial": "recorded in the project but the model is never pulled or run: Docker Model Runner is not in Engine API 1.56 and compose configures context_size through the docker-model CLI plugin (compose v5.1.4 pkg/compose/model.go:160-190); PARTIAL(pass5) compose:models"
+   "partial": "recorded in the project but the model is never pulled or run: Docker Model Runner is not in Engine API 1.56 and compose configures context_size through the docker-model CLI plugin (compose v5.7.0 pkg/compose/model.go:170-207, ConfigureModel); PARTIAL(pass5) compose:models"
   },
   "compose:model/name": {
    "item": "compose:models",
-   "partial": "recorded in the project but the model is never pulled or run: Docker Model Runner is not in Engine API 1.56 and compose configures name through the docker-model CLI plugin (compose v5.1.4 pkg/compose/model.go:160-190); PARTIAL(pass5) compose:models"
+   "partial": "recorded in the project but the model is never pulled or run: Docker Model Runner is not in Engine API 1.56 and compose configures name through the docker-model CLI plugin (compose v5.7.0 pkg/compose/model.go:170-207, ConfigureModel); PARTIAL(pass5) compose:models"
   },
   "compose:model/runtime_flags": {
    "item": "compose:models",
-   "partial": "recorded in the project but the model is never pulled or run: Docker Model Runner is not in Engine API 1.56 and compose configures runtime_flags through the docker-model CLI plugin (compose v5.1.4 pkg/compose/model.go:160-190); PARTIAL(pass5) compose:models"
+   "partial": "recorded in the project but the model is never pulled or run: Docker Model Runner is not in Engine API 1.56 and compose configures runtime_flags through the docker-model CLI plugin (compose v5.7.0 pkg/compose/model.go:170-207, ConfigureModel); PARTIAL(pass5) compose:models"
   },
   "compose:network/external/name": {
    "skip": "deprecated upstream and resolved by compose-go's loader: external.name is copied into name with a deprecation warning before the project reaches the provider (compose-go v2.16.2 transform/external.go:39-52)"
@@ -72,7 +72,7 @@
    "item": "compose:secrets"
   },
   "compose:service/attach": {
-   "skip": "CLI log streaming only: attach selects whose logs `docker compose up` prints to the terminal (compose v5.1.4 cmd/compose/up.go:321, cmd/compose/logs.go:83); it creates nothing in the Engine and has no Terraform meaning"
+   "skip": "CLI log streaming only: attach selects whose logs `docker compose up` prints to the terminal (compose v5.7.0 cmd/compose/up.go:351, cmd/compose/logs.go:89); it creates nothing in the Engine and has no Terraform meaning"
   },
   "compose:service/blkio_config/device_read_bps/[]/path": {
    "attr": "compose file blkio_config.device_read_bps[].path -> HostConfig.Blkio* ThrottleDevice.Path (compose_local_k.go composeBlkio; compose-go ThrottleDevice has no yaml tags, so fieldcov cannot auto-map it)",
@@ -115,16 +115,16 @@
    "item": "compose:services"
   },
   "compose:service/build/isolation": {
-   "skip": "BuildKit (the provider's only builder, through the BuildKit seam) has no isolation option; compose v5.1.4 sends it only to the legacy Windows builder (pkg/compose/build_classic.go:309 ImageBuildOptions.Isolation), not through bake (build_bake.go:221-247)"
+   "skip": "BuildKit (the provider's only builder, through the BuildKit seam) has no isolation option; compose v5.7.0 sends it only to the legacy Windows builder (pkg/compose/build_classic.go:357 ImageBuildOptions.Isolation), not through bake (pkg/compose/build_bake.go:289-316)"
   },
   "compose:service/build/secrets/[]/gid": {
-   "skip": "BuildKit secrets have no client-side gid: the Dockerfile's RUN --mount=type=secret sets it; compose v5.1.4 ignores it too (pkg/compose/build_bake.go:505-523 toBakeSecrets passes only id and source)"
+   "skip": "BuildKit secrets have no client-side gid: the Dockerfile's RUN --mount=type=secret sets it; compose v5.7.0 ignores it too (pkg/compose/build_bake.go:741-759 toBakeSecrets passes only id and source)"
   },
   "compose:service/build/secrets/[]/mode": {
-   "skip": "BuildKit secrets have no client-side mode: the Dockerfile's RUN --mount=type=secret sets it; compose v5.1.4 ignores it too (pkg/compose/build_bake.go:505-523 toBakeSecrets passes only id and source)"
+   "skip": "BuildKit secrets have no client-side mode: the Dockerfile's RUN --mount=type=secret sets it; compose v5.7.0 ignores it too (pkg/compose/build_bake.go:741-759 toBakeSecrets passes only id and source)"
   },
   "compose:service/build/secrets/[]/uid": {
-   "skip": "BuildKit secrets have no client-side uid: the Dockerfile's RUN --mount=type=secret sets it; compose v5.1.4 ignores it too (pkg/compose/build_bake.go:505-523 toBakeSecrets passes only id and source)"
+   "skip": "BuildKit secrets have no client-side uid: the Dockerfile's RUN --mount=type=secret sets it; compose v5.7.0 ignores it too (pkg/compose/build_bake.go:741-759 toBakeSecrets passes only id and source)"
   },
   "compose:service/configs/[]/gid": {
    "attr": "compose file configs[].gid -> the copied file's owner/mode (local, compose_local.go composeLocalFileRef) and the Swarm reference file target (swarm, compose_swarm.go fileTarget); read through the ctypes.FileReferenceConfig conversion, which fieldcov cannot follow",
@@ -139,22 +139,22 @@
    "item": "compose:services"
   },
   "compose:service/develop/watch/[]/action": {
-   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-536): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
+   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-539): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
   },
   "compose:service/develop/watch/[]/ignore": {
-   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-536): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
+   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-539): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
   },
   "compose:service/develop/watch/[]/include": {
-   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-536): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
+   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-539): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
   },
   "compose:service/develop/watch/[]/initial_sync": {
-   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-536): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
+   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-539): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
   },
   "compose:service/develop/watch/[]/path": {
-   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-536): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
+   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-539): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
   },
   "compose:service/develop/watch/[]/target": {
-   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-536): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
+   "skip": "develop is the skipped inventory item compose:service-develop (reference/_gen/fragments/z2-compose.json:503-539): watch mode needs a CLI process that keeps running and syncs files, which a Terraform apply is not; docker_compose warns and ignores develop"
   },
   "compose:service/env_file/[]/format": {
    "skip": "resolved by compose-go's loader before the project reaches the provider: env_file contents are merged into environment (compose-go v2.16.2 types/project.go:865-919 WithServicesEnvironmentResolved / resolveEnvironment, called from loader/loader.go:697-702)"
@@ -172,7 +172,7 @@
    "skip": "resolved by compose-go's loader before the project reaches the provider: label_file entries are merged into labels (compose-go v2.16.2 types/project.go:920-970 WithServicesLabelsResolved, called from loader/loader.go:704-709)"
   },
   "compose:service/ports/[]/app_protocol": {
-   "skip": "metadata hint only: the Engine API has no port field for it (swagger PortBinding / EndpointPortConfig) and compose v5.1.4 never reads ServicePortConfig.AppProtocol (no use in pkg/compose)"
+   "skip": "metadata hint only: the Engine API has no port field for it (swagger PortBinding / EndpointPortConfig) and compose v5.7.0 never reads ServicePortConfig.AppProtocol (no use in pkg/, cmd/ or internal/)"
   },
   "compose:service/pre_start/[]/blkio_config/device_read_bps/[]/path": {
    "attr": "compose file blkio_config.device_read_bps[].path -> HostConfig.Blkio* ThrottleDevice.Path (compose_local_k.go composeBlkio; compose-go ThrottleDevice has no yaml tags, so fieldcov cannot auto-map it)",
@@ -252,10 +252,10 @@
    "item": "compose:services"
   },
   "compose:service/provider/options": {
-   "skip": "provider services run an external binary (compose v5.1.4 pkg/compose/plugins.go:216 exec.CommandContext runs the provider binary); nothing shells out in this provider, so docker_compose warns and ignores provider"
+   "skip": "provider services run an external binary (compose v5.7.0 internal/provider/plugins.go:605 exec.CommandContext runs the provider binary); nothing shells out in this provider, so docker_compose warns and ignores provider"
   },
   "compose:service/provider/type": {
-   "skip": "provider services run an external binary (compose v5.1.4 pkg/compose/plugins.go:216 exec.CommandContext runs the provider binary); nothing shells out in this provider, so docker_compose warns and ignores provider"
+   "skip": "provider services run an external binary (compose v5.7.0 internal/provider/plugins.go:605 exec.CommandContext runs the provider binary); nothing shells out in this provider, so docker_compose warns and ignores provider"
   },
   "compose:service/secrets/[]/gid": {
    "attr": "compose file secrets[].gid -> the copied file's owner/mode (local, compose_local.go composeLocalFileRef) and the Swarm reference file target (swarm, compose_swarm.go fileTarget); read through the ctypes.FileReferenceConfig conversion, which fieldcov cannot follow",

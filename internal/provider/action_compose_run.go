@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/action"
 	aschema "github.com/hashicorp/terraform-plugin-framework/action/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -228,6 +229,8 @@ type composeRunModel struct {
 	User       types.String `tfsdk:"user"`
 	Workdir    types.String `tfsdk:"workdir"`
 	Remove     types.Bool   `tfsdk:"rm"`
+	StartDeps  types.Bool   `tfsdk:"start_dependencies"`
+	NoRecreate types.Bool   `tfsdk:"no_recreate"`
 	Timeout    types.String `tfsdk:"timeout"`
 	ResultPath types.String `tfsdk:"result_path"`
 }
@@ -243,7 +246,8 @@ func (a *composeRunAction) Schema(_ context.Context, _ action.SchemaRequest, res
 			"secrets and configs as for `docker_compose`), labelled `com.docker.compose.oneoff=True`, waited for and removed. The action " +
 			"fails when the command exits non-zero. The result carries `exit_code` and the captured `stdout` / `stderr`. Use it for " +
 			"migrations and other jobs: compose `jobs` are not run by `docker_compose` yet. The project's networks must exist " +
-			"(apply the `docker_compose` resource first).",
+			"(apply the `docker_compose` resource first). By default the service's `depends_on` services are expected to run " +
+			"already (CLI `--no-deps`); set `start_dependencies` to bring them up first.",
 		Attributes: composeActionSource(map[string]aschema.Attribute{
 			"service": aschema.StringAttribute{Required: true, MarkdownDescription: "The service to run."},
 			"command": aschema.ListAttribute{ElementType: types.StringType, Optional: true,
@@ -256,6 +260,17 @@ func (a *composeRunAction) Schema(_ context.Context, _ action.SchemaRequest, res
 			"workdir": aschema.StringAttribute{Optional: true, MarkdownDescription: "Working directory (CLI `--workdir`)."},
 			"rm": aschema.BoolAttribute{Optional: true,
 				MarkdownDescription: "Remove the container after it exits (CLI `--rm`). Default `true`."},
+			"start_dependencies": aschema.BoolAttribute{Optional: true,
+				MarkdownDescription: "Bring up the service's `depends_on` services (transitively) before the run, like `docker compose run` " +
+					"without `--no-deps`: a missing dependency container is created and started, a stopped one is started, a dependency " +
+					"container whose configuration diverged from the compose model is recreated (unless `no_recreate`), and the run waits for " +
+					"each `depends_on` condition. Default `false` (CLI `--no-deps`): the dependencies are expected to run already, usually " +
+					"managed by `docker_compose`.",
+			},
+			"no_recreate": aschema.BoolAttribute{Optional: true,
+				MarkdownDescription: "With `start_dependencies`, an existing dependency container is never recreated, even if its " +
+					"configuration diverged; it is only started when stopped (CLI `--no-recreate`). Default `false`.",
+			},
 			"timeout":     composeTimeoutAttr("the run"),
 			"result_path": actResultPathAttribute(),
 		}),
@@ -268,6 +283,10 @@ func (a *composeRunAction) ValidateConfig(ctx context.Context, req action.Valida
 	if !resp.Diagnostics.HasError() {
 		composeValidateSource(m.composeSourceModel, &resp.Diagnostics)
 		actDuration(m.Timeout, "timeout", &resp.Diagnostics)
+		if nr, ok := knownBool(m.NoRecreate); ok && nr && !m.StartDeps.IsUnknown() && !actBool(m.StartDeps, false) {
+			resp.Diagnostics.AddAttributeError(path.Root("no_recreate"), "no_recreate needs start_dependencies",
+				"no_recreate only applies to the dependency containers that start_dependencies brings up; set start_dependencies = true.")
+		}
 	}
 }
 
@@ -326,8 +345,9 @@ func (a *composeRunAction) Invoke(ctx context.Context, req action.InvokeRequest,
 		d.RestartPolicy = nil
 		svc.Deploy = &d
 	}
-	svc.Ports = nil     // like `compose run` without --service-ports
-	svc.DependsOn = nil // dependencies are expected to run already (docker_compose)
+	svc.Ports = nil // like `compose run` without --service-ports
+	runDeps := svc.DependsOn
+	svc.DependsOn = nil // the run waits for them below (start_dependencies), not through the plan
 	sub := *p
 	sub.Services = ctypes.Services{svcName: svc}
 	plan, err := composeLocalExpand(&sub)
@@ -370,6 +390,20 @@ func (a *composeRunAction) Invoke(ctx context.Context, req action.InvokeRequest,
 	timeout := actTimeout(m.Timeout, composeActionDefaultTimeout)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+
+	if actBool(m.StartDeps, false) {
+		warn := func(summary, detail string) { resp.Diagnostics.AddWarning(summary, detail) }
+		ids, err := composeRunStartDeps(ctx, a.pd, p, svcName, actBool(m.NoRecreate, false), timeout,
+			func(msg string) { actProgress(ctx, resp, "%s", msg) }, warn)
+		if err != nil {
+			resp.Diagnostics.AddError("docker_compose_run: cannot start dependencies", err.Error())
+			return
+		}
+		if err := composeRunWaitDeps(ctx, a.pd, runDeps, ids, timeout, warn); err != nil {
+			resp.Diagnostics.AddError("docker_compose_run: dependency not ready", fmt.Sprintf("service %s: %v", svcName, err))
+			return
+		}
+	}
 
 	id, err := composeLocalCreate(ctx, a.pd, dc, nil)
 	remove := func() {
@@ -416,6 +450,133 @@ func (a *composeRunAction) Invoke(ctx context.Context, req action.InvokeRequest,
 		"container_name": dc.Name,
 		"result":         map[string]any{"exit_code": code, "stdout": stdout, "stderr": stderr},
 	}, m.ResultPath)
+}
+
+// composeRunStartDeps brings up the depends_on closure of svcName before a
+// one-off run, like compose v5.7.0 RunOneOffContainer -> startDependencies
+// (pkg/compose/run.go:291-321): the project is narrowed to the service and
+// its dependencies (cmd/compose/run.go:279-280, ToProject with the service
+// selected), the service itself is left out, and the rest is created with
+// the "diverged" recreate policy, or "never" with --no-recreate
+// (cmd/compose/create.go:165-173 dependenciesRecreateStrategy;
+// pkg/compose/reconcile.go:1028-1031 mustRecreate returns false for
+// RecreateNever), then started. Containers are handled as docker_compose
+// handles them (composeLocalApply): missing ones created, diverged ones
+// recreated (pre_stop hooks first), created or failed ones started, each
+// after its own depends_on conditions. Nothing else of the project is
+// touched (no orphan removal, no network or volume changes). It returns the
+// container IDs per dependency service.
+func composeRunStartDeps(ctx context.Context, pd *providerData, p *ctypes.Project, svcName string, noRecreate bool, timeout time.Duration, progress func(string), warn func(string, string)) (map[string][]string, error) {
+	sel, err := p.WithSelectedServices([]string{svcName})
+	if err != nil {
+		return nil, err
+	}
+	deps := ctypes.Services{}
+	for name, s := range sel.Services {
+		if name != svcName {
+			deps[name] = s
+		}
+	}
+	if len(deps) == 0 {
+		return nil, nil
+	}
+	sub := *sel
+	sub.Services = deps
+	plan, err := composeLocalExpand(&sub)
+	if err != nil {
+		return nil, fmt.Errorf("invalid project: %w", err)
+	}
+	ex, err := composeLocalList(ctx, pd, p.Name)
+	if err != nil {
+		return nil, err
+	}
+	recreate := map[string]bool{}
+	replaced := map[string]bool{}
+	recreatedSvc := map[string]bool{}
+	kept := map[string]bool{}
+	for _, dc := range plan.Containers {
+		got, ok := ex.containers[dc.Name]
+		if !ok {
+			replaced[dc.Name] = true
+			recreatedSvc[dc.Service] = true
+			continue
+		}
+		diverged := false
+		if !noRecreate {
+			diverged = !composeHashMatches(got.Labels, dc.Hash) || !composeLocalConfigHashCurrent(dc, got.Labels, ex, replaced)
+			for dep, d := range dc.DependsOn {
+				if d.Restart && recreatedSvc[dep] {
+					diverged = true
+				}
+			}
+		}
+		if diverged {
+			recreate[dc.Name] = true
+			replaced[dc.Name] = true
+			recreatedSvc[dc.Service] = true
+			continue
+		}
+		kept[dc.Service] = true
+	}
+	c := pd.Client
+	ids := map[string][]string{}
+	sharedDone := map[string]bool{}
+	for _, dc := range plan.Containers {
+		if err := composeRunWaitDeps(ctx, pd, dc.DependsOn, ids, timeout, warn); err != nil {
+			return ids, fmt.Errorf("service %s: %w", dc.Service, err)
+		}
+		got, exists := ex.containers[dc.Name]
+		if exists && !recreate[dc.Name] {
+			ids[dc.Service] = append(ids[dc.Service], got.ID)
+			if got.State == container.StateCreated || (got.State == container.StateExited && composeLocalStateDrift(got, dc.Host.RestartPolicy.Name) != "") {
+				progress("starting dependency " + dc.Name)
+				if _, err := c.ContainerStart(ctx, got.ID, client.ContainerStartOptions{}); err != nil {
+					return ids, fmt.Errorf("starting container %s: %w", dc.Name, err)
+				}
+				if err := composeRunExecHooks(ctx, pd, got.ID, dc.Name, "post_start", dc.PostStart); err != nil {
+					return ids, err
+				}
+			}
+			continue
+		}
+		if exists {
+			progress("recreating dependency " + dc.Name + " (configuration diverged)")
+			if err := composeRunPreStop(ctx, pd, got, dc.PreStop); err != nil {
+				return ids, err
+			}
+			if _, err := c.ContainerRemove(ctx, got.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil && !isNotFound(err) {
+				return ids, fmt.Errorf("removing container %s: %w", dc.Name, err)
+			}
+		} else {
+			progress("creating dependency " + dc.Name)
+		}
+		if !kept[dc.Service] && !sharedDone[dc.Service] {
+			dc.SharedPreStart = true
+			sharedDone[dc.Service] = true
+		}
+		id, err := composeLocalCreate(ctx, pd, dc, nil)
+		if err != nil {
+			return ids, err
+		}
+		ids[dc.Service] = append(ids[dc.Service], id)
+	}
+	return ids, nil
+}
+
+// composeRunWaitDeps waits for the depends_on conditions of one service;
+// an optional dependency (required: false) that is not ready is a warning.
+func composeRunWaitDeps(ctx context.Context, pd *providerData, deps ctypes.DependsOnConfig, ids map[string][]string, timeout time.Duration, warn func(string, string)) error {
+	for _, dep := range composeSortedKeys(deps) {
+		d := deps[dep]
+		if err := composeWaitDependency(ctx, pd, dep, ids[dep], d.Condition, timeout); err != nil {
+			if !d.Required {
+				warn("Optional dependency not ready", err.Error())
+				continue
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 // composeTailLines returns the last actTailLines lines of s.

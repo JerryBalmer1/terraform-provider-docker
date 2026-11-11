@@ -47,6 +47,7 @@ type execActionModel struct {
 	TTY         types.Bool   `tfsdk:"tty"`
 	ConsoleSize types.List   `tfsdk:"console_size"`
 	Detach      types.Bool   `tfsdk:"detach"`
+	Stdin       types.String `tfsdk:"stdin"`
 	Timeout     types.String `tfsdk:"timeout"`
 	ResultPath  types.String `tfsdk:"result_path"`
 }
@@ -87,6 +88,11 @@ func (a *execAction) Schema(_ context.Context, _ action.SchemaRequest, resp *act
 					"that format output to the terminal width."},
 			"detach": schema.BoolAttribute{Optional: true,
 				MarkdownDescription: "Start the command and return at once without waiting for it (`docker exec --detach`). Default `false`. Output is not captured and the exit code is not checked."},
+			"stdin": schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "Data written to the command's standard input, which is then closed, like `echo ... | docker exec -i`. " +
+					"Unset (the default), the command gets no stdin. It is never logged or written to `result_path`, but action arguments cannot be marked sensitive or write-only (terraform-plugin-framework v1.19), so pass secrets through `docker_exec_output`, whose `stdin` is sensitive. Not with `tty` or `detach`.",
+			},
 			"timeout": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "How long the command may run, as a Go duration (`30s`, `10m`). Default `5m`. On timeout the action fails; the process keeps running in the container.",
@@ -109,6 +115,16 @@ func (a *execAction) ValidateConfig(ctx context.Context, req action.ValidateConf
 	}
 	if containerKnown(m.ConsoleSize) && !actBool(m.TTY, false) {
 		resp.Diagnostics.AddAttributeError(path.Root("console_size"), "console_size needs tty", "The Engine only applies console_size to a TTY; set tty = true.")
+	}
+	if !m.Stdin.IsNull() && !m.Stdin.IsUnknown() {
+		if actBool(m.TTY, false) {
+			resp.Diagnostics.AddAttributeError(path.Root("stdin"), "stdin needs tty = false",
+				"With a TTY the daemon cannot signal end of file on stdin (it closes the output streams instead), so the command would never see the end of the input. Unset tty.")
+		}
+		if actBool(m.Detach, false) {
+			resp.Diagnostics.AddAttributeError(path.Root("stdin"), "stdin cannot be used with detach",
+				"A detached command is not attached to the provider, so there is no stream to write stdin to. Unset detach.")
+		}
 	}
 	if !m.Command.IsUnknown() && !m.Command.IsNull() && len(m.Command.Elements()) == 0 {
 		resp.Diagnostics.AddAttributeError(path.Root("command"), "Empty command", "command needs at least one element.")
@@ -169,6 +185,7 @@ func (a *execAction) Invoke(ctx context.Context, req action.InvokeRequest, resp 
 			Cmd:         cmd,
 		},
 		Detach:   detach,
+		Stdin:    actExecStdin(m.Stdin),
 		Timeout:  timeout,
 		MaxBytes: actExecMaxBytes,
 		Stdout:   stdout,
@@ -202,6 +219,15 @@ func (a *execAction) Invoke(ctx context.Context, req action.InvokeRequest, resp 
 		"stderr":       out.Stderr,
 		"result":       out.Inspect,
 	}, m.ResultPath)
+}
+
+// actExecStdin returns the stdin data, or nil when stdin is unset.
+func actExecStdin(v types.String) *string {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	s := v.ValueString()
+	return &s
 }
 
 func actExecTail(tail []string) string {

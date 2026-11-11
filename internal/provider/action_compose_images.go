@@ -62,7 +62,13 @@ func composeImagesValidate(ctx context.Context, req action.ValidateConfigRequest
 // composeImagesLoad loads the project and the selected services.
 func composeImagesLoad(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse, a *actBase) (*composeImagesActModel, *ctypes.Project, []ctypes.ServiceConfig) {
 	var m composeImagesActModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	return composeImagesLoadInto(ctx, req, resp, a, &m, &m)
+}
+
+// composeImagesLoadInto is composeImagesLoad for an action whose model
+// embeds composeImagesActModel (m points into full).
+func composeImagesLoadInto(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse, a *actBase, m *composeImagesActModel, full any) (*composeImagesActModel, *ctypes.Project, []ctypes.ServiceConfig) {
+	resp.Diagnostics.Append(req.Config.Get(ctx, full)...)
 	a.client(&resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return nil, nil, nil
@@ -76,7 +82,7 @@ func composeImagesLoad(ctx context.Context, req action.InvokeRequest, resp *acti
 		resp.Diagnostics.AddError("Unknown service", err.Error())
 		return nil, nil, nil
 	}
-	return &m, p, svcs
+	return m, p, svcs
 }
 
 // ---------------------------------------------------------------------------
@@ -203,54 +209,108 @@ func NewComposePushAction() action.Action { return &composePushAction{} }
 
 type composePushAction struct{ actBase }
 
+// composePushActModel is docker_compose_push's model: the image action
+// model plus ignore_missing.
+type composePushActModel struct {
+	composeImagesActModel
+	IgnoreMissing types.Bool `tfsdk:"ignore_missing"`
+}
+
 func (a *composePushAction) Metadata(_ context.Context, req action.MetadataRequest, resp *action.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_compose_push"
 }
 
 func (a *composePushAction) Schema(_ context.Context, _ action.SchemaRequest, resp *action.SchemaResponse) {
-	resp.Schema = composeImagesSchema("Pushes the image of every service of a compose project that names one (`image`), like " +
-		"`docker compose push`, with the provider's `registry_auth`. `image_digest_refs` records what was pushed.")
+	resp.Schema = composeImagesSchema("Pushes the image of every service of a compose project that is built and named (`build` and " +
+		"`image`), plus its `build.tags`, like `docker compose push`, with the provider's `registry_auth`. A service without `build` " +
+		"or without `image` is skipped (`result.push_status` says why), as compose does. `image_refs` and `image_digest_refs` record " +
+		"the service's image as pushed (the first `build.tags` entry pushed when the image itself was skipped).")
+	resp.Schema.Attributes["ignore_missing"] = aschema.BoolAttribute{Optional: true,
+		MarkdownDescription: "Skip an image (the service's `image` or one of its `build.tags`) that is not in the daemon's local " +
+			"image store instead of failing the push (CLI `--ignore-missing`); `result.push_status` says `skipped (no local image)` " +
+			"for a service with nothing pushed, and lists the skipped tags otherwise. Only a definite not-found " +
+			"skips: any other error inspecting the image is left to the push to report. Default `false`."}
 }
 
 func (a *composePushAction) ValidateConfig(ctx context.Context, req action.ValidateConfigRequest, resp *action.ValidateConfigResponse) {
-	composeImagesValidate(ctx, req, resp)
+	var m composePushActModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if !resp.Diagnostics.HasError() {
+		composeValidateSource(m.composeSourceModel, &resp.Diagnostics)
+	}
 }
 
 func (a *composePushAction) Invoke(ctx context.Context, req action.InvokeRequest, resp *action.InvokeResponse) {
-	m, p, svcs := composeImagesLoad(ctx, req, resp, &a.actBase)
+	var pm composePushActModel
+	m, p, svcs := composeImagesLoadInto(ctx, req, resp, &a.actBase, &pm.composeImagesActModel, &pm)
 	if p == nil {
 		return
 	}
+	ignoreMissing := actBool(pm.IgnoreMissing, false)
 	var names []string
 	status, refs, digests := map[string]string{}, map[string]string{}, map[string]string{}
 	for _, svc := range svcs {
 		names = append(names, svc.Name)
-		if svc.Image == "" {
+		// compose v5.7.0 pkg/compose/push.go:50-60: only a service that is
+		// both built (`build`) and named (`image`) is pushed; the others
+		// are skipped. :61-64: its `build.tags` are pushed too.
+		switch {
+		case svc.Image == "":
 			status[svc.Name] = "skipped (no image name)"
 			continue
+		case svc.Build == nil:
+			status[svc.Name] = "skipped (not built)"
+			continue
 		}
-		auth, err := a.pd.registryAuthFor(svc.Image)
-		if err != nil {
-			resp.Diagnostics.AddError("docker_compose_push failed", fmt.Sprintf("service %s: %v", svc.Name, err))
-			return
-		}
-		actProgress(ctx, resp, "pushing %s (%s)", svc.Name, svc.Image)
-		image := svc.Image
-		digest, err := registryImagePushWithRetry(ctx, 0, func(ctx context.Context) (io.ReadCloser, error) {
-			return a.pd.Client.ImagePush(ctx, image, client.ImagePushOptions{RegistryAuth: auth})
-		})
-		if err != nil {
-			resp.Diagnostics.AddError("docker_compose_push failed", fmt.Sprintf("service %s image %s: %v", svc.Name, svc.Image, err))
-			return
-		}
-		refs[svc.Name] = svc.Image
-		status[svc.Name] = "pushed"
-		if digest != "" {
-			repo := svc.Image
-			if i := strings.LastIndex(repo, ":"); i > strings.LastIndex(repo, "/") {
-				repo = repo[:i]
+		tags := append([]string{svc.Image}, svc.Build.Tags...)
+		var pushed, missing []string
+		for _, tag := range tags {
+			// compose v5.7.0 pkg/compose/push.go:68-71 and :90-95: with
+			// --ignore-missing an image the local store definitely lacks
+			// (ImageInspect not found) is skipped; other inspect errors
+			// fall through to the push. It applies per tag.
+			if ignoreMissing {
+				if _, err := a.pd.Client.ImageInspect(ctx, tag); err != nil && isNotFound(err) {
+					actProgress(ctx, resp, "skipping %s (%s): no local image", svc.Name, tag)
+					missing = append(missing, tag)
+					continue
+				}
 			}
-			digests[svc.Name] = repo + "@" + digest
+			auth, err := a.pd.registryAuthFor(tag)
+			if err != nil {
+				resp.Diagnostics.AddError("docker_compose_push failed", fmt.Sprintf("service %s: %v", svc.Name, err))
+				return
+			}
+			actProgress(ctx, resp, "pushing %s (%s)", svc.Name, tag)
+			image := tag
+			digest, err := registryImagePushWithRetry(ctx, 0, func(ctx context.Context) (io.ReadCloser, error) {
+				return a.pd.Client.ImagePush(ctx, image, client.ImagePushOptions{RegistryAuth: auth})
+			})
+			if err != nil {
+				resp.Diagnostics.AddError("docker_compose_push failed", fmt.Sprintf("service %s image %s: %v", svc.Name, tag, err))
+				return
+			}
+			pushed = append(pushed, tag)
+			// image_refs / image_digest_refs name the first tag pushed:
+			// the service's image unless it was skipped.
+			if _, ok := refs[svc.Name]; !ok {
+				refs[svc.Name] = tag
+				if digest != "" {
+					repo := tag
+					if i := strings.LastIndex(repo, ":"); i > strings.LastIndex(repo, "/") {
+						repo = repo[:i]
+					}
+					digests[svc.Name] = repo + "@" + digest
+				}
+			}
+		}
+		switch {
+		case len(pushed) == 0:
+			status[svc.Name] = "skipped (no local image)"
+		case len(missing) > 0:
+			status[svc.Name] = "pushed; skipped (no local image): " + strings.Join(missing, ", ")
+		default:
+			status[svc.Name] = "pushed"
 		}
 	}
 	actFinishResult(ctx, resp, a.pd, "compose:cli-push", map[string]any{

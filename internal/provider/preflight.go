@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"runtime"
 	"strings"
 	"syscall"
@@ -97,32 +98,87 @@ func isWinAccessDenied(err error) bool {
 	return isWindows && errors.As(err, &errno) && errno == errorAccessDenied
 }
 
+// daemonConnError is a connection failure of the Docker client that the
+// preflight classifies as permission denied or TLS (daemonAnnotate). Its
+// text is the preflight diagnostic's summary and detail, so the first
+// resource, data source or action call after a Configure warning fails with
+// the same explanation instead of the raw client error. It deliberately does
+// not unwrap to Cause: the moby client would replace a wrapped
+// fs.ErrPermission by its own one-line message (client request.go
+// doRequest).
+type daemonConnError struct {
+	Summary, Detail string
+	Cause           error
+}
+
+func (e *daemonConnError) Error() string { return e.Summary + ": " + e.Detail }
+
+// daemonAnnotate turns a permission-denied or TLS failure reaching ep into
+// a daemonConnError; any other error (unreachable, context cancelled, ...)
+// is returned unchanged.
+func daemonAnnotate(ep endpointConfig, err error) error {
+	if err == nil {
+		return nil
+	}
+	switch classifyDaemonError(err) {
+	case daemonPermissionDenied, daemonTLSFailure:
+		summary, detail := daemonFailureText(ep, err)
+		return &daemonConnError{Summary: summary, Detail: detail, Cause: err}
+	}
+	return err
+}
+
+// permissionCause is the text of a permission-denied failure without the
+// dial wrapper of a *net.OpError ("dial unix <path>: "), whose host the
+// diagnostic already names. The moby client turns any connection error
+// whose text contains "dial unix" into its generic "Cannot connect to the
+// Docker daemon" (client request.go doRequest), which would drop the
+// daemonConnError text.
+func permissionCause(err error) string {
+	var op *net.OpError
+	if errors.As(err, &op) && op.Err != nil {
+		return op.Err.Error()
+	}
+	return err.Error()
+}
+
 // daemonCheckDiagnostic returns the summary and detail for a failed
 // Configure-time ping of ep.
 func daemonCheckDiagnostic(ep endpointConfig, err error) (string, string) {
-	where := fmt.Sprintf("%s (from %s)", ep.Host, ep.hostSource())
 	const tail = "\n\nPlanning continues; operations that need the daemon fail until this is fixed. " +
 		"Set disable_docker_daemon_check = true to skip this check."
+	var ce *daemonConnError
+	if errors.As(err, &ce) {
+		err = ce.Cause
+	}
+	summary, detail := daemonFailureText(ep, err)
+	return summary, detail + tail
+}
+
+// daemonFailureText is the summary and detail (without the Configure
+// tail) for a failure reaching ep.
+func daemonFailureText(ep endpointConfig, err error) (string, string) {
+	where := fmt.Sprintf("%s (from %s)", ep.Host, ep.hostSource())
 	switch classifyDaemonError(err) {
 	case daemonPermissionDenied:
 		return "Permission denied on the Docker daemon socket",
-			fmt.Sprintf("Connecting to %s was refused by the operating system: %v\n\n"+
+			fmt.Sprintf("Connecting to %s was refused by the operating system: %s\n\n"+
 				"On Linux, the user running Terraform needs access to the socket (usually membership of the `docker` group, or a "+
 				"rootless daemon's socket); on Windows, the named pipe needs an elevated process or membership of the `docker-users` "+
-				"group (Docker Desktop).%s", where, err, tail)
+				"group (Docker Desktop).", where, permissionCause(err))
 	case daemonTLSFailure:
 		return "TLS failure talking to the Docker daemon",
-			fmt.Sprintf("The TLS connection to %s failed: %v\n\nTLS settings in effect: %s.\n\n%s%s",
-				where, err, ep.tlsSummary(), tlsHint(err), tail)
+			fmt.Sprintf("The TLS connection to %s failed: %v\n\nTLS settings in effect: %s.\n\n%s",
+				where, err, ep.tlsSummary(), tlsHint(err))
 	case daemonErrorResponse:
 		return "Docker daemon check failed",
-			fmt.Sprintf("Something answered at %s, but not with a Docker Engine /_ping: %v%s", where, err, tail)
+			fmt.Sprintf("Something answered at %s, but not with a Docker Engine /_ping: %v", where, err)
 	default:
 		return "Docker daemon not reachable",
 			fmt.Sprintf("No Docker daemon answered at %s: %v\n\n"+
 				"Check that the daemon is running and that the address is right; the provider resolves it from `host`, the `ssh` "+
-				"block, `context`, DOCKER_HOST, DOCKER_CONTEXT, `currentContext` in the docker config.json, then %s, in that order.%s",
-				where, err, defaultDockerHost, tail)
+				"block, `context`, DOCKER_HOST, DOCKER_CONTEXT, `currentContext` in the docker config.json, then %s, in that order.",
+				where, err, defaultDockerHost)
 	}
 }
 

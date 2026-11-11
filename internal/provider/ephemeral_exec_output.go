@@ -39,6 +39,7 @@ type execOutputModel struct {
 	Env         types.Map    `tfsdk:"env"`
 	Privileged  types.Bool   `tfsdk:"privileged"`
 	Timeout     types.String `tfsdk:"timeout"`
+	Stdin       types.String `tfsdk:"stdin"`
 	ExecID      types.String `tfsdk:"exec_id"`
 	ExitCode    types.Int64  `tfsdk:"exit_code"`
 	contractEngineExecOutput
@@ -66,7 +67,12 @@ func (e *execOutputEphemeral) Schema(_ context.Context, _ ephemeral.SchemaReques
 			"env":        schema.MapAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: "Extra environment variables for the command."},
 			"privileged": schema.BoolAttribute{Optional: true, MarkdownDescription: "Give the command extended privileges. Default `false`."},
 			"timeout":    schema.StringAttribute{Optional: true, MarkdownDescription: "Maximum run time as a Go duration, e.g. `30s`. Default `60s`."},
-			"exec_id":    schema.StringAttribute{Computed: true, MarkdownDescription: "ID of the exec instance (`POST /containers/{id}/exec`)."},
+			"stdin": schema.StringAttribute{
+				Optional: true, Sensitive: true,
+				MarkdownDescription: "Data written to the command's standard input, which is then closed, like `echo ... | docker exec -i`. " +
+					"Unset (the default), the command gets no stdin. Sensitive, e.g. a password piped to a CLI inside the container.",
+			},
+			"exec_id": schema.StringAttribute{Computed: true, MarkdownDescription: "ID of the exec instance (`POST /containers/{id}/exec`)."},
 			"exit_code": schema.Int64Attribute{
 				Computed:            true,
 				MarkdownDescription: "Exit code of the command; always 0, because any other code fails the read.",
@@ -130,6 +136,7 @@ func (e *execOutputEphemeral) Open(ctx context.Context, req ephemeral.OpenReques
 			Cmd: cmd, User: m.User.ValueString(), WorkingDir: m.Workdir.ValueString(), Env: copMergeEnv(nil, envMap),
 			Privileged: m.Privileged.ValueBool(),
 		},
+		Stdin:    actExecStdin(m.Stdin),
 		Timeout:  timeout,
 		MaxBytes: execOutputMaxBytes,
 	})

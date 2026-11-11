@@ -2,110 +2,110 @@
   "about": "Pass 5.3 Lane S manual field coverage: swarm topology and workload (docker_service, docker_stack, docker_secret, docker_config, docker_node, docker_swarm_init, docker_swarm_node). Docker daemon source citations are paths in the Go module cache under github.com/docker/docker@v28.5.2+incompatible.",
   "fields": {
     "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/CreateMountpoint": {
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (moby docker-v29.9.3 daemon/cluster/convert/container.go:397-411, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
     },
     "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyForceRecursive": {
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (moby docker-v29.9.3 daemon/cluster/convert/container.go:397-411, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
     },
     "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyNonRecursive": {
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (moby docker-v29.9.3 daemon/cluster/convert/container.go:397-411, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
     },
     "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/Consistency": {
-      "skip": "The daemon never converts Mount.Consistency for services (daemon/cluster/convert/container.go:381-433, docker v28.5.2, has no Consistency), and it only ever affected Docker Desktop for Mac osxfs bind mounts (swagger.yaml Mount.Consistency); TestAccServiceP53_daemonDropsMountFields pins it. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
+      "skip": "The daemon never converts Mount.Consistency for services (moby docker-v29.9.3 daemon/cluster/convert/container.go:383-436, has no Consistency), and no Linux daemon code acts on it: it only accepts the mode names (swagger.yaml:427-428 Mount.Consistency; moby docker-v29.9.3 daemon/volume/mounts/linux_parser.go:136); TestAccServiceP53_daemonDropsMountFields pins it. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
     },
     "engine:ServiceCreate/TaskTemplate/ContainerSpec/Mounts/[]/ImageOptions/Subpath": {
-      "skip": "Image mounts exist for containers only (CHANGELOG.md v1.48: POST /containers/create supports Mount of type image); the service conversion maps Mount.Type through swarmkit's Mount_MountType enum and rejects other types (daemon/cluster/convert/container.go:389-392), and swarmkit v2.0.0 vendored by docker v28.5.2 has no image type; TestAccServiceP53_daemonDropsMountFields pins it."
+      "skip": "Image mounts exist for containers only (CHANGELOG.md:222, v1.48: POST /containers/create supports Mount of type image); the service conversion maps Mount.Type through swarmkit's Mount_MountType enum and rejects other types (moby docker-v29.9.3 daemon/cluster/convert/container.go:391-395), and swarmkit v2.1.3 vendored by docker v29.9.3 has no image type (vendor/github.com/moby/swarmkit/v2/api/types.pb.go:240-246); TestAccServiceP53_daemonDropsMountFields pins it."
     },
     "engine:ServiceCreate/TaskTemplate/NetworkAttachmentSpec/ContainerID": {
-      "skip": "NetworkAttachmentSpec is a read-only spec for non-swarm containers attached to overlay networks (swagger.yaml:4754-4757); the daemon rejects a service with runtime attachment (daemon/cluster/services.go:201 and :308, docker v28.5.2)."
+      "skip": "NetworkAttachmentSpec is a read-only spec for non-swarm containers attached to overlay networks (swagger.yaml:4754-4757); the daemon rejects a service with runtime attachment (moby docker-v29.9.3 daemon/cluster/services.go:228 and :343)."
     },
     "engine:ServiceCreate/TaskTemplate/PluginSpec/Disabled": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234); it also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:ServiceCreate/TaskTemplate/PluginSpec/Name": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234); it also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:ServiceCreate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Description": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234); it also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:ServiceCreate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Name": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234); it also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:ServiceCreate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Value": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234); it also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:ServiceCreate/TaskTemplate/PluginSpec/Remote": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234); it also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/CreateMountpoint": {
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (moby docker-v29.9.3 daemon/cluster/convert/container.go:397-411, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
     },
     "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyForceRecursive": {
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (moby docker-v29.9.3 daemon/cluster/convert/container.go:397-411, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
     },
     "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/BindOptions/ReadOnlyNonRecursive": {
-      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (daemon/cluster/convert/container.go:394-408 in docker v28.5.2, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
+      "skip": "The daemon drops it when it converts a service spec to swarmkit: containerToGRPC copies only Propagation and NonRecursive of BindOptions (moby docker-v29.9.3 daemon/cluster/convert/container.go:397-411, the harness engine), so a service cannot use it; TestAccServiceP53_daemonDropsMountFields pins this, implement it when that test fails. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
     },
     "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/Consistency": {
-      "skip": "The daemon never converts Mount.Consistency for services (daemon/cluster/convert/container.go:381-433, docker v28.5.2, has no Consistency), and it only ever affected Docker Desktop for Mac osxfs bind mounts (swagger.yaml Mount.Consistency); TestAccServiceP53_daemonDropsMountFields pins it. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
+      "skip": "The daemon never converts Mount.Consistency for services (moby docker-v29.9.3 daemon/cluster/convert/container.go:383-436, has no Consistency), and no Linux daemon code acts on it: it only accepts the mode names (swagger.yaml:427-428 Mount.Consistency; moby docker-v29.9.3 daemon/volume/mounts/linux_parser.go:136); TestAccServiceP53_daemonDropsMountFields pins it. Re-verified on Engine 29.9.3 (API 1.56): TestAccServiceP53_daemonDropsMountFields passes."
     },
     "engine:ServiceUpdate/TaskTemplate/ContainerSpec/Mounts/[]/ImageOptions/Subpath": {
-      "skip": "Image mounts exist for containers only (CHANGELOG.md v1.48: POST /containers/create supports Mount of type image); the service conversion maps Mount.Type through swarmkit's Mount_MountType enum and rejects other types (daemon/cluster/convert/container.go:389-392), and swarmkit v2.0.0 vendored by docker v28.5.2 has no image type; TestAccServiceP53_daemonDropsMountFields pins it."
+      "skip": "Image mounts exist for containers only (CHANGELOG.md:222, v1.48: POST /containers/create supports Mount of type image); the service conversion maps Mount.Type through swarmkit's Mount_MountType enum and rejects other types (moby docker-v29.9.3 daemon/cluster/convert/container.go:391-395), and swarmkit v2.1.3 vendored by docker v29.9.3 has no image type (vendor/github.com/moby/swarmkit/v2/api/types.pb.go:240-246); TestAccServiceP53_daemonDropsMountFields pins it."
     },
     "engine:ServiceUpdate/TaskTemplate/NetworkAttachmentSpec/ContainerID": {
-      "skip": "NetworkAttachmentSpec is a read-only spec for non-swarm containers attached to overlay networks (swagger.yaml:4754-4757); the daemon rejects a service with runtime attachment (daemon/cluster/services.go:201 and :308, docker v28.5.2)."
+      "skip": "NetworkAttachmentSpec is a read-only spec for non-swarm containers attached to overlay networks (swagger.yaml:4754-4757); the daemon rejects a service with runtime attachment (moby docker-v29.9.3 daemon/cluster/services.go:228 and :343)."
     },
     "engine:ServiceUpdate/TaskTemplate/PluginSpec/Disabled": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359): the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234; the update path, services.go:345-349, only requires PluginSpec to be set), so a plugin-runtime service can only come from an experimental daemon; PluginSpec also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:ServiceUpdate/TaskTemplate/PluginSpec/Name": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359): the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234; the update path, services.go:345-349, only requires PluginSpec to be set), so a plugin-runtime service can only come from an experimental daemon; PluginSpec also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:ServiceUpdate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Description": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359): the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234; the update path, services.go:345-349, only requires PluginSpec to be set), so a plugin-runtime service can only come from an experimental daemon; PluginSpec also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:ServiceUpdate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Name": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359): the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234; the update path, services.go:345-349, only requires PluginSpec to be set), so a plugin-runtime service can only come from an experimental daemon; PluginSpec also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:ServiceUpdate/TaskTemplate/PluginSpec/PluginPrivilege/[]/Value": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359): the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234; the update path, services.go:345-349, only requires PluginSpec to be set), so a plugin-runtime service can only come from an experimental daemon; PluginSpec also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:ServiceUpdate/TaskTemplate/PluginSpec/Remote": {
-      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359) and the daemon refuses runtime plugin unless it runs with --experimental (daemon/cluster/services.go:205-207, docker v28.5.2); it also excludes ContainerSpec, which docker_service always sends (image is required)."
+      "skip": "PluginSpec is 'Experimental release only' (swagger.yaml:4359): the daemon refuses to create a service with runtime plugin unless it runs with --experimental (moby docker-v29.9.3 daemon/cluster/services.go:232-234; the update path, services.go:345-349, only requires PluginSpec to be set), so a plugin-runtime service can only come from an experimental daemon; PluginSpec also excludes ContainerSpec (swagger.yaml:4363-4366), which docker_service always sends (image is required)."
     },
     "engine:SwarmInit/Spec/Labels": {
       "item": "swarm:swarm-init",
       "attr": "labels"
     },
     "engine:SwarmInit/Spec/Name": {
-      "skip": "The daemon only accepts the swarm spec name \"default\" and fills it in when empty (daemon/cluster/swarm.go:251-255 on update, :521-525 on init, docker v28.5.2), so there is nothing a user can set."
+      "skip": "The daemon only accepts the swarm spec name \"default\" and fills it in when empty (moby docker-v29.9.3 daemon/cluster/swarm.go:251-255 on update, :520-524 on init), so there is nothing a user can set."
     },
     "engine:SwarmSpec/Name": {
-      "skip": "The daemon only accepts the swarm spec name \"default\" and fills it in when empty (daemon/cluster/swarm.go:251-255 on update, :521-525 on init, docker v28.5.2), so there is nothing a user can set."
+      "skip": "The daemon only accepts the swarm spec name \"default\" and fills it in when empty (moby docker-v29.9.3 daemon/cluster/swarm.go:251-255 on update, :520-524 on init), so there is nothing a user can set."
     },
     "engine:SwarmInit/Spec/Raft/ElectionTick": {
-      "skip": "Raft ElectionTick/HeartbeatTick in the swarm spec are stored and echoed only: the manager's raft node takes them from the daemon's own configuration (daemon/cluster/noderunner.go:142-146 and cluster.go:143-148, docker v28.5.2), so setting them changes nothing."
+      "skip": "Raft ElectionTick/HeartbeatTick in the swarm spec are stored and echoed only: the manager's raft node takes them from the daemon's own configuration (moby docker-v29.9.3 daemon/cluster/noderunner.go:145-149 and cluster.go:142-147), so setting them changes nothing."
     },
     "engine:SwarmInit/Spec/Raft/HeartbeatTick": {
-      "skip": "Raft ElectionTick/HeartbeatTick in the swarm spec are stored and echoed only: the manager's raft node takes them from the daemon's own configuration (daemon/cluster/noderunner.go:142-146 and cluster.go:143-148, docker v28.5.2), so setting them changes nothing."
+      "skip": "Raft ElectionTick/HeartbeatTick in the swarm spec are stored and echoed only: the manager's raft node takes them from the daemon's own configuration (moby docker-v29.9.3 daemon/cluster/noderunner.go:145-149 and cluster.go:142-147), so setting them changes nothing."
     },
     "engine:SwarmSpec/Raft/ElectionTick": {
-      "skip": "Raft ElectionTick/HeartbeatTick in the swarm spec are stored and echoed only: the manager's raft node takes them from the daemon's own configuration (daemon/cluster/noderunner.go:142-146 and cluster.go:143-148, docker v28.5.2), so setting them changes nothing."
+      "skip": "Raft ElectionTick/HeartbeatTick in the swarm spec are stored and echoed only: the manager's raft node takes them from the daemon's own configuration (moby docker-v29.9.3 daemon/cluster/noderunner.go:145-149 and cluster.go:142-147), so setting them changes nothing."
     },
     "engine:SwarmSpec/Raft/HeartbeatTick": {
-      "skip": "Raft ElectionTick/HeartbeatTick in the swarm spec are stored and echoed only: the manager's raft node takes them from the daemon's own configuration (daemon/cluster/noderunner.go:142-146 and cluster.go:143-148, docker v28.5.2), so setting them changes nothing."
+      "skip": "Raft ElectionTick/HeartbeatTick in the swarm spec are stored and echoed only: the manager's raft node takes them from the daemon's own configuration (moby docker-v29.9.3 daemon/cluster/noderunner.go:145-149 and cluster.go:142-147), so setting them changes nothing."
     },
     "engine:SwarmInit/Spec/TaskDefaults/LogDriver/Name": {
-      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update."
+      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:16 and MergeSwarmSpecToGRPC:92, moby docker-v29.9.3), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update."
     },
     "engine:SwarmInit/Spec/TaskDefaults/LogDriver/Options": {
-      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update."
+      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:16 and MergeSwarmSpecToGRPC:92, moby docker-v29.9.3), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update."
     },
     "engine:SwarmSpec/TaskDefaults/LogDriver/Name": {
-      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update."
+      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:16 and MergeSwarmSpecToGRPC:92, moby docker-v29.9.3), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update."
     },
     "engine:SwarmSpec/TaskDefaults/LogDriver/Options": {
-      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:14 and MergeSwarmSpecToGRPC:90, docker v28.5.2), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update."
+      "skip": "The Engine ignores SwarmSpec.TaskDefaults: the daemon's swarm conversion never copies it in either direction (no TaskDefaults anywhere in daemon/cluster, e.g. convert/swarm.go SwarmFromGRPC:16 and MergeSwarmSpecToGRPC:92, moby docker-v29.9.3), so it is neither stored nor returned; TestAccSwarmInitP6a_taskDefaults with task_defaults read it back as null (P5.3-S log). Re-verified on Engine 29.9.3 (API 1.56) by TestAccSwarmInitP6a_taskDefaults: nil after init and after update."
     }
   }
 }

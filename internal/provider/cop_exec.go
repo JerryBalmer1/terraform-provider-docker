@@ -32,6 +32,10 @@ type copExecSpec struct {
 	MaxBytes int
 	// Stdout / Stderr, when set, also receive the streams as they arrive.
 	Stdout, Stderr io.Writer
+	// Stdin, when non-nil, is written to the command's stdin (AttachStdin),
+	// which is then closed so the command sees end of file. Ignored with
+	// Detach.
+	Stdin *string
 }
 
 // copExecOutcome is what a finished (or detached) exec produced.
@@ -57,6 +61,7 @@ func copExecRun(ctx context.Context, c *client.Client, s copExecSpec) (copExecOu
 	defer cancel()
 	opts := s.Opts
 	opts.AttachStdout, opts.AttachStderr = !s.Detach, !s.Detach
+	opts.AttachStdin = s.Stdin != nil && !s.Detach
 	created, err := c.ExecCreate(ctx, s.Container, opts)
 	if err != nil {
 		return out, fmt.Errorf("creating exec: %w", err)
@@ -76,6 +81,12 @@ func copExecRun(ctx context.Context, c *client.Client, s copExecSpec) (copExecOu
 	stop := context.AfterFunc(ctx, hj.Close)
 	defer stop()
 	defer hj.Close()
+	if opts.AttachStdin {
+		if _, ok := hj.Conn.(client.CloseWriter); !ok {
+			return out, fmt.Errorf("exec %s: the connection to the daemon (%T) cannot half-close, so stdin would never reach end of file", created.ID, hj.Conn)
+		}
+		go copExecWriteStdin(&hj.HijackedResponse, *s.Stdin)
+	}
 	outBuf := &cappedBuffer{max: s.MaxBytes}
 	errBuf := &cappedBuffer{max: s.MaxBytes}
 	if s.MaxBytes <= 0 {
@@ -116,6 +127,19 @@ func copExecRun(ctx context.Context, c *client.Client, s copExecSpec) (copExecOu
 	}
 	out.Inspect, out.ExitCode, out.Running = copExecInspect(ctx, c, created.ID, opts)
 	return out, nil
+}
+
+// copExecWriteStdin writes data to the attached stdin of an exec and closes
+// the write half, which the daemon turns into end of file on the command's
+// stdin (it closes the process stdin when the attached stream ends, as
+// `docker exec -i` does when its input ends). A write error (the command
+// exited or closed stdin without reading everything) is not an error of the
+// run: the exit code decides, as with a shell pipe.
+func copExecWriteStdin(hj *client.HijackedResponse, data string) {
+	if data != "" {
+		_, _ = io.WriteString(hj.Conn, data)
+	}
+	_ = hj.CloseWrite()
 }
 
 // copExecInspect returns the GET /exec/{id}/json body. The typed client

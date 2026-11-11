@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 
 	cerrdefs "github.com/containerd/errdefs"
 	"github.com/distribution/reference"
+	"github.com/docker/go-connections/sockets"
 	"github.com/moby/moby/api/pkg/authconfig"
 	"github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"
@@ -83,15 +85,90 @@ func newDockerClient(ep endpointConfig) (*client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	hostURL, err := client.ParseHostURL(host)
+	if err != nil {
+		return nil, err
+	}
+	// The dialer WithHost would install, wrapped so a permission-denied or
+	// TLS failure carries the same diagnostic as the Configure preflight
+	// (daemonAnnotateDial, preflight.go) on every later operation too.
+	base, err := daemonBaseDial(hostURL.Scheme, hostURL.Host)
+	if err != nil {
+		return nil, err
+	}
 	if tlsCfg != nil {
 		// WithHTTPClient must come before WithHost so the host's dialer is
 		// configured on this transport. A TLS transport makes the scheme https.
 		opts = append(opts, client.WithHTTPClient(&http.Client{
-			Transport: &http.Transport{TLSClientConfig: tlsCfg, Proxy: http.ProxyFromEnvironment},
+			Transport: &http.Transport{TLSClientConfig: tlsCfg, Proxy: http.ProxyFromEnvironment,
+				DialTLSContext: daemonTLSDial(ep, base, tlsCfg)},
 		}))
 	}
-	opts = append(opts, client.WithHost(host))
+	opts = append(opts, client.WithHost(host), client.WithDialContext(daemonAnnotateDial(ep, base)))
 	return finishDockerClient(ep, opts)
+}
+
+// dialFunc is an http.Transport DialContext.
+type dialFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
+
+// daemonBaseDialOverride, when set (tests), replaces the socket dialer of
+// every client newDockerClient builds for a non-SSH host.
+var daemonBaseDialOverride dialFunc
+
+// daemonBaseDial returns the dialer the moby client's WithHost installs for
+// proto / addr (go-connections sockets.ConfigureTransport: unix socket,
+// named pipe, or TCP with a timeout).
+func daemonBaseDial(proto, addr string) (dialFunc, error) {
+	if daemonBaseDialOverride != nil {
+		return daemonBaseDialOverride, nil
+	}
+	tr := &http.Transport{}
+	if err := sockets.ConfigureTransport(tr, proto, addr); err != nil {
+		return nil, err
+	}
+	return tr.DialContext, nil
+}
+
+// daemonAnnotateDial wraps base so a permission-denied failure is returned
+// as a daemonConnError (preflight.go) naming the host, its source and the
+// fix, the way the Configure preflight words it.
+func daemonAnnotateDial(ep endpointConfig, base dialFunc) dialFunc {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		conn, err := base(ctx, network, addr)
+		if err != nil {
+			return nil, daemonAnnotate(ep, err)
+		}
+		return conn, nil
+	}
+}
+
+// daemonTLSDial dials with base and runs the TLS handshake itself (what
+// http.Transport would do with TLSClientConfig), so a handshake or
+// certificate failure is returned as a daemonConnError with the preflight's
+// TLS diagnostic. Proxied requests do not use it (http.Transport runs the
+// handshake after CONNECT itself), and neither do hijacked streams, which
+// the moby client dials with tls.Dial.
+func daemonTLSDial(ep endpointConfig, base dialFunc, cfg *tls.Config) dialFunc {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		raw, err := base(ctx, network, addr)
+		if err != nil {
+			return nil, daemonAnnotate(ep, err)
+		}
+		c := cfg.Clone()
+		if c.ServerName == "" {
+			if h, _, err := net.SplitHostPort(addr); err == nil {
+				c.ServerName = h
+			} else {
+				c.ServerName = addr
+			}
+		}
+		tc := tls.Client(raw, c)
+		if err := tc.HandshakeContext(ctx); err != nil {
+			_ = raw.Close()
+			return nil, daemonAnnotate(ep, err)
+		}
+		return tc, nil
+	}
 }
 
 func finishDockerClient(ep endpointConfig, opts []client.Opt) (*client.Client, error) {
