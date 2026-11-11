@@ -32,6 +32,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	inv := fs.String("inventory", "reference/inventory.json", "path of the merged inventory")
 	out := fs.String("out", "internal/provider/contract_gen.go", "path of the generated Go file")
 	check := fs.Bool("check", false, "do not write; exit 1 when -out differs from what would be generated")
+	swaggerPath := fs.String("swagger", "reference/upstream/engine-api/api/swagger.yaml", "Engine API swagger the mapped structured outputs take their shape from")
+	swaggerMap := fs.String("swagger-map", "tools/contractgen/swagger_map.json", "output -> swagger definition map (\"\" = do not derive shapes)")
+	composeGo := fs.Bool("compose-go", true, "derive the compose project outputs from compose-go's types (composego.go)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -44,6 +47,24 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintln(stderr, "contractgen:", err)
 		return 2
+	}
+	if *swaggerMap != "" {
+		sw, m, err := LoadSwagger(*swaggerPath, *swaggerMap)
+		if err != nil {
+			fmt.Fprintln(stderr, "contractgen:", err)
+			return 2
+		}
+		if err := ApplySwagger(doc, sw, m); err != nil {
+			fmt.Fprintln(stderr, "contractgen:", err)
+			return 2
+		}
+		ApplyFieldPointers(doc, sw, m)
+	}
+	if *composeGo {
+		if err := ApplyComposeGo(doc); err != nil {
+			fmt.Fprintln(stderr, "contractgen:", err)
+			return 2
+		}
 	}
 	src, err := Generate(doc)
 	if err != nil {

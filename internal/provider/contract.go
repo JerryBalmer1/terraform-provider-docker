@@ -67,11 +67,13 @@ package provider
 // JSON) or a moby/compose-go struct; it is round-tripped through
 // encoding/json. For each field the value is looked up by the field's
 // upstream key, then by its snake_case name, then by any key whose
-// mechanical snake_case equals the name. Unmapped levels (fallback nodes)
-// get every object key converted by contractSnake (map keys included:
-// JSON cannot tell a struct from a map, so a label key such as "MyLabel"
-// becomes "my_label" inside a fallback node). Keys that are not identifiers
-// (contain '.', '/', ':' ...) are kept as is.
+// mechanical snake_case equals the name. Only schema field names are
+// renamed: map keys (labels, options, driver opts, sysctls, log config...)
+// and every key inside a fallback node pass through untouched (Pass 6c;
+// before, fallback keys were snake_cased and max-file became max_file).
+// Structured outputs listed in tools/contractgen/swagger_map.json take their
+// whole shape from the Engine API swagger, so they have no fallback node
+// except where the swagger itself is free-form.
 
 //go:generate go run ../../tools/contractgen -inventory ../../reference/inventory.json -out contract_gen.go
 
@@ -415,6 +417,10 @@ func contractBuildNode(e *contractTypeExpr, fields []contractField, sensitive, i
 				}
 				n.Attrs = append(n.Attrs, contractAttr{Name: a.name, Node: child})
 			}
+		case !e.opaque:
+			// object({}): an empty object (swagger `enum: [{}]`, e.g. the
+			// values of ExposedPorts and Volumes).
+			n.Kind = cnObject
 		default:
 			n.Kind = contractFallbackKind(inCollection)
 		}
@@ -431,13 +437,13 @@ func contractBuildNode(e *contractTypeExpr, fields []contractField, sensitive, i
 		}
 	}
 	if n.Elem != nil && n.Elem.jsonLeaf() {
-		n.Description = strings.TrimSpace(n.Description + " Each element is canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.")
+		n.Description = strings.TrimSpace(n.Description + " Each element is canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.")
 	}
 	switch n.Kind {
 	case cnDynamic:
-		n.Description = strings.TrimSpace(n.Description + " Dynamic value: the upstream object with every key in snake_case (no nested fields are fixed here).")
+		n.Description = strings.TrimSpace(n.Description + " Dynamic value: the upstream value with its keys as upstream (no nested fields are fixed here).")
 	case cnJSON:
-		n.Description = strings.TrimSpace(n.Description + " Canonical JSON (keys sorted, snake_case): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.")
+		n.Description = strings.TrimSpace(n.Description + " Canonical JSON (keys sorted, as upstream): no nested fields are fixed here and Terraform allows no dynamic value inside a list, set or map.")
 	}
 	return n, nil
 }
@@ -972,7 +978,7 @@ func contractPlain(v any) (any, error) {
 }
 
 // contractNormalize maps a plain value onto node n: object keys become the
-// contract's snake_case names, fallback nodes get contractSnakeKeys, and
+// contract's snake_case names, fallback nodes keep their keys, and
 // scalars are coerced to the node's type. Shape mismatches become null and
 // a call to warn with the path.
 func contractNormalize(n *contractNode, v any, p string, warn func(string)) any {
@@ -989,7 +995,7 @@ func contractNormalize(n *contractNode, v any, p string, warn func(string)) any 
 		case bool:
 			return strconv.FormatBool(t)
 		default:
-			b, _ := json.Marshal(contractSnakeKeys(t))
+			b, _ := json.Marshal(t)
 			return string(b)
 		}
 	case cnNumber:
@@ -1015,7 +1021,9 @@ func contractNormalize(n *contractNode, v any, p string, warn func(string)) any 
 		warn(fmt.Sprintf("%s: want a bool, got %T", p, v))
 		return nil
 	case cnDynamic, cnJSON:
-		return contractSnakeKeys(v)
+		// No schema below this node: keys are user data or unmapped, and only
+		// schema field names are ever renamed (Pass 6c), so they pass through.
+		return v
 	case cnList, cnSet:
 		arr, ok := v.([]any)
 		if !ok {
@@ -1093,6 +1101,11 @@ func contractToAttr(n *contractNode, v any) (attr.Value, diag.Diagnostics) {
 		s, _ := v.(string)
 		return types.StringValue(s), diags
 	case cnJSON:
+		if s, ok := v.(string); ok {
+			// A string is stored as is, never JSON-encoded a second time
+			// (Pass 6c: mounts[].type held "\"volume\"").
+			return types.StringValue(s), diags
+		}
 		b, err := json.Marshal(v)
 		if err != nil {
 			diags.AddError("Outputs contract", "encoding JSON: "+err.Error())
@@ -1320,9 +1333,7 @@ type contractFillInput struct {
 // become warnings and a null.
 func contractCompute(ctx context.Context, pd *providerData, it *contractItem, in contractFillInput, include func(contractOutput) bool) (map[string]any, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	warn := func(msg string) {
-		diags.AddWarning("Outputs contract value dropped", fmt.Sprintf("%s (%s): %s", it.Name, it.ID, msg))
-	}
+	warn := func(msg string) { contractDropped(&diags, it, msg) }
 	// Raw bytes, with the *_json fallback from the structured value.
 	raws := map[string][]byte{}
 	for _, o := range it.Outputs {
@@ -1357,6 +1368,10 @@ func contractCompute(ctx context.Context, pd *providerData, it *contractItem, in
 				out[o.Name] = nil
 			}
 		case contractHash:
+			if o.Name == contractConfigHashOutput {
+				out[o.Name] = contractConfigHash(it, raws[o.HashOf], warn)
+				continue
+			}
 			if b, ok := raws[o.HashOf]; ok {
 				sum := sha256.Sum256(b)
 				out[o.Name] = hex.EncodeToString(sum[:])

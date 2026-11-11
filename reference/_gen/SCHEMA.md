@@ -108,6 +108,14 @@ FIELD:
 { "name": "host_config", "upstream": "HostConfig", "tf_type": "object({...})", "pointer": "#/definitions/HostConfig",
   "sensitive": true,                      // optional: this field (and everything under it) is a secret channel; only in an output that is not sensitive
   "fields": [ FIELD, ... ] }              // nested fields optional; tf_type "object({...})" / "list(object({...}))" / "map(object({...}))" means "see fields"
+                                          // tf_type "object({})" is an empty object (swagger `enum: [{}]`, e.g. ExposedPorts values)
+
+Swagger-derived shapes (Pass 6c): for every "<item id>/<output>" listed in tools/contractgen/swagger_map.json,
+contractgen replaces the output's tf_type and field tree with the shape of the named swagger definition when it
+generates contract_gen.go (object with additionalProperties -> map(T), array -> list(T), enum -> string, free-form ->
+dynamic). The fragment tree still supplies names, descriptions and `sensitive` flags of the fields it maps (matched by
+`upstream`); swagger_map.json "sensitive" adds "Definition.Property" secret channels. inventory.json keeps the
+fragment trees; contract_gen.go and the provider schema carry the derived ones.
 
 INPUT (an argument the outputs depend on; today only the logs bounds):
 { "name": "tail", "tf_type": "number", "default": 1000, "upstream": "tail",

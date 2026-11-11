@@ -125,23 +125,23 @@ func TestRunWriteAndCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 	var so, se bytes.Buffer
-	if c := run([]string{"-inventory", inv, "-out", out, "-check"}, &so, &se); c != 1 {
+	if c := run([]string{"-swagger-map", "", "-compose-go=false", "-inventory", inv, "-out", out, "-check"}, &so, &se); c != 1 {
 		t.Errorf("check of a missing file: exit %d", c)
 	}
-	if c := run([]string{"-inventory", inv, "-out", out}, &so, &se); c != 0 {
+	if c := run([]string{"-swagger-map", "", "-compose-go=false", "-inventory", inv, "-out", out}, &so, &se); c != 0 {
 		t.Fatalf("write: exit %d %s", c, se.String())
 	}
-	if c := run([]string{"-inventory", inv, "-out", out, "-check"}, &so, &se); c != 0 {
+	if c := run([]string{"-swagger-map", "", "-compose-go=false", "-inventory", inv, "-out", out, "-check"}, &so, &se); c != 0 {
 		t.Errorf("check after write: exit %d %s", c, se.String())
 	}
 	// CRLF checkouts are not drift.
 	b, _ := os.ReadFile(out)
 	_ = os.WriteFile(out, bytes.ReplaceAll(b, []byte("\n"), []byte("\r\n")), 0o644)
-	if c := run([]string{"-inventory", inv, "-out", out, "-check"}, &so, &se); c != 0 {
+	if c := run([]string{"-swagger-map", "", "-compose-go=false", "-inventory", inv, "-out", out, "-check"}, &so, &se); c != 0 {
 		t.Errorf("CRLF: exit %d", c)
 	}
 	_ = os.WriteFile(out, append(b, "// edited\n"...), 0o644)
-	if c := run([]string{"-inventory", inv, "-out", out, "-check"}, &so, &se); c != 1 {
+	if c := run([]string{"-swagger-map", "", "-compose-go=false", "-inventory", inv, "-out", out, "-check"}, &so, &se); c != 1 {
 		t.Errorf("drift: exit %d", c)
 	}
 	if c := run([]string{"-inventory", filepath.Join(dir, "nope.json")}, &so, &se); c != 2 {
@@ -155,8 +155,51 @@ func TestCheckedInFileIsCurrent(t *testing.T) {
 	root := filepath.Join("..", "..")
 	var so, se bytes.Buffer
 	c := run([]string{"-inventory", filepath.Join(root, "reference", "inventory.json"),
+		"-swagger", filepath.Join(root, "reference", "upstream", "engine-api", "api", "swagger.yaml"),
+		"-swagger-map", "swagger_map.json",
 		"-out", filepath.Join(root, "internal", "provider", "contract_gen.go"), "-check"}, &so, &se)
 	if c != 0 {
 		t.Fatalf("contract_gen.go is stale (exit %d): %s", c, se.String())
+	}
+}
+
+// TestComposeGoDerivation: the compose-go-derived project shape has the field kinds the loader's JSON gives them.
+func TestComposeGoDerivation(t *testing.T) {
+	inv := &Inventory{Items: []Item{}}
+	for k := range ComposeOutputs {
+		id, out, _ := strings.Cut(k, "/")
+		inv.Items = append(inv.Items, Item{ID: id, Outputs: []Output{{Name: out, Category: "structured", TFType: "object({...})",
+			Fields: []Field{{Name: "services", Upstream: "services", TFType: "map(object({...}))"}}}}})
+	}
+	if err := ApplyComposeGo(inv); err != nil {
+		t.Fatal(err)
+	}
+	find := func(fs []Field, up string) *Field {
+		for i := range fs {
+			if fs[i].Upstream == up {
+				return &fs[i]
+			}
+		}
+		t.Fatalf("no field %s", up)
+		return nil
+	}
+	for _, it := range inv.Items {
+		if it.ID != "compose:name" {
+			continue
+		}
+		svc := find(it.Outputs[0].Fields, "services")
+		want := map[string]string{"cpus": "number", "mem_limit": "string", "shm_size": "string", "stop_grace_period": "string",
+			"extra_hosts": "map(list(string))", "ulimits": "map(object({...}))", "privileged": "bool", "command": "list(string)"}
+		for up, tf := range want {
+			if got := find(svc.Fields, up).TFType; got != tf {
+				t.Errorf("services.%s: %s, want %s", up, got, tf)
+			}
+		}
+		if got := find(find(svc.Fields, "ports").Fields, "published").TFType; got != "string" {
+			t.Errorf("ports.published: %s, want string", got)
+		}
+		if !find(svc.Fields, "environment").Sensitive {
+			t.Error("services.environment is not sensitive")
+		}
 	}
 }

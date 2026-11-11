@@ -22,16 +22,22 @@ Each output has `name`, `tf_type`, `category`, `source`, `known_after_apply` and
 | **result** | The outcome of running an action, or a descriptive value about how the data was produced, not the identity or state of a lasting object. Every structured output of an action is a result, and every action has at least one (V6). | an action's single `result` object (prune `space_reclaimed`, exec/run `exit_code`, container `state`, service `update_status`, `archive_size`, commit `changes`); on data sources `created`, `fidelity` |
 | **identity** | Stable handoff values. | `id`, `name`, `image_ref` (repo:tag), `image_digest_ref` (repo@sha256:…), `digest`, `platforms`, `labels` |
 | **version** | Which versions produced or describe the result. | see [Version metadata](#version-metadata) |
-| **hash** | `sha256` of a raw output, so a consumer can detect change without diffing the text. | `content_sha256` when the item has one raw output; `<raw>_sha256` for each raw output when it has two or more (Q34) |
+| **hash** | `sha256` of a raw output, so a consumer can detect change without diffing the text. | `content_sha256` when the item has one raw output; `<raw>_sha256` for each raw output when it has two or more (Q34); `config_sha256` on `docker_container`, `docker_service`, `docker_network` and `docker_volume` (see [Which hash to watch](#which-hash-to-watch)) |
 
 Rules:
 - Raw and structured describe the same data. The raw output names the structured one it serializes (`serializes`).
-- Every raw output has exactly one hash output (`hash_of`).
+- Every raw output has exactly one content hash output (`hash_of`). `config_sha256` is a second hash of
+  `inspect_json`, over its configuration part only.
 - Sensitivity is per field. The secret channels are container/service/task/plugin env, image config env, volume
   driver options, build args / secrets / ssh / inline Dockerfiles, ENV values and ARG defaults (and image history
   `created_by`, which records them), compose `environment` / `env_file` / environment-sourced secrets and configs /
   config `content`, build provenance and attestations, join tokens, unlock keys, registry auth, logs and exec/run
-  output. Command lines (args, cmd, entrypoint, process lists) are not a secret channel.
+  output, healthcheck output (`state.health.log[].output`: the health command's stdout/stderr). Command lines
+  (args, cmd, entrypoint, process lists) are not a secret channel. Outputs mirrored from the swagger take the
+  `Definition.Property` pairs listed under `sensitive` in `tools/contractgen/swagger_map.json`
+  (`HealthcheckResult.Output`, `ContainerConfig.Env`, `ImageConfig.Env`, `TaskSpec.Env` (the service / task
+  container spec), `Plugin.Env`, `PluginEnv.Value`, `SecretSpec.Data`, `JoinTokens.*`, `ImageHistoryResponseItem.CreatedBy`)
+  wherever the definition appears, on top of the fragment's own flags.
   - A raw output (one string) is `sensitive` when any secret channel can reach it.
   - A structured or result output is not sensitive as a whole: each FIELD that is a secret channel carries
     `sensitive: true`, so harmless fields (image, ports, names) stay readable in plans. A `dynamic` field cannot hide
@@ -63,7 +69,59 @@ Rules:
 - Compose keys are already snake_case (hyphens become `_`). Dockerfile flags drop the dashes
   (`--keep-git-dir` → `keep_git_dir`).
 - Each structured output records the full upstream → snake_case mapping in its `fields`, so no mapping is
-  implicit. Where `fields_complete` is false, the levels below follow the rule above from the cited pointer.
+  implicit. Where `fields_complete` is false, the levels below are a fallback (see [Structured shapes](#structured-shapes)).
+- Only schema field names are renamed. Keys of maps (`additionalProperties` objects: labels, options, driver
+  opts, sysctls, annotations, log config, port bindings, networks by name) are user data and pass through
+  untouched: `inspect.host_config.log_config.config["max-file"]`, never `max_file`. Keys inside a fallback node
+  (no schema below it) pass through untouched too.
+
+## Structured shapes
+
+Every structured output listed in `tools/contractgen/swagger_map.json` (the Engine API inspect / list outputs of
+containers, images, networks, volumes, plugins, info, version, configs, secrets, nodes, services, tasks, swarm
+and join tokens: 43 outputs) takes its whole shape from the swagger definition it mirrors; `tools/contractgen`
+derives it at generation time and `TestContractSwaggerShapes` fails on any node that disagrees with the swagger:
+
+| swagger schema | Terraform type |
+|---|---|
+| object with `properties` | object, one attribute per property (fragment name if the fragment maps it, else the mechanical snake_case; `.` and other non-identifier characters become `_`, e.g. `os.version` → `os_version`) |
+| object with `additionalProperties: <schema>` | `map(<that schema>)`, keys verbatim |
+| object with only `enum: [{}]` (ExposedPorts / Volumes values) | `object({})`, an empty object |
+| array | `list(<items>)`: arrays of objects are lists of objects, addressable as `x[0].y` |
+| string, with or without `enum` | string (the value itself, never JSON-encoded) |
+| integer / number | number |
+| boolean | bool |
+| free-form (`additionalProperties: {}` / no type) | `dynamic` at top level, canonical JSON string below a list / set / map |
+
+So `inspect.network_settings.networks["bridge"].ip_address`, `inspect.host_config.port_bindings["80/tcp"][0].host_port`
+and `inspect.ipam.config[0].subnet` are attribute paths, not JSON strings, and `inspect.mounts[0].type` is `volume`.
+
+Other structured outputs (compose, buildx, Dockerfile, registry manifests, actions) keep their fragment trees; a
+level without fields there is a fallback node: `dynamic` at top level, canonical JSON (keys sorted, keys as
+upstream) below a collection; a string value in a JSON fallback is stored as is.
+
+A value that does not fit its node (a map where the contract has a list...) is null plus the warning
+`Outputs contract value dropped ...`. Under `TF_ACC` it is an error instead, so an acceptance test cannot pass
+while a structured output loses a value; ExampleTests and PairwiseTest fail on the warning text.
+
+## Which hash to watch
+
+- `content_sha256` is the sha256 of the raw output (`inspect_json`, the exact Engine response). It changes
+  whenever anything in the response changes, runtime state included: `State`, health log entries, timestamps,
+  PIDs, sandbox keys, daemon-assigned addresses, attached containers, usage data. Reading a running container
+  twice gives two different values.
+- `config_sha256` (on `docker_container`, `docker_service`, `docker_network`, `docker_volume`) is the sha256 of the
+  canonical JSON (keys sorted) of the configuration part of `inspect_json` only:
+  - container: `Name`, `Image`, `Platform`, `Config`, `HostConfig`, and per network in `NetworkSettings.Networks`
+    the requested endpoint settings (`IPAMConfig`, `Links`, `Aliases`, `DriverOpts`, `GwPriority`);
+  - service: `Spec`;
+  - network: `Name`, `Driver`, `Scope`, `EnableIPv4`, `EnableIPv6`, `IPAM`, `Internal`, `Attachable`, `Ingress`,
+    `ConfigFrom`, `ConfigOnly`, `Options`, `Labels`;
+  - volume: `Name`, `Driver`, `Scope`, `Labels`, `Options`, `ClusterVolume.Spec`.
+  Never `State`, timestamps, PIDs, health logs or daemon-assigned addresses.
+- **A downstream consumer that should react to configuration changes watches `config_sha256`**: it is stable
+  across reads of an unchanged object (TestAccP6cSContainerRoundTrip reads a running container with a 2-second
+  healthcheck twice, 15 seconds apart, and gets the same value).
 - Sources are pinned: swagger pointers into `upstream/engine-api/api/swagger.yaml` (API 1.56), compose-spec
   pointers (`#/$defs/...`) into `upstream/compose-spec/schema/compose-spec.json` (or `compose-go-embedded.json` where the
   two differ, e.g. `mem_limit` / `memswap_limit` / `shm_size` types, `jobs.*.extends`), Dockerfile reference anchors,
@@ -326,6 +384,7 @@ with no Terraform- or Docker-provider-specific types:
 | `compose_yaml` + `content_sha256` | `docker_compose`, `data.docker_compose_config` | Hand the normalized project to another runner. |
 | `stack_yaml` + `content_sha256` | `docker_stack` | Hand the rendered stack to `docker stack deploy` elsewhere. |
 | structured objects (`stages`, `project`, `inspect`) | every resource / data source | Read one field without parsing text. |
+| `config_sha256` | `docker_container`, `docker_service`, `docker_network`, `docker_volume` | Trigger downstream work on configuration changes only (not on runtime state). |
 | version outputs | every item | Record which engine/spec/frontend produced the value. |
 
 `data.docker_image` and `data.docker_registry_image` share one identity/version/structured shape (Lane D), so a

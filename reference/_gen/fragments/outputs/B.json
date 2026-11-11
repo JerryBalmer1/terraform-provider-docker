@@ -1952,9 +1952,24 @@
      },
      "known_after_apply": true,
      "sensitive": false,
-     "description": "SHA-256 of inspect_json; changes whenever the object changes.",
+     "description": "SHA-256 (hex) of inspect_json, the raw Engine response: it changes whenever runtime state changes (State, health log, timestamps, PIDs, daemon-assigned addresses), not only the configuration. Watch config_sha256 to react to configuration changes.",
      "hash_of": "inspect_json",
      "provided": false
+    },
+    {
+     "name": "config_sha256",
+     "tf_type": "string",
+     "category": "hash",
+     "source": {
+      "type": "derived",
+      "from": "inspect_json",
+      "how": "hex sha256 of the canonical JSON (keys sorted) of the configuration part of inspect_json: Spec"
+     },
+     "known_after_apply": true,
+     "sensitive": false,
+     "hash_of": "inspect_json",
+     "description": "SHA-256 (hex) of the configuration part of inspect_json only (Spec; never State, timestamps, PIDs, health logs or daemon-assigned addresses), as canonical JSON. Stable across reads of an unchanged object; the hash a downstream consumer should watch.",
+     "provided": true
     },
     {
      "name": "id",

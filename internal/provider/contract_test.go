@@ -275,13 +275,15 @@ func TestContractSchemaEngineContainer(t *testing.T) {
 	if img := cfg.Attributes["image"]; img.IsSensitive() {
 		t.Error("inspect.config.image must be readable")
 	}
-	// map(list(object)) without nested fields: map of lists of JSON strings.
+	// Pass 6c: shapes come from the swagger. PortBindings is a map of lists
+	// of objects (a plain map attribute of list(object)), not JSON strings.
 	hc := insp.Attributes["host_config"].(rschema.SingleNestedAttribute)
 	pb, ok := hc.Attributes["port_bindings"].(rschema.MapAttribute)
-	if !ok || !pb.ElementType.Equal(types.ListType{ElemType: types.StringType}) {
+	want := types.ListType{ElemType: types.ObjectType{AttrTypes: map[string]attr.Type{"host_ip": types.StringType, "host_port": types.StringType}}}
+	if !ok || !pb.ElementType.Equal(want) {
 		t.Fatalf("port_bindings: %T %+v", hc.Attributes["port_bindings"], hc.Attributes["port_bindings"])
 	}
-	if !strings.Contains(pb.MarkdownDescription, "canonical JSON") {
+	if strings.Contains(pb.MarkdownDescription, "canonical JSON") {
 		t.Errorf("port_bindings description: %s", pb.MarkdownDescription)
 	}
 }
@@ -454,21 +456,22 @@ func TestContractFillRoundTrip(t *testing.T) {
 	if labels["com.example.Key"].(types.String).ValueString() != "v" || labels["MyLabel"] == nil {
 		t.Errorf("typed map keys must stay as is: %v", labels)
 	}
-	// Dynamic fallback: keys snake_cased recursively.
+	// Dynamic fallback: no schema below it, so keys pass through untouched (Pass 6c).
 	hc := insp["host_config"].(types.Dynamic).UnderlyingValue().(types.Object).Attributes()
-	if hc["network_mode"].(types.String).ValueString() != "bridge" {
+	if hc["NetworkMode"].(types.String).ValueString() != "bridge" {
 		t.Errorf("host_config: %v", hc)
 	}
-	if hc["nested"].(types.Object).Attributes()["ip_address"].(types.String).ValueString() != "1.2.3.4" {
+	if hc["Nested"].(types.Object).Attributes()["IPAddress"].(types.String).ValueString() != "1.2.3.4" {
 		t.Errorf("host_config.nested: %v", hc["nested"])
 	}
 	// JSON fallback below a collection.
 	pb := insp["port_bindings"].(types.Map).Elements()["80/tcp"].(types.List).Elements()
-	if got := pb[0].(types.String).ValueString(); got != `{"host_ip":"","host_port":"8080"}` {
+	if got := pb[0].(types.String).ValueString(); got != `{"HostIp":"","HostPort":"8080"}` {
 		t.Errorf("port_bindings JSON: %s", got)
 	}
 	ex := insp["extra"].(types.List).Elements()
-	if ex[0].(types.String).ValueString() != `{"some_key":1}` || ex[1].(types.String).ValueString() != `"x"` {
+	// A string element is stored as is, never JSON-encoded twice (Pass 6c).
+	if ex[0].(types.String).ValueString() != `{"SomeKey":1}` || ex[1].(types.String).ValueString() != `x` {
 		t.Errorf("extra: %v", ex)
 	}
 	mounts := insp["mounts"].(types.List).Elements()
