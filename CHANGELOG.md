@@ -7,9 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0]
+## [0.1.0] (2026-11-11)
 
-The first release. This section covers build passes 5, 5.1, 5.2, 5.3, 6a, 6b and 6c (the log of each pass is in [BUILD_REPORT.md](BUILD_REPORT.md)). Pass 6c comes first, then 6b, 6a and 5.3; the sections after them are passes 5 to 5.2.
+The first release. This section covers build passes 5, 5.1, 5.2, 5.3, 6a, 6b, 6c and 6d (the log of each pass is in [BUILD_REPORT.md](BUILD_REPORT.md)). Pass 6d comes first, then 6c, 6b, 6a and 5.3; the sections after them are passes 5 to 5.2.
+
+### Known issues
+
+Each issue is listed in `reference/_gen/deferred.json` (kind `known_issue`, with a reproduction) and in a "Known issues" section of its docs page.
+
+- `docker_buildx_builder` with `driver = "cloud"` (Docker Build Cloud) is implemented against fakes and not yet verified against the live service: the builder group is dialled at the default proxy, `buildx-version: v0.38.2` is sent, and results are loaded through the build session (buildx's "cloud pull" is not implemented). Affects Build Cloud users only; other drivers are not affected. No workaround needed to try it; `TestAccBuildxBuilderCloud_live` (`TF_ACC_BUILD_CLOUD=1`) verifies an account. [docs/resources/buildx_builder.md](docs/resources/buildx_builder.md), id `buildx-builder-cloud-unverified`.
+- `docker_compose` (`mode = "local"`): a `pre_start` step with `per_replica: true` runs once per created replica and its container is always removed, while compose v5.7.0 rejects `per_replica: true` and keeps a failed step container. Affects projects that use `per_replica` and also run under `docker compose`. Workaround: leave `per_replica` unset in such projects; a failed step's last 20 log lines are in the apply error. [docs/resources/compose.md](docs/resources/compose.md), id `compose-pre-start-per-replica`.
+- `docker_compose` (`mode = "local"`): for `use_api_socket: true` the `com.docker.compose.config-hash` label differs from the compose CLI's when the host has no registry credentials or the service sets `DOCKER_CONFIG`, so a container created by `docker compose up` is recreated by the next apply, and the other way round. Affects only projects managed by both the CLI and the provider; no workaround other than managing the project from one side. [docs/resources/compose.md](docs/resources/compose.md), id `compose-use-api-socket-config-hash`.
+- `docker_compose` and `data.docker_compose_config`: a service whose `build.ssh` has an entry with a key path (`default: /home/me/.ssh/id_ed25519`) makes compose-go v2.16.2 write invalid JSON, so the structured `project` holds only `name` (every other field is null, with no diagnostic). `compose_yaml` and the deployment are not affected. Workaround: read `compose_yaml`, or use the SSH agent (`ssh: [default]`) instead of a key path. [docs/resources/compose.md](docs/resources/compose.md), [docs/data-sources/compose_config.md](docs/data-sources/compose_config.md), id `compose-build-ssh-project-dropped`.
+- `data.docker_registry_image`: for a plain-HTTP registry on a host other than `localhost` or a loopback address (a daemon `insecure-registries` entry served over http), `config`, `labels` and `created` stay null with the warning "Image config not read from registry": the provider reads the image config from the registry itself and uses plain HTTP only for loopback registries. `digest`, `platforms` and `inspect_json` are filled. Workaround: serve the registry over TLS, or use `data.docker_image` on a pulled image. [docs/data-sources/registry_image.md](docs/data-sources/registry_image.md), id `registry-image-config-plain-http-remote`.
+
+### Pass 6d
+
+#### Fixed
+
+- `data.docker_registry_image`: `config`, `labels` and `created` were always null. They are now read from the registry's image config blob, on the daemon path too (the provider fetches the blob with `registry_auth`; a registry it cannot reach gives a warning and null values, never an error). For an index the daemon's os/arch is used, else linux/amd64, else the first image entry. `config` has the same shape and values as `data.docker_image`'s `config` (TestAccP6cImageDataRoundTrip compares them).
 
 ### Pass 6c
 

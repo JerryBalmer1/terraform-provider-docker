@@ -938,7 +938,7 @@ before choosing argument names.
 - [`data.docker_nodes`](reference/data.docker_nodes.md): Lists the swarm's nodes (`GET /nodes`) through the provider's Docker host (which must be a manager), sorted by name (the node name, else its hostname) then ID.
 - [`data.docker_plugin`](reference/data.docker_plugin.md): Looks up a managed plugin installed on the provider's daemon by `id` or `alias` (`GET /plugins/{name}/json`).
 - [`data.docker_plugins`](reference/data.docker_plugins.md): Lists the managed plugins installed on the provider's Docker host (`GET /plugins`), like `docker plugin ls`.
-- [`data.docker_registry_image`](reference/data.docker_registry_image.md): Reads the current manifest digest and platforms of an image tag from its registry, through the daemon's distribution endpoint (`GET /distribution/<name>/json`) with the provider's `registry_auth`.
+- [`data.docker_registry_image`](reference/data.docker_registry_image.md): Reads the current manifest digest, platforms and image config of an image tag from its registry, without pulling it.
 - [`data.docker_registry_image_manifests`](reference/data.docker_registry_image_manifests.md): Reads the manifest of an image straight from its registry, with the provider's `registry_auth`, like `docker buildx imagetools inspect` or `docker manifest inspect`.
 - [`data.docker_registry_image_tags`](reference/data.docker_registry_image_tags.md): Lists every tag of a repository straight from its registry (`GET /v2/<name>/tags/list`), following pagination, with the provider's `registry_auth`.
 - [`data.docker_secret`](reference/data.docker_secret.md): Looks up one swarm secret's metadata (`GET /secrets/{id}`) by `id` or `name`; the provider's host must be a swarm manager.

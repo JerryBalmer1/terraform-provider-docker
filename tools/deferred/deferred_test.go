@@ -149,3 +149,93 @@ func TestDiagnosticsP6cF(t *testing.T) {
 		t.Errorf("missing reason: err = %v", err)
 	}
 }
+
+// Pass 6d Lane D: kind known_issue from reference/_gen/deferred.d/known_issues.json.
+func knownIssueFixture(t *testing.T) string {
+	root := t.TempDir()
+	writeFile(t, root, "reference/inventory.json", `{"items":[{"id":"compose:services","kind":"resource"}]}`)
+	writeFile(t, root, "internal/provider/compose_hooks.go", "package p\n")
+	writeFile(t, root, "docs/resources/compose.md", "## Known issues\n\n`compose-pre-start-per-replica`\n")
+	writeFile(t, root, "CHANGELOG.md", "### Known issues\n\n- compose-pre-start-per-replica\n")
+	writeFile(t, root, "reference/_gen/deferred.d/known_issues.json", `{"issues":[{"id":"compose-pre-start-per-replica",
+		"item":"compose:services","file":"internal/provider/compose_hooks.go","reason":"differs from compose",
+		"reproduce":"services:\n  web:\n    image: nginx","docs":["docs/resources/compose.md"],"changelog":true}]}`)
+	return root
+}
+
+func TestKnownIssuesP6dD(t *testing.T) {
+	root := knownIssueFixture(t)
+	d, err := Collect(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Totals["known_issue"] != 1 || len(d.Items) != 1 {
+		t.Fatalf("totals %v items %v", d.Totals, d.Items)
+	}
+	it := d.Items[0]
+	if it.Kind != "known_issue" || it.ID != "compose-pre-start-per-replica" || it.Source != "internal/provider/compose_hooks.go" ||
+		it.Reason != "compose:services: differs from compose" || !strings.Contains(it.Reproduce, "image: nginx") {
+		t.Errorf("item %+v", it)
+	}
+	b, err := d.Marshal()
+	if err != nil || !strings.Contains(string(b), `"reproduce": "services:\n  web:`) {
+		t.Errorf("marshal: %v\n%s", err, b)
+	}
+	// Items of other kinds carry no reproduce key.
+	other, _ := newDoc([]Item{{Kind: "field_skip", ID: "x", Reason: "r", Source: "s"}})
+	if b, _ := other.Marshal(); strings.Contains(string(b), "reproduce") {
+		t.Errorf("reproduce on a field_skip item:\n%s", b)
+	}
+}
+
+func TestKnownIssuesMissingFileP6dD(t *testing.T) {
+	root := knownIssueFixture(t)
+	if err := os.Remove(filepath.Join(root, "internal", "provider", "compose_hooks.go")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Collect(root); err == nil || !strings.Contains(err.Error(), "does not exist") {
+		t.Errorf("missing code file: err = %v", err)
+	}
+	root = knownIssueFixture(t)
+	if err := os.Remove(filepath.Join(root, "docs", "resources", "compose.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Collect(root); err == nil || !strings.Contains(err.Error(), "docs/resources/compose.md") {
+		t.Errorf("missing docs page: err = %v", err)
+	}
+}
+
+func TestKnownIssuesMissingFieldP6dD(t *testing.T) {
+	for _, field := range []string{"id", "item", "file", "reason", "reproduce", "docs"} {
+		root := knownIssueFixture(t)
+		row := map[string]string{"id": `"compose-pre-start-per-replica"`, "item": `"compose:services"`,
+			"file": `"internal/provider/compose_hooks.go"`, "reason": `"r"`, "reproduce": `"x"`, "docs": `["docs/resources/compose.md"]`}
+		delete(row, field)
+		var parts []string
+		for k, v := range row {
+			parts = append(parts, `"`+k+`":`+v)
+		}
+		writeFile(t, root, "reference/_gen/deferred.d/known_issues.json", `{"issues":[{`+strings.Join(parts, ",")+`}]}`)
+		if _, err := Collect(root); err == nil || !strings.Contains(err.Error(), "every row needs") {
+			t.Errorf("without %s: err = %v", field, err)
+		}
+	}
+}
+
+func TestKnownIssuesCrossChecksP6dD(t *testing.T) {
+	root := knownIssueFixture(t)
+	writeFile(t, root, "reference/inventory.json", `{"items":[]}`)
+	if _, err := Collect(root); err == nil || !strings.Contains(err.Error(), "not in reference/inventory.json") {
+		t.Errorf("unknown item: err = %v", err)
+	}
+	root = knownIssueFixture(t)
+	writeFile(t, root, "CHANGELOG.md", "### Known issues\n")
+	if _, err := Collect(root); err == nil || !strings.Contains(err.Error(), "not mentioned in CHANGELOG.md") {
+		t.Errorf("changelog without the id: err = %v", err)
+	}
+	root = knownIssueFixture(t)
+	writeFile(t, root, "docs/resources/compose.md", "no section\n")
+	if _, err := Collect(root); err == nil || !strings.Contains(err.Error(), "not mentioned in docs/resources/compose.md") {
+		t.Errorf("docs page without the id: err = %v", err)
+	}
+}

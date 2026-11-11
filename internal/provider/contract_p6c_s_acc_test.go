@@ -388,7 +388,11 @@ resource "docker_service" "p6cs" {
 // its inspect_json (config.exposed_ports and volumes are maps, the shape that
 // ExampleTests caught as "want a list, got map"), and data.docker_registry_image's
 // inspect mirrors its inspect_json (DistributionInspect, descriptor and
-// platforms typed).
+// platforms typed). Pass 6d Lane N: data.docker_registry_image's config,
+// read by the provider from the registry's image config blob (the harness
+// registry is plain HTTP on 127.0.0.1, reached through the local-registry
+// http fallback), is non-null and equal to data.docker_image's config: same
+// attribute paths, same values.
 func TestAccP6cImageDataRoundTrip(t *testing.T) {
 	testAccPreCheck(t)
 	reg := os.Getenv("TF_ACC_REGISTRY")
@@ -434,7 +438,63 @@ data "docker_registry_image" "p6cd" {
 				resource.TestCheckResourceAttrPair("data.docker_registry_image.p6cd", "inspect.descriptor.digest",
 					"data.docker_registry_image.p6cd", "digest"),
 				resource.TestMatchResourceAttr("data.docker_registry_image.p6cd", "inspect.platforms.0.os", regexp.MustCompile(`^linux$`)),
+				resource.TestCheckResourceAttr("data.docker_registry_image.p6cd", "config.exposed_ports.%", "1"),
+				resource.TestCheckResourceAttrSet("data.docker_registry_image.p6cd", "config.exposed_ports.80/tcp.%"),
+				resource.TestCheckResourceAttr("data.docker_registry_image.p6cd", "config.stop_signal", "SIGQUIT"),
+				resource.TestCheckResourceAttrSet("data.docker_registry_image.p6cd", "created"),
+				resource.TestCheckResourceAttrPair("data.docker_registry_image.p6cd", "labels.%", "data.docker_image.p6cd", "labels.%"),
+				testAccP6dNConfigShapeEqual("data.docker_image.p6cd", "data.docker_registry_image.p6cd"),
 			),
 		}},
 	})
+}
+
+// testAccP6dNConfigShapeEqual checks that the `config` attribute of two
+// data sources has the same attribute paths (flatmap keys under config.)
+// and the same values.
+func testAccP6dNConfigShapeEqual(a, b string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		sub := func(name string) (map[string]string, error) {
+			rs, ok := s.RootModule().Resources[name]
+			if !ok {
+				return nil, fmt.Errorf("%s not in state", name)
+			}
+			out := map[string]string{}
+			for k, v := range rs.Primary.Attributes {
+				if strings.HasPrefix(k, "config.") {
+					out[k] = v
+				}
+			}
+			if len(out) == 0 {
+				return nil, fmt.Errorf("%s: config is null or empty", name)
+			}
+			return out, nil
+		}
+		ca, err := sub(a)
+		if err != nil {
+			return err
+		}
+		cb, err := sub(b)
+		if err != nil {
+			return err
+		}
+		var diffs []string
+		for k, v := range ca {
+			if w, ok := cb[k]; !ok {
+				diffs = append(diffs, fmt.Sprintf("%s only in %s", k, a))
+			} else if v != w {
+				diffs = append(diffs, fmt.Sprintf("%s: %q (%s) vs %q (%s)", k, v, a, w, b))
+			}
+		}
+		for k := range cb {
+			if _, ok := ca[k]; !ok {
+				diffs = append(diffs, fmt.Sprintf("%s only in %s", k, b))
+			}
+		}
+		if len(diffs) > 0 {
+			sort.Strings(diffs)
+			return fmt.Errorf("config of %s and %s differ:\n%s", a, b, strings.Join(diffs, "\n"))
+		}
+		return nil
+	}
 }

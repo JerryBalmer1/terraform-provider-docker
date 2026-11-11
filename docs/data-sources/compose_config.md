@@ -1570,3 +1570,26 @@ Read-Only:
 - `external` (Boolean) Upstream `external`.
 - `labels` (Map of String) Upstream `labels`.
 - `name` (String) Upstream `name`.
+
+## Known issues
+
+### A service with `build.ssh` `id: path` empties the structured `project`
+
+Known issue `compose-build-ssh-project-dropped` (`reference/_gen/deferred.json`, kind `known_issue`). When a service's `build.ssh` has an entry with a path (`default: /home/me/.ssh/id_ed25519`), compose-go v2.16.2 encodes the project as invalid JSON, and `project` falls back to `{ name = ... }`: every other field is null, with no diagnostic. `compose_yaml` is not affected. Workaround: read `compose_yaml` (for example with `yamldecode`) for such projects, or pass the SSH agent socket (`ssh: [default]`) instead of a key path. The same applies to the [`docker_compose`](../resources/compose.md) resource.
+
+```terraform
+data "docker_compose_config" "x" {
+  content = <<-YAML
+    services:
+      app:
+        build:
+          context: .
+          ssh:
+            default: /home/me/.ssh/id_ed25519
+  YAML
+}
+
+output "svc" {
+  value = data.docker_compose_config.x.project.services # null
+}
+```

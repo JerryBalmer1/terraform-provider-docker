@@ -3,12 +3,12 @@
 page_title: "docker_registry_image Data Source - docker"
 subcategory: ""
 description: |-
-  Reads the current manifest digest and platforms of an image tag from its registry, through the daemon's distribution endpoint (GET /distribution/<name>/json) with the provider's registry_auth. Nothing is pulled. Feed digest into docker_image.triggers to re-pull when a moving tag changes. The registry side returns no image config, so labels, created and config are always null here; use docker_registry_image_manifests for the config.
+  Reads the current manifest digest, platforms and image config of an image tag from its registry, without pulling it. By default the daemon's distribution endpoint (GET /distribution/<name>/json, with the provider's registry_auth) gives the digest and platforms; that endpoint returns no image config, so the provider then reads the image config blob for that digest from the registry itself (Registry HTTP API v2, registry_auth, TLS verification on; localhost and loopback registries fall back to plain HTTP like the daemon) to fill config, labels and created. If the provider cannot reach the registry the daemon reached (for example a certificate only the daemon trusts through insecure-registries), those three stay null and a warning says why; set insecure_skip_verify to read the registry directly instead. A plain-HTTP registry on a host other than localhost or a loopback address is never read over plain HTTP by the provider, so its config stays null. For an index or manifest list, config, labels and created describe one platform: the daemon's os/arch when an entry matches, else linux/amd64, else the first entry. Feed digest into docker_image.triggers to re-pull when a moving tag changes.
 ---
 
 # docker_registry_image (Data Source)
 
-Reads the current manifest digest and platforms of an image tag from its registry, through the daemon's distribution endpoint (`GET /distribution/<name>/json`) with the provider's `registry_auth`. Nothing is pulled. Feed `digest` into `docker_image.triggers` to re-pull when a moving tag changes. The registry side returns no image config, so `labels`, `created` and `config` are always null here; use `docker_registry_image_manifests` for the config.
+Reads the current manifest digest, platforms and image config of an image tag from its registry, without pulling it. By default the daemon's distribution endpoint (`GET /distribution/<name>/json`, with the provider's `registry_auth`) gives the digest and platforms; that endpoint returns no image config, so the provider then reads the image config blob for that digest from the registry itself (Registry HTTP API v2, `registry_auth`, TLS verification on; `localhost` and loopback registries fall back to plain HTTP like the daemon) to fill `config`, `labels` and `created`. If the provider cannot reach the registry the daemon reached (for example a certificate only the daemon trusts through `insecure-registries`), those three stay null and a warning says why; set `insecure_skip_verify` to read the registry directly instead. A plain-HTTP registry on a host other than `localhost` or a loopback address is never read over plain HTTP by the provider, so its config stays null. For an index or manifest list, `config`, `labels` and `created` describe one platform: the daemon's os/arch when an entry matches, else linux/amd64, else the first entry. Feed `digest` into `docker_image.triggers` to re-pull when a moving tag changes.
 
 ## Example Usage
 
@@ -39,13 +39,13 @@ data "docker_registry_image" "internal" {
 
 ### Optional
 
-- `insecure_skip_verify` (Boolean) Read the registry directly instead of through the daemon, with TLS certificate verification off (`true`) or on (`false`). Set either way, the provider itself calls the Registry HTTP API v2 (`GET /v2/<repo>/manifests/<ref>`, plus the image config blob of a single-platform manifest) with the `registry_auth` username and password, and fills the same outputs from the response. `true` accepts a self-signed or otherwise unverifiable certificate; `false` verifies it against the system roots and fails with the certificate error. Unset (default): the daemon reads the registry (`GET /distribution/<name>/json`) and follows its own `insecure-registries` setting.
+- `insecure_skip_verify` (Boolean) Read the registry directly instead of through the daemon, with TLS certificate verification off (`true`) or on (`false`). Set either way, the provider itself calls the Registry HTTP API v2 (`GET /v2/<repo>/manifests/<ref>`, plus the image config blob) with the `registry_auth` username and password, and fills the same outputs from the response. `true` accepts a self-signed or otherwise unverifiable certificate; `false` verifies it against the system roots and fails with the certificate error. Unset (default): the daemon reads the registry (`GET /distribution/<name>/json`) and follows its own `insecure-registries` setting.
 
 ### Read-Only
 
-- `config` (Attributes) Same shape as data.docker_image.config; the registry side cannot fill it (DistributionInspect has no config), always null. (see [below for nested schema](#nestedatt--config))
+- `config` (Attributes) Same shape as data.docker_image.config, read from the image config blob in the registry (Registry HTTP API v2, the `config` object of the OCI / Docker image config). For an index or manifest list, one platform's config: the daemon's os/arch when an entry matches, else linux/amd64, else the first non-attestation entry. Null, with a warning, when the provider itself cannot read the registry the daemon read: for a certificate only the daemon trusts (insecure-registries), set insecure_skip_verify; a plain-HTTP registry on a host other than localhost or a loopback address is never read over plain HTTP by the provider, so config stays null there. (see [below for nested schema](#nestedatt--config))
 - `content_sha256` (String) The `content_sha256` hash output.
-- `created` (String) Registry side cannot fill (no image config via the Engine API); always null.
+- `created` (String) Creation time (RFC 3339) from the registry's image config blob (`created`), of the same platform `config` describes; null when the blob has none or cannot be read.
 - `digest` (String) Manifest (or manifest list / index) digest, `sha256:...` (DistributionInspect `Descriptor.digest`).
 - `docker_server_version` (String) Docker Engine version reported by GET /version.
 - `engine_api_version` (String) Engine API version the provider negotiated with the daemon for this read/build.
@@ -54,7 +54,7 @@ data "docker_registry_image" "internal" {
 - `image_ref` (String) Normalized `<registry>/<repository>:<tag>` of `name`.
 - `inspect` (Attributes) Full DistributionInspect, field by field. (see [below for nested schema](#nestedatt--inspect))
 - `inspect_json` (String) The Engine API GET /distribution/{name}/json response as JSON. Re-encoded, not byte-exact: the moby client keeps no raw body for this call, so this is the decoded response written as canonical JSON (keys sorted, compact).
-- `labels` (Map of String) Always null: the distribution endpoint returns no image config. Present so both image data sources share one shape.
+- `labels` (Map of String) Labels of the image config (`config.Labels` of the registry's image config blob, for the platform `config` describes). Null when the config blob could not be read (see the warning).
 - `manifests` (Attributes List) Per-platform manifests in one shape for both data sources; `filled_by` on each field says which side fills it. (see [below for nested schema](#nestedatt--manifests))
 - `platforms` (List of String) Platforms of the image as `os/arch[/variant]` (DistributionInspect `Platforms`).
 
@@ -168,3 +168,17 @@ Read-Only:
 - `os_features` (List of String) Upstream `os.features`.
 - `os_version` (String) Upstream `os.version`.
 - `variant` (String) Upstream `variant`.
+
+## Known issues
+
+### No `config` from a plain-HTTP registry on a remote host
+
+Known issue `registry-image-config-plain-http-remote` (`reference/_gen/deferred.json`, kind `known_issue`). The daemon's distribution endpoint returns no image config, so the provider reads `config`, `labels` and `created` from the registry itself. It falls back to plain HTTP only for `localhost` and loopback registries, as docker does. For a plain-HTTP registry on any other host (a daemon `insecure-registries` entry served over http), the read gives the warning "Image config not read from registry" and the three values are null; `digest`, `platforms` and `inspect_json` are still filled. `insecure_skip_verify` does not help there: it turns certificate verification off but still uses HTTPS. Workaround: serve the registry over TLS, or read the config from a pulled image with [`data.docker_image`](image.md).
+
+```terraform
+# Daemon: "insecure-registries": ["reg.lan:5000"], registry at reg.lan:5000 over plain HTTP.
+data "docker_registry_image" "x" {
+  name = "reg.lan:5000/app:1"
+}
+output "cfg" { value = data.docker_registry_image.x.config } # null, with a warning
+```

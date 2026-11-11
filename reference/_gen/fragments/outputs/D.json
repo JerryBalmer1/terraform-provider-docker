@@ -4097,10 +4097,11 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "Registry side cannot fill: DistributionInspect returns no image config; always null.",
+          "description": "Labels of the registry's image config blob (`config.Labels`), of the same platform `config` describes; null when the blob cannot be read.",
           "provided": false,
           "filled_by": [
-            "local"
+            "local",
+            "registry"
           ]
         },
         {
@@ -4114,10 +4115,11 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "Registry side cannot fill (no image config via the Engine API); always null.",
+          "description": "Creation time (RFC 3339) from the registry's image config blob (`created`), of the same platform `config` describes; null when the blob has none or cannot be read.",
           "provided": false,
           "filled_by": [
-            "local"
+            "local",
+            "registry"
           ]
         },
         {
@@ -4228,7 +4230,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "Same shape as data.docker_image.config; the registry side cannot fill it (DistributionInspect has no config), always null.",
+          "description": "Same shape as data.docker_image.config, read from the image config blob in the registry (Registry HTTP API v2, the `config` object of the OCI / Docker image config). For an index or manifest list, one platform's config: the daemon's os/arch when an entry matches, else linux/amd64, else the first non-attestation entry. Null, with a warning, when the provider itself cannot read the registry the daemon read: for a certificate only the daemon trusts (insecure-registries), set insecure_skip_verify; a plain-HTTP registry on a host other than localhost or a loopback address is never read over plain HTTP by the provider, so config stays null there.",
           "fields": [
             {
               "name": "user",

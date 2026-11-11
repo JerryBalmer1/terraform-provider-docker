@@ -650,7 +650,7 @@ task FieldMap {
     exec { & $GoExe run ./tools/fieldcov -write }
 }
 
-# Synopsis: Regenerate reference/_gen/deferred.json (everything knowingly not done) and print totals by kind plus the items added or removed since the committed version.
+# Synopsis: Regenerate reference/_gen/deferred.json (everything knowingly not done, plus the release's known issues from reference/_gen/deferred.d/known_issues.json) and print totals by kind plus the items added or removed since the committed version.
 task DeferredReport {
     requires -Variable GoExe, GitExe
     $null = New-Item -ItemType Directory -Force $TpdWork

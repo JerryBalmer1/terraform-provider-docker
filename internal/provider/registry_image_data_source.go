@@ -51,10 +51,16 @@ func (d *registryImageDataSource) Schema(_ context.Context, _ datasource.SchemaR
 		return schema.StringAttribute{Computed: true, MarkdownDescription: desc}
 	}
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Reads the current manifest digest and platforms of an image tag from its registry, through the daemon's distribution " +
-			"endpoint (`GET /distribution/<name>/json`) with the provider's `registry_auth`. Nothing is pulled. " +
-			"Feed `digest` into `docker_image.triggers` to re-pull when a moving tag changes. The registry side returns no image config, " +
-			"so `labels`, `created` and `config` are always null here; use `docker_registry_image_manifests` for the config.",
+		MarkdownDescription: "Reads the current manifest digest, platforms and image config of an image tag from its registry, without pulling it. " +
+			"By default the daemon's distribution endpoint (`GET /distribution/<name>/json`, with the provider's `registry_auth`) gives the digest " +
+			"and platforms; that endpoint returns no image config, so the provider then reads the image config blob for that digest from the " +
+			"registry itself (Registry HTTP API v2, `registry_auth`, TLS verification on; `localhost` and loopback registries fall back to plain " +
+			"HTTP like the daemon) to fill `config`, `labels` and `created`. If the provider cannot reach the registry the daemon reached " +
+			"(for example a certificate only the daemon trusts through `insecure-registries`), those three stay null and a warning says why; set " +
+			"`insecure_skip_verify` to read the registry directly instead. A plain-HTTP registry on a host other than `localhost` or a " +
+			"loopback address is never read over plain HTTP by the provider, so its config stays null. For an index or manifest list, `config`, `labels` and `created` " +
+			"describe one platform: the daemon's os/arch when an entry matches, else linux/amd64, else the first entry. " +
+			"Feed `digest` into `docker_image.triggers` to re-pull when a moving tag changes.",
 		Attributes: contractAddDataSourceAttributes(map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Required:            true,
@@ -64,7 +70,7 @@ func (d *registryImageDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Optional: true,
 				MarkdownDescription: "Read the registry directly instead of through the daemon, with TLS certificate verification off " +
 					"(`true`) or on (`false`). Set either way, the provider itself calls the Registry HTTP API v2 " +
-					"(`GET /v2/<repo>/manifests/<ref>`, plus the image config blob of a single-platform manifest) with the " +
+					"(`GET /v2/<repo>/manifests/<ref>`, plus the image config blob) with the " +
 					"`registry_auth` username and password, and fills the same outputs from the response. `true` accepts a " +
 					"self-signed or otherwise unverifiable certificate; `false` verifies it against the system roots and fails " +
 					"with the certificate error. Unset (default): the daemon reads the registry (`GET /distribution/<name>/json`) " +
@@ -80,9 +86,10 @@ func (d *registryImageDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				MarkdownDescription: "Platforms of the image as `os/arch[/variant]` (DistributionInspect `Platforms`).",
 			},
 			"labels": schema.MapAttribute{
-				ElementType:         types.StringType,
-				Computed:            true,
-				MarkdownDescription: "Always null: the distribution endpoint returns no image config. Present so both image data sources share one shape.",
+				ElementType: types.StringType,
+				Computed:    true,
+				MarkdownDescription: "Labels of the image config (`config.Labels` of the registry's image config blob, for the platform `config` describes). " +
+					"Null when the config blob could not be read (see the warning).",
 			},
 		}, regImageDataItem),
 	}
@@ -109,8 +116,11 @@ func (d *registryImageDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 	var di client.DistributionInspectResult
-	if insecure, ok := knownBool(m.InsecureSkipVerify); ok {
-		di.DistributionInspect, err = regDirectDistributionInspect(ctx, d.pd, name, insecure)
+	var direct *regInspection
+	var directReg *p3Registry
+	insecure, isDirect := knownBool(m.InsecureSkipVerify)
+	if isDirect {
+		di.DistributionInspect, direct, directReg, err = regDirectDistributionInspect(ctx, d.pd, name, insecure)
 	} else {
 		// Through the daemon: GET /distribution needs Engine API 1.30.
 		if !d.pd.gateItemAPI(ctx, regImageDataItem, &resp.Diagnostics) {
@@ -137,8 +147,30 @@ func (d *registryImageDataSource) Read(ctx context.Context, req datasource.ReadR
 	for _, p := range di.Platforms {
 		manifests = append(manifests, map[string]any{"platform": p})
 	}
-	fill.Structured = map[string]any{"manifests": manifests, "config": nil}
-	fill.Result = map[string]any{"created": nil}
+	// The image config comes from the registry's config blob: the daemon
+	// path asks the registry itself (the daemon returns no config), the
+	// direct path reuses its registry client. Failing to read it is a
+	// warning, never an error: digest and platforms are still good.
+	var cfg *regImageConfig
+	if isDirect {
+		cfg, err = regReadImageConfig(ctx, d.pd, directReg, direct.Top, direct.SingleCfg)
+	} else {
+		cfg, err = regDaemonPathImageConfig(ctx, d.pd, name, digest)
+	}
+	if err != nil {
+		resp.Diagnostics.AddWarning("Image config not read from registry", regImageConfigWarning(name, !isDirect, err))
+		cfg = nil
+	}
+	var config, created any
+	if cfg != nil {
+		config = cfg.Config
+		m.Labels = stringMapValue(cfg.Labels, false)
+		if cfg.Created != "" {
+			created = cfg.Created
+		}
+	}
+	fill.Structured = map[string]any{"manifests": manifests, "config": config}
+	fill.Result = map[string]any{"created": created}
 	resp.Diagnostics.Append(m.contractFill(ctx, d.pd, fill)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
@@ -148,10 +180,10 @@ func (d *registryImageDataSource) Read(ctx context.Context, req datasource.ReadR
 // what the daemon's GET /distribution/<name>/json would: the top manifest's
 // descriptor and the platforms of an index's entries, or of a single
 // manifest's image config.
-func regDirectDistributionInspect(ctx context.Context, pd *providerData, name string, insecure bool) (registry.DistributionInspect, error) {
+func regDirectDistributionInspect(ctx context.Context, pd *providerData, name string, insecure bool) (registry.DistributionInspect, *regInspection, *p3Registry, error) {
 	p, err := parseImageRef(name)
 	if err != nil {
-		return registry.DistributionInspect{}, err
+		return registry.DistributionInspect{}, nil, nil, err
 	}
 	ref := p.Digest
 	if ref == "" {
@@ -163,18 +195,18 @@ func regDirectDistributionInspect(ctx context.Context, pd *providerData, name st
 	r := newP3Registry(pd, p.Registry, p.Repository, insecure)
 	in, err := regInspect(ctx, r, ref, true)
 	if err != nil {
-		return registry.DistributionInspect{}, err
+		return registry.DistributionInspect{}, nil, nil, err
 	}
 	top := in.Top
 	if !regDigestPattern.MatchString(top.Digest) {
-		return registry.DistributionInspect{}, fmt.Errorf("registry digest %q is not a sha256 digest", top.Digest)
+		return registry.DistributionInspect{}, nil, nil, fmt.Errorf("registry digest %q is not a sha256 digest", top.Digest)
 	}
 	var out registry.DistributionInspect
 	// Descriptor.Digest is a go-digest type; decoding fills it without a
 	// direct dependency on that module.
 	desc, _ := json.Marshal(map[string]any{"mediaType": top.MediaType, "digest": top.Digest, "size": len(top.Body)})
 	if err := json.Unmarshal(desc, &out.Descriptor); err != nil {
-		return registry.DistributionInspect{}, err
+		return registry.DistributionInspect{}, nil, nil, err
 	}
 	if top.isIndex() {
 		for _, e := range top.Doc.Manifests {
@@ -190,7 +222,7 @@ func regDirectDistributionInspect(ctx context.Context, pd *providerData, name st
 			out.Platforms = append(out.Platforms, pl)
 		}
 	}
-	return out, nil
+	return out, in, r, nil
 }
 
 // regDigestPattern matches a sha256 content digest.

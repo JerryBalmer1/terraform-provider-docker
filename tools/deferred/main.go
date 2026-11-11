@@ -22,9 +22,16 @@
 //	diagnostic         reference/_gen/deferred.d/diagnostics.json: connection failures (hijacked streams over TLS,
 //	                   TLS through a proxy, ...) that still surface the raw client error instead of the Configure
 //	                   preflight diagnostic; each names the file whose code would carry it, which must exist
+//	known_issue        reference/_gen/deferred.d/known_issues.json: behaviour gaps a release ships with (a type
+//	                   that differs from upstream or is unverified somewhere); each names its inventory item (must
+//	                   be in reference/inventory.json), the file whose code carries the gap (must exist), a
+//	                   reproduction (copied into the item as "reproduce"), the docs pages that describe it and
+//	                   whether CHANGELOG.md lists it; every docs page, and CHANGELOG.md when changelog is true,
+//	                   must mention the id
 //
 // Every item has kind, id, reason and source (a repository path, no line
-// numbers, so unrelated edits do not make the file stale). Items are sorted
+// numbers, so unrelated edits do not make the file stale); known_issue items
+// also have reproduce. Items are sorted
 // by kind, then id. Exit codes: 0 ok, 1 stale (check mode), 2 error. Run from
 // the repository root.
 package main

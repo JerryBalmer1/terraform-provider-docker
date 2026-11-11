@@ -211,3 +211,29 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 # Import by builder name (its node container buildx_buildkit_<name>0), node name, or container ID.
 terraform import docker_buildx_builder.ci ci
 ```
+
+## Known issues
+
+### `driver = "cloud"` is not verified against the live Docker Build Cloud service
+
+Known issue `buildx-builder-cloud-unverified` (`reference/_gen/deferred.json`, kind `known_issue`). Docker Build Cloud builders are tested only against a fake auth server and a fake BuildKit proxy. Three behaviours follow buildx v0.38.2 by assumption: the provider dials the builder group at the default proxy `build-cloud.docker.com:443` (buildx looks up per-platform instances through the Hub API), it sends `buildx-version: v0.38.2`, and it loads build results through the build session (buildx's "cloud pull" is not implemented). Other drivers are not affected. To verify an account, run the live acceptance test (needs a Build Cloud subscription):
+
+```terraform
+provider "docker" {
+  registry_auth {
+    address  = "docker.io"
+    username = var.hub_user
+    password = var.hub_pat
+  }
+}
+
+resource "docker_buildx_builder" "cloud" {
+  name     = "cloud-builder"
+  driver   = "cloud"
+  endpoint = "<org>/<builder>"
+}
+```
+
+```shell
+TF_ACC=1 TF_ACC_BUILD_CLOUD=1 TF_ACC_BUILD_CLOUD_BUILDER=<org>/<builder> DOCKER_REGISTRY_USER=<hub user> DOCKER_REGISTRY_PASS=<hub PAT> go test -run TestAccBuildxBuilderCloud_live ./internal/provider -count=1
+```

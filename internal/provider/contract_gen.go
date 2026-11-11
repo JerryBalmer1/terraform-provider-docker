@@ -7763,8 +7763,8 @@ var contractItems = map[string]*contractItem{
 			{Name: "image_digest_ref", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "`<repo>@<digest>` (today: `id`, which keeps the tag in the repo part)."},
 			{Name: "digest", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "DistributionInspect.Descriptor.digest (manifest or index; today: `sha256_digest`)."},
 			{Name: "platforms", Category: "identity", TFType: "list(string)", Sensitive: false, KnownAfterApply: false, Description: "`os/arch[/variant]` for every platform in the index (DistributionInspect.Platforms)."},
-			{Name: "labels", Category: "identity", TFType: "map(string)", Sensitive: false, KnownAfterApply: false, Description: "Registry side cannot fill: DistributionInspect returns no image config; always null."},
-			{Name: "created", Category: "result", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Registry side cannot fill (no image config via the Engine API); always null."},
+			{Name: "labels", Category: "identity", TFType: "map(string)", Sensitive: false, KnownAfterApply: false, Description: "Labels of the registry's image config blob (`config.Labels`), of the same platform `config` describes; null when the blob cannot be read."},
+			{Name: "created", Category: "result", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Creation time (RFC 3339) from the registry's image config blob (`created`), of the same platform `config` describes; null when the blob has none or cannot be read."},
 			{Name: "manifests", Category: "structured", TFType: "list(object({...}))", Sensitive: false, KnownAfterApply: false, Description: "Per-platform manifests in one shape for both data sources; `filled_by` on each field says which side fills it.", FieldsComplete: true, Fields: []contractField{
 				{Name: "platform", Upstream: "Platform (os/architecture/variant)", TFType: "object({...})", Fields: []contractField{
 					{Name: "architecture", Upstream: "architecture", TFType: "string"},
@@ -7778,7 +7778,7 @@ var contractItems = map[string]*contractItem{
 				{Name: "size", Upstream: "Descriptor.size", TFType: "number"},
 				{Name: "available", Upstream: "Available", TFType: "bool", Description: "Local only: whether that platform's content is present on the daemon."},
 			}},
-			{Name: "config", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: false, Description: "Same shape as data.docker_image.config; the registry side cannot fill it (DistributionInspect has no config), always null.", FieldsComplete: false, Fields: []contractField{
+			{Name: "config", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: false, Description: "Same shape as data.docker_image.config, read from the image config blob in the registry (Registry HTTP API v2, the `config` object of the OCI / Docker image config). For an index or manifest list, one platform's config: the daemon's os/arch when an entry matches, else linux/amd64, else the first non-attestation entry. Null, with a warning, when the provider itself cannot read the registry the daemon read: for a certificate only the daemon trusts (insecure-registries), set insecure_skip_verify; a plain-HTTP registry on a host other than localhost or a loopback address is never read over plain HTTP by the provider, so config stays null there.", FieldsComplete: false, Fields: []contractField{
 				{Name: "user", Upstream: "User", TFType: "string"},
 				{Name: "exposed_ports", Upstream: "ExposedPorts", TFType: "map(object({}))", Description: "ExposedPorts as the Engine returns it: a map keyed by `<port>/<proto>` with empty objects as values (keys verbatim; use `keys(...)` for a list)."},
 				{Name: "env", Upstream: "Env", TFType: "list(string)", Sensitive: true},
