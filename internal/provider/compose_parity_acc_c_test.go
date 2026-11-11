@@ -10,7 +10,7 @@ package provider
 // difference in the cases it names fails too (stale).
 //
 // Two fields are compared through a normalisation, not literally:
-//   - com.docker.compose.depends_on is a set: compose v5.7.0 writes it in Go
+//   - com.docker.compose.depends_on is a set: compose v5.7.1 writes it in Go
 //     map order (composeParitySetLabels);
 //   - com.docker.compose.config-hash of a container with service references
 //     (service:<x>, volumes_from) hashes the target's container ID, which
@@ -159,10 +159,10 @@ func composeParityExampleCases(t *testing.T) []composeParityCase {
 type composeParityObject map[string]string
 
 // composeParitySetLabels are labels whose value is a comma-separated set.
-// com.docker.compose.depends_on: docker compose v5.7.0 builds it by ranging
+// com.docker.compose.depends_on: docker compose v5.7.1 builds it by ranging
 // over the service.DependsOn map (pkg/compose/depends_on_label.go:30-36,
 // encodeDependsOnLabel: `for dep, d := range dependsOn`, called from
-// create.go:319), so
+// create.go:321), so
 // its order is Go's random map order, different per container and per run;
 // docker_compose sorts it. Only the set of entries is compared.
 var composeParitySetLabels = []string{"label " + composeLabelDependsOn}
@@ -192,8 +192,8 @@ var composeParityKnownDiffs = []composeParityKnownDiff{{
 	Cases: []string{"unit_expand"},
 	Reason: `volumes_from "<service>:ro" / "container:<c>:ro": docker compose drops the access mode and sends the bare container ` +
 		`(the volumes are mounted read-write); docker_compose keeps ":ro" / ":rw" as the compose spec documents it`,
-	Source: "docker/compose v5.7.0 pkg/compose/service_containers.go:79-97 resolveVolumeFrom (service.VolumesFrom[i] = spec[1] / " +
-		"dependencies.sorted()[0].ID), called from executor_ops.go:93, sent as-is by pkg/compose/create.go:453",
+	Source: "docker/compose v5.7.1 pkg/compose/service_containers.go:79-97 resolveVolumeFrom (service.VolumesFrom[i] = spec[1] / " +
+		"dependencies.sorted()[0].ID), called from executor_ops.go:93, sent as-is by pkg/compose/create.go:455",
 	Match: composeParityModeSuffixOnly,
 }}
 

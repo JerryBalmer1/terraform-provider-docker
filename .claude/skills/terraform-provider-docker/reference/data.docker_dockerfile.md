@@ -6,7 +6,7 @@ Kind: data-source. Back to [SKILL.md](../SKILL.md).
 
 Reads, parses and renders one Dockerfile: from `content`, a local `path`, an https `url`, an `image` history (approximate), or written with ordered `stage` / `instruction` blocks. Every source yields the same outputs: the re-rendered `dockerfile` (+ `dockerfile_sha256`), the text as read in `source_dockerfile` (+ `source_dockerfile_sha256`), and structured `stages` (each instruction with all its flags as the object named by its lowercase keyword, JSON-encoded), `directives`, `global_args`, `exposed_ports`, `base_images`.
 
-Builder mode keeps instruction order with one `instruction` block per instruction holding exactly one keyword block (`run`, `copy`, `env`, ...): Terraform keeps the order of blocks of one type, not across types. `onbuild = true` on a keyword block writes `ONBUILD <instruction>`. MAINTAINER is read from existing Dockerfiles but cannot be written: use `label { labels = { "org.opencontainers.image.authors" = "..." } }`. `check.skip` names outside the pinned rule list (frontend 1.28) give a warning, not an error, because a newer `syntax` may add rules.
+Builder mode keeps instruction order with one `instruction` block per instruction holding exactly one keyword block (`run`, `copy`, `env`, ...): Terraform keeps the order of blocks of one type, not across types. `onbuild = true` on a keyword block writes `ONBUILD <instruction>`. MAINTAINER is read from existing Dockerfiles but cannot be written: use `label { labels = { "org.opencontainers.image.authors" = "..." } }`. `check.skip` names outside the pinned rule list (frontend 1.29) give a warning, not an error, because a newer `syntax` may add rules.
 
 ## Arguments and attributes
 
@@ -18,7 +18,7 @@ Builder mode keeps instruction order with one `instruction` block per instructio
 | `docker_server_version` | `string` | computed |  |  | Image mode only; null otherwise. |
 | `dockerfile` | `string` | computed |  | yes | Re-rendered Dockerfile from the structured model (directives, global ARGs, stages). ENV values and ARG defaults are inline, hence sensitive. |
 | `dockerfile_sha256` | `string` | computed |  |  | The `dockerfile_sha256` hash output. |
-| `dockerfile_syntax` | `string` | computed |  |  | `# syntax=` value of the parsed file, else the default frontend `docker/dockerfile:1` (pinned reference 1.28.0); null in image mode (not recorded in images). |
+| `dockerfile_syntax` | `string` | computed |  |  | `# syntax=` value of the parsed file, else the default frontend `docker/dockerfile:1` (pinned reference 1.29.0); null in image mode (not recorded in images). |
 | `engine_api_version` | `string` | computed |  |  | Image mode only (the only mode that talks to the Engine); null otherwise. |
 | `escape` | `string` | optional |  |  | Builder mode: the `# escape=` parser directive, `\` (default) or a backtick (needs `stage` blocks). |
 | `exposed_ports` | `list(object)` | computed |  |  | EXPOSE entries of the final stage (image mode: Config.ExposedPorts). |
@@ -71,7 +71,7 @@ nested attribute, object. Upstream `# check=`.
 | Name | Type | Status | Forces replacement | Sensitive | Description |
 |---|---|---|---|---|---|
 | `error` | `bool` | computed |  |  | Upstream `# check=error=<boolean>`. |
-| `skip` | `list(string)` | computed |  |  | Build-check rule names (21 at frontend 1.28; InvalidDefinitionDescription is experimental) or `all`. |
+| `skip` | `list(string)` | computed |  |  | Build-check rule names (21 at frontend 1.29; InvalidDefinitionDescription is experimental) or `all`. |
 
 ### `exposed_ports`
 
@@ -169,7 +169,7 @@ list of blocks. Builder mode: `ARG` instructions before the first FROM, in order
 | `content_sha256` | `string` | computed |  |  | The sha256 (hex) of this block's `dockerfile` text. |
 | `default` | `string` | optional |  | yes | Default value. Sensitive: it is stored in the image history. |
 | `dockerfile` | `string` | computed |  | yes | This block rendered as Dockerfile text (instruction line and heredoc bodies). Sensitive: ENV values and ARG defaults appear inline. |
-| `dockerfile_syntax` | `string` | computed |  |  | The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.28.0`). |
+| `dockerfile_syntax` | `string` | computed |  |  | The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.29.0`). |
 | `instruction` | `string` | computed |  |  | The instruction keyword of this block in upper case (`RUN`, `COPY`, ...); ONBUILD shows in `dockerfile`, not here. |
 | `instruction_index` | `number` | computed |  |  | 0-based position of the block inside its stage (FROM is 0, so instructions start at 1); for a `global_arg`, its position among the global ARGs. |
 | `name` | `string` | required |  |  | Argument name. |
@@ -184,7 +184,7 @@ list of blocks. Builder mode: build stages in order (`FROM [--platform=...] <fro
 | `comments` | `list(string)` | optional |  |  | Comment lines written above the FROM line. |
 | `content_sha256` | `string` | computed |  |  | The sha256 (hex) of this block's `dockerfile` text. |
 | `dockerfile` | `string` | computed |  | yes | This block rendered as Dockerfile text (instruction line and heredoc bodies). Sensitive: ENV values and ARG defaults appear inline. |
-| `dockerfile_syntax` | `string` | computed |  |  | The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.28.0`). |
+| `dockerfile_syntax` | `string` | computed |  |  | The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.29.0`). |
 | `from` | `string` | required |  |  | Base image (`image`, `image:tag`, `image@digest`, `scratch`), an earlier stage name, or a `$GLOBAL_ARG` reference. |
 | `instruction_index` | `number` | computed |  |  | 0-based position of the block inside its stage (FROM is 0, so instructions start at 1); for a `global_arg`, its position among the global ARGs. |
 | `name` | `string` | optional |  |  | Stage name (`FROM ... AS <name>`), usable by `COPY --from`, `RUN --mount=from=` and `build.target`. |
@@ -203,7 +203,7 @@ list of blocks. One instruction of the stage, in order. Holds exactly one keywor
 | `comments` | `list(string)` | optional |  |  | Comment lines written above the instruction. |
 | `content_sha256` | `string` | computed |  |  | The sha256 (hex) of this block's `dockerfile` text. |
 | `dockerfile` | `string` | computed |  | yes | This block rendered as Dockerfile text (instruction line and heredoc bodies). Sensitive: ENV values and ARG defaults appear inline. |
-| `dockerfile_syntax` | `string` | computed |  |  | The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.28.0`). |
+| `dockerfile_syntax` | `string` | computed |  |  | The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.29.0`). |
 | `instruction` | `string` | computed |  |  | The instruction keyword of this block in upper case (`RUN`, `COPY`, ...); ONBUILD shows in `dockerfile`, not here. |
 | `instruction_index` | `number` | computed |  |  | 0-based position of the block inside its stage (FROM is 0, so instructions start at 1); for a `global_arg`, its position among the global ARGs. |
 | `stage_index` | `number` | computed |  |  | 0-based index of the build stage holding the block; null for a `global_arg`. |

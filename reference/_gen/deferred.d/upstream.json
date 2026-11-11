@@ -1,0 +1,29 @@
+{
+  "about": "Hand-maintained. Upstream surface items (Invoke-Build DriftCheck surface findings, <source>:<kind>/<name>) that a newer release added and that are knowingly not implemented. tools/drift reports a listed item as mapped; tools/deferred lists it in reference/_gen/deferred.json as kind upstream_surface. Each: item, version_seen (the release that brought it), date (YYYY-MM-DD of the decision), reason. Remove an entry when the item is implemented.",
+  "items": [
+    {
+      "item": "buildkit:flag/ENV --unset",
+      "version_seen": "dockerfile/1.29.0",
+      "date": "2026-11-11",
+      "reason": "labs-only (`# syntax=docker/dockerfile:1-labs`), not in stable syntax. data.docker_dockerfile fails on a Dockerfile that uses it: the vendored BuildKit parser rejects `ENV --unset <key>` (\"ENV must have two arguments\"), and the structured env block has no unset field. docker_image builds are unaffected: the Dockerfile goes to BuildKit unchanged and the stage reader falls back to its line reader."
+    },
+    {
+      "item": "buildkit:flag/FROM --reset",
+      "version_seen": "dockerfile/1.29.0",
+      "date": "2026-11-11",
+      "reason": "labs-only (`# syntax=docker/dockerfile:1-labs`), not in stable syntax. data.docker_dockerfile fails on a Dockerfile that uses it (\"unknown FROM flag --reset\"), and the structured from block has no reset field. docker_image builds are unaffected: the Dockerfile goes to BuildKit unchanged and the stage reader falls back to its line reader."
+    },
+    {
+      "item": "buildkit:flag/LABEL --unset",
+      "version_seen": "dockerfile/1.29.0",
+      "date": "2026-11-11",
+      "reason": "labs-only (`# syntax=docker/dockerfile:1-labs`), not in stable syntax. The structured label block has no unset field, so data.docker_dockerfile does not represent the flag and builder mode cannot write it. docker_image builds are unaffected: the Dockerfile goes to BuildKit unchanged."
+    },
+    {
+      "item": "buildkit:flag/VOLUME --unset",
+      "version_seen": "dockerfile/1.29.0",
+      "date": "2026-11-11",
+      "reason": "labs-only (`# syntax=docker/dockerfile:1-labs`), not in stable syntax. The structured volume block has no unset field, so data.docker_dockerfile does not represent the flag and builder mode cannot write it. docker_image builds are unaffected: the Dockerfile goes to BuildKit unchanged."
+    }
+  ]
+}

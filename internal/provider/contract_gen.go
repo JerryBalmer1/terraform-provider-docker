@@ -14,11 +14,11 @@ import (
 // contractPins are the inventory pins (reference/SOURCES.md), verbatim.
 var contractPins = map[string]string{
 	"buildx":       "v0.38.2 @ 3c4cbd35852fc1a476923627a780a7836c28b654",
-	"compose_cli":  "v5.7.0 @ 5bceecf985347fcf6dd23029ce440b502a0d4301",
+	"compose_cli":  "v5.7.1 @ fb1fd129f86828359335477f82821525201d4a8c",
 	"compose_go":   "v2.16.2 @ ddbe099a5404149d75fe774b30de7bd0befd3bd3",
 	"compose_spec": "main @ 3a4a6995e4a971f6173dff9130cb3e38e6738651",
 	"docker_cli":   "v29.5.3 @ d1c06ef6b41d88d76866aea43c246cd7c63d04fa",
-	"dockerfile":   "dockerfile/1.28.0 @ f5b59a1f2fb25a0cb7072c398cab9aed7835da4e",
+	"dockerfile":   "dockerfile/1.29.0 @ f55949dea4f03bb9d85b73e9afc9a609291289db",
 	"engine_api":   "1.56 (moby api/v1.56.1 @ 14ebc602124e280ef4ae3e1a8e688dac1255baa6)",
 }
 
@@ -31,7 +31,7 @@ const (
 	// contractBuildxVersion is buildx_version.
 	contractBuildxVersion = "v0.38.2"
 	// contractDockerfileDefaultSyntax is dockerfile_syntax when a Dockerfile has no # syntax= line.
-	contractDockerfileDefaultSyntax = "docker/dockerfile:1.28.0"
+	contractDockerfileDefaultSyntax = "docker/dockerfile:1.29.0"
 )
 
 // contractItems is the outputs contract of every item, keyed by item id.
@@ -4521,7 +4521,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "add"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:ARG": {
@@ -4540,7 +4540,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "arg"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:CMD": {
@@ -4556,7 +4556,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "cmd"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:COPY": {
@@ -4586,7 +4586,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "copy"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:ENTRYPOINT": {
@@ -4602,7 +4602,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "entrypoint"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:ENV": {
@@ -4617,7 +4617,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: true, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "env"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:EXPOSE": {
@@ -4634,7 +4634,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "expose"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:FROM": {
@@ -4653,7 +4653,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "from"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:HEALTHCHECK": {
@@ -4677,7 +4677,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "healthcheck"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:LABEL": {
@@ -4691,7 +4691,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "label"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:MAINTAINER": {
@@ -4705,7 +4705,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "maintainer"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:ONBUILD": {
@@ -4724,7 +4724,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "onbuild"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:RUN": {
@@ -4795,7 +4795,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "run"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:SHELL": {
@@ -4809,7 +4809,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "shell"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:STOPSIGNAL": {
@@ -4823,7 +4823,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "stopsignal"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:USER": {
@@ -4838,7 +4838,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "user"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:VOLUME": {
@@ -4853,7 +4853,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "volume"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:WORKDIR": {
@@ -4867,7 +4867,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (the instruction line(s), heredoc bodies included).", Serializes: "workdir"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:data-dockerfile": {
@@ -4924,7 +4924,7 @@ var contractItems = map[string]*contractItem{
 				{Name: "syntax", Upstream: "# syntax=", TFType: "string"},
 				{Name: "escape", Upstream: "# escape=", TFType: "string"},
 				{Name: "check", Upstream: "# check=", TFType: "object({...})", Fields: []contractField{
-					{Name: "skip", Upstream: "# check=skip=<checks|all>", TFType: "list(string)", Description: "Build-check rule names (21 at frontend 1.28; InvalidDefinitionDescription is experimental) or `all`."},
+					{Name: "skip", Upstream: "# check=skip=<checks|all>", TFType: "list(string)", Description: "Build-check rule names (21 at frontend 1.29; InvalidDefinitionDescription is experimental) or `all`."},
 					{Name: "error", Upstream: "# check=error=<boolean>", TFType: "bool"},
 				}},
 			}},
@@ -4951,7 +4951,7 @@ var contractItems = map[string]*contractItem{
 				{Name: "size", Upstream: "Size", TFType: "number"},
 				{Name: "comment", Upstream: "Comment", TFType: "string"},
 			}},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "`# syntax=` value of the parsed file, else the default frontend `docker/dockerfile:1` (pinned reference 1.28.0); null in image mode (not recorded in images)."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "`# syntax=` value of the parsed file, else the default frontend `docker/dockerfile:1` (pinned reference 1.29.0); null in image mode (not recorded in images)."},
 			{Name: "engine_api_version", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Image mode only (the only mode that talks to the Engine); null otherwise."},
 			{Name: "docker_server_version", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Image mode only; null otherwise."},
 			{Name: "source_dockerfile_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "sha256 of `source_dockerfile` (Q34).", HashOf: "source_dockerfile"},
@@ -4962,12 +4962,12 @@ var contractItems = map[string]*contractItem{
 		Outputs: []contractOutput{
 			{Name: "directive", Category: "identity", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "Parser directive name, `check`. File-level and unique, so it is its own identity."},
 			{Name: "check", Category: "structured", TFType: "object({...})", Sensitive: false, KnownAfterApply: false, Description: "The check directive as typed fields; every documented flag is a field.", FieldsComplete: true, Fields: []contractField{
-				{Name: "skip", Upstream: "# check=skip=<checks|all>", TFType: "list(string)", Description: "Build-check rule names (21 at frontend 1.28; InvalidDefinitionDescription is experimental) or `all`."},
+				{Name: "skip", Upstream: "# check=skip=<checks|all>", TFType: "list(string)", Description: "Build-check rule names (21 at frontend 1.29; InvalidDefinitionDescription is experimental) or `all`."},
 				{Name: "error", Upstream: "# check=error=<boolean>", TFType: "bool"},
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (one instruction, or one `# check=` line).", Serializes: "check"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:directive-escape": {
@@ -4979,7 +4979,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (one instruction, or one `# escape=` line).", Serializes: "escape"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."},
 		},
 	},
 	"dockerfile:directive-syntax": {
@@ -4991,7 +4991,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile", Category: "raw", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "This block rendered as Dockerfile text (one instruction, or one `# syntax=` line).", Serializes: "syntax"},
 			{Name: "content_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The directive's own value, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0)."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The directive's own value, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0)."},
 		},
 	},
 	"engine:build-prune": {
@@ -6508,7 +6508,7 @@ var contractItems = map[string]*contractItem{
 			}},
 			{Name: "dockerfile_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "", HashOf: "dockerfile"},
 			{Name: "inspect_json_sha256", Category: "hash", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "", HashOf: "inspect_json"},
-			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The built Dockerfile's `# syntax=` value, else the default frontend `docker/dockerfile:1` (pinned reference 1.28.0); null for a pulled image."},
+			{Name: "dockerfile_syntax", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: false, Description: "The built Dockerfile's `# syntax=` value, else the default frontend `docker/dockerfile:1` (pinned reference 1.29.0); null for a pulled image."},
 			{Name: "engine_api_version", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "Engine API version the provider negotiated with the daemon for this read/build."},
 			{Name: "docker_server_version", Category: "version", TFType: "string", Sensitive: false, KnownAfterApply: true, Description: "Docker Engine version reported by GET /version."},
 		},

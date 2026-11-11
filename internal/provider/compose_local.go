@@ -58,7 +58,7 @@ func composeHashMatches(labels map[string]string, want string) bool {
 
 // composeEndpoint is one network a container joins.
 // composeEndpointIfname is the endpoint driver option interface_name sets
-// (compose v5.7.0 pkg/compose/create.go:610-624 endpointDriverOpts).
+// (compose v5.7.1 pkg/compose/create.go:612-626 endpointDriverOpts).
 const composeEndpointIfname = "com.docker.network.endpoint.ifname"
 
 type composeEndpoint struct {
@@ -73,8 +73,8 @@ type composeEndpoint struct {
 	MacAddress string `json:"mac_address,omitempty"`
 	// DriverOpts, GwPriority and LinkLocalIPs are the endpoint's driver_opts
 	// (interface_name joins them as com.docker.network.endpoint.ifname),
-	// gw_priority and link_local_ips, as compose v5.7.0 sends them
-	// (pkg/compose/create.go:529-624 createEndpointSettings,
+	// gw_priority and link_local_ips, as compose v5.7.1 sends them
+	// (pkg/compose/create.go:531-626 createEndpointSettings,
 	// parseEndpointIPAM, endpointDriverOpts). Empty values
 	// are left out of the spec hash, so existing containers keep theirs.
 	DriverOpts   map[string]string `json:"driver_opts,omitempty"`
@@ -575,7 +575,7 @@ func composeLocalService(p *ctypes.Project, plan *composeLocalPlan, svc ctypes.S
 		}
 		if len(eps) > 0 {
 			hc.NetworkMode = container.NetworkMode(eps[0].Name)
-			// create.go:340-368 prepareContainerMACAddress: the
+			// create.go:342-370 prepareContainerMACAddress: the
 			// service-level mac_address goes to the primary network and
 			// must agree with that network's own.
 			if m := svc.MacAddress; m != "" {
@@ -862,7 +862,7 @@ func composeLocalMount(p *ctypes.Project, svc ctypes.ServiceConfig, v ctypes.Ser
 			}
 			m.VolumeOptions.NoCopy = v.Volume.NoCopy
 			m.VolumeOptions.Subpath = v.Volume.Subpath
-			// create.go:1285-1295 buildVolumeOptions: labels of the
+			// create.go:1287-1297 buildVolumeOptions: labels of the
 			// volume the mount creates (an anonymous one, or a named
 			// one the daemon creates on first use).
 			if len(v.Volume.Labels) > 0 {

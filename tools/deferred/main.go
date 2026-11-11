@@ -28,6 +28,10 @@
 //	                   reproduction (copied into the item as "reproduce"), the docs pages that describe it and
 //	                   whether CHANGELOG.md lists it; every docs page, and CHANGELOG.md when changelog is true,
 //	                   must mention the id
+//	upstream_surface   reference/_gen/deferred.d/upstream.json: upstream surface items (DriftCheck surface
+//	                   findings <source>:<kind>/<name>: a command, option, Dockerfile instruction, flag,
+//	                   directive, build check or build arg) a newer release added and that are knowingly not
+//	                   implemented; tools/drift reports them as mapped
 //
 // Every item has kind, id, reason and source (a repository path, no line
 // numbers, so unrelated edits do not make the file stale); known_issue items

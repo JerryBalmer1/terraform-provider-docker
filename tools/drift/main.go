@@ -25,8 +25,9 @@
 //
 // Exit codes: 0 no unaccepted drift; 1 unmapped items that are not in
 // reference/_gen/drift-accepted.json (a new operation not in the inventory,
-// a new writable field fieldcov cannot map, or a documentation-only source
-// at a newer release); 2 an error (network, fieldcov, bad input). Removals
+// a new writable field fieldcov cannot map, or an added, removed or changed
+// surface item of a documentation-only source not deferred in
+// reference/_gen/deferred.d/upstream.json); 2 an error (network, fieldcov, bad input). Removals
 // are reported, never fail. The report is written in every case.
 package main
 
@@ -70,6 +71,7 @@ func mainErr() int {
 	gitExe := flag.String("git", "git", "git command (git ls-remote)")
 	flag.Var(ov, "to", "source=version: compare against this version instead of the newest (repeatable; what-if runs)")
 	maxProbe := flag.Int("max-probe", 10, "docs.docker.com: API versions above the pinned one to probe")
+	logPath := flag.String("log", "", "drift log of moved sources with no surface change (default REPO/reference/_gen/drift-log.json; \"-\" = do not write)")
 	flag.Parse()
 
 	repo := *repoFlag
@@ -100,6 +102,17 @@ func mainErr() int {
 		fmt.Fprintln(os.Stderr, "drift:", err)
 		return 2
 	}
+	deferred, err := loadUpstreamDeferrals(filepath.Join(repo, "reference", "_gen", "deferred.d", "upstream.json"))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "drift:", err)
+		return 2
+	}
+	switch *logPath {
+	case "":
+		*logPath = filepath.Join(repo, "reference", "_gen", "drift-log.json")
+	case "-":
+		*logPath = ""
+	}
 	for k := range ov {
 		if _, ok := pins[k]; !ok {
 			fmt.Fprintf(os.Stderr, "drift: -to %s: unknown source\n", k)
@@ -107,7 +120,7 @@ func mainErr() int {
 		}
 	}
 	o := options{Repo: repo, Work: *work, Sources: defaultSources, Pins: pins, Accepted: acc, Overrides: ov,
-		MaxProbe: *maxProbe, Now: time.Now()}
+		MaxProbe: *maxProbe, Now: time.Now(), Docs: &gitDocs{git: *gitExe}, Deferred: deferred, LogPath: *logPath}
 	rm := &netRemote{git: *gitExe, hc: &http.Client{Timeout: 2 * time.Minute}}
 	fr := &goFieldcov{goExe: *goExe, repo: repo, work: *work}
 	r := run(o, rm, fr)

@@ -537,7 +537,7 @@
     },
     "compose:service/build/isolation": {
       "item": "compose:services",
-      "skip": "BuildKit (the provider's only builder, through the BuildKit seam) has no isolation option; compose v5.7.0 sends it only to the legacy Windows builder (pkg/compose/build_classic.go:357 ImageBuildOptions.Isolation), not through bake (pkg/compose/build_bake.go:289-316)",
+      "skip": "BuildKit (the provider's only builder, through the BuildKit seam) has no isolation option; compose v5.7.1 sends it only to the legacy Windows builder (pkg/compose/build_classic.go:356 ImageBuildOptions.Isolation), not through bake (pkg/compose/build_bake.go:289-316)",
       "how": "manual:K",
       "lane": "K"
     },

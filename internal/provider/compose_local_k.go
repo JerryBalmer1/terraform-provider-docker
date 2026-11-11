@@ -2,28 +2,28 @@ package provider
 
 // docker_compose, mode = "local" (Pass 5.3 Lane K): the service keys the
 // conversion used to warn about and ignore, mapped onto the Engine API the
-// way docker compose v5.7.0 does (pkg/compose/create.go, apiSocket.go,
+// way docker compose v5.7.1 does (pkg/compose/create.go, apiSocket.go,
 // service_containers.go, pull.go):
 //
-//   - blkio_config -> HostConfig.Blkio* (create.go:923-937 setBlkio);
+//   - blkio_config -> HostConfig.Blkio* (create.go:925-939 setBlkio);
 //   - links / external_links -> HostConfig.Links and EndpointSettings.Links
 //     (service_containers.go:309-362 getLinks);
-//   - mac_address -> the primary endpoint's MacAddress (create.go:494-514
+//   - mac_address -> the primary endpoint's MacAddress (create.go:496-516
 //     prepareContainerMACAddress, :698-703);
 //   - use_api_socket -> a bind mount of /var/run/docker.sock, DOCKER_CONFIG
 //     and a config.json with the registry credentials (apiSocket.go:45-132;
-//     compose v5.7.0 differs: it adds DOCKER_CONFIG and the config only when
+//     compose v5.7.1 differs: it adds DOCKER_CONFIG and the config only when
 //     the host has credentials and the service does not set DOCKER_CONFIG,
 //     with mode 0600);
 //   - volumes[].volume.labels -> Mount.VolumeOptions.Labels
-//     (create.go:1408-1435 buildMountOptions);
+//     (create.go:1410-1437 buildMountOptions);
 //   - pull_policy refresh / daily / weekly / every_<d> -> pull when the
 //     image's LastTagTime is older than the period (pull.go:536-563
-//     mustPull, images.go:148 / :211 Metadata.LastTagTime);
-//   - umask -> HostConfig.Umask (Engine API 1.56; compose v5.7.0 sends it
-//     too, refusing an Engine below 1.56, create.go:737-749 umaskOption);
+//     mustPull, internal/images/images.go:191 / :256 Metadata.LastTagTime);
+//   - umask -> HostConfig.Umask (Engine API 1.56; compose v5.7.1 sends it
+//     too, refusing an Engine below 1.56, create.go:739-751 umaskOption);
 //   - credential_spec -> HostConfig.SecurityOpt "credentialspec=..." (the
-//     Windows daemon form `docker run --security-opt` takes; compose v5.7.0
+//     Windows daemon form `docker run --security-opt` takes; compose v5.7.1
 //     does not send it in local mode and reports it as unsupported,
 //     internal/projectloader/unsupported_attributes.go:59; docker stack
 //     deploy does send it in swarm mode).
@@ -44,7 +44,7 @@ import (
 	"github.com/moby/moby/api/types/network"
 )
 
-// composeBlkio is compose's setBlkio (create.go:923-937).
+// composeBlkio is compose's setBlkio (create.go:925-939).
 func composeBlkio(b *ctypes.BlkioConfig, r *container.Resources) {
 	if b == nil {
 		return
@@ -149,7 +149,7 @@ const (
 // service (apiSocket.go:45-132), applied before anything is hashed so the
 // config-hash matches the CLI's: a bind mount of the Engine socket, the
 // DOCKER_CONFIG variable (unless the service sets it) and the "#apisocket"
-// config (compose v5.7.0 differs: no DOCKER_CONFIG or config when the host
+// config (compose v5.7.1 differs: no DOCKER_CONFIG or config when the host
 // has no credentials or the service sets DOCKER_CONFIG, and mode 0600). The service's slices and maps are copied, never changed.
 func composeWithAPISocket(svc ctypes.ServiceConfig) ctypes.ServiceConfig {
 	if !svc.UseAPISocket {

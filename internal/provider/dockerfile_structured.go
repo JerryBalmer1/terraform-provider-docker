@@ -19,7 +19,7 @@ import (
 )
 
 // dockerfileCheckRules are the build-check rule names of the pinned frontend
-// (reference/upstream/dockerfile/frontend/dockerfile/docs/rules, 1.28.0).
+// (reference/upstream/dockerfile/frontend/dockerfile/docs/rules, 1.29.0).
 // Q32: a name outside this list is a warning, never an error.
 var dockerfileCheckRules = []string{
 	"ConsistentInstructionCasing", "CopyIgnoredFile", "DuplicateStageName", "ExposeInvalidFormat",
@@ -55,7 +55,7 @@ var dockerfileBuiltinArgs = func() map[string]string {
 	for _, n := range []string{"TARGETPLATFORM", "TARGETOS", "TARGETARCH", "TARGETVARIANT", "BUILDPLATFORM", "BUILDOS", "BUILDARCH", "BUILDVARIANT"} {
 		m[n] = "platform"
 	}
-	for _, n := range []string{"BUILDKIT_BUILD_NAME", "BUILDKIT_CACHE_MOUNT_NS", "BUILDKIT_CONTEXT_KEEP_GIT_DIR", "BUILDKIT_GIT_ADVICE", "BUILDKIT_INLINE_CACHE", "BUILDKIT_MULTI_PLATFORM", "BUILDKIT_SANDBOX_HOSTNAME", "BUILDKIT_SYNTAX", "SOURCE_DATE_EPOCH"} {
+	for _, n := range []string{"BUILDKIT_BUILD_NAME", "BUILDKIT_CACHE_MOUNT_NS", "BUILDKIT_CONTEXT_KEEP_GIT_DIR", "BUILDKIT_DISABLE_ONBUILD", "BUILDKIT_GIT_ADVICE", "BUILDKIT_GIT_DEBUG_COMMANDS", "BUILDKIT_INLINE_CACHE", "BUILDKIT_MULTI_PLATFORM", "BUILDKIT_SANDBOX_HOSTNAME", "BUILDKIT_SYNTAX", "SOURCE_DATE_EPOCH"} {
 		m[n] = "buildkit"
 	}
 	return m

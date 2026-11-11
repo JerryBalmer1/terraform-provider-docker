@@ -156,7 +156,7 @@ resource "docker_image" "multi" {
 - `docker_server_version` (String) Docker Engine version reported by GET /version.
 - `dockerfile` (String, Sensitive) The Dockerfile actually sent to the builder (null for a pulled image). ENV values and ARG defaults are inline, hence sensitive.
 - `dockerfile_sha256` (String) The `dockerfile_sha256` hash output.
-- `dockerfile_syntax` (String) The built Dockerfile's `# syntax=` value, else the default frontend `docker/dockerfile:1` (pinned reference 1.28.0); null for a pulled image.
+- `dockerfile_syntax` (String) The built Dockerfile's `# syntax=` value, else the default frontend `docker/dockerfile:1` (pinned reference 1.29.0); null for a pulled image.
 - `engine_api_version` (String) Engine API version the provider negotiated with the daemon for this read/build.
 - `id` (String) Image ID (`sha256:...`, `ImageInspect.Id`).
 - `image_digest_ref` (String) Repository digest reference (`repo@sha256:...`) of the image for `name`'s repository, from `RepoDigests`, when the daemon knows one (pulled images, or built images after a push). Null for a built image that was never pushed. Every upstream entry is in `inspect.repo_digests`.

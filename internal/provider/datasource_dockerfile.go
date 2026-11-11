@@ -294,7 +294,7 @@ func (d *dockerfileDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 			"and structured `stages` (each instruction with all its flags as the object named by its lowercase keyword, JSON-encoded), `directives`, `global_args`, `exposed_ports`, `base_images`.\n\n" +
 			"Builder mode keeps instruction order with one `instruction` block per instruction holding exactly one keyword block (`run`, `copy`, `env`, ...): Terraform keeps the order of blocks of one type, not across types. " +
 			"`onbuild = true` on a keyword block writes `ONBUILD <instruction>`. MAINTAINER is read from existing Dockerfiles but cannot be written: use `label { labels = { \"org.opencontainers.image.authors\" = \"...\" } }`. " +
-			"`check.skip` names outside the pinned rule list (frontend 1.28) give a warning, not an error, because a newer `syntax` may add rules.",
+			"`check.skip` names outside the pinned rule list (frontend 1.29) give a warning, not an error, because a newer `syntax` may add rules.",
 		Attributes: attrs,
 		Blocks: map[string]schema.Block{
 			"check": schema.SingleNestedBlock{

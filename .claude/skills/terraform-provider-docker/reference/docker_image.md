@@ -19,7 +19,7 @@ A Docker image on the provider's daemon, pulled from its registry or built from 
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version reported by GET /version. |
 | `dockerfile` | `string` | computed |  | yes | The Dockerfile actually sent to the builder (null for a pulled image). ENV values and ARG defaults are inline, hence sensitive. |
 | `dockerfile_sha256` | `string` | computed |  |  | The `dockerfile_sha256` hash output. |
-| `dockerfile_syntax` | `string` | computed |  |  | The built Dockerfile's `# syntax=` value, else the default frontend `docker/dockerfile:1` (pinned reference 1.28.0); null for a pulled image. |
+| `dockerfile_syntax` | `string` | computed |  |  | The built Dockerfile's `# syntax=` value, else the default frontend `docker/dockerfile:1` (pinned reference 1.29.0); null for a pulled image. |
 | `engine_api_version` | `string` | computed |  |  | Engine API version the provider negotiated with the daemon for this read/build. |
 | `force_remove` | `bool` | optional, computed |  |  | Remove the image on destroy even when stopped containers use it (`docker rmi -f`). Default `false`. |
 | `id` | `string` | computed |  |  | Image ID (`sha256:...`, `ImageInspect.Id`). |

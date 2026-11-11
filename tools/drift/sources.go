@@ -46,6 +46,12 @@ type source struct {
 	// Baseline is the pinned copy (repo-relative) fieldcov compares against
 	// when it is not fieldcov's default input (compose-go).
 	Baseline string
+	// Surface is the surface extractor of a docs source (surface.go): its
+	// DocPaths (repository-relative) are read from reference/upstream/<Local>
+	// for the pin and from a sparse checkout of the newer release.
+	Surface  string
+	Local    string
+	DocPaths []string
 }
 
 // defaultSources follow reference/SOURCES.md, row by row. The docker trust
@@ -61,13 +67,17 @@ var defaultSources = []source{
 		Repo: "https://github.com/compose-spec/compose-go", TagPrefix: "v", Model: modelComposeGo, File: "schema/compose-spec.json",
 		Baseline: "reference/upstream/compose-spec/compose-go-embedded.json"},
 	{Name: "compose", Title: "docker compose CLI reference", RowKey: "github.com/docker/compose/tree/",
-		Repo: "https://github.com/docker/compose", TagPrefix: "v"},
+		Repo: "https://github.com/docker/compose", TagPrefix: "v",
+		Surface: surfaceCLIYAML, Local: "compose-cli", DocPaths: []string{"docs/reference"}},
 	{Name: "docker-cli", Title: "docker CLI reference", RowKey: "github.com/docker/cli/tree/",
-		Repo: "https://github.com/docker/cli", TagPrefix: "v"},
+		Repo: "https://github.com/docker/cli", TagPrefix: "v",
+		Surface: surfaceCLIMD, Local: "docker-cli", DocPaths: []string{"docs/reference/commandline", "cmd/docker-trust/docs/reference"}},
 	{Name: "buildkit", Title: "Dockerfile reference (buildkit)", RowKey: "github.com/moby/buildkit/tree/",
-		Repo: "https://github.com/moby/buildkit", TagPrefix: "dockerfile/"},
-	{Name: "buildx", Title: "buildx bake reference", RowKey: "github.com/docker/buildx/tree/",
-		Repo: "https://github.com/docker/buildx", TagPrefix: "v", Model: modelBake, File: "docs/bake-reference.md"},
+		Repo: "https://github.com/moby/buildkit", TagPrefix: "dockerfile/",
+		Surface: surfaceDockerfile, Local: "dockerfile", DocPaths: []string{"frontend/dockerfile/docs"}},
+	{Name: "buildx", Title: "buildx CLI and bake reference", RowKey: "github.com/docker/buildx/tree/",
+		Repo: "https://github.com/docker/buildx", TagPrefix: "v", Model: modelBake, File: "docs/bake-reference.md",
+		Surface: surfaceCLIMD, Local: "buildx", DocPaths: []string{"docs/reference"}},
 }
 
 // localRow marks SOURCES.md rows with no upstream to watch.

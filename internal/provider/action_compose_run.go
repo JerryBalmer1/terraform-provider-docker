@@ -453,13 +453,13 @@ func (a *composeRunAction) Invoke(ctx context.Context, req action.InvokeRequest,
 }
 
 // composeRunStartDeps brings up the depends_on closure of svcName before a
-// one-off run, like compose v5.7.0 RunOneOffContainer -> startDependencies
-// (pkg/compose/run.go:291-321): the project is narrowed to the service and
+// one-off run, like compose v5.7.1 RunOneOffContainer -> startDependencies
+// (pkg/compose/run.go:296-326): the project is narrowed to the service and
 // its dependencies (cmd/compose/run.go:279-280, ToProject with the service
 // selected), the service itself is left out, and the rest is created with
 // the "diverged" recreate policy, or "never" with --no-recreate
 // (cmd/compose/create.go:165-173 dependenciesRecreateStrategy;
-// pkg/compose/reconcile.go:1028-1031 mustRecreate returns false for
+// pkg/compose/reconcile.go:1029-1032 mustRecreate returns false for
 // RecreateNever), then started. Containers are handled as docker_compose
 // handles them (composeLocalApply): missing ones created, diverged ones
 // recreated (pre_stop hooks first), created or failed ones started, each

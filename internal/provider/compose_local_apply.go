@@ -584,7 +584,7 @@ func composeLocalCreateOnly(ctx context.Context, pd *providerData, dc composeLoc
 
 // composeEndpointSettings is one endpoint of a compose container: aliases,
 // static addresses, mac_address and the legacy links (compose sends the
-// links on every endpoint, create.go:441-454 createEndpointSettings).
+// links on every endpoint, create.go:443-456 createEndpointSettings).
 func composeEndpointSettings(ep composeEndpoint, links []string) (*network.EndpointSettings, error) {
 	es, err := containerEndpointSettings(ep.Aliases, ep.IPv4, ep.IPv6)
 	if err != nil {
@@ -620,9 +620,9 @@ const composeLabelImage = "com.docker.compose.image"
 
 // composeLabelDependsOn lists a container's dependencies as
 // "<service>:<condition>:<restart>", comma-separated, like `docker compose`
-// (api.DependenciesLabel). compose v5.7.0 writes them in Go map order
+// (api.DependenciesLabel). compose v5.7.1 writes them in Go map order
 // (pkg/compose/depends_on_label.go:30-36 encodeDependsOnLabel ranges over
-// service.DependsOn, called from create.go:319), which differs from run to run; docker_compose sorts
+// service.DependsOn, called from create.go:321), which differs from run to run; docker_compose sorts
 // them so the label is deterministic.
 const composeLabelDependsOn = "com.docker.compose.depends_on"
 

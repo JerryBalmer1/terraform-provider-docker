@@ -1,0 +1,28 @@
+command: docker compose up
+short: Create and start containers
+usage: docker compose up [OPTIONS] [SERVICE...]
+pname: docker compose
+options:
+    - option: build
+      value_type: bool
+      default_value: "false"
+      description: Build images before starting containers
+      deprecated: false
+      hidden: false
+    - option: detach
+      shorthand: d
+      value_type: bool
+      default_value: "false"
+      description: Detached mode
+      deprecated: false
+      hidden: false
+    - option: wait-timeout
+      value_type: int
+      default_value: "0"
+      description: added
+      deprecated: false
+      hidden: false
+inherited_options:
+    - option: dry-run
+      value_type: bool
+      default_value: "false"

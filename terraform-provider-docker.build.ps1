@@ -120,9 +120,9 @@ $ReferenceSources = @(
     @{ Name = 'moby'; Url = 'https://github.com/moby/moby'; Sha = '14ebc602124e280ef4ae3e1a8e688dac1255baa6'; Local = 'engine-api'; Exclude = @('docs.docker.com-v1.56.yaml') }
     @{ Name = 'compose-spec'; Url = 'https://github.com/compose-spec/compose-spec'; Sha = '3a4a6995e4a971f6173dff9130cb3e38e6738651'; Local = 'compose-spec'; Exclude = @('compose-go-embedded.json') }
     @{ Name = 'compose-go'; Url = 'https://github.com/compose-spec/compose-go'; Sha = 'ddbe099a5404149d75fe774b30de7bd0befd3bd3'; Files = @{ 'compose-spec/compose-go-embedded.json' = 'schema/compose-spec.json' } }
-    @{ Name = 'compose'; Url = 'https://github.com/docker/compose'; Sha = '5bceecf985347fcf6dd23029ce440b502a0d4301'; Local = 'compose-cli' }
+    @{ Name = 'compose'; Url = 'https://github.com/docker/compose'; Sha = 'fb1fd129f86828359335477f82821525201d4a8c'; Local = 'compose-cli' }
     @{ Name = 'docker-cli'; Url = 'https://github.com/docker/cli'; Sha = '5457199aa57c45e990c59c89cab5f02b817238d7'; Local = 'docker-cli' }
-    @{ Name = 'buildkit'; Url = 'https://github.com/moby/buildkit'; Sha = 'f5b59a1f2fb25a0cb7072c398cab9aed7835da4e'; Local = 'dockerfile' }
+    @{ Name = 'buildkit'; Url = 'https://github.com/moby/buildkit'; Sha = 'f55949dea4f03bb9d85b73e9afc9a609291289db'; Local = 'dockerfile' }
     @{ Name = 'buildx'; Url = 'https://github.com/docker/buildx'; Sha = '3c4cbd35852fc1a476923627a780a7836c28b654'; Local = 'buildx' }
 )
 $ReferenceSha256 = @{ 'engine-api/docs.docker.com-v1.56.yaml' = '00ccd7d2e6e0b7a943ac0067007d181d723b2513ef1f6af3b6b54145314a6fa7' }

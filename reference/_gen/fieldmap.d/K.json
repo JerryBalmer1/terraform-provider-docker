@@ -115,7 +115,7 @@
    "item": "compose:services"
   },
   "compose:service/build/isolation": {
-   "skip": "BuildKit (the provider's only builder, through the BuildKit seam) has no isolation option; compose v5.7.0 sends it only to the legacy Windows builder (pkg/compose/build_classic.go:357 ImageBuildOptions.Isolation), not through bake (pkg/compose/build_bake.go:289-316)"
+   "skip": "BuildKit (the provider's only builder, through the BuildKit seam) has no isolation option; compose v5.7.1 sends it only to the legacy Windows builder (pkg/compose/build_classic.go:356 ImageBuildOptions.Isolation), not through bake (pkg/compose/build_bake.go:289-316)"
   },
   "compose:service/build/secrets/[]/gid": {
    "skip": "BuildKit secrets have no client-side gid: the Dockerfile's RUN --mount=type=secret sets it; compose v5.7.0 ignores it too (pkg/compose/build_bake.go:741-759 toBakeSecrets passes only id and source)"

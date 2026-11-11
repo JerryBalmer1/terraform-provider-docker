@@ -35,11 +35,17 @@ func (r *report) summaryLine() string {
 	for _, f := range r.unmapped() {
 		unmappedBy[f.Kind]++
 	}
-	return fmt.Sprintf("%s: %d of %d sources moved; new operations %d, new writable fields %d, removed operations %d, removed fields %d; "+
-		"unaccepted: %d version, %d operation, %d field; errors %d",
+	surface := 0
+	for _, f := range r.Findings {
+		if f.Kind == kindSurface {
+			surface++
+		}
+	}
+	return fmt.Sprintf("%s: %d of %d sources moved; new operations %d, new writable fields %d, removed operations %d, removed fields %d, surface changes %d; "+
+		"unaccepted: %d version, %d operation, %d field, %d surface; errors %d",
 		r.verdict(), moved, len(r.Sources), r.count(kindOperation, changeNew), r.count(kindField, changeNew),
-		r.count(kindOperation, changeRemoved), r.count(kindField, changeRemoved),
-		unmappedBy[kindVersion], unmappedBy[kindOperation], unmappedBy[kindField], len(r.Errors))
+		r.count(kindOperation, changeRemoved), r.count(kindField, changeRemoved), surface,
+		unmappedBy[kindVersion], unmappedBy[kindOperation], unmappedBy[kindField], unmappedBy[kindSurface], len(r.Errors))
 }
 
 func (r *report) writeConsole(w io.Writer) {
@@ -58,6 +64,9 @@ func (r *report) writeConsole(w io.Writer) {
 		if s.Note != "" && s.Error == "" {
 			status += "; " + s.Note
 		}
+		if s.Surface != "" {
+			status += "; " + s.Surface
+		}
 		fmt.Fprintf(w, "%-16s %-10s %-20s %-20s %s\n", s.Name, s.Model, s.Pinned, s.Newest, status)
 	}
 	un := r.unmapped()
@@ -70,6 +79,9 @@ func (r *report) writeConsole(w io.Writer) {
 			}
 			fmt.Fprintf(w, "  %-9s %-7s %s  [%s %s]\n", f.Kind, f.Change, f.Item, f.Source, f.Version)
 		}
+	}
+	for _, n := range r.Notices {
+		fmt.Fprintln(w, "NOTICE", n)
 	}
 	for _, e := range r.Errors {
 		fmt.Fprintln(w, "ERROR", e)
@@ -103,6 +115,9 @@ func (r *report) writeMarkdown(w io.Writer) {
 		if s.Note != "" {
 			status += "; " + s.Note
 		}
+		if s.Surface != "" {
+			status += "; " + s.Surface
+		}
 		fmt.Fprintf(w, "| %s (%s) | %s | `%s` | `%s` | %s |\n", s.Name, mdEscape(s.Title), s.Model, s.Pinned, s.Newest, mdEscape(status))
 	}
 	groups := []struct {
@@ -112,7 +127,7 @@ func (r *report) writeMarkdown(w io.Writer) {
 		{"Unmapped (fails DriftCheck)", statusUnmapped},
 		{"Accepted (reference/_gen/drift-accepted.json)", statusAccepted},
 		{"New and already mapped", statusMapped},
-		{"Reported only (removals, version movement of a diffed source)", statusInfo},
+		{"Reported only (removed fields and operations, version movement of a diffed source)", statusInfo},
 	}
 	for _, g := range groups {
 		var rows []finding
@@ -160,6 +175,7 @@ func (r *report) writeMarkdown(w io.Writer) {
 
 For each unmapped item, either
 - map it: a new operation goes into reference/_gen/fragments (Invoke-Build Inventory) as an item or a reasoned skip; a new field is implemented under its upstream name, or gets a skip / partial in reference/_gen/fieldmap.d/<lane>.json, after re-pinning;
+- for a surface item (kind surface: a command, option, Dockerfile instruction, flag, directive, build check or build arg), implement it after re-pinning, or record it in reference/_gen/deferred.d/upstream.json {"item", "version_seen", "date", "reason"} (it then shows as mapped here and as kind upstream_surface in reference/_gen/deferred.json);
 - accept it for now: add {"item", "reason", "date", "version_seen"} to reference/_gen/drift-accepted.json (a version:<source> entry accepts that exact release only); or
 - re-pin: refresh reference/upstream, reference/SOURCES.md and $ReferenceSources (Invoke-Build ReferenceVerify), then FieldMap / FieldCoverage.
 

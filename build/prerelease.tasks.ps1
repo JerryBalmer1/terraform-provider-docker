@@ -9,12 +9,12 @@
 $DriftWork = Join-Path $BuildRoot 'test/harness/.logs/drift'
 $DriftReport = if ($env:DRIFT_REPORT) { $env:DRIFT_REPORT } else { Join-Path $DriftWork 'drift-report.md' }
 
-# Synopsis: Upstream drift: newest release of every reference/SOURCES.md source vs its pin; new operations / writable fields must be mapped or in reference/_gen/drift-accepted.json (go run ./tools/drift; needs the network; never changes a pin).
+# Synopsis: Upstream drift: newest release of every reference/SOURCES.md source vs its pin; new operations / writable fields and the surface diff of doc-only sources (commands, options, Dockerfile instructions, flags, directives, build checks, build args) must be mapped, deferred (reference/_gen/deferred.d/upstream.json) or in reference/_gen/drift-accepted.json; a moved source with no surface change passes and is logged in reference/_gen/drift-log.json (go run ./tools/drift; needs the network; never changes a pin).
 task DriftCheck {
     requires -Variable GoExe, GitExe
     $null = New-Item -ItemType Directory -Force $DriftWork
     exec { & $GoExe run ./tools/drift -work $DriftWork -report $DriftReport -go $GoExe -git $GitExe } -ErrorMessage (
-        "Upstream drift (exit 1: unmapped items not in reference/_gen/drift-accepted.json; exit 2: a probe or fieldcov error). " +
+        "Upstream drift (exit 1: unmapped items or surface changes not deferred or in reference/_gen/drift-accepted.json; exit 2: a probe, fetch or fieldcov error). " +
         "Report: $DriftReport")
     Write-Build Green "DriftCheck: report $DriftReport"
 }

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] (2026-11-11)
 
-The first release. This section covers build passes 5, 5.1, 5.2, 5.3, 6a, 6b, 6c and 6d (the log of each pass is in [BUILD_REPORT.md](BUILD_REPORT.md)). Pass 6d comes first, then 6c, 6b, 6a and 5.3; the sections after them are passes 5 to 5.2.
+The first release. This section covers build passes 5, 5.1, 5.2, 5.3, 6a, 6b, 6c, 6d and 6e (the log of each pass is in [BUILD_REPORT.md](BUILD_REPORT.md)). Pass 6e comes first, then 6d, 6c, 6b, 6a and 5.3; the sections after them are passes 5 to 5.2.
 
 ### Known issues
 
@@ -20,6 +20,18 @@ Each issue is listed in `reference/_gen/deferred.json` (kind `known_issue`, with
 - `docker_compose` (`mode = "local"`): for `use_api_socket: true` the `com.docker.compose.config-hash` label differs from the compose CLI's when the host has no registry credentials or the service sets `DOCKER_CONFIG`, so a container created by `docker compose up` is recreated by the next apply, and the other way round. Affects only projects managed by both the CLI and the provider; no workaround other than managing the project from one side. [docs/resources/compose.md](docs/resources/compose.md), id `compose-use-api-socket-config-hash`.
 - `docker_compose` and `data.docker_compose_config`: a service whose `build.ssh` has an entry with a key path (`default: /home/me/.ssh/id_ed25519`) makes compose-go v2.16.2 write invalid JSON, so the structured `project` holds only `name` (every other field is null, with no diagnostic). `compose_yaml` and the deployment are not affected. Workaround: read `compose_yaml`, or use the SSH agent (`ssh: [default]`) instead of a key path. [docs/resources/compose.md](docs/resources/compose.md), [docs/data-sources/compose_config.md](docs/data-sources/compose_config.md), id `compose-build-ssh-project-dropped`.
 - `data.docker_registry_image`: for a plain-HTTP registry on a host other than `localhost` or a loopback address (a daemon `insecure-registries` entry served over http), `config`, `labels` and `created` stay null with the warning "Image config not read from registry": the provider reads the image config from the registry itself and uses plain HTTP only for loopback registries. `digest`, `platforms` and `inspect_json` are filled. Workaround: serve the registry over TLS, or use `data.docker_image` on a pulled image. [docs/data-sources/registry_image.md](docs/data-sources/registry_image.md), id `registry-image-config-plain-http-remote`.
+
+### Pass 6e
+
+#### Changed
+
+- Reference sources re-pinned: docker/compose v5.7.0 -> v5.7.1 (the compose CLI reference is unchanged; the harness's `docker compose` binary for TestAccComposeParity follows) and the Dockerfile reference dockerfile/1.28.0 -> dockerfile/1.29.0. The computed `dockerfile_syntax` default (`docker_image`, `data.docker_dockerfile`) is now `docker/dockerfile:1.29.0`. Compose source citations whose lines moved in v5.7.1 were updated.
+- `data.docker_dockerfile`: `ARG BUILDKIT_DISABLE_ONBUILD` and `ARG BUILDKIT_GIT_DEBUG_COMMANDS` are reported as BuildKit built-in build args (new in Dockerfile 1.29.0).
+- DriftCheck diffs the documentation-only sources (docker compose and docker CLI commands and options, buildx commands and options, Dockerfile instructions, flags, parser directives, build checks and build args) instead of requiring a blind acceptance. A release with no surface change passes and is logged in `reference/_gen/drift-log.json`.
+
+#### Known limitations
+
+- The labs-only Dockerfile 1.29.0 flags `FROM --reset`, `ENV --unset`, `LABEL --unset` and `VOLUME --unset` (`# syntax=docker/dockerfile:1-labs`) are not modelled by `data.docker_dockerfile`. A Dockerfile that uses `FROM --reset` or `ENV --unset` fails to parse there. `docker_image` builds are unaffected. Recorded in `reference/_gen/deferred.json` as kind `upstream_surface`.
 
 ### Pass 6d
 

@@ -4,17 +4,17 @@ package provider
 // service's container (network_mode / ipc / pid "service:<x>" and
 // volumes_from "<x>[:mode]"), and environment entries with no value.
 //
-// docker compose v5.7.0 resolves the references when it creates a
+// docker compose v5.7.1 resolves the references when it creates a
 // container, once the target's containers exist (pkg/compose/executor_ops.go:93
 // execCreateContainer calls resolveServiceReferences,
 // service_containers.go:72-125): volumes_from "<x>[:mode]" becomes the ID of
 // <x>'s first container (sorted by name, mode dropped),
 // "container:<c>[:mode]" becomes "<c>", and a "service:<x>" namespace
 // becomes "container:<ID>". It then hashes that resolved service for
-// com.docker.compose.config-hash (create.go:308-313 getCreateConfigs ->
+// com.docker.compose.config-hash (create.go:310-315 getCreateConfigs ->
 // internal/confighash/hash.go:181-192 ServiceHash) and compares the label with
 // the hash of the service resolved the same way to decide recreation
-// (reconcile.go:1028-1051 mustRecreate, :1084-1090
+// (reconcile.go:1029-1052 mustRecreate, :1085-1091
 // serviceHashWithResolvedRefs). So the label carries
 // the target's container ID, and a dependant is recreated whenever its
 // target gets a new container. docker_compose does the same here: the plan
@@ -93,7 +93,7 @@ func (r *composeLocalRefs) names() []string {
 func (r *composeLocalRefs) resolve(id func(name string) (string, bool)) (ctypes.ServiceConfig, error) {
 	s := r.Service
 	s.VolumesFrom = append([]string(nil), r.Service.VolumesFrom...)
-	// service_containers.go:79-97 resolveVolumeFrom (compose v5.7.0)
+	// service_containers.go:79-97 resolveVolumeFrom (compose v5.7.1)
 	for i, vol := range s.VolumesFrom {
 		spec := strings.Split(vol, ":")
 		if spec[0] == "container" {
@@ -108,7 +108,7 @@ func (r *composeLocalRefs) resolve(id func(name string) (string, bool)) (ctypes.
 		}
 		s.VolumesFrom[i] = cid
 	}
-	// service_containers.go:99-125 resolveSharedNamespaces (compose v5.7.0)
+	// service_containers.go:99-125 resolveSharedNamespaces (compose v5.7.1)
 	for _, f := range []struct {
 		field *string
 		noun  string
@@ -136,7 +136,7 @@ func (r *composeLocalRefs) configHash(id func(name string) (string, bool)) (stri
 }
 
 // host returns a copy of h with the service references pointing at
-// container IDs, as docker compose sends them (compose v5.7.0 create.go:442-463 takes
+// container IDs, as docker compose sends them (compose v5.7.1 create.go:444-465 takes
 // NetworkMode, IpcMode, PidMode and VolumesFrom from the resolved
 // service). One difference is kept on purpose: a volumes_from mode
 // ("web:ro") stays on the entry ("<ID>:ro"), where compose drops it and
@@ -196,9 +196,9 @@ func composeLocalRefsCurrent(dc composeLocalContainer, got map[string]string, ex
 }
 
 // composeLocalConfigHashCurrent is docker compose's mustRecreate test
-// (compose v5.7.0 pkg/compose/reconcile.go:1028-1051: the container's
+// (compose v5.7.1 pkg/compose/reconcile.go:1029-1052: the container's
 // com.docker.compose.config-hash label against ServiceHash of the expected
-// service, references resolved, :1084-1090) for every container that carries the spec-hash label: with
+// service, references resolved, :1085-1091) for every container that carries the spec-hash label: with
 // references against the hash resolved on the live target IDs
 // (composeLocalRefsCurrent), otherwise against the planned label. So a
 // change only the CLI hash sees (an environment entry with no value, a
@@ -233,8 +233,8 @@ func composeLocalExistingID(ex composeLocalExisting) func(string) (string, bool)
 // The compose spec (reference/upstream/compose-spec/container_spec.md,
 // "environment"): "If the value is not resolved, the variable is unset and
 // is removed from the service container environment." docker compose
-// v5.7.0 implements that by sending the bare "KEY" in Config.Env
-// (pkg/compose/convert.go:30-40 ToMobyEnv, called from create.go:376); the
+// v5.7.1 implements that by sending the bare "KEY" in Config.Env
+// (pkg/compose/convert.go:30-40 ToMobyEnv, called from create.go:378); the
 // Engine then removes KEY from the image's environment
 // (moby container/env.go ReplaceOrAppendEnvValues: "Values w/o = means they
 // want this env to be removed/unset"). docker_compose sends the same.

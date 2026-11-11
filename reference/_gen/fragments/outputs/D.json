@@ -2,7 +2,7 @@
   "lane": "D",
   "notes": [
     "Outputs for the 21 dockerfile_block items, engine:image (docker_image), engine:image-data, engine:registry-image-data and the new dockerfile:data-dockerfile.",
-    "Every Dockerfile flag is a typed field checked against reference.md (frontend 1.28.0); min_syntax only where reference.md states a 'Minimum Dockerfile version' or 'since Dockerfile v1.x'. ADD has no --from and no heredoc in reference.md, so none is modelled. Heredocs carry no min_syntax (none stated).",
+    "Every Dockerfile flag is a typed field checked against reference.md (frontend 1.29.0); min_syntax only where reference.md states a 'Minimum Dockerfile version' or 'since Dockerfile v1.x'. ADD has no --from and no heredoc in reference.md, so none is modelled. Heredocs carry no min_syntax (none stated).",
     "Block identity = instruction keyword + stage_index + instruction_index (directives: the directive name, which is file-level and unique). No allowed_violations needed.",
     "Each block also has a raw `dockerfile` (the block rendered) + content_sha256, so a consumer can hand off one instruction as text.",
     "Field-level extra keys: min_syntax, anchor (doc anchor), options (documented values), sensitive (per field), see (item id whose shape a nested object takes), filled_by (local/registry/image), existing_attribute on outputs (today's attribute carrying the same value under another name).",
@@ -164,7 +164,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -646,7 +646,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -769,7 +769,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -877,7 +877,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -985,7 +985,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -1112,7 +1112,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -1227,7 +1227,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -1402,7 +1402,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -1609,7 +1609,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -1732,7 +1732,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -1850,7 +1850,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -1964,7 +1964,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -2073,7 +2073,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -2218,7 +2218,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -2355,7 +2355,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -2464,7 +2464,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -2636,7 +2636,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -2745,7 +2745,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -2828,7 +2828,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The directive's own value, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0)."
+          "description": "The directive's own value, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0)."
         }
       ],
       "outputs_status": "missing",
@@ -2915,7 +2915,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -2980,7 +2980,7 @@
                 "UndefinedVar",
                 "WorkdirRelativePath"
               ],
-              "description": "Build-check rule names (21 at frontend 1.28; InvalidDefinitionDescription is experimental) or `all`."
+              "description": "Build-check rule names (21 at frontend 1.29; InvalidDefinitionDescription is experimental) or `all`."
             },
             {
               "name": "error",
@@ -3030,7 +3030,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.28.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
+          "description": "The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend `docker/dockerfile:1` (reference pinned at dockerfile 1.29.0, SOURCES.md). Per-flag minimums are the `min_syntax` keys on the structured fields."
         }
       ],
       "outputs_status": "missing",
@@ -5545,7 +5545,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "The built Dockerfile's `# syntax=` value, else the default frontend `docker/dockerfile:1` (pinned reference 1.28.0); null for a pulled image.",
+          "description": "The built Dockerfile's `# syntax=` value, else the default frontend `docker/dockerfile:1` (pinned reference 1.29.0); null for a pulled image.",
           "provided": false
         },
         {
@@ -6062,7 +6062,7 @@
                     "UndefinedVar",
                     "WorkdirRelativePath"
                   ],
-                  "description": "Build-check rule names (21 at frontend 1.28; InvalidDefinitionDescription is experimental) or `all`."
+                  "description": "Build-check rule names (21 at frontend 1.29; InvalidDefinitionDescription is experimental) or `all`."
                 },
                 {
                   "name": "error",
@@ -6245,7 +6245,7 @@
           },
           "known_after_apply": false,
           "sensitive": false,
-          "description": "`# syntax=` value of the parsed file, else the default frontend `docker/dockerfile:1` (pinned reference 1.28.0); null in image mode (not recorded in images)."
+          "description": "`# syntax=` value of the parsed file, else the default frontend `docker/dockerfile:1` (pinned reference 1.29.0); null in image mode (not recorded in images)."
         },
         {
           "name": "engine_api_version",

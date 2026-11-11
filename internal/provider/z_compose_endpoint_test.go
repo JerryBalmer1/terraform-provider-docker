@@ -8,8 +8,8 @@ import (
 
 // TestComposeLocalEndpointFieldsZ: per-network gw_priority, link_local_ips,
 // driver_opts, interface_name and use_service_name_alias reach the endpoint
-// local mode creates, as compose v5.7.0 sends them
-// (pkg/compose/create.go:529-624 createEndpointSettings). Pass 5.3 Lane Z:
+// local mode creates, as compose v5.7.1 sends them
+// (pkg/compose/create.go:531-626 createEndpointSettings). Pass 5.3 Lane Z:
 // fieldcov found these once it looked inside map values.
 func TestComposeLocalEndpointFieldsZ(t *testing.T) {
 	yaml := `

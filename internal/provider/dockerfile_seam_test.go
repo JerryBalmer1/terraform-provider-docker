@@ -16,7 +16,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 )
 
-// dockerfileDocsDir is the harvested Dockerfile reference (frontend 1.28.0).
+// dockerfileDocsDir is the harvested Dockerfile reference (frontend 1.29.0).
 const dockerfileDocsDir = "../../reference/upstream/dockerfile/frontend/dockerfile/docs"
 
 var dockerfileFenceRe = regexp.MustCompile("(?ms)^[ \t]*```dockerfile[^\n]*\n(.*?)^[ \t]*```")

@@ -4,14 +4,14 @@ page_title: "docker_dockerfile Data Source - docker"
 subcategory: ""
 description: |-
   Reads, parses and renders one Dockerfile: from content, a local path, an https url, an image history (approximate), or written with ordered stage / instruction blocks. Every source yields the same outputs: the re-rendered dockerfile (+ dockerfile_sha256), the text as read in source_dockerfile (+ source_dockerfile_sha256), and structured stages (each instruction with all its flags as the object named by its lowercase keyword, JSON-encoded), directives, global_args, exposed_ports, base_images.
-  Builder mode keeps instruction order with one instruction block per instruction holding exactly one keyword block (run, copy, env, ...): Terraform keeps the order of blocks of one type, not across types. onbuild = true on a keyword block writes ONBUILD <instruction>. MAINTAINER is read from existing Dockerfiles but cannot be written: use label { labels = { "org.opencontainers.image.authors" = "..." } }. check.skip names outside the pinned rule list (frontend 1.28) give a warning, not an error, because a newer syntax may add rules.
+  Builder mode keeps instruction order with one instruction block per instruction holding exactly one keyword block (run, copy, env, ...): Terraform keeps the order of blocks of one type, not across types. onbuild = true on a keyword block writes ONBUILD <instruction>. MAINTAINER is read from existing Dockerfiles but cannot be written: use label { labels = { "org.opencontainers.image.authors" = "..." } }. check.skip names outside the pinned rule list (frontend 1.29) give a warning, not an error, because a newer syntax may add rules.
 ---
 
 # docker_dockerfile (Data Source)
 
 Reads, parses and renders one Dockerfile: from `content`, a local `path`, an https `url`, an `image` history (approximate), or written with ordered `stage` / `instruction` blocks. Every source yields the same outputs: the re-rendered `dockerfile` (+ `dockerfile_sha256`), the text as read in `source_dockerfile` (+ `source_dockerfile_sha256`), and structured `stages` (each instruction with all its flags as the object named by its lowercase keyword, JSON-encoded), `directives`, `global_args`, `exposed_ports`, `base_images`.
 
-Builder mode keeps instruction order with one `instruction` block per instruction holding exactly one keyword block (`run`, `copy`, `env`, ...): Terraform keeps the order of blocks of one type, not across types. `onbuild = true` on a keyword block writes `ONBUILD <instruction>`. MAINTAINER is read from existing Dockerfiles but cannot be written: use `label { labels = { "org.opencontainers.image.authors" = "..." } }`. `check.skip` names outside the pinned rule list (frontend 1.28) give a warning, not an error, because a newer `syntax` may add rules.
+Builder mode keeps instruction order with one `instruction` block per instruction holding exactly one keyword block (`run`, `copy`, `env`, ...): Terraform keeps the order of blocks of one type, not across types. `onbuild = true` on a keyword block writes `ONBUILD <instruction>`. MAINTAINER is read from existing Dockerfiles but cannot be written: use `label { labels = { "org.opencontainers.image.authors" = "..." } }`. `check.skip` names outside the pinned rule list (frontend 1.29) give a warning, not an error, because a newer `syntax` may add rules.
 
 ## Example Usage
 
@@ -137,7 +137,7 @@ data "docker_dockerfile" "nginx" {
 - `docker_server_version` (String) Image mode only; null otherwise.
 - `dockerfile` (String, Sensitive) Re-rendered Dockerfile from the structured model (directives, global ARGs, stages). ENV values and ARG defaults are inline, hence sensitive.
 - `dockerfile_sha256` (String) The `dockerfile_sha256` hash output.
-- `dockerfile_syntax` (String) `# syntax=` value of the parsed file, else the default frontend `docker/dockerfile:1` (pinned reference 1.28.0); null in image mode (not recorded in images).
+- `dockerfile_syntax` (String) `# syntax=` value of the parsed file, else the default frontend `docker/dockerfile:1` (pinned reference 1.29.0); null in image mode (not recorded in images).
 - `engine_api_version` (String) Image mode only (the only mode that talks to the Engine); null otherwise.
 - `exposed_ports` (Attributes List) EXPOSE entries of the final stage (image mode: Config.ExposedPorts). (see [below for nested schema](#nestedatt--exposed_ports))
 - `fidelity` (String) `exact` for content/path/git (parsed from the real file); `approximate` for image (see notes).
@@ -178,7 +178,7 @@ Read-Only:
 
 - `content_sha256` (String) The sha256 (hex) of this block's `dockerfile` text.
 - `dockerfile` (String, Sensitive) This block rendered as Dockerfile text (instruction line and heredoc bodies). Sensitive: ENV values and ARG defaults appear inline.
-- `dockerfile_syntax` (String) The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.28.0`).
+- `dockerfile_syntax` (String) The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.29.0`).
 - `instruction` (String) The instruction keyword of this block in upper case (`RUN`, `COPY`, ...); ONBUILD shows in `dockerfile`, not here.
 - `instruction_index` (Number) 0-based position of the block inside its stage (FROM is 0, so instructions start at 1); for a `global_arg`, its position among the global ARGs.
 - `stage_index` (Number) 0-based index of the build stage holding the block; null for a `global_arg`.
@@ -202,7 +202,7 @@ Read-Only:
 
 - `content_sha256` (String) The sha256 (hex) of this block's `dockerfile` text.
 - `dockerfile` (String, Sensitive) This block rendered as Dockerfile text (instruction line and heredoc bodies). Sensitive: ENV values and ARG defaults appear inline.
-- `dockerfile_syntax` (String) The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.28.0`).
+- `dockerfile_syntax` (String) The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.29.0`).
 - `instruction_index` (Number) 0-based position of the block inside its stage (FROM is 0, so instructions start at 1); for a `global_arg`, its position among the global ARGs.
 - `stage_index` (Number) 0-based index of the build stage holding the block; null for a `global_arg`.
 - `stage_name` (String) The `AS <name>` stage name; null when unnamed.
@@ -233,7 +233,7 @@ Read-Only:
 
 - `content_sha256` (String) The sha256 (hex) of this block's `dockerfile` text.
 - `dockerfile` (String, Sensitive) This block rendered as Dockerfile text (instruction line and heredoc bodies). Sensitive: ENV values and ARG defaults appear inline.
-- `dockerfile_syntax` (String) The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.28.0`).
+- `dockerfile_syntax` (String) The `# syntax=` value in effect for the Dockerfile holding this block, else the default frontend (`docker/dockerfile:1.29.0`).
 - `instruction` (String) The instruction keyword of this block in upper case (`RUN`, `COPY`, ...); ONBUILD shows in `dockerfile`, not here.
 - `instruction_index` (Number) 0-based position of the block inside its stage (FROM is 0, so instructions start at 1); for a `global_arg`, its position among the global ARGs.
 - `stage_index` (Number) 0-based index of the build stage holding the block; null for a `global_arg`.
@@ -519,7 +519,7 @@ Read-Only:
 Read-Only:
 
 - `error` (Boolean) Upstream `# check=error=<boolean>`.
-- `skip` (List of String) Build-check rule names (21 at frontend 1.28; InvalidDefinitionDescription is experimental) or `all`.
+- `skip` (List of String) Build-check rule names (21 at frontend 1.29; InvalidDefinitionDescription is experimental) or `all`.
 
 
 

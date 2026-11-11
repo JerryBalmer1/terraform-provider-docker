@@ -108,8 +108,12 @@ type sourceStatus struct {
 	Error    string `json:"error,omitempty"`
 	// Spec is the fetched spec file (temp directory), for a moved field model.
 	Spec string `json:"spec,omitempty"`
-	ref  string
-	body []byte
+	// Surface is the surface verdict of a moved docs source: "no surface
+	// change" or "<n> surface change(s)"; SurfaceItems the items compared.
+	Surface      string `json:"surface,omitempty"`
+	SurfaceItems int    `json:"surface_items,omitempty"`
+	ref          string
+	body         []byte
 }
 
 // report is the whole result.
@@ -120,6 +124,8 @@ type report struct {
 	// Notes are fieldcov error lines on a newer spec (dropped operations,
 	// overlay pointers the newer spec no longer has): context, never failures.
 	Notes []string `json:"notes,omitempty"`
+	// Notices: moved sources with no surface change, drift-log.json rows.
+	Notices []string `json:"notices,omitempty"`
 	// Stale are drift-accepted.json items nothing matched this run.
 	Stale  []string `json:"stale_accepted,omitempty"`
 	Errors []string `json:"errors,omitempty"`
@@ -158,6 +164,14 @@ type options struct {
 	Overrides map[string]string
 	MaxProbe  int
 	Now       time.Time
+	// Docs fetches a docs source's newer release for the surface diff; nil
+	// keeps the old rule (a moved docs source needs a version: acceptance).
+	Docs docFetcher
+	// Deferred are reference/_gen/deferred.d/upstream.json entries (surface
+	// items knowingly not implemented: reported as mapped).
+	Deferred map[string]upstreamDeferral
+	// LogPath is reference/_gen/drift-log.json ("" = do not write).
+	LogPath string
 }
 
 // run probes every source, diffs the moved field models with fieldcov and
@@ -181,7 +195,10 @@ func run(o options, rm remote, fr fieldRunner) *report {
 		if st.Moved && st.Error == "" {
 			f := finding{Kind: kindVersion, Change: changeMoved, Source: s.Name, Item: "version:" + s.Name,
 				Version: st.Newest, Detail: "pinned " + st.Pinned + ", newest " + st.Newest}
-			if s.Model == modelDoc {
+			if s.Surface != "" && o.Docs != nil {
+				f.Status = statusInfo
+				f.Detail += " (surface diffed below)"
+			} else if s.Model == modelDoc {
 				// Documentation only: nothing to diff, so the movement itself must be
 				// reviewed (re-pin, or accept this version).
 				f.Status = statusUnmapped
@@ -193,6 +210,8 @@ func run(o options, rm remote, fr fieldRunner) *report {
 		}
 	}
 	diffModels(o, r, fr)
+	diffSurfaces(o, r)
+	judgeNoChange(o, r)
 	applyAccepted(r, o.Accepted)
 	sortFindings(r.Findings)
 	return r

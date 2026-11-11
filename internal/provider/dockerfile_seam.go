@@ -36,7 +36,7 @@ func (dockerfileSeam) Parse(text string) (seamDockerfileDoc, error) {
 }
 
 // dockerfileKeywords are the instructions of the Dockerfile reference
-// (frontend 1.28), upper case.
+// (frontend 1.29), upper case.
 var dockerfileKeywords = map[string]bool{
 	"ADD": true, "ARG": true, "CMD": true, "COPY": true, "ENTRYPOINT": true, "ENV": true, "EXPOSE": true,
 	"FROM": true, "HEALTHCHECK": true, "LABEL": true, "MAINTAINER": true, "ONBUILD": true, "RUN": true,

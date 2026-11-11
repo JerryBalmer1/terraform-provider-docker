@@ -1,0 +1,19 @@
+{
+  "about": "Moved upstream documentation sources that Invoke-Build DriftCheck (tools/drift) diffed and found to have no surface change (commands, options, Dockerfile instructions, flags, directives, build checks, build args; plus fieldcov's operations and fields). Appended by DriftCheck, one row per source and version pair; a row is not a re-pin.",
+  "rows": [
+    {
+      "source": "compose",
+      "pinned": "v5.7.0",
+      "newest": "v5.7.1",
+      "date": "2026-11-11",
+      "result": "no surface change"
+    },
+    {
+      "source": "buildx",
+      "pinned": "v0.38.2",
+      "newest": "v0.39.0",
+      "date": "2026-11-11",
+      "result": "no surface change"
+    }
+  ]
+}
