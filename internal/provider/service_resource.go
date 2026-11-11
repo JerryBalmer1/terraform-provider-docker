@@ -79,6 +79,7 @@ func (r *serviceResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 		attrs[n] = deployAttrs[n]
 	}
 	resp.Schema = schema.Schema{
+		Version: 1, // Pass 6c: structured outputs changed shape (state_upgrade_p6c_z.go)
 		MarkdownDescription: "A Swarm service: a desired number of tasks (containers) of one image scheduled across the Swarm. " +
 			"Requires the provider to point at a Swarm manager. Almost every change is a rolling update in place " +
 			"(`ServiceUpdate`, governed by `update_config`); only `name` and changing `mode` (replicated, global, replicated_job, " +
@@ -186,7 +187,7 @@ func (r *serviceResource) refresh(ctx context.Context, m *serviceResourceModel, 
 		}
 	}
 	m.ID = types.StringValue(svc.ID)
-	m.svcSpecModel = svcFlatten(svc.Spec, m.svcSpecModel, lk, svcFlattenOpts{})
+	m.svcSpecModel = svcFlatten(svc.Spec, m.svcSpecModel, lk, svcFlattenOpts{NullReplicasUnlessReplicated: true})
 	if priv != nil {
 		diags.Append(ownerRecord(ctx, priv, svc.Spec.Labels)...)
 	}

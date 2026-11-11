@@ -36,9 +36,9 @@ Import-Module $pester.Path -Force
 Import-Module (Join-Path $PSScriptRoot 'TfDockerTest.psd1') -Force
 
 if ($LogDir) { $null = New-Item -ItemType Directory -Force $LogDir; $env:TPD_EXAMPLE_LOG_DIR = $LogDir }
-# Build the provider once for every example (reused through TPD_PROVIDER_DIR).
-$providerDir = Initialize-TfDevProvider
-Write-Host "Invoke-ExamplePester: provider $providerDir, terraform $(Get-TfTerraformPath), DOCKER_HOST $env:DOCKER_HOST, Pester $($pester.Version)"
+# Build the provider mirror once for every example (reused through TPD_PROVIDER_MIRROR).
+$mirror = Initialize-TfProviderMirror
+Write-Host "Invoke-ExamplePester: provider mirror $($mirror.Dir) ($($mirror.Version) $($mirror.Platform), zip sha256 $($mirror.Sha256)), terraform $(Get-TfTerraformPath), DOCKER_HOST $env:DOCKER_HOST, Pester $($pester.Version)"
 
 $files = @(Get-ChildItem -LiteralPath $examples -Recurse -File -Filter '*.tests.ps1' | Sort-Object FullName)
 if ($Include) {

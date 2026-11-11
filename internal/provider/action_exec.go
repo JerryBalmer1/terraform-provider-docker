@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -48,6 +49,7 @@ type execActionModel struct {
 	ConsoleSize types.List   `tfsdk:"console_size"`
 	Detach      types.Bool   `tfsdk:"detach"`
 	Stdin       types.String `tfsdk:"stdin"`
+	StdinPath   types.String `tfsdk:"stdin_path"`
 	Timeout     types.String `tfsdk:"timeout"`
 	ResultPath  types.String `tfsdk:"result_path"`
 }
@@ -91,7 +93,14 @@ func (a *execAction) Schema(_ context.Context, _ action.SchemaRequest, resp *act
 			"stdin": schema.StringAttribute{
 				Optional: true,
 				MarkdownDescription: "Data written to the command's standard input, which is then closed, like `echo ... | docker exec -i`. " +
-					"Unset (the default), the command gets no stdin. It is never logged or written to `result_path`, but action arguments cannot be marked sensitive or write-only (terraform-plugin-framework v1.19), so pass secrets through `docker_exec_output`, whose `stdin` is sensitive. Not with `tty` or `detach`.",
+					"Unset (the default), the command gets no stdin. It is never logged or written to `result_path`, but action arguments cannot be marked sensitive or write-only (terraform-plugin-framework v1.19), so the value shows in plan output: " +
+					"pass secrets with `stdin_path` (or `docker_exec_output`, whose `stdin` is sensitive) instead. Not with `stdin_path`, `tty` or `detach`.",
+			},
+			"stdin_path": schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "A local file, on the machine running Terraform, whose bytes are written to the command's standard input, which is then closed, like `docker exec -i ... < file`. " +
+					"The file is read at invoke time, so only its path shows in plan output: this is the way to pass a secret to `docker_exec` (action arguments cannot be marked sensitive). " +
+					"The content is never logged or written to `result_path`. Not with `stdin`, `tty` or `detach`.",
 			},
 			"timeout": schema.StringAttribute{
 				Optional:            true,
@@ -116,13 +125,23 @@ func (a *execAction) ValidateConfig(ctx context.Context, req action.ValidateConf
 	if containerKnown(m.ConsoleSize) && !actBool(m.TTY, false) {
 		resp.Diagnostics.AddAttributeError(path.Root("console_size"), "console_size needs tty", "The Engine only applies console_size to a TTY; set tty = true.")
 	}
-	if !m.Stdin.IsNull() && !m.Stdin.IsUnknown() {
+	if !m.Stdin.IsNull() && !m.StdinPath.IsNull() {
+		resp.Diagnostics.AddAttributeError(path.Root("stdin_path"), "stdin and stdin_path are mutually exclusive",
+			"Set stdin (inline data) or stdin_path (a local file read at invoke time), not both.")
+	}
+	for _, a := range []struct {
+		name string
+		v    types.String
+	}{{"stdin", m.Stdin}, {"stdin_path", m.StdinPath}} {
+		if a.v.IsNull() || a.v.IsUnknown() {
+			continue
+		}
 		if actBool(m.TTY, false) {
-			resp.Diagnostics.AddAttributeError(path.Root("stdin"), "stdin needs tty = false",
+			resp.Diagnostics.AddAttributeError(path.Root(a.name), a.name+" needs tty = false",
 				"With a TTY the daemon cannot signal end of file on stdin (it closes the output streams instead), so the command would never see the end of the input. Unset tty.")
 		}
 		if actBool(m.Detach, false) {
-			resp.Diagnostics.AddAttributeError(path.Root("stdin"), "stdin cannot be used with detach",
+			resp.Diagnostics.AddAttributeError(path.Root(a.name), a.name+" cannot be used with detach",
 				"A detached command is not attached to the provider, so there is no stream to write stdin to. Unset detach.")
 		}
 	}
@@ -148,6 +167,17 @@ func (a *execAction) Invoke(ctx context.Context, req action.InvokeRequest, resp 
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("env_file"), "Cannot read env_file", err.Error())
 		return
+	}
+	stdin := actExecStdin(m.Stdin)
+	if p := m.StdinPath.ValueString(); !m.StdinPath.IsNull() && !m.StdinPath.IsUnknown() {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			// The error names the path only, never content.
+			resp.Diagnostics.AddAttributeError(path.Root("stdin_path"), "Cannot read stdin_path", err.Error())
+			return
+		}
+		data := string(b)
+		stdin = &data
 	}
 	ctr := m.ContainerID.ValueString()
 	if svc := m.ServiceID.ValueString(); svc != "" {
@@ -185,7 +215,7 @@ func (a *execAction) Invoke(ctx context.Context, req action.InvokeRequest, resp 
 			Cmd:         cmd,
 		},
 		Detach:   detach,
-		Stdin:    actExecStdin(m.Stdin),
+		Stdin:    stdin,
 		Timeout:  timeout,
 		MaxBytes: actExecMaxBytes,
 		Stdout:   stdout,

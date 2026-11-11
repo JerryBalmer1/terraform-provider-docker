@@ -3,10 +3,10 @@
 
 # ---------------------------------------------------------------------------- upstream drift
 
-# Where DriftCheck writes its report: $env:DRIFT_REPORT when set (the drift workflow), else the temp directory.
-# The JSON report is the same path with .json. Fetched specs and fieldcov output go to the temp directory too,
-# never under reference/.
-$DriftWork = Join-Path ([System.IO.Path]::GetTempPath()) 'tpd-drift'
+# Where DriftCheck writes its report: $env:DRIFT_REPORT when set (the drift workflow), else test/harness/.logs/drift
+# (git-ignored; never %TEMP%). The JSON report is the same path with .json. Fetched specs and fieldcov output go to
+# test/harness/.logs/drift too, never under reference/.
+$DriftWork = Join-Path $BuildRoot 'test/harness/.logs/drift'
 $DriftReport = if ($env:DRIFT_REPORT) { $env:DRIFT_REPORT } else { Join-Path $DriftWork 'drift-report.md' }
 
 # Synopsis: Upstream drift: newest release of every reference/SOURCES.md source vs its pin; new operations / writable fields must be mapped or in reference/_gen/drift-accepted.json (go run ./tools/drift; needs the network; never changes a pin).

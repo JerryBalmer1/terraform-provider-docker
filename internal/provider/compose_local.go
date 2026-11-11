@@ -58,7 +58,7 @@ func composeHashMatches(labels map[string]string, want string) bool {
 
 // composeEndpoint is one network a container joins.
 // composeEndpointIfname is the endpoint driver option interface_name sets
-// (compose v5.1.4 pkg/compose/create.go:383).
+// (compose v5.7.0 pkg/compose/create.go:610-624 endpointDriverOpts).
 const composeEndpointIfname = "com.docker.network.endpoint.ifname"
 
 type composeEndpoint struct {
@@ -73,8 +73,9 @@ type composeEndpoint struct {
 	MacAddress string `json:"mac_address,omitempty"`
 	// DriverOpts, GwPriority and LinkLocalIPs are the endpoint's driver_opts
 	// (interface_name joins them as com.docker.network.endpoint.ifname),
-	// gw_priority and link_local_ips, as compose v5.1.4 sends them
-	// (pkg/compose/create.go:382-450 createEndpointSettings). Empty values
+	// gw_priority and link_local_ips, as compose v5.7.0 sends them
+	// (pkg/compose/create.go:529-624 createEndpointSettings,
+	// parseEndpointIPAM, endpointDriverOpts). Empty values
 	// are left out of the spec hash, so existing containers keep theirs.
 	DriverOpts   map[string]string `json:"driver_opts,omitempty"`
 	GwPriority   int               `json:"gw_priority,omitempty"`

@@ -9,7 +9,8 @@ terraform init, apply, terraform show -json (state.json), `pairwise -compare` (c
 vs the daemon's inspect through the contract field maps), a second plan with -detailed-exitcode (plan.json and
 `pairwise -plan-summary` when it is not empty), destroy. The outcome of each step goes to run.json; the terraform
 output of each step to <step>.log in the config directory. Exit code 0 when every config ran (findings are judged
-by `pairwise -report`, not here), 1 on a setup error.
+by `pairwise -report`, not here), 1 on a setup error or when any terraform output carries "Outputs contract value
+dropped" (listed in <OutDir>/contract-drops.txt).
 
 .PARAMETER OutDir
 The `pairwise -gen -out` directory.
@@ -18,7 +19,7 @@ Comma-separated resource types to run.
 .PARAMETER Pairwise
 The pairwise tool binary.
 .PARAMETER CliConfig
-Terraform CLI config file with the dev_overrides for JerryBalmer1/docker.
+Terraform CLI config file that installs JerryBalmer1/docker from the local filesystem mirror (PairwiseTest writes it).
 #>
 [CmdletBinding()]
 param(
@@ -62,6 +63,10 @@ function Get-ErrorText {
     return (($lines | Select-Object -Skip $start -First 25) -join "`n")
 }
 
+# Lane S's outputs contract writes this text when it drops a value; any terraform output carrying it fails the run.
+$contractDrop = 'Outputs contract value dropped'
+$drops = [System.Collections.Generic.List[string]]::new()
+
 $tfVersion = (& $tf version | Select-Object -First 1)
 Write-Host "pairwise run: $tfVersion, DOCKER_HOST=$env:DOCKER_HOST, registry prefix '$env:TF_VAR_pw_registry'"
 $total = 0
@@ -101,6 +106,10 @@ foreach ($type in ($Types -split ',' | ForEach-Object { $_.Trim() } | Where-Obje
         $destroyCode = Invoke-Tf $dir 'destroy' @('destroy', '-auto-approve', '-input=false', '-no-color')
         $run.destroyed = $destroyCode -eq 0
         if (-not $run.destroyed) { $run.destroy_error = Get-ErrorText $dir 'destroy' }
+        foreach ($l in Get-ChildItem -LiteralPath $dir -Filter '*.log' -File) {
+            foreach ($hit in @(Select-String -LiteralPath $l.FullName -SimpleMatch $contractDrop)) { $drops.Add("$type/$($cfg.Name)/$($l.Name): $($hit.Line.Trim())") }
+        }
+        $run.contract_dropped = @($drops | Where-Object { $_.StartsWith("$type/$($cfg.Name)/") }).Count
         $run | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $dir 'run.json') -Encoding utf8
         $mm = 0
         $cmpFile = Join-Path $dir 'compare.json'
@@ -109,4 +118,12 @@ foreach ($type in ($Types -split ',' | ForEach-Object { $_.Trim() } | Where-Obje
     }
 }
 Write-Host "pairwise run: $total configs done"
+$dropFile = Join-Path $OutDir 'contract-drops.txt'
+if ($drops.Count) {
+    Set-Content -LiteralPath $dropFile -Value $drops
+    Write-Host "pairwise run: FAILED: $($drops.Count) terraform output line(s) with '$contractDrop' (list: $dropFile)"
+    $drops | Select-Object -First 10 | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+Remove-Item -LiteralPath $dropFile -ErrorAction SilentlyContinue
 exit 0

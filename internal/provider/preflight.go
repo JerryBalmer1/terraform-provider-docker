@@ -5,6 +5,7 @@ package provider
 // that host came from, and (for TLS) which TLS settings were in effect.
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -35,7 +36,18 @@ const (
 	daemonTLSFailure
 	// daemonErrorResponse: something answered, but not with a usable /_ping.
 	daemonErrorResponse
+	// daemonSSHUnreachable: the TCP connection to an SSH host (or one of its
+	// jump hosts) failed (sshDialError, provider_ssh.go).
+	daemonSSHUnreachable
 )
+
+// plainHTTPToTLSText is what a Go TLS server (dockerd --tlsverify) answers
+// to a plain HTTP request (net/http server.go).
+const plainHTTPToTLSText = "Client sent an HTTP request to an HTTPS server"
+
+// errPlainHTTPToTLS is returned by the plain-HTTP dial wrapper
+// (daemonPlainConn) when the daemon answered with plainHTTPToTLSText.
+var errPlainHTTPToTLS = errors.New("client sent an HTTP request to an HTTPS server: the daemon expects TLS on this address")
 
 // Host and TLS sources recorded by resolveEndpoint (endpointConfig.HostSource
 // / TLSSource) and shown in the preflight diagnostics.
@@ -60,6 +72,10 @@ const isWindows = runtime.GOOS == "windows"
 func classifyDaemonError(err error) daemonFailure {
 	if err == nil {
 		return daemonUnreachable
+	}
+	var sshErr *sshDialError
+	if errors.As(err, &sshErr) {
+		return daemonSSHUnreachable
 	}
 	msg := strings.ToLower(err.Error())
 	var (
@@ -121,7 +137,7 @@ func daemonAnnotate(ep endpointConfig, err error) error {
 		return nil
 	}
 	switch classifyDaemonError(err) {
-	case daemonPermissionDenied, daemonTLSFailure:
+	case daemonPermissionDenied, daemonTLSFailure, daemonSSHUnreachable:
 		summary, detail := daemonFailureText(ep, err)
 		return &daemonConnError{Summary: summary, Detail: detail, Cause: err}
 	}
@@ -170,6 +186,16 @@ func daemonFailureText(ep endpointConfig, err error) (string, string) {
 		return "TLS failure talking to the Docker daemon",
 			fmt.Sprintf("The TLS connection to %s failed: %v\n\nTLS settings in effect: %s.\n\n%s",
 				where, err, ep.tlsSummary(), tlsHint(err))
+	case daemonSSHUnreachable:
+		// "connection refused" in the text would make the moby client
+		// replace the whole error by its generic "Cannot connect" message
+		// (client request.go doRequest), so it is reworded.
+		cause := strings.ReplaceAll(err.Error(), "connection refused", "connection was refused")
+		return "SSH host not reachable",
+			fmt.Sprintf("The SSH connection for %s could not be opened: %s\n\n"+
+				"The provider dials SSH itself (no ssh binary). Check the host name and port (`ssh.host` / `ssh.port`, or "+
+				"ssh://user@host:port in `host` or DOCKER_HOST), that sshd runs there and a firewall lets the port through, "+
+				"every `ssh.proxy_jump` hop, and `ssh.connect_timeout` for a slow link.", where, cause)
 	case daemonErrorResponse:
 		return "Docker daemon check failed",
 			fmt.Sprintf("Something answered at %s, but not with a Docker Engine /_ping: %v", where, err)
@@ -188,7 +214,8 @@ func tlsHint(err error) string {
 	var unknownCA x509.UnknownAuthorityError
 	var hostErr x509.HostnameError
 	switch {
-	case strings.Contains(msg, "client sent an http request to an https server"), strings.Contains(msg, "without tls"):
+	case strings.Contains(msg, "client sent an http request to an https server"), strings.Contains(msg, "without tls"),
+		strings.Contains(msg, "malformed http response"):
 		return "The daemon expects TLS on this address but the provider spoke plain HTTP: set the `tls` block or `cert_path` " +
 			"(or DOCKER_TLS_VERIFY and DOCKER_CERT_PATH), or use the daemon's plain-HTTP address."
 	case strings.Contains(msg, "first record does not look like a tls handshake"):
@@ -264,4 +291,39 @@ func endpointHasUnknown(m providerModel) bool {
 		}
 	}
 	return false
+}
+
+// daemonPlainConn wraps a plain-HTTP connection to a tcp:// host. When the
+// first bytes the daemon sends are a Go TLS server's answer to plain HTTP
+// (plainHTTPToTLSText), or a TLS record (an alert or handshake, 0x15 /
+// 0x16), the read fails with a daemonConnError carrying the preflight's TLS
+// diagnostic, so every operation names the fix instead of the raw
+// "Error response from daemon" or "malformed HTTP response".
+type daemonPlainConn struct {
+	net.Conn
+	ep      endpointConfig
+	checked bool
+}
+
+// CloseWrite half-closes the wrapped connection, so a hijacked exec stream
+// (docker_exec stdin) still signals end of file (cop_exec.go needs a
+// client.CloseWriter). Pass 6c Lane F: found by TestAccExecStdinP6bV.
+func (c *daemonPlainConn) CloseWrite() error {
+	if cw, ok := c.Conn.(interface{ CloseWrite() error }); ok {
+		return cw.CloseWrite()
+	}
+	return fmt.Errorf("%T cannot half-close", c.Conn)
+}
+
+func (c *daemonPlainConn) Read(b []byte) (int, error) {
+	n, err := c.Conn.Read(b)
+	if c.checked || n == 0 {
+		return n, err
+	}
+	c.checked = true
+	head := b[:n]
+	if head[0] == 0x15 || head[0] == 0x16 || (bytes.HasPrefix(head, []byte("HTTP/1.0 400")) && bytes.Contains(head, []byte(plainHTTPToTLSText))) {
+		return 0, daemonAnnotate(c.ep, errPlainHTTPToTLS)
+	}
+	return n, err
 }

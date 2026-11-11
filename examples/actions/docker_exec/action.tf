@@ -18,8 +18,9 @@ action "docker_exec" "migrate" {
     container_id = docker_container.db.id
     command      = ["sh", "-c", "until pg_isready -U postgres; do sleep 1; done; psql -U postgres -v ON_ERROR_STOP=1"]
     # The SQL script on standard input (`docker exec -i`); psql reads it to
-    # end of file. stdin may show in plan output: read secrets with the
-    # docker_exec_output ephemeral resource instead.
+    # end of file. stdin shows in plan output (action arguments cannot be
+    # sensitive): pass a secret with stdin_path instead, a local file read at
+    # invoke time, e.g. stdin_path = "${path.module}/secret.sql".
     stdin   = <<-EOT
       CREATE TABLE IF NOT EXISTS t (id int);
       INSERT INTO t VALUES (1);

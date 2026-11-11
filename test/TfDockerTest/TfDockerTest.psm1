@@ -4,7 +4,10 @@ TfDockerTest: run the examples/ folders of terraform-provider-docker on the dind
 
 Invoke-TfExample copies one example folder into a temporary directory, applies optional rewrites (Replace,
 RemoveBlock, Files), and runs terraform init, apply, a second plan that must be empty, and destroy, with a generated
-dev_overrides CLI configuration (TF_CLI_CONFIG_FILE) pointing at the locally built provider. Assert-TfState compares
+CLI configuration (TF_CLI_CONFIG_FILE) whose provider_installation installs JerryBalmer1/docker from a local filesystem
+mirror (Initialize-TfProviderMirror: the provider zip, built once per run, under the registry path layout), so terraform
+init runs for real, writes .terraform.lock.hcl and verifies the package checksum (Assert-TfLockFile). Any terraform
+output with "Outputs contract value dropped" fails the example (Assert-NoContractDrop). Assert-TfState compares
 `terraform show -json` with what the Engine API reports. Every run takes a snapshot of the daemon first and removes
 whatever is new afterwards (Clear-DockerSnapshotDiff), so a half-applied example leaves nothing behind.
 
@@ -18,6 +21,13 @@ $script:ProviderAddress = 'JerryBalmer1/docker'
 $script:ApiVersion = 'v1.56'
 $script:HarnessHostPattern = '^tcp://127\.0\.0\.1:123(7[5-9]|8[0-3])/?$'
 $script:SwarmActiveCache = @{}
+# The version the mirror publishes the local build as (a release version: Terraform never selects a prerelease for an
+# unconstrained requirement). TPD_MIRROR_VERSION overrides it.
+$script:MirrorVersion = if ($env:TPD_MIRROR_VERSION) { $env:TPD_MIRROR_VERSION } else { '99.0.0' }
+# Text Lane S's outputs contract writes when a contract value is dropped; any terraform output carrying it fails a run.
+$script:ContractDropText = 'Outputs contract value dropped'
+# Scratch for example copies and kept logs (git-ignored; never %TEMP%). TPD_EXAMPLE_WORK overrides it.
+$script:WorkRoot = if ($env:TPD_EXAMPLE_WORK) { $env:TPD_EXAMPLE_WORK } else { Join-Path $script:RepoRoot 'test/harness/.work/ex' }
 
 # ---------------------------------------------------------------------------- environment
 
@@ -64,11 +74,12 @@ function Get-TfTerraformPath {
     $cmd.Source
 }
 
-# Synopsis: build the provider once (go build) into a directory and return that directory (the dev_overrides path).
+# Synopsis: build the provider once (go build) into a directory and return that directory (a dev_overrides path; the
+# example tests and manual tasks use Initialize-TfProviderMirror instead).
 function Initialize-TfDevProvider {
     [CmdletBinding()]
     param(
-        # Where to put terraform-provider-docker[.exe]. Default: TPD_PROVIDER_DIR, else <temp>/tpd-dev-provider.
+        # Where to put terraform-provider-docker[.exe]. Default: TPD_PROVIDER_DIR, else test/harness/.work/dev-provider.
         [string]$ProviderDir,
         # Rebuild even when the binary exists (otherwise TPD_PROVIDER_DIR with a binary is reused as is).
         [switch]$Force
@@ -78,7 +89,7 @@ function Initialize-TfDevProvider {
         if ($env:TPD_PROVIDER_DIR -and -not $Force -and (Test-Path -LiteralPath (Join-Path $env:TPD_PROVIDER_DIR $exe))) {
             return $env:TPD_PROVIDER_DIR
         }
-        $ProviderDir = if ($env:TPD_PROVIDER_DIR) { $env:TPD_PROVIDER_DIR } else { Join-Path ([IO.Path]::GetTempPath()) 'tpd-dev-provider' }
+        $ProviderDir = if ($env:TPD_PROVIDER_DIR) { $env:TPD_PROVIDER_DIR } else { Join-Path $script:RepoRoot 'test/harness/.work/dev-provider' }
     }
     $bin = Join-Path $ProviderDir $exe
     if ($Force -or -not (Test-Path -LiteralPath $bin)) {
@@ -117,6 +128,137 @@ provider_installation {
     if ($parent) { $null = New-Item -ItemType Directory -Force -Path $parent }
     [IO.File]::WriteAllText($Path, $text + "`n")
     $Path
+}
+
+# Synopsis: the Terraform platform of this machine, e.g. windows_amd64.
+function Get-TfPlatform {
+    $os = if ($IsWindows) { 'windows' } elseif ($IsMacOS) { 'darwin' } else { 'linux' }
+    $arch = switch ([string][Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
+        'X64' { 'amd64' } 'Arm64' { 'arm64' } 'X86' { '386' } 'Arm' { 'arm' } default { throw "TfDockerTest: unsupported architecture $_" }
+    }
+    "${os}_$arch"
+}
+
+# Synopsis: build the provider once (go build, host platform) into a local filesystem mirror; returns its description.
+# Layout (Terraform's packed mirror layout, with the zip GoReleaser publishes):
+#   <dir>/providers/registry.terraform.io/jerrybalmer1/docker/terraform-provider-docker_<ver>_<os>_<arch>.zip
+#     holding terraform-provider-docker_v<ver>[.exe]
+#   <dir>/terraform-provider-docker_<ver>_SHA256SUMS   (sha256 of the zip; terraform records it as zh:<sha256>)
+#   <dir>/mirror.json                                  (what this function returns: Dir, Providers, Version, Zip, Sha256)
+# -ZipPath publishes a ready zip instead of building one (e.g. dist/ of Invoke-Build Release, for this platform).
+function Initialize-TfProviderMirror {
+    [CmdletBinding()]
+    param(
+        # Default: TPD_PROVIDER_MIRROR, else test/harness/.work/mirror (git-ignored).
+        [string]$MirrorDir,
+        # Rebuild even when the mirror exists (otherwise TPD_PROVIDER_MIRROR with a mirror.json is reused as is).
+        [switch]$Force,
+        [string]$ZipPath
+    )
+    if (-not $MirrorDir) {
+        if ($env:TPD_PROVIDER_MIRROR -and -not $Force -and (Test-Path -LiteralPath (Join-Path $env:TPD_PROVIDER_MIRROR 'mirror.json'))) {
+            return (Get-Content -Raw -LiteralPath (Join-Path $env:TPD_PROVIDER_MIRROR 'mirror.json') | ConvertFrom-Json)
+        }
+        if ($env:TPD_PROVIDER_MIRROR) { $MirrorDir = $env:TPD_PROVIDER_MIRROR }
+        else {
+            # First call of a run with no TPD_PROVIDER_MIRROR: rebuild, so a mirror left by an earlier run is never
+            # reused with an old binary (later calls reuse it through TPD_PROVIDER_MIRROR, set below).
+            $MirrorDir = Join-Path $script:RepoRoot 'test/harness/.work/mirror'
+            $Force = [switch]$true
+        }
+    }
+    $ver = $script:MirrorVersion
+    $plat = Get-TfPlatform
+    $providers = Join-Path $MirrorDir 'providers'
+    $pkgDir = Join-Path $providers 'registry.terraform.io/jerrybalmer1/docker'
+    $zipName = "terraform-provider-docker_${ver}_$plat.zip"
+    $zip = Join-Path $pkgDir $zipName
+    $metaPath = Join-Path $MirrorDir 'mirror.json'
+    if ($Force -or -not (Test-Path -LiteralPath $zip) -or -not (Test-Path -LiteralPath $metaPath)) {
+        Remove-Item -LiteralPath $providers -Recurse -Force -ErrorAction Ignore
+        $null = New-Item -ItemType Directory -Force -Path $pkgDir
+        if ($ZipPath) {
+            Copy-Item -LiteralPath $ZipPath -Destination $zip -Force
+        } else {
+            $build = Join-Path $MirrorDir 'build'
+            Remove-Item -LiteralPath $build -Recurse -Force -ErrorAction Ignore
+            $null = New-Item -ItemType Directory -Force -Path $build
+            $bin = Join-Path $build ("terraform-provider-docker_v$ver" + $(if ($IsWindows) { '.exe' } else { '' }))
+            $go = Get-Command go -CommandType Application -ErrorAction Ignore | Select-Object -First 1
+            if (-not $go) { throw 'TfDockerTest: go is not on PATH; cannot build the provider.' }
+            Push-Location $script:RepoRoot
+            try {
+                $out = & $go.Source build -trimpath -ldflags "-s -w -X main.version=$ver" -o $bin . 2>&1 | ForEach-Object { "$_" }
+                if ($LASTEXITCODE) { throw "TfDockerTest: go build failed: $($out -join "`n")" }
+            } finally { Pop-Location }
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $z = [IO.Compression.ZipFile]::Open($zip, [IO.Compression.ZipArchiveMode]::Create)
+            try { $null = [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($z, $bin, (Split-Path -Leaf $bin)) } finally { $z.Dispose() }
+            Remove-Item -LiteralPath $build -Recurse -Force -ErrorAction Ignore
+        }
+        $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+        [IO.File]::WriteAllText((Join-Path $MirrorDir "terraform-provider-docker_${ver}_SHA256SUMS"), "$sha  $zipName`n")
+        $meta = [ordered]@{ Dir = $MirrorDir; Providers = $providers; Version = $ver; Platform = $plat; Zip = $zip; Sha256 = $sha; Built = (Get-Date -Format o) }
+        [IO.File]::WriteAllText($metaPath, ($meta | ConvertTo-Json))
+    }
+    # Child processes (and later calls) reuse this mirror.
+    $env:TPD_PROVIDER_MIRROR = $MirrorDir
+    Get-Content -Raw -LiteralPath $metaPath | ConvertFrom-Json
+}
+
+# Synopsis: write a Terraform CLI configuration that installs JerryBalmer1/docker from the mirror's providers directory
+# (every other provider directly from its registry); returns its path.
+function New-TfMirrorConfig {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ProvidersDir,
+        [Parameter(Mandatory)][string]$Path
+    )
+    $dir = ($ProvidersDir -replace '\\', '/')
+    $addr = 'registry.terraform.io/' + $script:ProviderAddress.ToLowerInvariant()
+    $text = @"
+# Generated by TfDockerTest: install $($script:ProviderAddress) from the local filesystem mirror (terraform init
+# verifies the package and records its checksums in .terraform.lock.hcl), every other provider from its registry.
+provider_installation {
+  filesystem_mirror {
+    path    = "$dir"
+    include = ["$addr"]
+  }
+  direct {
+    exclude = ["$addr"]
+  }
+}
+"@
+    $parent = Split-Path -Parent $Path
+    if ($parent) { $null = New-Item -ItemType Directory -Force -Path $parent }
+    [IO.File]::WriteAllText($Path, $text + "`n")
+    $Path
+}
+
+# Synopsis: fail unless WorkingDir's .terraform.lock.hcl pins JerryBalmer1/docker at the mirror's version with the
+# mirror zip's checksum (zh:<sha256>) or a package hash (h1:), i.e. terraform init really verified the package.
+function Assert-TfLockFile {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$WorkingDir, [Parameter(Mandatory)]$Mirror)
+    $lock = Join-Path $WorkingDir '.terraform.lock.hcl'
+    if (-not (Test-Path -LiteralPath $lock)) { throw "terraform init wrote no .terraform.lock.hcl in $WorkingDir" }
+    $text = (Get-Content -Raw -LiteralPath $lock) -replace "`r", ''
+    $addr = 'registry.terraform.io/' + $script:ProviderAddress.ToLowerInvariant()
+    $m = [regex]::Match($text, '(?s)provider "' + [regex]::Escape($addr) + '" \{(.*?)\n\}')
+    if (-not $m.Success) { throw "lock file has no entry for $addr" }
+    $body = $m.Groups[1].Value
+    if ($body -notmatch ('version\s*=\s*"' + [regex]::Escape([string]$Mirror.Version) + '"')) { throw "lock file pins $addr at another version than the mirror's $($Mirror.Version)" }
+    $zh = "zh:$($Mirror.Sha256)"
+    if ($body -match '"zh:' -and -not $body.Contains($zh)) { throw "lock file checksums for $addr do not include the mirror zip's $zh" }
+    if ($body -notmatch '"(h1|zh):') { throw "lock file has no checksum for $addr" }
+}
+
+# Synopsis: throw when terraform output carries the outputs-contract drop text ("Outputs contract value dropped", Lane S).
+function Assert-NoContractDrop {
+    [CmdletBinding()]
+    param([AllowNull()][AllowEmptyCollection()][string[]]$Output, [string]$Label = 'terraform')
+    $hit = @($Output | Where-Object { $_ -and $_.Contains($script:ContractDropText) })
+    if ($hit.Count) { throw "$Label`: $($script:ContractDropText) ($($hit.Count) line(s)): $(($hit | Select-Object -First 3) -join ' | ')" }
 }
 
 # Deadline of the running example (Invoke-TfExample sets it; $null = none). Invoke-TfCli kills terraform when it passes.
@@ -595,7 +737,7 @@ function Invoke-TfExample {
     $Path = (Resolve-Path -LiteralPath $Path).Path
     if ($env:TPD_EXAMPLE_DRYRUN -eq '1') { $ValidateOnly = [switch]$true }
     $name = ((Split-Path -Leaf (Split-Path -Parent $Path)) + '_' + (Split-Path -Leaf $Path)) -replace '[^A-Za-z0-9_.-]', '_'
-    $root = Join-Path ([IO.Path]::GetTempPath()) ("tpd-ex-$name-" + [IO.Path]::GetRandomFileName().Replace('.', ''))
+    $root = Join-Path $script:WorkRoot ("$name-" + [IO.Path]::GetRandomFileName().Replace('.', ''))
     $work = Join-Path $root 'work'
     $pre = Join-Path $root 'prereq'
     $null = New-Item -ItemType Directory -Force -Path $work
@@ -617,14 +759,15 @@ function Invoke-TfExample {
         $r = Invoke-TfCli -WorkingDir $Dir -Arguments $TfArgs -LogFile $log
         $result.Steps.Add([pscustomobject]@{ Step = $Label; ExitCode = $r.ExitCode })
         if ($r.ExitCode -notin $OkCodes) { throw "$Label failed (exit $($r.ExitCode)): $(Get-ErrorExcerpt $r.Output)" }
+        Assert-NoContractDrop -Output $r.Output -Label $Label
         $r
     }
     $applied = $false; $preApplied = $false; $baseline = $null
     $script:TfDeadline = (Get-Date).AddMinutes($TimeoutMinutes)
     Add-Content -LiteralPath $log -Value "# budget ${TimeoutMinutes}m (deadline $('{0:HH:mm:ss}' -f $script:TfDeadline)), teardown ${CleanupMinutes}m"
     try {
-        $providerDir = Initialize-TfDevProvider
-        $env:TF_CLI_CONFIG_FILE = New-TfDevOverrideConfig -ProviderDir $providerDir -Path (Join-Path $root 'dev.tfrc')
+        $mirror = Initialize-TfProviderMirror
+        $env:TF_CLI_CONFIG_FILE = New-TfMirrorConfig -ProvidersDir $mirror.Providers -Path (Join-Path $root 'mirror.tfrc')
         $env:TF_IN_AUTOMATION = '1'; $env:TF_INPUT = '0'; $env:CHECKPOINT_DISABLE = '1'
         if ($Env) { foreach ($k in $Env.Keys) { [Environment]::SetEnvironmentVariable($k, [string]$Env[$k]) } }
 
@@ -654,8 +797,9 @@ function Invoke-TfExample {
             $varArgs = @("-var-file=$vf")
         }
 
-        # No terraform init: the examples use only this provider (dev_overrides) and built-in providers, which need no
-        # installation, and Terraform before 1.15 fails init for a dev-overridden provider the registry does not have.
+        # A real terraform init from the filesystem mirror: it writes the lock file and verifies the package checksum.
+        $null = & $step $work 'init' @('init', '-input=false', '-no-color')
+        Assert-TfLockFile -WorkingDir $work -Mirror $mirror
         if ($ValidateOnly) {
             if ($env:TPD_EXAMPLE_DRYRUN -eq '1') {
                 # Files a -Setup block would write (rootfs.tar, images.tar, plugin/config.json) do not exist in a dry run:
@@ -677,6 +821,7 @@ function Invoke-TfExample {
             $null = New-Item -ItemType Directory -Force -Path $pre
             if ($Prerequisite -is [System.Collections.IDictionary]) { Write-TfFiles $pre $Prerequisite } else { [IO.File]::WriteAllText((Join-Path $pre 'main.tf'), [string]$Prerequisite) }
             Add-ProviderRequirement $pre
+            $null = & $step $pre 'prerequisite init' @('init', '-input=false', '-no-color')
             $preApplied = $true
             $null = & $step $pre 'prerequisite apply' @('apply', '-auto-approve', '-input=false', '-no-color')
         }
@@ -749,7 +894,7 @@ function Invoke-TfExample {
         if (-not $KeepWorkDir) {
             if ($logDir -eq $root -and $errors.Count) {
                 # Keep the log, so the failure can be read.
-                $kept = Join-Path ([IO.Path]::GetTempPath()) "tpd-ex-$name-failed.log"
+                $kept = Join-Path $script:WorkRoot "$name-failed.log"
                 Copy-Item -LiteralPath $log -Destination $kept -Force -ErrorAction Ignore
                 $result.LogFile = $kept
             }
@@ -858,7 +1003,8 @@ function Remove-DockerSwarmMember {
 function New-DockerPluginFromDir {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][string]$Dir)
-    $tarFile = Join-Path ([IO.Path]::GetTempPath()) ("tpd-plugin-" + [IO.Path]::GetRandomFileName() + '.tar')
+    $null = New-Item -ItemType Directory -Force -Path $script:WorkRoot
+    $tarFile = Join-Path $script:WorkRoot ("plugin-" + [IO.Path]::GetRandomFileName() + '.tar')
     try {
         New-TarArchive -SourceDir $Dir -OutFile $tarFile
         $r = Invoke-DockerApi -Method POST -Path '/plugins/create' -Query @{ name = $Name } -InFile $tarFile -ContentType 'application/x-tar'

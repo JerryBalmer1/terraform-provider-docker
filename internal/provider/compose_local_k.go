@@ -2,26 +2,31 @@ package provider
 
 // docker_compose, mode = "local" (Pass 5.3 Lane K): the service keys the
 // conversion used to warn about and ignore, mapped onto the Engine API the
-// way docker compose v5.1.4 does (pkg/compose/create.go, apiSocket.go,
-// convergence.go, pull.go):
+// way docker compose v5.7.0 does (pkg/compose/create.go, apiSocket.go,
+// service_containers.go, pull.go):
 //
-//   - blkio_config -> HostConfig.Blkio* (create.go:761-797 setBlkio);
+//   - blkio_config -> HostConfig.Blkio* (create.go:923-937 setBlkio);
 //   - links / external_links -> HostConfig.Links and EndpointSettings.Links
-//     (convergence.go:779-833 getLinks);
-//   - mac_address -> the primary endpoint's MacAddress (create.go:340-368
-//     prepareContainerMACAddress, :550-555);
+//     (service_containers.go:309-362 getLinks);
+//   - mac_address -> the primary endpoint's MacAddress (create.go:494-514
+//     prepareContainerMACAddress, :698-703);
 //   - use_api_socket -> a bind mount of /var/run/docker.sock, DOCKER_CONFIG
-//     and a config.json with the registry credentials (apiSocket.go:31-94);
+//     and a config.json with the registry credentials (apiSocket.go:45-132;
+//     compose v5.7.0 differs: it adds DOCKER_CONFIG and the config only when
+//     the host has credentials and the service does not set DOCKER_CONFIG,
+//     with mode 0600);
 //   - volumes[].volume.labels -> Mount.VolumeOptions.Labels
-//     (create.go:1285-1295 buildVolumeOptions);
+//     (create.go:1408-1435 buildMountOptions);
 //   - pull_policy refresh / daily / weekly / every_<d> -> pull when the
-//     image's LastTagTime is older than the period (pull.go:350-378
-//     mustPull, images.go:157 Metadata.LastTagTime);
-//   - umask -> HostConfig.Umask (Engine API 1.56; compose-go v2.16.2 has the
-//     key, compose v5.1.4 predates it);
+//     image's LastTagTime is older than the period (pull.go:536-563
+//     mustPull, images.go:148 / :211 Metadata.LastTagTime);
+//   - umask -> HostConfig.Umask (Engine API 1.56; compose v5.7.0 sends it
+//     too, refusing an Engine below 1.56, create.go:737-749 umaskOption);
 //   - credential_spec -> HostConfig.SecurityOpt "credentialspec=..." (the
-//     Windows daemon form `docker run --security-opt` takes; compose v5.1.4
-//     does not send it in local mode, docker stack deploy does in swarm mode).
+//     Windows daemon form `docker run --security-opt` takes; compose v5.7.0
+//     does not send it in local mode and reports it as unsupported,
+//     internal/projectloader/unsupported_attributes.go:59; docker stack
+//     deploy does send it in swarm mode).
 
 import (
 	"context"
@@ -39,7 +44,7 @@ import (
 	"github.com/moby/moby/api/types/network"
 )
 
-// composeBlkio is compose's setBlkio (create.go:761-797).
+// composeBlkio is compose's setBlkio (create.go:923-937).
 func composeBlkio(b *ctypes.BlkioConfig, r *container.Resources) {
 	if b == nil {
 		return
@@ -80,7 +85,7 @@ func composeCredentialSpecOpt(cs *ctypes.CredentialSpecConfig) (string, error) {
 	return "", nil
 }
 
-// composeLinks is compose's getLinks (convergence.go:779-833) on the
+// composeLinks is compose's getLinks (service_containers.go:309-362) on the
 // planned container names: each linked service's containers under the link
 // alias, "<service>-<number>" and "<project>-<service>-<number>" (number is
 // the linking container's own number, as in compose), then external_links
@@ -131,7 +136,7 @@ func composeMAC(s string) (network.HardwareAddr, error) {
 }
 
 // composeAPISocketConfigPath is where use_api_socket puts the credentials
-// (apiSocket.go:73-87: DOCKER_CONFIG=/run/secrets/docker and a config
+// (apiSocket.go:110-128: DOCKER_CONFIG=/run/secrets/docker and a config
 // "#apisocket" mounted at /run/secrets/docker/config.json).
 const (
 	composeAPISocketDir    = "/run/secrets/docker"
@@ -141,10 +146,11 @@ const (
 )
 
 // composeWithAPISocket is compose's useAPISocket transformation of one
-// service (apiSocket.go:31-94), applied before anything is hashed so the
+// service (apiSocket.go:45-132), applied before anything is hashed so the
 // config-hash matches the CLI's: a bind mount of the Engine socket, the
 // DOCKER_CONFIG variable (unless the service sets it) and the "#apisocket"
-// config. The service's slices and maps are copied, never changed.
+// config (compose v5.7.0 differs: no DOCKER_CONFIG or config when the host
+// has no credentials or the service sets DOCKER_CONFIG, and mode 0600). The service's slices and maps are copied, never changed.
 func composeWithAPISocket(svc ctypes.ServiceConfig) ctypes.ServiceConfig {
 	if !svc.UseAPISocket {
 		return svc
@@ -170,7 +176,7 @@ func composeWithAPISocket(svc ctypes.ServiceConfig) ctypes.ServiceConfig {
 // composeAPISocketAuth is the config.json use_api_socket copies into the
 // container: the provider's registry_auth credentials in the docker CLI
 // config file format (compose writes configfile.ConfigFile{AuthConfigs}
-// with every credential the CLI knows, apiSocket.go:52-66).
+// with every credential the CLI knows, apiSocket.go:68-86).
 func composeAPISocketAuth(pd *providerData) []byte {
 	type authEntry struct {
 		Auth          string `json:"auth,omitempty"`
@@ -216,7 +222,7 @@ func composePullRefresh(svc ctypes.ServiceConfig) (time.Duration, bool, error) {
 }
 
 // composeRefreshDue is compose's mustPull for the refresh policies
-// (pull.go:368-373): pull when the image is missing or its last tag time
+// (pull.go:553-558): pull when the image is missing or its last tag time
 // (set by every pull and tag) is older than the period.
 func composeRefreshDue(ctx context.Context, pd *providerData, ref string, every time.Duration, now time.Time) (bool, error) {
 	insp, err := pd.Client.ImageInspect(ctx, ref)

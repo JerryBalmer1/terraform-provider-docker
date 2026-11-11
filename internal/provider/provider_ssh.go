@@ -487,7 +487,7 @@ func (c sshConfig) connect(ctx context.Context) (*sshChain, error) {
 		}
 		if err != nil {
 			chain.Close()
-			return nil, fmt.Errorf("ssh: connecting to %s: %w", hop.Addr, err)
+			return nil, &sshDialError{Addr: hop.Addr, Err: err}
 		}
 		cl, err := sshHandshake(ctx, conn, hop, auth, hk, c.ConnectTimeout)
 		if err != nil {
@@ -499,6 +499,16 @@ func (c sshConfig) connect(ctx context.Context) (*sshChain, error) {
 	}
 	return chain, nil
 }
+
+// sshDialError is a failed TCP connection to an SSH host or jump host. The
+// preflight (preflight.go) classifies it as daemonSSHUnreachable.
+type sshDialError struct {
+	Addr string
+	Err  error
+}
+
+func (e *sshDialError) Error() string { return fmt.Sprintf("ssh: connecting to %s: %v", e.Addr, e.Err) }
+func (e *sshDialError) Unwrap() error { return e.Err }
 
 func sshHandshake(ctx context.Context, conn net.Conn, hop sshHop, auth []ssh.AuthMethod, hk ssh.HostKeyCallback, timeout time.Duration) (*ssh.Client, error) {
 	// Channel connections (jump hops) do not support deadlines; a timer that

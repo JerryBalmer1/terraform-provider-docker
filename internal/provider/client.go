@@ -71,7 +71,9 @@ func newDockerClient(ep endpointConfig) (*client.Client, error) {
 				return nil, err
 			}
 		}
-		dial := sc.dialContext
+		// An unreachable SSH host (or jump host) fails every operation with
+		// the preflight's SSH diagnostic (sshDialError, daemonAnnotate).
+		dial := daemonAnnotateDial(ep, sc.dialContext)
 		// The unix host gives the HTTP layer its dummy host name and no
 		// proxy; WithDialContext then swaps the unix dialer for SSH.
 		opts = append(opts,
@@ -104,7 +106,19 @@ func newDockerClient(ep endpointConfig) (*client.Client, error) {
 				DialTLSContext: daemonTLSDial(ep, base, tlsCfg)},
 		}))
 	}
-	opts = append(opts, client.WithHost(host), client.WithDialContext(daemonAnnotateDial(ep, base)))
+	plainDial := daemonAnnotateDial(ep, base)
+	if tlsCfg == nil && hostURL.Scheme == "tcp" {
+		// Plain HTTP to a TLS port: the TLS diagnostic on every operation.
+		annotated := plainDial
+		plainDial = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			conn, err := annotated(ctx, network, addr)
+			if err != nil {
+				return nil, err
+			}
+			return &daemonPlainConn{Conn: conn, ep: ep}, nil
+		}
+	}
+	opts = append(opts, client.WithHost(host), client.WithDialContext(plainDial))
 	return finishDockerClient(ep, opts)
 }
 

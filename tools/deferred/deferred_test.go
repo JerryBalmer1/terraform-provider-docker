@@ -121,3 +121,31 @@ func TestRunWriteThenCheck(t *testing.T) {
 		t.Fatalf("stale check exit %d, want 1", code)
 	}
 }
+
+// Pass 6c Lane F: kind diagnostic from reference/_gen/deferred.d/diagnostics.json.
+func TestDiagnosticsP6cF(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "reference/inventory.json", `{"items":[]}`)
+	writeFile(t, root, "internal/provider/client.go", "package p\n")
+	writeFile(t, root, "reference/_gen/deferred.d/diagnostics.json", `{"diagnostics":[
+		{"id":"tls-through-http-proxy","file":"internal/provider/client.go","reason":"handshake after CONNECT"}]}`)
+	d, err := Collect(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Totals["diagnostic"] != 1 || len(d.Items) != 1 {
+		t.Fatalf("totals %v items %v", d.Totals, d.Items)
+	}
+	it := d.Items[0]
+	if it.Kind != "diagnostic" || it.ID != "tls-through-http-proxy" || it.Source != "internal/provider/client.go" || it.Reason == "" {
+		t.Errorf("item %+v", it)
+	}
+	writeFile(t, root, "reference/_gen/deferred.d/diagnostics.json", `{"diagnostics":[{"id":"x","file":"internal/provider/gone.go","reason":"r"}]}`)
+	if _, err := Collect(root); err == nil || !strings.Contains(err.Error(), "does not exist") {
+		t.Errorf("missing file: err = %v", err)
+	}
+	writeFile(t, root, "reference/_gen/deferred.d/diagnostics.json", `{"diagnostics":[{"id":"x","file":"internal/provider/client.go"}]}`)
+	if _, err := Collect(root); err == nil || !strings.Contains(err.Error(), "needs id and reason") {
+		t.Errorf("missing reason: err = %v", err)
+	}
+}

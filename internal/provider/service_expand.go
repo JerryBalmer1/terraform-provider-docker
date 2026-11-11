@@ -396,6 +396,9 @@ type svcFlattenOpts struct {
 	ShortName string
 	// StripStack removes the stack namespace label from labels.
 	StripStack bool
+	// NullReplicasUnlessReplicated keeps replicas null for every mode but
+	// replicated (docker_service; svcReplicasAttribute).
+	NullReplicasUnlessReplicated bool
 }
 
 // svcFlatten converts spec into a model, using prior to keep the user's
@@ -409,6 +412,9 @@ func svcFlatten(spec swarm.ServiceSpec, prior svcSpecModel, lk *svcLookup, o svc
 	m.Labels = svcMapValue(prior.Labels, ownerStrip(userLabels(spec.Labels, o.StripStack)))
 
 	svcFlattenMode(spec, prior, &m)
+	if o.NullReplicasUnlessReplicated && m.Mode.ValueString() != "replicated" {
+		m.Replicas = types.Int64Null()
+	}
 
 	cs := spec.TaskTemplate.ContainerSpec
 	if cs == nil {

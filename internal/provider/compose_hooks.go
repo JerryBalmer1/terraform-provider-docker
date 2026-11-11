@@ -3,15 +3,17 @@ package provider
 // docker_compose, mode = "local": service lifecycle hooks.
 //
 //   - post_start: commands exec'd in the service container once it has
-//     started (docker compose v5.1.4 pkg/compose/convergence.go:926-931,
-//     hook.go:34-85 runHook: ExecCreate with the hook's user, privileged,
-//     environment, working_dir and command, then wait for exit 0).
+//     started (docker compose v5.7.0 pkg/compose/executor_ops.go:296-316
+//     execRunPostStart, hook.go:43-140 runHook: ExecCreate with the hook's
+//     user, privileged, environment, working_dir and command, then wait for exit 0).
 //   - pre_stop: the same, exec'd before a container of the service is
-//     stopped and removed (down.go:298-311 stopContainer), errors
+//     stopped and removed (down.go:448-462 stopContainer), errors
 //     "not found" / "conflict" ignored as compose does.
 //   - pre_start: init containers that run to completion before the service
 //     container starts (compose-spec 05-services.md "pre_start", Compose
-//     v5.3.0; compose v5.1.4 predates it). compose-go v2.16.2 resolves each
+//     v5.3.0; compose v5.7.0 pkg/compose/pre_start.go:115-147 runPreStart
+//     runs them too, but rejects per_replica: true and keeps a failed step
+//     container for inspection). compose-go v2.16.2 resolves each
 //     step's inheritance from the service at load time
 //     (loader/normalize.go:156-197 resolvePreStartHooks), except volumes,
 //     which "inherit at runtime through volumes_from": each step container

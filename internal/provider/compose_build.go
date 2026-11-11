@@ -106,8 +106,9 @@ func composeBuildRequest(p *ctypes.Project, svc ctypes.ServiceConfig, image stri
 		}
 	}
 	// additional_contexts, entitlements and privileged as compose's bake
-	// path sends them (compose v5.1.4 pkg/compose/build_bake.go:175-181,
-	// :223, :474-483): "service:<x>" names another service's image (built
+	// path sends them (compose v5.7.0 pkg/compose/build_bake.go:291,
+	// :706-715 additionalContexts, :351-360 bakeEntitlements, :492-494):
+	// "service:<x>" names another service's image (built
 	// first by composeBuild), privileged adds the security.insecure
 	// entitlement.
 	for name, v := range b.AdditionalContexts {

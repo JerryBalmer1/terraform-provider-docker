@@ -68,6 +68,58 @@ Describe 'New-TfDevOverrideConfig' {
     }
 }
 
+Describe 'Provider filesystem mirror' {
+    It 'publishes a zip under the registry layout with its SHA256SUMS and mirror.json' {
+        $src = Join-Path $TestDrive 'src'
+        $null = New-Item -ItemType Directory -Force $src
+        Set-Content (Join-Path $src 'terraform-provider-docker_v99.0.0') 'binary'
+        $zipIn = Join-Path $TestDrive 'in.zip'
+        Compress-Archive -Path (Join-Path $src '*') -DestinationPath $zipIn
+        $saved = $env:TPD_PROVIDER_MIRROR
+        try {
+            $m = Initialize-TfProviderMirror -MirrorDir (Join-Path $TestDrive 'mirror') -ZipPath $zipIn
+            $plat = Get-TfPlatform
+            $m.Version | Should -Be '99.0.0'
+            $m.Zip | Should -BeLike "*providers*registry.terraform.io*jerrybalmer1*docker*terraform-provider-docker_99.0.0_$plat.zip"
+            Test-Path $m.Zip | Should -BeTrue
+            $m.Sha256 | Should -Be (Get-FileHash -Algorithm SHA256 $zipIn).Hash.ToLowerInvariant()
+            Get-Content (Join-Path $TestDrive 'mirror/terraform-provider-docker_99.0.0_SHA256SUMS') | Should -Be "$($m.Sha256)  terraform-provider-docker_99.0.0_$plat.zip"
+            $env:TPD_PROVIDER_MIRROR | Should -Be (Join-Path $TestDrive 'mirror')
+            # Reused through TPD_PROVIDER_MIRROR without a rebuild.
+            (Initialize-TfProviderMirror).Sha256 | Should -Be $m.Sha256
+        } finally { $env:TPD_PROVIDER_MIRROR = $saved }
+    }
+    It 'writes a filesystem_mirror CLI configuration with forward slashes' {
+        $p = Join-Path $TestDrive 'm.tfrc'
+        New-TfMirrorConfig -ProvidersDir 'C:\x\providers' -Path $p | Should -Be $p
+        $c = Get-Content -Raw $p
+        $c | Should -Match 'path    = "C:/x/providers"'
+        $c | Should -Match 'include = \["registry.terraform.io/jerrybalmer1/docker"\]'
+        $c | Should -Match 'exclude = \["registry.terraform.io/jerrybalmer1/docker"\]'
+    }
+    It 'Assert-TfLockFile accepts the mirror checksum and rejects another one or a missing lock' {
+        $d = Join-Path $TestDrive 'lock'
+        $null = New-Item -ItemType Directory -Force $d
+        $mirror = [pscustomobject]@{ Version = '99.0.0'; Sha256 = 'abc123' }
+        { Assert-TfLockFile -WorkingDir $d -Mirror $mirror } | Should -Throw '*no .terraform.lock.hcl*'
+        $lock = "provider `"registry.terraform.io/jerrybalmer1/docker`" {`n  version = `"99.0.0`"`n  hashes = [`n    `"h1:xyz=`",`n    `"zh:abc123`",`n  ]`n}`n"
+        Set-Content (Join-Path $d '.terraform.lock.hcl') $lock
+        { Assert-TfLockFile -WorkingDir $d -Mirror $mirror } | Should -Not -Throw
+        Set-Content (Join-Path $d '.terraform.lock.hcl') ($lock -replace 'zh:abc123', 'zh:other')
+        { Assert-TfLockFile -WorkingDir $d -Mirror $mirror } | Should -Throw '*do not include*'
+        Set-Content (Join-Path $d '.terraform.lock.hcl') ($lock -replace '99\.0\.0', '1.0.0')
+        { Assert-TfLockFile -WorkingDir $d -Mirror $mirror } | Should -Throw '*another version*'
+    }
+}
+
+Describe 'Assert-NoContractDrop' {
+    It 'passes clean output and fails on the drop text' {
+        { Assert-NoContractDrop -Output @('Apply complete!', '') -Label apply } | Should -Not -Throw
+        { Assert-NoContractDrop -Output @() } | Should -Not -Throw
+        { Assert-NoContractDrop -Output @('x', 'Outputs contract value dropped: docker_volume.v mountpoint') -Label plan } | Should -Throw '*plan: Outputs contract value dropped (1 line(s))*mountpoint*'
+    }
+}
+
 Describe 'Get-TfTerraformPath' {
     It 'prefers TF_ACC_TERRAFORM_PATH' {
         $fake = Join-Path $TestDrive 'terraform.exe'
@@ -186,7 +238,8 @@ Describe 'Invoke-TfExample' {
         $env:DOCKER_HOST = 'tcp://127.0.0.1:12375'; $env:TF_ACC = '1'; $env:TPD_EXAMPLE_ALLOW_HOST = $null; $env:TPD_EXAMPLE_LOG_DIR = $null
         $script:Calls = [System.Collections.Generic.List[string]]::new()
         $script:Seen = [System.Collections.Generic.List[string]]::new()
-        Mock -ModuleName TfDockerTest Initialize-TfDevProvider { 'C:/fake/provider' }
+        Mock -ModuleName TfDockerTest Initialize-TfProviderMirror { [pscustomobject]@{ Providers = 'C:/fake/mirror/providers'; Version = '99.0.0'; Sha256 = 'ab' } }
+        Mock -ModuleName TfDockerTest Assert-TfLockFile { }
         Mock -ModuleName TfDockerTest Get-DockerSnapshot { [pscustomobject]@{ DockerHost = $env:DOCKER_HOST } }
         Mock -ModuleName TfDockerTest Clear-DockerSnapshotDiff { @() }
         Mock -ModuleName TfDockerTest Assert-TfState { 1 }
@@ -201,10 +254,12 @@ Describe 'Invoke-TfExample' {
             [pscustomobject]@{ ExitCode = 0; Output = @('ok') }
         }
         $r = Invoke-TfExample -Path $script:Ex -Replace @{ 'registry.example.com' = '127.0.0.1:12380' } -Files @{ 'app/Dockerfile' = 'FROM busybox' } -Invoke 'action.docker_x.y'
-        $script:Calls[0] | Should -Be 'apply'
-        $script:Calls[1] | Should -Be 'apply -invoke=action.docker_x.y'
-        $script:Calls[2] | Should -BeLike 'plan -detailed-exitcode -out=*'
-        $script:Calls[3] | Should -Be 'destroy'
+        $script:Calls[0] | Should -Be 'init'
+        $script:Calls[1] | Should -Be 'apply'
+        $script:Calls[2] | Should -Be 'apply -invoke=action.docker_x.y'
+        $script:Calls[3] | Should -BeLike 'plan -detailed-exitcode -out=*'
+        $script:Calls[4] | Should -Be 'destroy'
+        Should -Invoke -ModuleName TfDockerTest Assert-TfLockFile -Times 1 -Exactly
         $script:Seen[0] | Should -Match '_tfexample_providers.tf'
         $script:Seen[0] | Should -Match 'app'
         $script:Seen[0] | Should -Not -Match 'tests.ps1|import.sh'
@@ -244,18 +299,18 @@ Describe 'Invoke-TfExample' {
         $env:DOCKER_HOST = $null
         Mock -ModuleName TfDockerTest Invoke-TfCli { $script:Calls.Add($Arguments[0]); [pscustomobject]@{ ExitCode = 0; Output = @() } }
         Invoke-TfExample -Path $script:Ex -ValidateOnly | Out-Null
-        $script:Calls -join ',' | Should -Be 'validate'
+        $script:Calls -join ',' | Should -Be 'init,validate'
         Should -Invoke -ModuleName TfDockerTest Get-DockerSnapshot -Times 0 -Exactly
     }
     It 'applies the prerequisite first and destroys it last' {
         Mock -ModuleName TfDockerTest Invoke-TfCli { $script:Calls.Add("$(Split-Path -Leaf $WorkingDir):$($Arguments[0])"); [pscustomobject]@{ ExitCode = 0; Output = @() } }
         Invoke-TfExample -Path $script:Ex -Prerequisite 'resource "docker_network" "n" { name = "n" }' -PlanCheck Skip | Out-Null
-        $script:Calls -join ',' | Should -Be 'prereq:apply,work:apply,work:destroy,prereq:destroy'
+        $script:Calls -join ',' | Should -Be 'work:init,prereq:init,prereq:apply,work:apply,work:destroy,prereq:destroy'
     }
     It 'runs terraform query for list resources and checks QueryExpect' {
         Mock -ModuleName TfDockerTest Invoke-TfCli { $script:Calls.Add($Arguments[0]); [pscustomobject]@{ ExitCode = 0; Output = @('list.docker_volume.unused   id=data') } }
         Invoke-TfExample -Path $script:Ex -Query -QueryExpect 'id=data' | Out-Null
-        $script:Calls -join ',' | Should -Be 'query'
+        $script:Calls -join ',' | Should -Be 'init,query'
         { Invoke-TfExample -Path $script:Ex -Query -QueryExpect 'id=other' } | Should -Throw '*does not match*'
     }
     It 'rejects a Replace key or RemoveBlock pattern the example does not contain' {
@@ -268,6 +323,26 @@ Describe 'Invoke-TfExample' {
         Mock -ModuleName TfDockerTest Invoke-TfCli { [pscustomobject]@{ ExitCode = 0; Output = @() } }
         { Invoke-TfExample -Path $script:Ex } | Should -Throw '*refusing*'
         Should -Invoke -ModuleName TfDockerTest Get-DockerSnapshot -Times 0 -Exactly
+    }
+    It 'fails when terraform output carries the outputs contract drop text, and still destroys' {
+        Mock -ModuleName TfDockerTest Invoke-TfCli {
+            $script:Calls.Add($Arguments[0])
+            if ($Arguments[0] -eq 'apply') { return [pscustomobject]@{ ExitCode = 0; Output = @('Warning: Outputs contract value dropped: docker_container.c inspect.State.Health') } }
+            [pscustomobject]@{ ExitCode = 0; Output = @() }
+        }
+        { Invoke-TfExample -Path $script:Ex -PlanCheck Skip } | Should -Throw '*apply: Outputs contract value dropped*docker_container.c*'
+        $script:Calls | Should -Contain 'destroy'
+    }
+    It 'writes the mirror CLI configuration into the copy' {
+        Mock -ModuleName TfDockerTest Invoke-TfCli {
+            if ($Arguments[0] -eq 'init') { $script:Seen.Add([string]$env:TF_CLI_CONFIG_FILE); $script:Seen.Add((Get-Content -Raw $env:TF_CLI_CONFIG_FILE)) }
+            [pscustomobject]@{ ExitCode = 0; Output = @() }
+        }
+        Invoke-TfExample -Path $script:Ex -PlanCheck Skip | Out-Null
+        $script:Seen[0] | Should -BeLike '*mirror.tfrc'
+        $script:Seen[1] | Should -Match 'filesystem_mirror'
+        $script:Seen[1] | Should -Match 'C:/fake/mirror/providers'
+        $script:Seen[1] | Should -Not -Match 'dev_overrides'
     }
     It 'restores environment variables it set' {
         $env:TPD_SOME = 'before'

@@ -22,6 +22,7 @@
         Invoke-Build _List                          # scenarios and what each shows
         Invoke-Build _Up [-Swarm]                   # harness up (and swarm init)
         Invoke-Build _Init -Scenario container_full # then _Plan, _Apply, _Destroy with the same -Scenario
+                                                    # (_Apply / _Destroy run unattended; add -Prompt to confirm)
         Invoke-Build _Down                          # harness down
 
     Install once: Install-Module InvokeBuild -Scope CurrentUser
@@ -56,6 +57,11 @@
 
 .PARAMETER Invoke
     _Apply: run only this action (terraform apply -invoke=action.<type>.<name>).
+
+.PARAMETER Prompt
+    _Apply, _Destroy: let Terraform ask for confirmation. Without it they run unattended (_Apply: terraform plan -out,
+    a one-line summary of the plan, then terraform apply of that saved plan, so the full plan is not printed twice;
+    _Destroy: terraform destroy -auto-approve).
 #>
 param(
     [string]$Go = $(if ($env:GO) { $env:GO } else { 'go' }),
@@ -67,6 +73,7 @@ param(
     [string]$Scenario = '',
     [switch]$Swarm,
     [string]$Invoke = '',
+    [switch]$Prompt,
     # ExampleTests / ExampleValidate: comma-separated wildcards on the example path (resources/docker_tag, actions/*)
     # or its folder name (docker_tag); overrides TPD_EXAMPLE_INCLUDE.
     [string]$Filter = ''
@@ -98,7 +105,10 @@ $SwarmAccRegex = 'TestAcc(OwnerLabelSwarm|Service|Stack|Secret|DockerConfig|Swar
 
 $RefDir = Join-Path $BuildRoot 'reference'
 $InventoryFiles = 'reference/inventory.json', 'reference/INVENTORY.md'
-$RefVerifyCache = Join-Path ([System.IO.Path]::GetTempPath()) 'tpd-reference-verify'
+# Scratch of the build tasks (git-ignored; never %TEMP%): ReferenceVerify's cache, self-test trees, cross-compiles,
+# manual scenario working copies, the provider filesystem mirror and example copies.
+$TpdWork = Join-Path $BuildRoot 'test/harness/.work'
+$RefVerifyCache = Join-Path $TpdWork 'reference-verify'
 
 # What ReferenceVerify checks. Every file under reference/upstream must be covered by exactly one entry.
 # Repo trees: <Local>/<path> must equal blob <path> of <Url> at <Sha>, minus <Exclude>.
@@ -160,12 +170,16 @@ function Get-LocalBlobShas([string[]]$FullPaths) {
 # ---------------------------------------------------------------------------- manual tasks (a person at the keyboard)
 # Defined first so `Invoke-Build ?` lists them at the top. They stream plain terraform output (no log capture) and are
 # never part of a gate: ManualTaskCheck (default task) fails when the default task, PreRelease or CI reaches one.
-# Each copies test/__manual/<Scenario> into <temp>/tpd-manual/<Scenario> (state, .terraform and the lock file stay
-# there, never in the repository), builds the provider into <temp>/tpd-manual/provider, writes a dev_overrides CLI
-# configuration, and loads test/harness/.env. They refuse to run unless DOCKER_HOST is the harness manager.
+# Each copies test/__manual/<Scenario> into test/harness/.work/manual/<Scenario> (git-ignored; state, .terraform and
+# the lock file stay there, never in the repository or %TEMP%) and loads test/harness/.env. _Init builds the provider
+# into a local filesystem mirror (test/harness/.work/manual/_mirror, TfDockerTest Initialize-TfProviderMirror) and runs
+# a real terraform init from it (lock file written, checksum verified); _Plan, _Apply and _Destroy use what _Init
+# installed. Terraform is the harness copy (TF_ACC_TERRAFORM_PATH from .env), else terraform on PATH. They refuse to
+# run unless DOCKER_HOST is the harness manager.
 
 $ManualDir = Join-Path $BuildRoot 'test/__manual'
-$ManualStateRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'tpd-manual'
+$ManualStateRoot = Join-Path $TpdWork 'manual'
+$ManualMirror = Join-Path $ManualStateRoot '_mirror'
 $HarnessScripts = Join-Path $BuildRoot 'test/harness/scripts'
 
 # Loads test/harness/.env into this process (export NAME=value lines), as Invoke-E2E.ps1 does.
@@ -178,26 +192,31 @@ function Import-HarnessEnv {
     if ($env:DOCKER_HOST -ne 'tcp://127.0.0.1:12375') { throw "DOCKER_HOST is '$env:DOCKER_HOST', not the harness manager: refusing to run a manual scenario." }
 }
 
-# Prepares a manual scenario run and returns @{ Work; Terraform }: harness env, provider build, dev_overrides config,
-# a fresh copy of the scenario's files beside its kept state.
-function Enter-ManualScenario {
+# Prepares a manual scenario run and returns @{ Work; Terraform; Source }: harness env, the mirror CLI configuration
+# (-Build: rebuild the provider mirror first, _Init only), a fresh copy of the scenario's files beside its kept state.
+function Enter-ManualScenario([switch]$Build) {
     if (-not $Scenario) { throw 'Give -Scenario <name> (Invoke-Build _List shows them).' }
     $src = Join-Path $ManualDir $Scenario
     if (-not (Test-Path -LiteralPath (Join-Path $src 'main.tf'))) { throw "No scenario test/__manual/$Scenario (Invoke-Build _List shows them)." }
     Import-HarnessEnv
     Import-Module (Join-Path $BuildRoot 'test/TfDockerTest') -Force
-    $providerDir = Initialize-TfDevProvider -ProviderDir (Join-Path $ManualStateRoot 'provider') -Force
-    $env:TF_CLI_CONFIG_FILE = New-TfDevOverrideConfig -ProviderDir $providerDir -Path (Join-Path $ManualStateRoot 'dev.tfrc')
     $work = Join-Path $ManualStateRoot $Scenario
+    $cfg = Join-Path $ManualStateRoot 'mirror.tfrc'
+    if ($Build) {
+        $mirror = Initialize-TfProviderMirror -MirrorDir $ManualMirror -Force
+        $null = New-TfMirrorConfig -ProvidersDir $mirror.Providers -Path $cfg
+    } elseif (-not (Test-Path -LiteralPath (Join-Path $work '.terraform.lock.hcl')) -or -not (Test-Path -LiteralPath $cfg)) {
+        throw "Scenario $Scenario is not initialised: run Invoke-Build _Init -Scenario $Scenario first."
+    }
+    $env:TF_CLI_CONFIG_FILE = $cfg
     $null = New-Item -ItemType Directory -Force $work
     Get-ChildItem -LiteralPath $src -Force | Where-Object { $_.Name -notin 'README.md', 'prepare.ps1' } | ForEach-Object {
         Copy-Item -LiteralPath $_.FullName -Destination $work -Recurse -Force
     }
+    $tf = Get-TfTerraformPath
     # Write-Host, not print: print writes to the output stream, which is this function's return value.
-    Write-Host -ForegroundColor Cyan "scenario $Scenario`: working copy $work (state kept there), provider $providerDir, DOCKER_HOST $env:DOCKER_HOST"
-    # terraform on PATH first: Terraform before 1.15 (the harness copy is 1.14) fails init for a dev-overridden provider.
-    $tf = Get-Command terraform -CommandType Application -ErrorAction Ignore | Select-Object -First 1
-    @{ Work = $work; Terraform = $(if ($tf) { $tf.Source } else { Get-TfTerraformPath }); Source = $src }
+    Write-Host -ForegroundColor Cyan "scenario $Scenario`: working copy $work (state kept there), provider mirror $ManualMirror, terraform $tf, DOCKER_HOST $env:DOCKER_HOST"
+    @{ Work = $work; Terraform = $tf; Source = $src }
 }
 
 # Synopsis: List the manual scenarios (test/__manual/<name>) with the first line of each README.md.
@@ -216,14 +235,16 @@ task _Up {
     if ($Swarm) { & (Join-Path $HarnessScripts 'harness-swarm-init.ps1') }
 }
 
-# Synopsis: terraform init for -Scenario <name> (runs the scenario's prepare.ps1 first when it has one and no state yet).
+# Synopsis: terraform init for -Scenario <name> from a freshly built provider mirror (lock file rewritten for this build; runs the scenario's prepare.ps1 first when it has one and no state yet).
 task _Init {
-    $s = Enter-ManualScenario
+    $s = Enter-ManualScenario -Build
     $prepare = Join-Path $s.Source 'prepare.ps1'
     if ((Test-Path -LiteralPath $prepare) -and -not (Test-Path -LiteralPath (Join-Path $s.Work 'terraform.tfstate'))) {
         Write-Build Cyan "running $prepare"
         & $prepare -WorkDir $s.Work
     }
+    # The mirror was just rebuilt under the same version: drop the old pin, so init records this build's checksums.
+    Remove-Item -LiteralPath (Join-Path $s.Work '.terraform.lock.hcl'), (Join-Path $s.Work '.terraform/providers') -Recurse -Force -ErrorAction Ignore
     exec { & $s.Terraform "-chdir=$($s.Work)" init -input=false }
 }
 
@@ -233,23 +254,35 @@ task _Plan {
     exec { & $s.Terraform "-chdir=$($s.Work)" plan }
 }
 
-# Synopsis: terraform apply for -Scenario <name> (asks for approval); -Invoke action.<type>.<name> runs only that action.
+# Synopsis: terraform apply for -Scenario <name>, unattended (saved plan, one summary line); -Prompt asks for approval; -Invoke action.<type>.<name> runs only that action.
 task _Apply {
     $s = Enter-ManualScenario
-    if ($Invoke) { exec { & $s.Terraform "-chdir=$($s.Work)" apply "-invoke=$Invoke" } }
-    else { exec { & $s.Terraform "-chdir=$($s.Work)" apply } }
+    $inv = @(if ($Invoke) { "-invoke=$Invoke" })
+    if ($Prompt) {
+        exec { & $s.Terraform "-chdir=$($s.Work)" apply @inv }
+        return
+    }
+    # plan -out, then apply the saved plan: apply prints no plan for a saved one, so the plan is not shown twice.
+    $planFile = Join-Path $s.Work 'manual.tfplan'
+    $out = @(& $s.Terraform "-chdir=$($s.Work)" plan -input=false "-out=$planFile" @inv 2>&1 | ForEach-Object { "$_" })
+    if ($LASTEXITCODE) { $out | ForEach-Object { Write-Host $_ }; throw "terraform plan failed (exit $LASTEXITCODE)" }
+    $summary = @($out | Where-Object { $_ -match '^(Plan:|Changes to Outputs:|No changes\.|Actions:)' })
+    Write-Build Cyan $(if ($summary) { $summary -join ' ' } else { 'plan saved' })
+    try { exec { & $s.Terraform "-chdir=$($s.Work)" apply -input=false $planFile } }
+    finally { Remove-Item -LiteralPath $planFile -ErrorAction Ignore }
 }
 
-# Synopsis: terraform destroy for -Scenario <name> (asks for approval).
+# Synopsis: terraform destroy for -Scenario <name>, unattended (-auto-approve); -Prompt asks for approval.
 task _Destroy {
     $s = Enter-ManualScenario
-    exec { & $s.Terraform "-chdir=$($s.Work)" destroy }
+    if ($Prompt) { exec { & $s.Terraform "-chdir=$($s.Work)" destroy } }
+    else { exec { & $s.Terraform "-chdir=$($s.Work)" destroy -auto-approve -input=false } }
 }
 
 # Synopsis: Tear the dind harness down (test/harness/scripts/harness-down.ps1) and forget every manual scenario's state.
 task _Down {
     & (Join-Path $HarnessScripts 'harness-down.ps1')
-    Get-ChildItem -LiteralPath $ManualStateRoot -Directory -ErrorAction Ignore | Where-Object Name -ne 'provider' | Remove-Item -Recurse -Force -ErrorAction Ignore
+    Get-ChildItem -LiteralPath $ManualStateRoot -Directory -ErrorAction Ignore | Where-Object Name -ne '_mirror' | Remove-Item -Recurse -Force -ErrorAction Ignore
 }
 # ---------------------------------------------------------------------------- build
 
@@ -266,10 +299,17 @@ task Vet {
     exec { & $GoExe vet ./... }
 }
 
-# Synopsis: gofmt -w .
+# The Go files gofmt checks: tracked and untracked-not-ignored ones only, so git-ignored scratch (test/harness/.work
+# upstream clones and worktrees, .bin) is never walked. In batches, to stay under the Windows command-line limit.
+function Get-RepoGoFileBatches {
+    $files = @(exec { & $GitExe -C $BuildRoot ls-files -co --exclude-standard -- '*.go' } | Where-Object { $_ })
+    for ($i = 0; $i -lt $files.Count; $i += 200) { ,@($files[$i..([Math]::Min($i + 199, $files.Count - 1))]) }
+}
+
+# Synopsis: gofmt -w on every Go file git tracks or would track (not git-ignored scratch).
 task Fmt {
-    requires -Variable GofmtExe
-    exec { & $GofmtExe -w . }
+    requires -Variable GofmtExe, GitExe
+    foreach ($b in Get-RepoGoFileBatches) { exec { & $GofmtExe -w @b } }
 }
 
 # Synopsis: go install . (into GOBIN / GOPATH\bin, the dev_overrides path).
@@ -281,6 +321,23 @@ task Install {
 # Synopsis: Remove the provider binary, harness run logs and the ReferenceVerify cache.
 task Clean {
     remove terraform-provider-docker, terraform-provider-docker.exe, test/harness/last-*.log, $RefVerifyCache
+    # Build scratch that is cheap to recreate (never test/harness/.work/manual: it holds the manual scenarios' state).
+    foreach ($d in 'ex', 'mirror', 'dev-provider', 'release-check') { remove (Join-Path $TpdWork $d) }
+    # Everything this repo's tasks, tests and passes ever left in the system temp directory (all named tpd-*: tpd-p53*,
+    # tpd-p6a*, tpd-p6b, tpd-pairwise, tpd-drift, tpd-manual, tpd-reference-verify, tpd-release-check, tpd-excov-<pid>,
+    # tpd-mtc-<pid>.yml, tpd-deferred-base-<pid>.json, tpd-dev-provider, tpd-ex-*, tpd-example*, tpd-plugin-*,
+    # tpd-acc*, tpd-config*, ...). Since Pass 6c nothing writes there any more.
+    $removed = @(Remove-TpdTempItems)
+    if ($removed.Count) { foreach ($r in $removed) { Write-Build Gray "removed $r" } }
+    Write-Build Cyan "Clean: removed $($removed.Count) tpd-* item(s) from $([System.IO.Path]::GetTempPath())"
+}
+
+# Removes every tpd-* file or folder directly under the system temp directory (or -TempDir) and returns their paths.
+function Remove-TpdTempItems([string]$TempDir = [System.IO.Path]::GetTempPath()) {
+    foreach ($i in @(Get-ChildItem -LiteralPath $TempDir -Filter 'tpd-*' -Force -ErrorAction Ignore)) {
+        Remove-Item -LiteralPath $i.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $i.FullName) { Write-Warning "Clean: could not remove $($i.FullName) (in use?)" } else { $i.FullName }
+    }
 }
 
 # ---------------------------------------------------------------------------- tests
@@ -361,7 +418,8 @@ task DocsValidate {
 # Synopsis: gofmt -l: fail if any Go file needs formatting.
 task FmtCheck {
     requires -Variable GofmtExe
-    $unformatted = @(exec { & $GofmtExe -l . } | Where-Object { $_ })
+    requires -Variable GitExe
+    $unformatted = @(foreach ($b in Get-RepoGoFileBatches) { exec { & $GofmtExe -l @b } | Where-Object { $_ } })
     assert ($unformatted.Count -eq 0) "gofmt needed (Invoke-Build Fmt): $($unformatted -join ', ')"
 }
 
@@ -410,16 +468,16 @@ task ApiWatchCheck {
     exec { & $GoExe run ./tools/apiwatch -check } -ErrorMessage 'A newer Engine API spec is published (or the probe failed): see .claude/skills/engine-api-watch/SKILL.md.'
 }
 
-# Synopsis: Rewrite the generated type-count blocks in CLAUDE.md and README.md from internal/provider/registry_gen.go (tools/doccounts).
+# Synopsis: Rewrite the generated type-count blocks in CLAUDE.md and README.md from internal/provider/registry_gen.go, and README.md's evidence numbers (fieldmap, TestAcc, compose parity fixtures, example tests, pairwise configs) (tools/doccounts).
 task DocCounts {
     requires -Variable GoExe
     exec { & $GoExe run ./tools/doccounts -write }
 }
 
-# Synopsis: Fail if a type count, a short type list or a backticked docker_* name in CLAUDE.md / README.md disagrees with registry_gen.go.
+# Synopsis: Fail if a type count, a short type list or a backticked docker_* name in CLAUDE.md / README.md disagrees with registry_gen.go, or README.md's evidence numbers (fieldmap, TestAcc, compose parity fixtures, example tests, pairwise configs) are stale.
 task DocCountsCheck {
     requires -Variable GoExe
-    exec { & $GoExe run ./tools/doccounts } -ErrorMessage 'CLAUDE.md / README.md disagree with internal/provider/registry_gen.go. Run Invoke-Build DocCounts (after RegistryGen) and fix any hand-written count or name it lists.'
+    exec { & $GoExe run ./tools/doccounts } -ErrorMessage 'CLAUDE.md / README.md disagree with internal/provider/registry_gen.go. Run Invoke-Build DocCounts (after RegistryGen; also for stale evidence numbers) and fix any hand-written count or name it lists.'
 }
 
 # Synopsis: Convert a compose file to HCL once: -In <file> -Out <file> -Mode swarm|local.
@@ -456,7 +514,7 @@ task InventoryValidate Inventory, {
     exec { & $PythonExe -I (Join-Path $RefDir '_gen/validate.py') } -ErrorMessage 'Outputs contract violations (VIOLATION / STALE lines above). Fix the outputs fragment or add a reasoned line to reference/_gen/allowed-violations.txt.'
 }
 
-# Synopsis: Re-hash reference/upstream against the pinned upstream commits in SOURCES.md (fetches trees once; cached in TEMP).
+# Synopsis: Re-hash reference/upstream against the pinned upstream commits in SOURCES.md (fetches trees once; cached in test/harness/.work/reference-verify).
 task ReferenceVerify {
     requires -Variable GitExe
     $up = Join-Path $RefDir 'upstream'
@@ -595,7 +653,8 @@ task FieldMap {
 # Synopsis: Regenerate reference/_gen/deferred.json (everything knowingly not done) and print totals by kind plus the items added or removed since the committed version.
 task DeferredReport {
     requires -Variable GoExe, GitExe
-    $base = Join-Path ([System.IO.Path]::GetTempPath()) "tpd-deferred-base-$PID.json"
+    $null = New-Item -ItemType Directory -Force $TpdWork
+    $base = Join-Path $TpdWork "deferred-base-$PID.json"
     # The committed version is the baseline; before the first commit of deferred.json there is none (empty file).
     $old = & $GitExe show 'HEAD:reference/_gen/deferred.json' 2>$null
     if ($LASTEXITCODE) { $old = '' }

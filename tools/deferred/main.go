@@ -19,6 +19,9 @@
 //	example            reference/_gen/deferred.d/examples.json: examples/ folders whose test only validates them, or
 //	                   parts of an example the test rewrites or removes before applying it on the harness; each
 //	                   folder must exist
+//	diagnostic         reference/_gen/deferred.d/diagnostics.json: connection failures (hijacked streams over TLS,
+//	                   TLS through a proxy, ...) that still surface the raw client error instead of the Configure
+//	                   preflight diagnostic; each names the file whose code would carry it, which must exist
 //
 // Every item has kind, id, reason and source (a repository path, no line
 // numbers, so unrelated edits do not make the file stale). Items are sorted

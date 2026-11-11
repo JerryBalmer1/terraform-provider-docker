@@ -119,11 +119,11 @@ function Test-ReleaseDist([string]$Dist) {
     Write-Build Green "dist check: version $version, $($zips.Count) zips + manifest, all listed in $sumsName with matching hashes."
 }
 
-# Synopsis: Release config check without goreleaser: .goreleaser.yml matrix == $ReleaseTargets, every target cross-compiles (CGO_ENABLED=0, output in %TEMP%).
+# Synopsis: Release config check without goreleaser: .goreleaser.yml matrix == $ReleaseTargets, every target cross-compiles (CGO_ENABLED=0, output in test/harness/.work/release-check).
 task ReleaseCheck {
     Assert-ReleaseMatrix
     if (-not $GoExe) { throw 'go not found on PATH.' }
-    $out = Join-Path ([System.IO.Path]::GetTempPath()) 'tpd-release-check'
+    $out = Join-Path $TpdWork 'release-check'
     New-Item -ItemType Directory -Force $out | Out-Null
     $saved = @{ GOOS = $env:GOOS; GOARCH = $env:GOARCH; CGO_ENABLED = $env:CGO_ENABLED }
     $failed = [System.Collections.Generic.List[string]]::new()

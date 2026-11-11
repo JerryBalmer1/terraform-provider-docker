@@ -1,0 +1,20 @@
+{
+  "about": "Hand-maintained (Pass 6c Lane F, open finding 4): connection failures that still surface the raw Docker client error instead of the Configure preflight diagnostic (internal/provider/preflight.go: permission denied, TLS failures through the provider's own TLS dialer, plain HTTP sent to a TLS port, an unreachable SSH host). Each row names the file whose code would carry the diagnostic (tools/deferred fails when it is missing) and why it does not yet. Remove a row in the change that covers the case. Read by tools/deferred into reference/_gen/deferred.json (kind diagnostic).",
+  "diagnostics": [
+    {
+      "id": "hijacked-stream-over-tls",
+      "file": "internal/provider/client.go",
+      "reason": "docker_exec, docker_exec_output and attach use hijacked connections, which the moby client dials itself with tls.Dial from the transport's TLS config (client hijack.go), not through the provider's DialTLSContext wrapper (daemonTLSDial). A TLS failure there keeps the client's own text. Covering it needs the moby client to dial hijacks through the transport (upstream) or a wrapper around every hijacking call."
+    },
+    {
+      "id": "tls-through-http-proxy",
+      "file": "internal/provider/client.go",
+      "reason": "With HTTPS_PROXY set, http.Transport runs the TLS handshake itself after CONNECT and never calls DialTLSContext, so a certificate or handshake failure behind a proxy is not annotated. The Configure preflight still classifies it from the error text; later operations show the raw error."
+    },
+    {
+      "id": "tls13-client-certificate-rejected",
+      "file": "internal/provider/preflight.go",
+      "reason": "Under TLS 1.3 the server rejects a missing or bad client certificate after the client's handshake completes, so the alert arrives on the first read, not in daemonTLSDial's Handshake; the moby client rewords it ('check your TLS client certification settings') and the preflight classifies that text, but operations after Configure keep the client's message. A read-side wrapper on the TLS conn (like daemonPlainConn) would cover it; not done in Pass 6c."
+    }
+  ]
+}

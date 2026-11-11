@@ -4,7 +4,8 @@
 // with tools/fieldcov (new and removed Engine API operations, new and
 // removed writable fields, each checked against reference/inventory.json and
 // the field map). It never changes a pin and never writes under reference/:
-// fetched specs and the report go to a temp directory.
+// fetched specs and the report go to -work (default
+// test/harness/.logs/drift under the repository, git-ignored; never %TEMP%).
 //
 //	go run ./tools/drift                           probe, diff, write the report, exit 0/1/2
 //	go run ./tools/drift -report FILE              Markdown report path (the JSON report is FILE with .json)
@@ -63,7 +64,7 @@ func main() {
 func mainErr() int {
 	ov := overrideFlag{}
 	repoFlag := flag.String("repo", "", "repository root (default: found from the working directory)")
-	work := flag.String("work", filepath.Join(os.TempDir(), "tpd-drift"), "temp directory for fetched specs and fieldcov output")
+	work := flag.String("work", "", "work directory for fetched specs and fieldcov output (default REPO/test/harness/.logs/drift)")
 	reportPath := flag.String("report", "", "Markdown report path (default WORK/drift-report.md; the JSON report is the same path with .json)")
 	goExe := flag.String("go", envOr("GO", "go"), "go command (runs tools/fieldcov)")
 	gitExe := flag.String("git", "git", "git command (git ls-remote)")
@@ -78,6 +79,9 @@ func mainErr() int {
 			fmt.Fprintln(os.Stderr, "drift:", err)
 			return 2
 		}
+	}
+	if *work == "" {
+		*work = defaultWorkDir(repo)
 	}
 	if *reportPath == "" {
 		*reportPath = filepath.Join(*work, "drift-report.md")
@@ -270,4 +274,11 @@ func (g *goFieldcov) Run(in fcInputs) (*fieldSet, error) {
 		return nil, fmt.Errorf("%s %s: %w (output in %s)", g.goExe, strings.Join(args, " "), err, logPath)
 	}
 	return readFieldSet(out)
+}
+
+// defaultWorkDir is where drift writes fetched specs, fieldcov output and the
+// report without -work: test/harness/.logs/drift under the repository
+// (git-ignored), never the system temp directory.
+func defaultWorkDir(repo string) string {
+	return filepath.Join(repo, "test", "harness", ".logs", "drift")
 }

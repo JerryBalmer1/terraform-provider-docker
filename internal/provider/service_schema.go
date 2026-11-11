@@ -332,10 +332,7 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 			PlanModifiers:       modePM,
 			Validators:          []validator.String{stringvalidator.OneOf(svcModes...)},
 		},
-		"replicas": schema.Int64Attribute{
-			Optional: true, Computed: true, Default: int64default.StaticInt64(1),
-			MarkdownDescription: replicasDesc,
-		},
+		"replicas": svcReplicasAttribute(topLevel, replicasDesc),
 		"max_concurrent": schema.Int64Attribute{Optional: true,
 			MarkdownDescription: "`replicated_job` only: tasks run at the same time (daemon default 1). Updated in place (re-runs the job)."},
 		"total_completions": schema.Int64Attribute{Optional: true,

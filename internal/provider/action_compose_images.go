@@ -330,7 +330,7 @@ const (
 	composeManifestMedia   = "application/vnd.oci.image.manifest.v1+json"
 	composeFileAnnotation  = "com.docker.compose.file"
 	composeVersionAnnotate = "com.docker.compose.version"
-	// compose v5.1.4 internal/oci/push.go:40-61: the OCI 1.0 config media
+	// compose v5.7.0 internal/oci/push.go:46-60: the OCI 1.0 config media
 	// type and the env file layers (`--with-env`).
 	composeEmptyConfig10   = "application/vnd.docker.compose.config.empty.v1+json"
 	composeEnvFileMedia    = "application/vnd.docker.compose.envfile"

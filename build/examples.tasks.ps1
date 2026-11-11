@@ -71,7 +71,7 @@ task ExampleCoverage {
     if (Test-Path -LiteralPath $ExampleAllowlist) { $allow = @(([IO.File]::ReadAllText($ExampleAllowlist) | ConvertFrom-Json).examples) }
 
     # Self-test on a throwaway tree, so the check cannot silently pass because it is broken.
-    $tmp = Join-Path ([IO.Path]::GetTempPath()) "tpd-excov-$PID"
+    $tmp = Join-Path $TpdWork "excov-$PID"
     try {
         $null = New-Item -ItemType Directory -Force (Join-Path $tmp 'resources/docker_a'), (Join-Path $tmp 'resources/docker_b'), (Join-Path $tmp 'resources/docker_orphan'), (Join-Path $tmp 'provider')
         Set-Content (Join-Path $tmp 'resources/docker_a/resource.tf') 'x'
@@ -178,12 +178,11 @@ task ExampleTests {
     $selection = Get-ExampleSelection
     $files = @(Get-ExampleTestFiles $selection)
     assert ($files.Count) "ExampleTests: no example test matches '$selection'"
-    # One provider build and one plugin cache for every example (the runner and the module reuse TPD_PROVIDER_DIR).
-    $providerDir = Join-Path $out "provider-$stamp"
-    $exe = if ($IsWindows) { 'terraform-provider-docker.exe' } else { 'terraform-provider-docker' }
-    exec { & $GoExe build -o (Join-Path $providerDir $exe) . }
-    $saved = @{ TPD_PROVIDER_DIR = $env:TPD_PROVIDER_DIR; TF_PLUGIN_CACHE_DIR = $env:TF_PLUGIN_CACHE_DIR }
-    $env:TPD_PROVIDER_DIR = $providerDir
+    # One provider mirror for every example: the runner builds it (go build, host platform, zipped under the registry
+    # path layout) on the first pass and the second reuses it through TPD_PROVIDER_MIRROR; every example runs a real
+    # terraform init from it (lock file, checksum verified). The plugin cache is shared.
+    $saved = @{ TPD_PROVIDER_MIRROR = $env:TPD_PROVIDER_MIRROR; TF_PLUGIN_CACHE_DIR = $env:TF_PLUGIN_CACHE_DIR }
+    $env:TPD_PROVIDER_MIRROR = Join-Path $out "mirror-$stamp"
     $env:TF_PLUGIN_CACHE_DIR = Join-Path $out 'plugin-cache'
     $null = New-Item -ItemType Directory -Force $env:TF_PLUGIN_CACHE_DIR
     $codes = [ordered]@{}
@@ -282,7 +281,8 @@ task ManualTaskCheck {
     # Negative self-tests: a synthetic graph where a gate reaches _Apply, and a workflow line calling _Up, must be caught.
     $bad = @(Find-ManualTaskReach -Graph @{ '.' = @('Build', '?Gate'); Gate = @('_Apply'); Build = @({ 'x' }) } -Roots '.')
     assert ($bad.Count -eq 1 -and $bad[0] -eq '. -> Gate -> _Apply') "ManualTaskCheck self-test failed: $($bad -join '; ')"
-    $tmp = Join-Path ([IO.Path]::GetTempPath()) "tpd-mtc-$PID.yml"
+    $null = New-Item -ItemType Directory -Force $TpdWork
+    $tmp = Join-Path $TpdWork "mtc-$PID.yml"
     try {
         Set-Content -LiteralPath $tmp -Value "      - name: Invoke-Build (default task)`n        run: Invoke-Build`n      - run: Invoke-Build _Up, Check -Scenario x`n      # run: Invoke-Build _Down"
         $wf = @(Get-WorkflowBuildTasks $tmp)

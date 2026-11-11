@@ -1,21 +1,21 @@
 package provider
 
 // docker_compose_publish (compose:cli-publish): the layers `docker compose
-// publish` adds besides the compose files (compose v5.1.4
-// pkg/compose/publish.go:163-195 createLayers):
+// publish` adds besides the compose files (compose v5.7.0
+// pkg/compose/publish.go:196-230 createLayers):
 //
 //   - every service env_file path in a published compose file is replaced by
-//     "<sha256 of the absolute path>.env" (publish.go:230-260 processFile,
-//     transform/replace.go:65-106 ReplaceEnvFile, done on the YAML text so
+//     "<sha256 of the absolute path>.env" (publish.go:262-332 processFile,
+//     transform/replace.go:47-72 ReplaceEnvFile, done on the YAML text so
 //     the rest of the file keeps its formatting);
 //   - with `--with-env`, each env file becomes an
 //     application/vnd.docker.compose.envfile layer named that way
-//     (publish.go:626-638 envFileLayers);
+//     (publish.go:694-706 envFileLayers);
 //   - with `--resolve-image-digests`, an "image-digests.yaml" layer pins
-//     every service image to its digest (publish.go:265-280
+//     every service image to its digest (publish.go:334-375
 //     generateImageDigestsOverride, resolved through the Engine API's
-//     GET /distribution/{name}/json like pull.go:259-274
-//     ImageDigestResolver).
+//     GET /distribution/{name}/json like pull.go:385-400
+//     imageDigestResolver; compose v5.7.0 also pins top-level jobs).
 
 import (
 	"context"

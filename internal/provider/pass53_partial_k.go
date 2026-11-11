@@ -15,10 +15,10 @@ package provider
 // the `--oci-version` manifest forms (action_compose_images.go,
 // compose_publish_k.go). `--app` also copies every service image into the
 // target repository and pushes an image index whose subject is the compose
-// manifest (compose v5.1.4 pkg/compose/publish.go:109-150, oci.Copy in
-// internal/oci/resolver.go:93-123): that needs a registry-to-registry
-// manifest and blob copy client the provider does not have (its registry
-// client only pushes the artifact's own blobs).
+// manifest (compose v5.7.0 pkg/compose/publish.go:140-194
+// pushApplicationIndex, oci.Copy in internal/oci/resolver.go:132-162): that
+// needs a registry-to-registry manifest and blob copy client the provider
+// does not have (its registry client only pushes the artifact's own blobs).
 //
 // PARTIAL(pass5) compose:cli-publish `--app` is not implemented: the service images are not copied into the repository and no image index is pushed
 
@@ -26,9 +26,9 @@ package provider
 // pulls or runs them, and a service's `models` bindings are ignored (plan
 // warning, compose_local.go). Docker Model Runner is not part of the Engine
 // API: the v1.56 swagger (reference/upstream/engine-api/api/swagger.yaml)
-// has no model endpoint, and docker compose v5.1.4 drives models by running
-// the `docker model` CLI plugin binary (pkg/compose/model.go:82 GetPlugin,
-// :118 `model pull`, :178 `model configure`, :197 `model status`), which
+// has no model endpoint, and docker compose v5.7.0 drives models by running
+// the `docker model` CLI plugin binary (pkg/compose/model.go:85 GetPlugin,
+// :127 `model pull`, :191 `model configure`, :210 `model status`), which
 // the provider cannot do: nothing shells out.
 //
 // PARTIAL(pass5) compose:models models are recorded in the `models` output but never pulled or run (Engine API 1.56 has no model endpoint; compose runs the docker-model CLI plugin), and service `models` bindings are ignored
