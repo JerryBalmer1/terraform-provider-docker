@@ -12,7 +12,7 @@ A Docker network (`NetworkCreate`): a local `bridge`/`macvlan`/`ipvlan` network,
 |---|---|---|---|---|---|
 | `adopt` | `bool` | optional |  |  | Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`. |
 | `attachable` | `bool` | optional, computed | yes |  | Let standalone containers attach to an `overlay` network. Changing this forces a new resource. |
-| `config_from` | `string` | optional | yes |  | Name of the config-only network that provides this network's configuration (`ConfigFrom.Network`), e.g. for a swarm-scoped `macvlan` network. Changing this forces a new resource. |
+| `config_from` | `string` | optional | yes |  | Name of the config-only network that provides this network's configuration (`ConfigFrom.Network`), e.g. for a swarm-scoped `macvlan` network. The network takes its IPAM, IPv4/IPv6 settings and labels from it: `labels`, `ipam_config`, `ipam_options`, `enable_ipv4 = false` and `enable_ipv6 = true` are rejected with it (the Engine refuses them), and no owner or managed-by label is added. Changing this forces a new resource. |
 | `config_only` | `bool` | optional, computed | yes |  | Create a config-only network (`ConfigOnly`): a placeholder holding IPAM and driver options for other networks' `config_from`; containers cannot attach to it. Changing this forces a new resource. |
 | `content_sha256` | `string` | computed |  |  | sha256 of inspect_json. |
 | `docker_server_version` | `string` | computed |  |  | Docker Engine version from GET /version. |

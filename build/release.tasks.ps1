@@ -72,7 +72,7 @@ function Assert-ReleaseMatrix {
     if ($onlyConfig.Count -or $onlyTasks.Count) {
         throw ("Release target matrix drift. Only in .goreleaser.yml: [{0}]. Only in `$ReleaseTargets (build/release.tasks.ps1): [{1}]." -f ($onlyConfig -join ', '), ($onlyTasks -join ', '))
     }
-    print Green "Release matrix: $($expected.Count) targets agree (.goreleaser.yml == `$ReleaseTargets): $($expected -join ', ')"
+    Write-Build Green "Release matrix: $($expected.Count) targets agree (.goreleaser.yml == `$ReleaseTargets): $($expected -join ', ')"
 }
 
 # Checks dist/ after a snapshot: every <project>_<version>_<os>_<arch>.zip of the matrix, the SHA256SUMS, the
@@ -116,7 +116,7 @@ function Test-ReleaseDist([string]$Dist) {
     if ($extra.Count) { $problems.Add("$sumsName lists unexpected files: $($extra -join ', ')") }
 
     if ($problems.Count) { throw ("dist check failed ($($problems.Count)):`n  " + ($problems -join "`n  ")) }
-    print Green "dist check: version $version, $($zips.Count) zips + manifest, all listed in $sumsName with matching hashes."
+    Write-Build Green "dist check: version $version, $($zips.Count) zips + manifest, all listed in $sumsName with matching hashes."
 }
 
 # Synopsis: Release config check without goreleaser: .goreleaser.yml matrix == $ReleaseTargets, every target cross-compiles (CGO_ENABLED=0, output in %TEMP%).
@@ -132,7 +132,7 @@ task ReleaseCheck {
         foreach ($t in $ReleaseTargets) {
             $env:GOOS, $env:GOARCH = $t.Split('_')
             & $GoExe build -trimpath -ldflags '-s -w -X main.version=0.0.0-releasecheck' -o (Join-Path $out "${ReleaseProject}_$t") .
-            if ($LASTEXITCODE) { $failed.Add($t) } else { print Green "cross-compile ok: $t" }
+            if ($LASTEXITCODE) { $failed.Add($t) } else { Write-Build Green "cross-compile ok: $t" }
         }
     }
     finally {

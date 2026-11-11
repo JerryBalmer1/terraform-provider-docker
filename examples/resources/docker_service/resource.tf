@@ -25,7 +25,6 @@ resource "docker_service" "web" {
 
   # Task container settings; all of these update in place (rolling update).
   hostname          = "web-{{.Task.Slot}}"
-  user              = "nginx"
   hosts             = ["db.internal:10.0.0.5"]
   cap_drop          = ["NET_RAW"]
   sysctls           = { "net.core.somaxconn" = "1024" }
@@ -122,8 +121,10 @@ resource "docker_service" "web" {
     no_new_privileges = true
   }
 
+  # 127.0.0.1, not localhost: busybox wget tries ::1 first, and the mounted
+  # default.conf listens on IPv4 only, so a localhost check never passes.
   healthcheck {
-    test           = ["CMD", "wget", "-q", "-O-", "http://localhost/"]
+    test           = ["CMD", "wget", "-q", "-O-", "http://127.0.0.1/"]
     interval       = "30s"
     timeout        = "5s"
     retries        = 3

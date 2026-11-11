@@ -3,12 +3,12 @@
 page_title: "docker_container_pause Action - docker"
 subcategory: ""
 description: |-
-  Freezes all processes of a running container, like docker container pause (the cgroup freezer). Resume it with docker_container_unpause. The result object holds the container's state after the call.
+  Freezes all processes of a running container, like docker container pause (the cgroup freezer). Resume it with docker_container_unpause. Pausing a paused container is a no-op (like docker_compose_pause). The result object holds the container's state after the call.
 ---
 
 # docker_container_pause (Action)
 
-Freezes all processes of a running container, like `docker container pause` (the cgroup freezer). Resume it with `docker_container_unpause`. The result object holds the container's `state` after the call.
+Freezes all processes of a running container, like `docker container pause` (the cgroup freezer). Resume it with `docker_container_unpause`. Pausing a paused container is a no-op (like `docker_compose_pause`). The result object holds the container's `state` after the call.
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_container_pause.<name>] } }`

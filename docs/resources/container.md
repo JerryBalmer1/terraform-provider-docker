@@ -60,7 +60,7 @@ resource "docker_container" "web" {
 
   # Files copied in after create and before start.
   files {
-    path    = "/etc/nginx/snippets/headers.conf"
+    path    = "/etc/nginx/headers.conf"
     content = "add_header X-Served-By terraform;\n"
     mode    = "0640"
     uid     = 0

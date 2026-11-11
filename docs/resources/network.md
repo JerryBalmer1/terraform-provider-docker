@@ -65,7 +65,7 @@ resource "docker_network" "macvlan" {
 
 - `adopt` (Boolean) Take over an object whose `io.terraform.provider.owner` label names a different owner than the provider's `owner` argument (for example after `terraform import`). Without it, planning such an object fails. Only checked when the provider sets `owner`. Default `false`.
 - `attachable` (Boolean) Let standalone containers attach to an `overlay` network. Changing this forces a new resource.
-- `config_from` (String) Name of the config-only network that provides this network's configuration (`ConfigFrom.Network`), e.g. for a swarm-scoped `macvlan` network. Changing this forces a new resource.
+- `config_from` (String) Name of the config-only network that provides this network's configuration (`ConfigFrom.Network`), e.g. for a swarm-scoped `macvlan` network. The network takes its IPAM, IPv4/IPv6 settings and labels from it: `labels`, `ipam_config`, `ipam_options`, `enable_ipv4 = false` and `enable_ipv6 = true` are rejected with it (the Engine refuses them), and no owner or managed-by label is added. Changing this forces a new resource.
 - `config_only` (Boolean) Create a config-only network (`ConfigOnly`): a placeholder holding IPAM and driver options for other networks' `config_from`; containers cannot attach to it. Changing this forces a new resource.
 - `driver` (String) Network driver: `bridge` (default), `overlay` (Swarm manager only), `macvlan`, `ipvlan`, or a plugin. Changing this forces a new resource.
 - `enable_ipv4` (Boolean) Enable IPv4 on the network (`EnableIPv4`); `false` disables IPv4 IPAM (only for networks that support it). Unset uses the daemon default (enabled), which is not reported. Changing this forces a new resource. Needs Engine API >= 1.48.

@@ -32,10 +32,18 @@ ephemeral "docker_exec_output" "admin_token" {
   timeout      = "30s"
 }
 
+# Pipe it through a command on standard input (`docker exec -i`), here to
+# strip whitespace; stdin is sensitive and never logged.
+ephemeral "docker_exec_output" "admin_token_clean" {
+  container_id = docker_container.app.id
+  command      = ["tr", "-d", " \n"]
+  stdin        = ephemeral.docker_exec_output.admin_token.stdout
+}
+
 # Share it with swarm services as a write-only secret.
 resource "docker_secret" "admin_token" {
   name            = "app-admin-token"
-  data_wo         = base64encode(trimspace(ephemeral.docker_exec_output.admin_token.stdout))
+  data_wo         = base64encode(ephemeral.docker_exec_output.admin_token_clean.stdout)
   data_wo_version = 1
 }
 ```
@@ -52,6 +60,7 @@ resource "docker_secret" "admin_token" {
 
 - `env` (Map of String) Extra environment variables for the command.
 - `privileged` (Boolean) Give the command extended privileges. Default `false`.
+- `stdin` (String, Sensitive) Data written to the command's standard input, which is then closed, like `echo ... | docker exec -i`. Unset (the default), the command gets no stdin. Sensitive, e.g. a password piped to a CLI inside the container.
 - `timeout` (String) Maximum run time as a Go duration, e.g. `30s`. Default `60s`.
 - `user` (String) User to run as (`name`, `uid` or `uid:gid`). Default: the container's user.
 - `workdir` (String) Working directory inside the container.

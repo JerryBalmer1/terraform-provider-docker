@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Resumes the processes of a paused container, like `docker container unpause`. The result object holds the container's `state` after the call.
+Resumes the processes of a paused container, like `docker container unpause`. Unpausing a container that is not paused is a no-op (like `docker_compose_unpause`). The result object holds the container's `state` after the call.
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
@@ -39,10 +39,21 @@ resource "docker_container" "app" {
   image = "nginx:1.27"
 
   lifecycle {
+    # Paused first, so there is something to resume (unpausing a running container fails).
+    action_trigger {
+      events  = [after_create, after_update]
+      actions = [action.docker_container_pause.app]
+    }
     action_trigger {
       events  = [after_create, after_update]
       actions = [action.docker_container_unpause.app]
     }
+  }
+}
+
+action "docker_container_pause" "app" {
+  config {
+    container_id = docker_container.app.id
   }
 }
 

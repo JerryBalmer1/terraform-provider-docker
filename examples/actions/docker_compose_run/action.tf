@@ -8,6 +8,7 @@ resource "docker_compose" "shop" {
       worker:
         image: busybox:1.36
         command: ["sh", "-c", "sleep 3600"]
+        depends_on: [web]
   EOT
 
   lifecycle {
@@ -28,6 +29,11 @@ action "docker_compose_run" "this" {
     service     = "worker"
     command     = ["sh", "-c", "echo migrating && echo done"]
     environment = { STEP = "migrate" }
-    result_path = "${path.module}/run-result.json"
+    # Start the service's dependencies first (web), as `docker compose run`
+    # does without --no-deps, but never recreate an existing one, even when
+    # its configuration changed (--no-recreate): docker_compose owns them.
+    start_dependencies = true
+    no_recreate        = true
+    result_path        = "${path.module}/run-result.json"
   }
 }

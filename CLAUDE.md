@@ -44,12 +44,15 @@ README_resources.md (generated) lists every type by layer.
 - `tools/parity/`: kreuzwerker/docker v4.6.0 types and attributes vs ours. Types: `tools/parity/paritydata` (hand-maintained). Attributes: every kreuzwerker attribute (`paritydata/kreuzwerker_v4.6.0_attrs.json`) must appear in `reference/_gen/renames.json`, mapped or dropped with a reason; a `gap:` row fails, `won't implement:` passes. `-check BUILD_REPORT.md` also fails on a missing type with no `[BLOCKED]` line. `-guide` regenerates `templates/guides/migrating-from-kreuzwerker.md.tmpl` (Invoke-Build Guide / GuideCheck).
 - `tools/apiwatch/`: diffs the pinned Docker Engine API spec (`pinned.json` + `spec/`) against the newest published one, mapped to provider types.
 - `tools/drift/`: upstream drift for every reference/SOURCES.md source (git ls-remote tags, compose-spec main HEAD, docs.docker.com probe). Moved specs are fetched into TEMP and diffed with fieldcov `-swagger` / `-compose-schema` / `-bake-ref` / `-fields-out`; an unmapped new operation or field, or a doc-only release, fails unless listed in `reference/_gen/drift-accepted.json` (Invoke-Build DriftCheck; the weekly `.github/workflows/drift.yml` opens or updates the "Upstream drift" issue). It never changes a pin.
-- `tools/deferred/`: generates `reference/_gen/deferred.json`, everything knowingly not done (fieldmap.d skips and partials, PARTIAL markers, inventory skips, and the acceptance tests in the hand-maintained `reference/_gen/deferred.d/acceptance.json`), each with its reason and source (Invoke-Build DeferredReport / DeferredCheck).
+- `tools/deferred/`: generates `reference/_gen/deferred.json`, everything knowingly not done (fieldmap.d skips and partials, PARTIAL markers, inventory skips, the acceptance tests in the hand-maintained `reference/_gen/deferred.d/acceptance.json` and the example parts in `reference/_gen/deferred.d/examples.json`), each with its reason and source (Invoke-Build DeferredReport / DeferredCheck).
+- `tools/pairwise/`: pairwise combination tests for `docker_container`, `docker_service`, `docker_network` and `docker_volume`. Reads the live provider schema, takes candidate values and Engine constraints from `reference/_gen/pairwise/<type>.json` (reviewable; a rejected combination carries the daemon's error text), writes configs covering every value pair (fixed seed, deterministic), and compares terraform state with the daemon's inspect through the contract field maps (Invoke-Build PairwiseGen / PairwiseTest).
+- `test/TfDockerTest/`: PowerShell module behind the example tests (Invoke-TfExample: apply, an empty second plan, destroy with a dev-override CLI config and no init, 5-minute budget per example; Get-DockerObject; Assert-TfState). Every `examples/**/` folder has a `<name>.tests.ps1` built on it (Invoke-Build ExampleTests).
+- `test/__manual/<scenario>/`: scenarios for a person at the keyboard (main.tf + README.md saying what to look at), driven by the underscore tasks `_List`, `_Up`, `_Init`, `_Plan`, `_Apply`, `_Destroy`, `_Down` (`-Scenario <name>`, `_Up -Swarm`). Nothing in the default task, PreRelease or CI may depend on an underscore task (ManualTaskCheck).
 - `.goreleaser.yml`, `.github/workflows/release.yml`, `build/release.tasks.ps1`, `RELEASING.md`: the release pipeline (tag v* -> GoReleaser, GPG-signed SHA256SUMS, cosign bundle, SLSA provenance). `build/prerelease.tasks.ps1` holds DriftCheck and PreRelease; the build script dot-sources both task files.
 - `tools/climap/commands.json`: the hand-maintained docker CLI command list behind the docker-cli-map skill.
 - `tools/fieldcov/`: the field-level coverage gate. Every writable leaf field of the Engine API swagger (write operations the inventory maps to a resource, action or ephemeral resource), the compose-spec definitions and the bake target attributes is mapped to a provider attribute (auto-detected from the code and the schema), or carries a reasoned skip or partial in `reference/_gen/fieldmap.d/<lane>.json`. `reference/_gen/fieldmap.json` is generated (`Invoke-Build FieldMap`); `FieldCoverage` (default task) fails on any gap.
 - `tools/doccounts/`: generates and checks the type counts in CLAUDE.md and README.md against `registry_gen.go` (`Invoke-Build DocCounts` / `DocCountsCheck`).
-- `test/harness/`: the dind swarm harness (Engine 29.9.3, API 1.56: manager, worker1-4, TLS node and containerd-store node cdnode (`TF_ACC_CONTAINERD_HOST`), the others pinned to overlay2; registry:2, Docker Hub mirror). `Invoke-E2E.ps1` is the only entry point for acceptance runs.
+- `test/harness/`: the dind swarm harness (Engine 29.9.3, API 1.56: manager, worker1-4, TLS node and containerd-store node cdnode (`TF_ACC_CONTAINERD_HOST`), the others pinned to overlay2; registry:2, Docker Hub mirror). harness-up also installs, into `test/harness/.bin`, Terraform and the docker compose release that reference/SOURCES.md pins (`TF_ACC_COMPOSE_CLI`, used by TestAccComposeParity). `Invoke-E2E.ps1` is the only entry point for acceptance runs; `-Script <ps1>` runs a PowerShell script (ExampleTests, PairwiseTest) instead of go test under the same harness lifecycle.
 - `examples/`, `templates/`, `docs/`: tfplugindocs inputs and output. `docs/` is generated; don't hand-edit it.
 - `.claude/skills/`: agent skills (see the end of this file).
 - `BUILD_REPORT.md`: the log of every pass.
@@ -64,6 +67,12 @@ README_resources.md (generated) lists every type by layer.
 - **Acceptance runs go through `test/harness/Invoke-E2E.ps1`** (or `Invoke-Build TestAcc`, which wraps it), never against the Docker Desktop daemon directly. The one exception is the npipe smoke test (see Build and test).
   - Only one lane or agent runs the harness at a time.
   - Swarm-manager tests need the `-SwarmInit` pass; see `$SwarmAccRegex` in terraform-provider-docker.build.ps1.
+- **Waiting on long runs** (Pass 6b: a session polled for eight hours for a status file in a %TEMP% folder it had deleted itself):
+  - Logs, pid and status files live under `test/harness/.logs/<pass>/` (git-ignored). Nothing a pass needs lives under %TEMP%.
+  - Start every long command through `build/Invoke-Logged.ps1 -Name <name> -CapMinutes <cap> -Command '<command>'` (add `-HarnessDown` for harness runs). It writes `<name>.pid` at start, `<name>.log` / `<name>.err.log`, and `<name>.exit` (exit code and duration) at the end. At the cap it kills the process tree, runs harness-down with `-HarnessDown`, and writes exit `124`.
+  - Never wait on a file in a loop. Check at most once a minute: does `<name>.exit` exist, and is a PID in `<name>.pid` alive? No exit file and no live PID means the run crashed: stop waiting and report the last 30 lines of the log.
+  - Caps: ExampleTests 90 minutes, PairwiseTest 60, TestAcc 45, anything else 15. Never raise a cap. Never start a second run of the same task without saying why the first one failed.
+  - Run the PreRelease gates one at a time through the wrapper, not PreRelease as one long command. A session stops and reports after 3 hours of wall clock.
 - **BUILD_REPORT.md is append-only.** Each pass gets a `## Pass N` section: a log, then a summary.
   - Log lines are `[P<pass>-<lane>] [TAG] text`, with TAG one of BUILD, TEST, VERIFIED, FIXED, ASSUMED, TODO, or `[BLOCKED] <lane> <what> <why> <what was tried>`.
   - A blocked item never stops a lane, and a blocked lane never stops the pass: log it, leave the code compiling (stub with a clear error and a TODO), and move on.
@@ -96,7 +105,7 @@ Linux and macOS, so the same tasks work there (the harness script `Invoke-E2E.ps
 
 ```
 Invoke-Build ?                   # list tasks
-Invoke-Build                     # default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage
+Invoke-Build                     # default: Build, Vet, Test, GenSkillCheck, InventoryCheck, InventoryValidate, RegistryCheck, ContractCheck, DocCountsCheck, FieldCoverage, ExampleCoverage, ManualTaskCheck
 Invoke-Build ContractGen         # regenerate internal/provider/contract_gen.go (outputs contract) from the inventory
 Invoke-Build RegistryGen         # regenerate internal/provider/registry_gen.go from reference/inventory.json
 Invoke-Build StubReport          # list STUB(pass5) stubs (fail) and PARTIAL(pass5) sub-feature gaps (listed)
@@ -107,6 +116,12 @@ Invoke-Build Docs                # GenSkill, then tfplugindocs generate + valida
 Invoke-Build Check               # gofmt, vet, genskill -check/-strict, tfplugindocs validate
 Invoke-Build TestAcc             # dind harness: plain pass, then -SwarmInit pass (TF_ACC=1)
 Invoke-Build E2E                 # dind harness: TestAccE2E only
+Invoke-Build ExampleTests        # every examples/**/<name>.tests.ps1 through Pester on the dind harness (plain + -SwarmInit pass), NUnit XML + summary in test/harness/.logs/examples; -Filter 'docker_tag,actions/*' re-runs a subset
+Invoke-Build ExampleValidate     # example tests as a validate-only dry run (no harness); ExampleModuleTest: the TfDockerTest module's own Pester tests
+Invoke-Build ExampleCoverage     # every registered type has an example and a test, or a deferred.d/examples.json entry (default task)
+Invoke-Build ManualTaskCheck     # no task in the default task, $PreReleaseTasks or CI depends on an underscore task (default task)
+Invoke-Build PairwiseTest        # tools/pairwise configs applied on the dind harness: inspect vs state, empty second plan, destroy (PairwiseGen: configs only)
+Invoke-Build _List               # manual scenarios (test/__manual); then _Up [-Swarm], _Init/_Plan/_Apply/_Destroy -Scenario <name>, _Down
 Invoke-Build Parity              # kreuzwerker parity: types + every attribute vs reference/_gen/renames.json (ParityCheck: + BUILD_REPORT.md [BLOCKED] lines, as CI)
 Invoke-Build Guide               # regenerate the migration guide template from renames.json (GuideCheck: fail if stale)
 Invoke-Build FieldCoverage       # every writable Engine API / compose-spec / bake field mapped, skipped or partial (enforce mode)

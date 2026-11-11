@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Runs a one-off container for a compose service, like `docker compose run`: the container `<project>-<service>-run-<id>` is created from the service's compose model (image pulled or built, networks, volumes, secrets and configs as for `docker_compose`), labelled `com.docker.compose.oneoff=True`, waited for and removed. The action fails when the command exits non-zero. The result carries `exit_code` and the captured `stdout` / `stderr`. Use it for migrations and other jobs: compose `jobs` are not run by `docker_compose` yet. The project's networks must exist (apply the `docker_compose` resource first).
+Runs a one-off container for a compose service, like `docker compose run`: the container `<project>-<service>-run-<id>` is created from the service's compose model (image pulled or built, networks, volumes, secrets and configs as for `docker_compose`), labelled `com.docker.compose.oneoff=True`, waited for and removed. The action fails when the command exits non-zero. The result carries `exit_code` and the captured `stdout` / `stderr`. Use it for migrations and other jobs: compose `jobs` are not run by `docker_compose` yet. The project's networks must exist (apply the `docker_compose` resource first). By default the service's `depends_on` services are expected to run already (CLI `--no-deps`); set `start_dependencies` to bring them up first.
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
@@ -36,11 +36,13 @@ action "docker_compose_run" "<name>" {
 | `environment` | `map(string)` | optional |  |  | Extra environment variables for the container (CLI `-e`), on top of the service's. |
 | `files` | `list(string)` | optional |  |  | Compose file paths, merged in order like repeated `docker compose -f`. |
 | `name` | `string` | optional |  |  | The compose project name (compose-spec top-level `name`, CLI `--project-name`). Defaults to the file's top-level `name`, then to the project directory's name. |
+| `no_recreate` | `bool` | optional |  |  | With `start_dependencies`, an existing dependency container is never recreated, even if its configuration diverged; it is only started when stopped (CLI `--no-recreate`). Default `false`. |
 | `profiles` | `list(string)` | optional |  |  | Profiles to enable (CLI `--profile`). |
 | `project_directory` | `string` | optional |  |  | The project directory relative paths resolve against (CLI `--project-directory`). Defaults to the first file's directory, or the Terraform working directory for `content`. |
 | `result_path` | `string` | optional |  |  | Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails. |
 | `rm` | `bool` | optional |  |  | Remove the container after it exits (CLI `--rm`). Default `true`. |
 | `service` | `string` | required |  |  | The service to run. |
+| `start_dependencies` | `bool` | optional |  |  | Bring up the service's `depends_on` services (transitively) before the run, like `docker compose run` without `--no-deps`: a missing dependency container is created and started, a stopped one is started, a dependency container whose configuration diverged from the compose model is recreated (unless `no_recreate`), and the run waits for each `depends_on` condition. Default `false` (CLI `--no-deps`): the dependencies are expected to run already, usually managed by `docker_compose`. |
 | `timeout` | `string` | optional |  |  | How long the run may take, as a Go duration (`30s`, `10m`). Default `10m`. |
 | `user` | `string` | optional |  |  | User to run as (CLI `--user`). |
 | `workdir` | `string` | optional |  |  | Working directory (CLI `--workdir`). |
@@ -58,6 +60,7 @@ resource "docker_compose" "shop" {
       worker:
         image: busybox:1.36
         command: ["sh", "-c", "sleep 3600"]
+        depends_on: [web]
   EOT
 
   lifecycle {
@@ -78,7 +81,12 @@ action "docker_compose_run" "this" {
     service     = "worker"
     command     = ["sh", "-c", "echo migrating && echo done"]
     environment = { STEP = "migrate" }
-    result_path = "${path.module}/run-result.json"
+    # Start the service's dependencies first (web), as `docker compose run`
+    # does without --no-deps, but never recreate an existing one, even when
+    # its configuration changed (--no-recreate): docker_compose owns them.
+    start_dependencies = true
+    no_recreate        = true
+    result_path        = "${path.module}/run-result.json"
   }
 }
 ```

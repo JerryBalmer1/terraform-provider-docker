@@ -560,8 +560,41 @@ func contractOutputNode(it *contractItem, o contractOutput) *contractNode {
 		panic(fmt.Sprintf("outputs contract %s.%s: %v", it.ID, o.Name, err))
 	}
 	// A scalar output carrying fields (a description of its parts) stays scalar.
+	// Compute every attr.Type of the tree now, under contractNodeMu, before the node is shared: AttrType caches
+	// lazily, and two data sources read concurrently (Terraform reads them in parallel) would otherwise race on
+	// n.attrType and could see a half-written interface (Pass 6b: a nil-pointer panic in basetypes.MapType.Equal
+	// from data.docker_tasks). After this, shared nodes are only read.
+	contractWarmTypes(n)
 	contractNodeCache[key] = n
 	return n
+}
+
+// contractWarmTypes fills the attrType cache of n and of every node below it.
+func contractWarmTypes(n *contractNode) {
+	if n == nil {
+		return
+	}
+	contractWarmTypes(n.Elem)
+	for _, a := range n.Attrs {
+		contractWarmTypes(a.Node)
+	}
+	n.AttrType()
+}
+
+// contractNodeTypesWarm reports whether n and every node below it have their attrType cached (tests).
+func contractNodeTypesWarm(n *contractNode) bool {
+	if n == nil {
+		return true
+	}
+	if n.attrType == nil || !contractNodeTypesWarm(n.Elem) {
+		return false
+	}
+	for _, a := range n.Attrs {
+		if !contractNodeTypesWarm(a.Node) {
+			return false
+		}
+	}
+	return true
 }
 
 // contractModelOutputs returns the outputs that are schema attributes.

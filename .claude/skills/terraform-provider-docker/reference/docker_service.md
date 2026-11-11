@@ -44,7 +44,7 @@ A Swarm service: a desired number of tasks (containers) of one image scheduled a
 | `open_stdin` | `bool` | optional |  |  | Keep the task containers' standard input open (`ContainerSpec.OpenStdin`). Updated in place. |
 | `published_ports` | `list(object)` | computed |  |  | Endpoint.Ports: the ports actually published, after the manager assigned any PublishedPort. Non-sensitive copy for handoff. |
 | `read_only` | `bool` | optional |  |  | Mount the task containers' root filesystem read-only (`ContainerSpec.ReadOnly`). Updated in place. |
-| `replicas` | `number` | optional, computed |  |  | Number of tasks for `replicated` mode (default 1); ignored by the other modes. Updated in place. |
+| `replicas` | `number` | optional, computed |  |  | Number of tasks for `replicated` mode (default 1). Only valid with `mode = "replicated"` (or unset): setting it with `global`, `global_job` or `replicated_job` is an error, as with `docker service create --replicas` (use `total_completions` for `replicated_job`). Updated in place. |
 | `runtime` | `string` | optional |  |  | Runtime of the tasks (`TaskTemplate.Runtime`). Only `container` (the default) is useful here: this type always sends a `ContainerSpec`, and the `plugin` and `attachment` runtimes need a plugin or network-attachment spec instead. Updated in place. |
 | `stop_grace_period` | `string` | optional |  |  | Time to wait after the stop signal before killing a task (Go duration, e.g. `30s`; daemon default 10s). Updated in place. |
 | `stop_signal` | `string` | optional |  |  | Signal that stops the task containers, e.g. `SIGTERM` (`ContainerSpec.StopSignal`). Unset uses the image's. Updated in place. |
@@ -1106,7 +1106,6 @@ resource "docker_service" "web" {
 
   # Task container settings; all of these update in place (rolling update).
   hostname          = "web-{{.Task.Slot}}"
-  user              = "nginx"
   hosts             = ["db.internal:10.0.0.5"]
   cap_drop          = ["NET_RAW"]
   sysctls           = { "net.core.somaxconn" = "1024" }
@@ -1203,8 +1202,10 @@ resource "docker_service" "web" {
     no_new_privileges = true
   }
 
+  # 127.0.0.1, not localhost: busybox wget tries ::1 first, and the mounted
+  # default.conf listens on IPv4 only, so a localhost check never passes.
   healthcheck {
-    test           = ["CMD", "wget", "-q", "-O-", "http://localhost/"]
+    test           = ["CMD", "wget", "-q", "-O-", "http://127.0.0.1/"]
     interval       = "30s"
     timeout        = "5s"
     retries        = 3

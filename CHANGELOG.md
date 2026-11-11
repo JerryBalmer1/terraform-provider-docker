@@ -7,7 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-This section covers build passes 5, 5.1, 5.2, 5.3 and 6a (the log of each pass is in [BUILD_REPORT.md](BUILD_REPORT.md)). Pass 6a comes first, then 5.3; the sections after them are passes 5 to 5.2.
+This section covers build passes 5, 5.1, 5.2, 5.3, 6a and 6b (the log of each pass is in [BUILD_REPORT.md](BUILD_REPORT.md)). Pass 6b comes first, then 6a and 5.3; the sections after them are passes 5 to 5.2.
+
+### Pass 6b
+
+#### Added
+
+- `docker_exec` (action) and `docker_exec_output` (ephemeral resource): `stdin`, written to the command's stdin and then closed (`docker exec -i`). Sensitive on the ephemeral resource; on the action it shows in plans, because actions cannot mark attributes sensitive.
+- `docker_compose_push`: `ignore_missing` (`docker compose push --ignore-missing`, compose v5.7.0).
+- `docker_compose_run`: `start_dependencies` (default `false`, the previous behaviour) and `no_recreate` (`--no-recreate`).
+- Example tests: every folder under `examples/` has a `<name>.tests.ps1` (Pester) built on the new `test/TfDockerTest` module (apply, an empty second plan, destroy against the locally built provider; state vs daemon). Each example has a 5-minute budget plus 3 minutes for teardown; `Invoke-Build ExampleTests -Filter 'docker_tag,actions/*'` re-runs a subset, and a summary by example name goes to `test/harness/.logs/examples`.
+- `build/Invoke-Logged.ps1`: runs one long command in the background with a hard cap and writes `<name>.pid`, `<name>.log` and `<name>.exit` under `test/harness/.logs/<pass>/` (git-ignored); at the cap it kills the process tree and can bring the harness down. CLAUDE.md makes it the way to start and wait on long runs. Tasks `ExampleTests` (dind harness), `ExampleValidate`, `ExampleModuleTest`, `ExampleCoverage` (default task: every registered type has an example and a test, or a reasoned entry in `reference/_gen/deferred.d/examples.json`, listed in `deferred.json` as kind `example`).
+- Pairwise combination tests (`tools/pairwise`, models in `reference/_gen/pairwise/`): configs covering every value pair of `docker_container`, `docker_service`, `docker_network` and `docker_volume`, applied on the harness and compared with the daemon's inspect (`PairwiseGen`, `PairwiseTest`).
+- Manual scenarios in `test/__manual/` (container_full, network_volume_full, dockerfile_image_container, compose_local, swarm_stack, actions_tour, kreuzwerker_migration) with the underscore tasks `_List`, `_Up [-Swarm]`, `_Init`, `_Plan`, `_Apply`, `_Destroy`, `_Down` (`-Scenario <name>`); `ManualTaskCheck` (default task) fails if the default task, PreRelease or CI depends on one.
+- `ExampleTests` and `PairwiseTest` are PreRelease gates. `test/harness/Invoke-E2E.ps1 -Script` runs a PowerShell script under the harness lifecycle.
+
+#### Changed
+
+- Reference sources re-pinned: docker/compose v5.1.4 -> v5.7.0, docker/cli v29.5.3 -> v29.9.3. The removed `docker compose alpha publish` is no longer an inventory item. The parity rules (volumes_from `:ro`, config-hash over resolved references, bare `KEY` for null environment, depends_on order) were re-checked in the v5.7.0 source and hold; citations updated.
+- TestAccComposeParity runs against the docker compose release reference/SOURCES.md pins, which harness-up downloads into `test/harness/.bin` (SHA256-checked), not the compose that ships with Docker Desktop.
+- `docker_service`: `replicas` with `mode` global, global_job or replicated_job is an error (it was silently ignored), as in the docker CLI.
+- `docker_swarm_node.role` is optional and computed with no default: left unset it follows the node's live role (so `docker_node_promote` leaves no drift), and a node joined with a manager token is no longer demoted to worker.
+- `docker_container_pause` / `docker_container_unpause` do nothing when the container is already in the target state.
+- `docker_compose_push` matches compose v5.7.0: services without `build` are skipped, and `build.tags` are pushed too.
+- Permission-denied and TLS daemon failures carry the Configure preflight diagnostic on every Engine operation, not only at Configure.
+- Build scripts call `Write-Build` instead of the `print` alias, which could resolve to Windows' print.exe ("Unable to initialize device PRN").
+
+#### Fixed
+
+- `docker_network`: `enable_ipv4 = false` with an IPv4 `ipam_config` pool is rejected at validate time (the Engine silently dropped the pool: inconsistent result); config-only networks keep their configured driver and IPAM (the Engine reports driver "null"); `config_from` networks are created without labels and reject the arguments the Engine refuses there.
+- `docker_volume`: an unnamed volume no longer fails on the Engine 29 `com.docker.volume.anonymous` label; a plugin driver reported with its tag (`sshfs:latest`) keeps the configured name.
+- `docker_buildx_bake`: `target.<name>.<attr>` references see every bake target attribute, as in buildx.
+- Examples that did not run: container_unpause, image_history, docker_container, docker_image, docker_stack, docker_service (healthcheck on IPv6 localhost), docker_buildx_bake.
 
 ### Pass 6a
 

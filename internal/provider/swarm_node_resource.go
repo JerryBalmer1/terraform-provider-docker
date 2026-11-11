@@ -166,10 +166,12 @@ func (r *swarmNodeResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				MarkdownDescription: "Scheduling availability: `active`, `pause` or `drain`. Default `active`. Updated in place through the manager.",
 			},
 			"role": schema.StringAttribute{
-				Optional: true, Computed: true, Default: stringdefault.StaticString(string(swarm.NodeRoleWorker)),
+				Optional: true, Computed: true, PlanModifiers: keep,
 				Validators: []validator.String{stringvalidator.OneOf(swarmValidRoles...)},
-				MarkdownDescription: "Node role: `worker` or `manager`. Default `worker`. Updated in place (promote/demote) through the manager, " +
-					"whichever token was used to join.",
+				MarkdownDescription: "Node role: `worker` or `manager`. Updated in place (promote/demote) through the manager, " +
+					"whichever token was used to join. Unset: the node keeps the role it joined with (the token's role) and Terraform " +
+					"follows the live role, so a promote or demote outside Terraform (`docker_node_promote`, `docker_node_demote`, " +
+					"`docker node promote`) is adopted rather than reverted. Set it to own the role.",
 			},
 			"labels": schema.MapAttribute{
 				ElementType: types.StringType, Optional: true,

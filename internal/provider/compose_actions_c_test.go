@@ -355,7 +355,9 @@ func TestComposeImageActionsC(t *testing.T) {
 	f.on("POST /images/docker.io/library/nginx/push", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"status":"pushed"}` + "\n" + `{"aux":{"Tag":"1.27","Digest":"sha256:` + strings.Repeat("d", 64) + `","Size":1}}` + "\n"))
 	})
-	res = actInvokePD(t, pd, NewComposePushAction(), map[string]tftypes.Value{"content": p3eStr(yaml), "project_directory": p3eStr(dir), "services": composeCStrings("web")})
+	// compose push only pushes a built service (pkg/compose/push.go:50-60, v5.7.0).
+	pushYAML := "name: app\nservices:\n  web:\n    build: {context: .}\n    image: \"nginx:1.27\"\n"
+	res = actInvokePD(t, pd, NewComposePushAction(), map[string]tftypes.Value{"content": p3eStr(pushYAML), "project_directory": p3eStr(dir), "services": composeCStrings("web")})
 	if res.Diags.HasError() {
 		t.Fatal(res.errText())
 	}

@@ -3,12 +3,12 @@
 page_title: "docker_container_unpause Action - docker"
 subcategory: ""
 description: |-
-  Resumes the processes of a paused container, like docker container unpause. The result object holds the container's state after the call.
+  Resumes the processes of a paused container, like docker container unpause. Unpausing a container that is not paused is a no-op (like docker_compose_unpause). The result object holds the container's state after the call.
 ---
 
 # docker_container_unpause (Action)
 
-Resumes the processes of a paused container, like `docker container unpause`. The result object holds the container's `state` after the call.
+Resumes the processes of a paused container, like `docker container unpause`. Unpausing a container that is not paused is a no-op (like `docker_compose_unpause`). The result object holds the container's `state` after the call.
 
 Actions require Terraform 1.14 or later. An action keeps no state: it runs when
 a resource's `lifecycle { action_trigger { events = [...] actions = [action.docker_container_unpause.<name>] } }`
@@ -23,10 +23,21 @@ resource "docker_container" "app" {
   image = "nginx:1.27"
 
   lifecycle {
+    # Paused first, so there is something to resume (unpausing a running container fails).
+    action_trigger {
+      events  = [after_create, after_update]
+      actions = [action.docker_container_pause.app]
+    }
     action_trigger {
       events  = [after_create, after_update]
       actions = [action.docker_container_unpause.app]
     }
+  }
+}
+
+action "docker_container_pause" "app" {
+  config {
+    container_id = docker_container.app.id
   }
 }
 

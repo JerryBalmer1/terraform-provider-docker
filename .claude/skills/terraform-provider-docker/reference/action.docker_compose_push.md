@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Pushes the image of every service of a compose project that names one (`image`), like `docker compose push`, with the provider's `registry_auth`. `image_digest_refs` records what was pushed.
+Pushes the image of every service of a compose project that is built and named (`build` and `image`), plus its `build.tags`, like `docker compose push`, with the provider's `registry_auth`. A service without `build` or without `image` is skipped (`result.push_status` says why), as compose does. `image_refs` and `image_digest_refs` record the service's image as pushed (the first `build.tags` entry pushed when the image itself was skipped).
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with
@@ -32,6 +32,7 @@ action "docker_compose_push" "<name>" {
 | `env` | `map(string)` | optional |  |  | Variables for `${VAR}` interpolation. The provider's own environment is never read; values here override `env_file`. |
 | `env_file` | `list(string)` | optional |  |  | Dotenv files read for interpolation variables (CLI `--env-file`), later files winning. |
 | `files` | `list(string)` | optional |  |  | Compose file paths, merged in order like repeated `docker compose -f`. |
+| `ignore_missing` | `bool` | optional |  |  | Skip an image (the service's `image` or one of its `build.tags`) that is not in the daemon's local image store instead of failing the push (CLI `--ignore-missing`); `result.push_status` says `skipped (no local image)` for a service with nothing pushed, and lists the skipped tags otherwise. Only a definite not-found skips: any other error inspecting the image is left to the push to report. Default `false`. |
 | `name` | `string` | optional |  |  | The compose project name (compose-spec top-level `name`, CLI `--project-name`). Defaults to the file's top-level `name`, then to the project directory's name. |
 | `profiles` | `list(string)` | optional |  |  | Profiles to enable (CLI `--profile`). |
 | `project_directory` | `string` | optional |  |  | The project directory relative paths resolve against (CLI `--project-directory`). Defaults to the first file's directory, or the Terraform working directory for `content`. |
@@ -61,16 +62,23 @@ resource "docker_compose" "shop" {
   }
 }
 
-# Pushes the app image to its registry. On demand:
+# Pushes the app image and its extra build tags to the registry, as
+# `docker compose push` does: only services with `build` and `image`. A tag
+# not in the local image store (say, :latest was never built here) is
+# skipped instead of failing the run. On demand:
 #   terraform apply -invoke=action.docker_compose_push.this
 action "docker_compose_push" "this" {
   config {
-    name    = "app"
-    content = <<-EOT
+    name           = "app"
+    content        = <<-EOT
       services:
         app:
           image: registry.example.com/app:1.0
+          build:
+            context: .
+            tags: ["registry.example.com/app:latest"]
     EOT
+    ignore_missing = true
   }
 }
 ```

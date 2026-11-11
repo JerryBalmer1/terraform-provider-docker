@@ -148,7 +148,9 @@ func (r *networkResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"config_from": schema.StringAttribute{
 				Optional: true,
 				MarkdownDescription: "Name of the config-only network that provides this network's configuration (`ConfigFrom.Network`), e.g. " +
-					"for a swarm-scoped `macvlan` network. Changing this forces a new resource.",
+					"for a swarm-scoped `macvlan` network. The network takes its IPAM, IPv4/IPv6 settings and labels from it: `labels`, " +
+					"`ipam_config`, `ipam_options`, `enable_ipv4 = false` and `enable_ipv6 = true` are rejected with it (the Engine refuses " +
+					"them), and no owner or managed-by label is added. Changing this forces a new resource.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"enable_ipv4": schema.BoolAttribute{
@@ -322,6 +324,21 @@ func networkFromInspect(n network.Inspect, prior networkResourceModel) networkRe
 	}
 	out.IPAMDriver = types.StringValue(ipamDriver)
 	out.IPAMConfig = networkFlattenIPAM(n.IPAM.Config, prior.IPAMConfig, importing)
+	// A config-only network is stored, never plumbed: libnetwork resets
+	// its type to "null" and skips IPAM allocation (Engine 29.9.3
+	// daemon/libnetwork/controller.go:560-568), and inspect reports only
+	// allocated pools (daemon/network.go:813-881, buildIPAMResources reads
+	// IpamInfo, empty here). So Driver "null" and no IPAM pools say nothing
+	// about the configuration: keep the configured driver and pools (an
+	// import has no prior and reads "null").
+	if n.ConfigOnly && !importing {
+		if d, ok := knownString(prior.Driver); ok && n.Driver == "null" {
+			out.Driver = types.StringValue(d)
+		}
+		if len(n.IPAM.Config) == 0 && len(prior.IPAMConfig) > 0 {
+			out.IPAMConfig = prior.IPAMConfig
+		}
+	}
 	out.IPAMOptions = containerMapValue(prior.IPAMOptions, n.IPAM.Options)
 	opts := n.Options
 	if !importing {
@@ -329,6 +346,12 @@ func networkFromInspect(n network.Inspect, prior networkResourceModel) networkRe
 	}
 	out.Options = containerMapValue(prior.Options, opts)
 	out.Labels = containerMapValue(prior.Labels, ownerStrip(userLabels(n.Labels, false)))
+	// A config_from network reports the config-only network's labels
+	// (applyConfigurationTo copies them) and cannot have its own, so its
+	// configured labels (none, see ValidateConfig) stay.
+	if n.ConfigFrom.Network != "" && !importing {
+		out.Labels = prior.Labels
+	}
 	out.Scope = types.StringValue(n.Scope)
 	out.ConfigOnly = types.BoolValue(n.ConfigOnly)
 	out.ConfigFrom = containerStringRead(prior.ConfigFrom, n.ConfigFrom.Network, "")
@@ -367,6 +390,16 @@ func (r *networkResource) Create(ctx context.Context, req resource.CreateRequest
 		Labels:     r.pd.ownerInject(mergeLabels(stringMapFrom(ctx, plan.Labels, &resp.Diagnostics), map[string]string{labelManagedBy: labelManagedByValue})),
 		ConfigOnly: plan.ConfigOnly.ValueBool(),
 		ConfigFrom: plan.ConfigFrom.ValueString(),
+	}
+	// A network built from a config-only one takes its labels (and IPAM,
+	// IPv4/IPv6 settings) from it, and libnetwork refuses any label of its
+	// own: "user-specified configurations are not supported if the network
+	// depends on a configuration network" (Engine 29.9.3
+	// daemon/libnetwork/network.go:410-419; copied by applyConfigurationTo,
+	// :447-457). So it gets no managed-by or owner label; it carries the
+	// config-only network's, which this provider labelled.
+	if cf, ok := knownString(plan.ConfigFrom); ok && cf != "" {
+		opts.Labels = nil
 	}
 	if sc, ok := knownString(plan.Scope); ok {
 		opts.Scope = sc

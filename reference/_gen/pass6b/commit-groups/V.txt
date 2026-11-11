@@ -1,0 +1,15 @@
+internal/provider/action_compose_images.go
+internal/provider/action_compose_run.go
+internal/provider/action_exec.go
+internal/provider/client.go
+internal/provider/compose_p6b_v_test.go
+internal/provider/cop_exec.go
+internal/provider/ephemeral_exec_output.go
+internal/provider/exec_stdin_p6b_v_test.go
+internal/provider/preflight.go
+internal/provider/preflight_p6b_v_test.go
+reference/_gen/fieldmap.d/A.json
+reference/_gen/fieldmap.d/K.json
+reference/_gen/fieldmap.d/S.json
+reference/_gen/pass6b/lane-V.files
+reference/_gen/pass6b/lane-V.md

@@ -306,6 +306,9 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 	modeDesc := "`replicated` (default; runs `replicas` tasks), `global` (one task per eligible node), `replicated_job` (runs " +
 		"`total_completions` tasks to completion, `max_concurrent` at a time) or `global_job` (one run-to-completion task per eligible " +
 		"node). The Engine API cannot change a service's mode type, so changing this forces replacement."
+	replicasDesc := "Number of tasks for `replicated` mode (default 1). Only valid with `mode = \"replicated\"` (or unset): setting it " +
+		"with `global`, `global_job` or `replicated_job` is an error, as with `docker service create --replicas` (use `total_completions` " +
+		"for `replicated_job`). Updated in place."
 	var namePM, modePM []planmodifier.String
 	if topLevel {
 		namePM = []planmodifier.String{stringplanmodifier.RequiresReplace()}
@@ -313,6 +316,7 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 	} else {
 		nameDesc = "Short service name inside the stack; the Swarm service is named `<stack>_<name>`. Renaming removes the old service and creates a new one."
 		modeDesc = "`replicated` (default), `global`, `replicated_job` or `global_job` (see `docker_service`). Changing it recreates this service."
+		replicasDesc = "Number of tasks for `replicated` mode (default 1); ignored by the other modes. Updated in place."
 	}
 	attrs := map[string]schema.Attribute{
 		"name": schema.StringAttribute{Required: true, MarkdownDescription: nameDesc, PlanModifiers: namePM},
@@ -330,7 +334,7 @@ func svcSchema(topLevel bool) (map[string]schema.Attribute, map[string]schema.Bl
 		},
 		"replicas": schema.Int64Attribute{
 			Optional: true, Computed: true, Default: int64default.StaticInt64(1),
-			MarkdownDescription: "Number of tasks for `replicated` mode (default 1); ignored by the other modes. Updated in place.",
+			MarkdownDescription: replicasDesc,
 		},
 		"max_concurrent": schema.Int64Attribute{Optional: true,
 			MarkdownDescription: "`replicated_job` only: tasks run at the same time (daemon default 1). Updated in place (re-runs the job)."},

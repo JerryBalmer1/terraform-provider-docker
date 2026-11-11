@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
 
@@ -35,6 +36,9 @@ type copVerb struct {
 	timeout  bool   // has a timeout (seconds) argument
 	progress string // past tense for messages
 	run      func(ctx context.Context, c *client.Client, id string, a copVerbArgs) error
+	// already reports that the container is in the verb's target state, so
+	// the Engine call (which would fail with 409) is skipped. nil = always call.
+	already func(st *container.State) bool
 }
 
 var copVerbs = map[string]copVerb{
@@ -83,19 +87,22 @@ var copVerbs = map[string]copVerb{
 	"pause": {
 		suffix: "container_pause", itemID: "engine:container-pause", progress: "paused",
 		doc: "Freezes all processes of a running container, like `docker container pause` (the cgroup freezer). " +
-			"Resume it with `docker_container_unpause`.",
+			"Resume it with `docker_container_unpause`. Pausing a paused container is a no-op (like `docker_compose_pause`).",
 		run: func(ctx context.Context, c *client.Client, id string, _ copVerbArgs) error {
 			_, err := c.ContainerPause(ctx, id, client.ContainerPauseOptions{})
 			return err
 		},
+		already: func(st *container.State) bool { return st != nil && st.Paused },
 	},
 	"unpause": {
 		suffix: "container_unpause", itemID: "engine:container-unpause", progress: "unpaused",
-		doc: "Resumes the processes of a paused container, like `docker container unpause`.",
+		doc: "Resumes the processes of a paused container, like `docker container unpause`. " +
+			"Unpausing a container that is not paused is a no-op (like `docker_compose_unpause`).",
 		run: func(ctx context.Context, c *client.Client, id string, _ copVerbArgs) error {
 			_, err := c.ContainerUnpause(ctx, id, client.ContainerUnpauseOptions{})
 			return err
 		},
+		already: func(st *container.State) bool { return st != nil && !st.Paused },
 	},
 }
 
@@ -183,7 +190,12 @@ func (a *copVerbAction) Invoke(ctx context.Context, req action.InvokeRequest, re
 		copInspectErr(&resp.Diagnostics, typ, ref.ValueString(), err)
 		return
 	}
-	if err := a.verb.run(ctx, c, insp.ID, args); err != nil {
+	if a.verb.already != nil && a.verb.already(insp.State) {
+		// Pass 6b Lane Z: already in the target state; the Engine would
+		// answer 409 ("already paused" / "is not paused"). No-op, as the
+		// docker_compose_pause / _unpause actions.
+		actProgress(ctx, resp, "container %s already %s; nothing to do", copName(insp.Name), a.verb.progress)
+	} else if err := a.verb.run(ctx, c, insp.ID, args); err != nil {
 		resp.Diagnostics.AddError(typ+" failed", fmt.Sprintf("container %q: %v", ref.ValueString(), err))
 		return
 	}

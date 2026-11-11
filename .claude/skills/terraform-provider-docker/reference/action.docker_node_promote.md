@@ -40,6 +40,8 @@ resource "docker_swarm_node" "manager2" {
   manager_address = "10.0.0.5:2377"
 
   # Joins as a worker, then promotes the node to manager once it is up.
+  # role is left unset, so Terraform adopts the promoted role (no drift);
+  # setting role = "worker" here would demote the node again on the next apply.
   lifecycle {
     action_trigger {
       events  = [after_create, after_update]

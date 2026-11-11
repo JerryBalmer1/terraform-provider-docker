@@ -16,14 +16,16 @@ task DriftCheck {
     exec { & $GoExe run ./tools/drift -work $DriftWork -report $DriftReport -go $GoExe -git $GitExe } -ErrorMessage (
         "Upstream drift (exit 1: unmapped items not in reference/_gen/drift-accepted.json; exit 2: a probe or fieldcov error). " +
         "Report: $DriftReport")
-    print Green "DriftCheck: report $DriftReport"
+    Write-Build Green "DriftCheck: report $DriftReport"
 }
 
 # ---------------------------------------------------------------------------- pre-release gate
 
 # Every pre-release gate, in order. One list so a later pass can add a gate: insert its task name here.
-# '.' is the default task (Build, Vet, Test and the generated-content checks). TestAcc runs the dind harness;
-# Release is Lane G's (it builds the release artifacts and never tags, pushes or publishes).
+# '.' is the default task (Build, Vet, Test and the generated-content checks). TestAcc, ExampleTests and PairwiseTest
+# run the dind harness (each brings it up and down through test/harness/Invoke-E2E.ps1); Release builds the release
+# artifacts and never tags, pushes or publishes. No gate may be a manual (underscore) task: ManualTaskCheck, in the
+# default task, fails if one is.
 $PreReleaseTasks = @(
     'DriftCheck'
     'DeferredReport'
@@ -35,6 +37,8 @@ $PreReleaseTasks = @(
     'GuideCheck'
     'ContractCheck'
     'TestAcc'
+    'ExampleTests'
+    'PairwiseTest'
     'Release'
 )
 
@@ -48,14 +52,14 @@ task PreRelease {
     $override = [bool]$env:PRERELEASE_TASKS
     if ($override) {
         $tasks = @($env:PRERELEASE_TASKS -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-        print Yellow "PreRelease: PRERELEASE_TASKS overrides the gate list (testing only, not a release gate): $($tasks -join ', ')"
+        Write-Build Yellow "PreRelease: PRERELEASE_TASKS overrides the gate list (testing only, not a release gate): $($tasks -join ', ')"
     }
     assert ($tasks.Count -gt 0) 'PreRelease: no tasks to run'
 
     $rows = [System.Collections.Generic.List[object]]::new()
     $total = [System.Diagnostics.Stopwatch]::StartNew()
     foreach ($t in $tasks) {
-        print Cyan "==== PreRelease [$($rows.Count + 1)/$($tasks.Count)]: $t"
+        Write-Build Cyan "==== PreRelease [$($rows.Count + 1)/$($tasks.Count)]: $t"
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
         $err = $null
         try { Invoke-Build $t $BuildFile -Go $Go -Python $Python }
@@ -72,12 +76,12 @@ task PreRelease {
 
     $failed = @($rows | Where-Object Result -eq 'FAIL')
     $fmt = '{0,-16} {1,-6} {2,10}  {3}'
-    print Cyan ''
-    print Cyan ("PreRelease summary" + $(if ($override) { ' (PRERELEASE_TASKS override)' } else { '' }))
-    print Cyan ($fmt -f 'task', 'result', 'duration', 'error')
+    Write-Build Cyan ''
+    Write-Build Cyan ("PreRelease summary" + $(if ($override) { ' (PRERELEASE_TASKS override)' } else { '' }))
+    Write-Build Cyan ($fmt -f 'task', 'result', 'duration', 'error')
     foreach ($r in $rows) {
-        print $(if ($r.Result -eq 'ok') { 'Green' } else { 'Red' }) ($fmt -f $r.Task, $r.Result, $r.Duration.ToString('hh\:mm\:ss'), $r.Error)
+        Write-Build $(if ($r.Result -eq 'ok') { 'Green' } else { 'Red' }) ($fmt -f $r.Task, $r.Result, $r.Duration.ToString('hh\:mm\:ss'), $r.Error)
     }
-    print Cyan ($fmt -f 'total', $(if ($failed.Count) { 'FAIL' } else { 'ok' }), $total.Elapsed.ToString('hh\:mm\:ss'), "$($rows.Count - $failed.Count) of $($rows.Count) passed")
+    Write-Build Cyan ($fmt -f 'total', $(if ($failed.Count) { 'FAIL' } else { 'ok' }), $total.Elapsed.ToString('hh\:mm\:ss'), "$($rows.Count - $failed.Count) of $($rows.Count) passed")
     assert ($failed.Count -eq 0) "PreRelease: $($failed.Count) gate(s) failed: $(($failed | ForEach-Object Task) -join ', ')"
 }

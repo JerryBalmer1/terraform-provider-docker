@@ -18,15 +18,22 @@ resource "docker_compose" "shop" {
   }
 }
 
-# Pushes the app image to its registry. On demand:
+# Pushes the app image and its extra build tags to the registry, as
+# `docker compose push` does: only services with `build` and `image`. A tag
+# not in the local image store (say, :latest was never built here) is
+# skipped instead of failing the run. On demand:
 #   terraform apply -invoke=action.docker_compose_push.this
 action "docker_compose_push" "this" {
   config {
-    name    = "app"
-    content = <<-EOT
+    name           = "app"
+    content        = <<-EOT
       services:
         app:
           image: registry.example.com/app:1.0
+          build:
+            context: .
+            tags: ["registry.example.com/app:latest"]
     EOT
+    ignore_missing = true
   }
 }

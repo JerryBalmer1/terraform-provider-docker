@@ -12,9 +12,17 @@ ephemeral "docker_exec_output" "admin_token" {
   timeout      = "30s"
 }
 
+# Pipe it through a command on standard input (`docker exec -i`), here to
+# strip whitespace; stdin is sensitive and never logged.
+ephemeral "docker_exec_output" "admin_token_clean" {
+  container_id = docker_container.app.id
+  command      = ["tr", "-d", " \n"]
+  stdin        = ephemeral.docker_exec_output.admin_token.stdout
+}
+
 # Share it with swarm services as a write-only secret.
 resource "docker_secret" "admin_token" {
   name            = "app-admin-token"
-  data_wo         = base64encode(trimspace(ephemeral.docker_exec_output.admin_token.stdout))
+  data_wo         = base64encode(ephemeral.docker_exec_output.admin_token_clean.stdout)
   data_wo_version = 1
 }

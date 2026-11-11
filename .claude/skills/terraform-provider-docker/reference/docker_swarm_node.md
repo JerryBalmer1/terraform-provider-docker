@@ -31,7 +31,7 @@ Import with the node ID; `host`, `join_token` and `manager_address` must then be
 | `manager_address` | `string` | required | yes |  | Address of an existing manager as seen from the joining node, e.g. `10.0.0.5:2377`. Changing this forces a new resource. |
 | `name` | `string` | computed |  |  | Node name (`Spec.Name`), else the hostname. |
 | `node_id` | `string` | computed |  |  | Swarm node ID, read from the joining daemon after the join. |
-| `role` | `string` | optional, computed |  |  | Node role: `worker` or `manager`. Default `worker`. Updated in place (promote/demote) through the manager, whichever token was used to join. |
+| `role` | `string` | optional, computed |  |  | Node role: `worker` or `manager`. Updated in place (promote/demote) through the manager, whichever token was used to join. Unset: the node keeps the role it joined with (the token's role) and Terraform follows the live role, so a promote or demote outside Terraform (`docker_node_promote`, `docker_node_demote`, `docker node promote`) is adopted rather than reverted. Set it to own the role. |
 | `version_index` | `number` | computed |  |  | The node object's `Version.Index`; it changes on every update of the node. |
 
 Nested blocks: `ssh` (single block), `tls` (single block).

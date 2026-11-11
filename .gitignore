@@ -21,5 +21,6 @@ crash.log
 
 __Prompt.md
 
-# Harness run logs (Invoke-E2E.ps1)
+# Harness run logs (Invoke-E2E.ps1) and long-run logs, pid and exit files (build/Invoke-Logged.ps1, ExampleTests)
 /test/harness/last-*.log
+/test/harness/.logs/

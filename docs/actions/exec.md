@@ -36,13 +36,20 @@ resource "docker_container" "db" {
 action "docker_exec" "migrate" {
   config {
     container_id = docker_container.db.id
-    command      = ["sh", "-c", "until pg_isready -U postgres; do sleep 1; done; psql -U postgres -c 'CREATE TABLE IF NOT EXISTS t (id int)'"]
-    env          = { PGCONNECT_TIMEOUT = "5" }
-    user         = "postgres"
-    workdir      = "/tmp"
-    timeout      = "2m"
+    command      = ["sh", "-c", "until pg_isready -U postgres; do sleep 1; done; psql -U postgres -v ON_ERROR_STOP=1"]
+    # The SQL script on standard input (`docker exec -i`); psql reads it to
+    # end of file. stdin may show in plan output: read secrets with the
+    # docker_exec_output ephemeral resource instead.
+    stdin   = <<-EOT
+      CREATE TABLE IF NOT EXISTS t (id int);
+      INSERT INTO t VALUES (1);
+    EOT
+    env     = { PGCONNECT_TIMEOUT = "5" }
+    user    = "postgres"
+    workdir = "/tmp"
+    timeout = "2m"
     # A TTY with a fixed size (height, width) for tools that format to it;
-    # stdout and stderr then arrive merged in stdout.
+    # stdout and stderr then arrive merged in stdout. Not together with stdin.
     # tty          = true
     # console_size = [40, 160]
     # stdout, stderr and the exec inspect (exit_code, pid, ...) as JSON.
@@ -68,6 +75,7 @@ action "docker_exec" "migrate" {
 - `privileged` (Boolean) Give the command extended privileges. Default `false`.
 - `result_path` (String) Local file the action writes its result object to after a successful run. The file holds one JSON object keyed by the action's output names (`result`, the identity values, the raw outputs with their `*_sha256` hashes, and the version values), with keys sorted at every level, two-space indentation and a trailing newline; it is written atomically (temporary file, then rename) and parent directories are created. Read it in a later run with `jsondecode(file(...))` or the `local_file` data source. Sensitive values are written in full, since this is your own file, but show as `(sensitive)` in the progress message. Nothing is written when the action fails.
 - `service_id` (String) A Swarm service, by name: the command runs in one running task container of it on the provider's daemon (the first by name). Pin the service to that node with a placement constraint. Exactly one of `container_id` and `service_id`.
+- `stdin` (String) Data written to the command's standard input, which is then closed, like `echo ... | docker exec -i`. Unset (the default), the command gets no stdin. It is never logged or written to `result_path`, but action arguments cannot be marked sensitive or write-only (terraform-plugin-framework v1.19), so pass secrets through `docker_exec_output`, whose `stdin` is sensitive. Not with `tty` or `detach`.
 - `timeout` (String) How long the command may run, as a Go duration (`30s`, `10m`). Default `5m`. On timeout the action fails; the process keeps running in the container.
 - `tty` (Boolean) Allocate a pseudo-TTY (`docker exec --tty`). Default `false`. With a TTY, stdout and stderr arrive merged in `stdout`.
 - `user` (String) User (and optional group) to run as, `name|uid[:group|gid]`. Default: the container's user.

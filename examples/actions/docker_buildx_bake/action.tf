@@ -49,8 +49,10 @@ action "docker_buildx_bake" "release" {
         context   = "worker"
         contexts  = { base = "target:base" }
         tags      = ["registry.example.com/worker:$${VERSION}"]
-        # The app target's VERSION argument (target.<name>.<attr>).
-        labels    = { "org.opencontainers.image.version" = target.app.args.VERSION }
+        # _common's VERSION argument (target.<name>.<attr>). A reference sees
+        # the target's own attributes only, not what it inherits, so this
+        # names _common rather than app; an unset attribute is null.
+        labels    = { "org.opencontainers.image.version" = target._common.args.VERSION }
         resources = { memory = "2g", cpu-quota = 50000 }
       }
     EOT

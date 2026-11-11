@@ -182,7 +182,10 @@ action "docker_container_unpause" "u" {
 	})
 }
 
-func TestAccCopContainerUnpauseError(t *testing.T) {
+// TestAccCopContainerUnpauseNotPaused: unpausing a running container is a
+// no-op (Pass 6b Lane Z; it used to fail with the Engine's 409 "is not
+// paused"), as docker_compose_unpause.
+func TestAccCopContainerUnpauseNotPaused(t *testing.T) {
 	testAccPreCheck(t)
 	name := acctest.RandomWithPrefix("tfacc-cop-unpause")
 	hAccTest(t, resource.TestCase{
@@ -195,8 +198,7 @@ action "docker_container_unpause" "u" {
     container_id = docker_container.c.id
   }
 }`, "action.docker_container_unpause.u"),
-			// Terraform wraps diagnostic text, so any whitespace may be a newline.
-			ExpectError: regexp.MustCompile(`(?i)not\s+paused`),
+			Check: resource.TestCheckResourceAttrSet("docker_container.c", "id"),
 		}},
 	})
 }

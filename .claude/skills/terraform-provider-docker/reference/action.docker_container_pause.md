@@ -4,7 +4,7 @@
 
 Kind: action. Back to [SKILL.md](../SKILL.md).
 
-Freezes all processes of a running container, like `docker container pause` (the cgroup freezer). Resume it with `docker_container_unpause`. The result object holds the container's `state` after the call.
+Freezes all processes of a running container, like `docker container pause` (the cgroup freezer). Resume it with `docker_container_unpause`. Pausing a paused container is a no-op (like `docker_compose_pause`). The result object holds the container's `state` after the call.
 
 Actions need Terraform >= 1.14. They keep no state: they run when a
 resource's `lifecycle { action_trigger { ... } }` fires, or on demand with

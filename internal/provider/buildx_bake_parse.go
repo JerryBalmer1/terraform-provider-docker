@@ -15,7 +15,8 @@ package provider
 //   - `target.<name>.<attr>` references between targets: target blocks are
 //     evaluated in dependency order and each evaluated target is exposed
 //     to the next ones as `target.<name>` (its own attributes, before
-//     `inherits` are applied); a reference cycle is an error;
+//     `inherits` are applied, and every attribute it leaves unset as null,
+//     as buildx does: bakeTargetAttrNulls); a reference cycle is an error;
 //   - `target:<name>` named contexts are resolved by the action
 //     (buildx_bake_contexts.go).
 
@@ -718,19 +719,69 @@ func bakeOrderTargets(blocks []*hcl.Block) ([]*hcl.Block, error) {
 	return out, nil
 }
 
+// bakeTargetAttrNulls is every attribute of a buildx bake target, as the
+// null value a reference sees when the target does not set it. buildx
+// v0.38.2 decodes a target block into its Target struct and stores the
+// whole struct as a cty value for `target.<name>` references
+// (bake/hclparser/hclparser.go:558-580, ImpliedType + ToCtyValue of the
+// output; the fields and their cty names are bake/bake.go:895-929), so an
+// unset attribute is null rather than missing: `target.app.args` is valid
+// even when app sets no args, `target.app.args.VERSION` then fails on the
+// null map, and `inherits` are not applied (they are merged after parsing).
+// The structured buildflags types (attest, cache-from/-to, secret, ssh,
+// output, resources, policy) are a dynamic null here.
+var bakeTargetAttrNulls = map[string]cty.Value{
+	"description":       cty.StringVal(""), // a plain string in bake.Target, so "" when unset
+	"inherits":          cty.NullVal(cty.List(cty.String)),
+	"annotations":       cty.NullVal(cty.List(cty.String)),
+	"attest":            cty.NullVal(cty.DynamicPseudoType),
+	"context":           cty.NullVal(cty.String),
+	"contexts":          cty.NullVal(cty.Map(cty.String)),
+	"dockerfile":        cty.NullVal(cty.String),
+	"dockerfile-inline": cty.NullVal(cty.String),
+	"args":              cty.NullVal(cty.Map(cty.String)),
+	"labels":            cty.NullVal(cty.Map(cty.String)),
+	"tags":              cty.NullVal(cty.List(cty.String)),
+	"cache-from":        cty.NullVal(cty.DynamicPseudoType),
+	"cache-to":          cty.NullVal(cty.DynamicPseudoType),
+	"target":            cty.NullVal(cty.String),
+	"secret":            cty.NullVal(cty.DynamicPseudoType),
+	"ssh":               cty.NullVal(cty.DynamicPseudoType),
+	"platforms":         cty.NullVal(cty.List(cty.String)),
+	"output":            cty.NullVal(cty.DynamicPseudoType),
+	"pull":              cty.NullVal(cty.Bool),
+	"no-cache":          cty.NullVal(cty.Bool),
+	"network":           cty.NullVal(cty.String),
+	"no-cache-filter":   cty.NullVal(cty.List(cty.String)),
+	"shm-size":          cty.NullVal(cty.String),
+	"ulimits":           cty.NullVal(cty.List(cty.String)),
+	"resources":         cty.NullVal(cty.DynamicPseudoType),
+	"call":              cty.NullVal(cty.String),
+	"entitlements":      cty.NullVal(cty.List(cty.String)),
+	"extra-hosts":       cty.NullVal(cty.Map(cty.String)),
+	"policy":            cty.NullVal(cty.DynamicPseudoType),
+}
+
 // bakeTargetObject is the `target` variable: every target evaluated so far
-// as an object of its attributes.
+// as an object of its attributes, with every bake target attribute it
+// does not set present as null (bakeTargetAttrNulls).
 func bakeTargetObject(vals map[string]map[string]cty.Value) cty.Value {
 	if len(vals) == 0 {
 		return cty.EmptyObjectVal
 	}
 	m := make(map[string]cty.Value, len(vals))
 	for name, attrs := range vals {
-		if len(attrs) == 0 {
-			m[name] = cty.EmptyObjectVal
-			continue
+		obj := make(map[string]cty.Value, len(attrs)+len(bakeTargetAttrNulls))
+		for k, v := range bakeTargetAttrNulls {
+			obj[k] = v
 		}
-		m[name] = cty.ObjectVal(attrs)
+		for k, v := range attrs {
+			obj[k] = v
+		}
+		if _, ok := obj["name"]; !ok {
+			obj["name"] = cty.StringVal(name)
+		}
+		m[name] = cty.ObjectVal(obj)
 	}
 	return cty.ObjectVal(m)
 }

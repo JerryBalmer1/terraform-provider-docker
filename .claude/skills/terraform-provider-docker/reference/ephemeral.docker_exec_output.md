@@ -37,6 +37,7 @@ ephemeral "docker_exec_output" "<name>" {
 | `result` | `object` | computed |  |  | GET /exec/{id}/json after the command finished (exit_code, running, pid, process_config...). |
 | `stderr` | `string` | computed |  | yes | The command's standard error (Q33). |
 | `stderr_sha256` | `string` | computed |  |  | sha256 of `stderr` (Q34). |
+| `stdin` | `string` | optional |  | yes | Data written to the command's standard input, which is then closed, like `echo ... \| docker exec -i`. Unset (the default), the command gets no stdin. Sensitive, e.g. a password piped to a CLI inside the container. |
 | `stdout` | `string` | computed |  | yes | The command's standard output (Q33). |
 | `stdout_sha256` | `string` | computed |  |  | sha256 of output. |
 | `timeout` | `string` | optional |  |  | Maximum run time as a Go duration, e.g. `30s`. Default `60s`. |
@@ -90,10 +91,18 @@ ephemeral "docker_exec_output" "admin_token" {
   timeout      = "30s"
 }
 
+# Pipe it through a command on standard input (`docker exec -i`), here to
+# strip whitespace; stdin is sensitive and never logged.
+ephemeral "docker_exec_output" "admin_token_clean" {
+  container_id = docker_container.app.id
+  command      = ["tr", "-d", " \n"]
+  stdin        = ephemeral.docker_exec_output.admin_token.stdout
+}
+
 # Share it with swarm services as a write-only secret.
 resource "docker_secret" "admin_token" {
   name            = "app-admin-token"
-  data_wo         = base64encode(trimspace(ephemeral.docker_exec_output.admin_token.stdout))
+  data_wo         = base64encode(ephemeral.docker_exec_output.admin_token_clean.stdout)
   data_wo_version = 1
 }
 ```

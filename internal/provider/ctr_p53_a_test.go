@@ -487,9 +487,10 @@ func TestNetworkOwnerAndFields(t *testing.T) {
 		if resp.Diagnostics.HasError() {
 			t.Fatal(resp.Diagnostics)
 		}
-		labels, _ := body["Labels"].(map[string]any)
-		if got, has := labels[ownerLabelKey]; has != (c.owner != "") || (has && got != c.owner) {
-			t.Errorf("owner %q: labels sent %v", c.owner, labels)
+		// Pass 6b Lane Z: a config_from network sends no labels at all (the
+		// Engine refuses them; it carries the config-only network's).
+		if labels, _ := body["Labels"].(map[string]any); len(labels) != 0 {
+			t.Errorf("owner %q: labels sent for a config_from network %v", c.owner, labels)
 		}
 		if body["Scope"] != "swarm" || body["EnableIPv4"] != false || body["ConfigFrom"] == nil {
 			t.Errorf("create body = %v", body)
