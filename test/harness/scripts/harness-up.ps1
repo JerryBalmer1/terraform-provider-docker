@@ -20,7 +20,11 @@
   SHA256SUMS) and exports TF_ACC_TERRAFORM_VERSION plus TF_ACC_TERRAFORM_PATH
   so terraform-plugin-testing does not download it again for every test. If
   the download fails only TF_ACC_TERRAFORM_VERSION is exported and
-  terraform-plugin-testing installs that version itself.
+  terraform-plugin-testing installs that version itself. The docker compose
+  release that reference/SOURCES.md pins (override $env:HARNESS_COMPOSE_VERSION)
+  goes into the same .bin (SHA256-checked against checksums.txt) and
+  TF_ACC_COMPOSE_CLI points at it, so TestAccComposeParity never depends on the
+  compose that ships with Docker Desktop.
 
   After the daemons answer it:
   - copies the Docker Hub images in test/harness/seed-images.txt into the
@@ -74,7 +78,7 @@ $HarnessEnv = [ordered]@{
     TF_ACC_TLS_REGISTRY      = '127.0.0.1:12382'
     TF_ACC_GPU_NODE_LABEL    = 'gpu=nvidia'
     TF_ACC_HARNESS_COMPOSE   = ConvertTo-SlashPath $ComposeFile
-    TF_ACC_COMPOSE_CLI       = ConvertTo-SlashPath ((Get-Command docker -ErrorAction SilentlyContinue).Source)
+    TF_ACC_COMPOSE_CLI       = ''  # the pinned docker compose release binary, set below (Install-HarnessCompose)
     TF_ACC_TERRAFORM_VERSION = $TerraformVersion
 }
 
@@ -192,6 +196,52 @@ function Install-HarnessTerraform {
     Expand-Archive -LiteralPath $zip -DestinationPath $target -Force
     Remove-Item -LiteralPath $zip -Force
     return $bin
+}
+
+# docker compose CLI for TestAccComposeParity: the release reference/SOURCES.md pins (the docker/compose row), never
+# whatever compose ships with Docker Desktop. One download into .bin, SHA256-checked against the release's checksums.txt.
+# The standalone binary takes compose's arguments directly (no `compose` subcommand); the parity test knows both forms.
+function Get-PinnedComposeVersion {
+    if ($env:HARNESS_COMPOSE_VERSION) { return $env:HARNESS_COMPOSE_VERSION }
+    $src = Get-Content -Raw -LiteralPath (Join-Path $RepoRoot 'reference/SOURCES.md')
+    if ($src -match 'github\.com/docker/compose/tree/(v\d+\.\d+\.\d+)/') { return $Matches[1] }
+    throw 'no docker/compose pin (github.com/docker/compose/tree/vX.Y.Z/) in reference/SOURCES.md'
+}
+
+function Install-HarnessCompose {
+    param([string]$Version, [string]$Dir)
+    $os = if ($IsWindows) { 'windows' } elseif ($IsMacOS) { 'darwin' } else { 'linux' }
+    $arch = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
+        'Arm64' { 'aarch64' } default { 'x86_64' }
+    }
+    $asset = "docker-compose-$os-$arch" + $(if ($IsWindows) { '.exe' } else { '' })
+    $target = Join-Path $Dir "compose_$Version"
+    $bin = Join-Path $target $asset
+    if (Test-Path -LiteralPath $bin) { return $bin }
+    $base = "https://github.com/docker/compose/releases/download/$Version"
+    New-Item -ItemType Directory -Path $target -Force | Out-Null
+    Write-Host "Downloading $base/$asset ..."
+    Invoke-WebRequest -Uri "$base/$asset" -OutFile $bin -UseBasicParsing
+    $sums = (Invoke-WebRequest -Uri "$base/checksums.txt" -UseBasicParsing).Content
+    if ($sums -is [byte[]]) { $sums = [System.Text.Encoding]::ASCII.GetString($sums) }
+    $want = ($sums -split "`n" | Where-Object { $_ -match "\s\*?$([regex]::Escape($asset))\s*$" } | Select-Object -First 1) -replace '\s.*$', ''
+    $got = (Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash.ToLowerInvariant()
+    if (-not $want -or $got -ne $want.ToLowerInvariant()) {
+        Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
+        throw "SHA256 mismatch for $asset (got $got, want $want)"
+    }
+    if (-not $IsWindows) { & chmod +x $bin }
+    return $bin
+}
+
+$HarnessEnv['TF_ACC_COMPOSE_CLI'] = ''
+try {
+    $composeVersion = Get-PinnedComposeVersion
+    $composeBin = Install-HarnessCompose -Version $composeVersion -Dir $BinDir
+    $HarnessEnv['TF_ACC_COMPOSE_CLI'] = ConvertTo-SlashPath $composeBin
+    Write-Host "docker compose $composeVersion at $composeBin"
+} catch {
+    Write-Warning "harness-up: could not install the pinned docker compose ($($_.Exception.Message)); TF_ACC_COMPOSE_CLI is empty and TestAccComposeParity skips."
 }
 
 try {
@@ -381,7 +431,7 @@ if ($r.Exit -eq 0 -and $r.Out) {
 }
 
 # LF line endings and no BOM so bash `source` reads it cleanly; values are
-# double-quoted (TF_ACC_COMPOSE_CLI is often under C:/Program Files).
+# double-quoted (paths may contain spaces).
 $lines = foreach ($k in $HarnessEnv.Keys) { "export $k=`"$($HarnessEnv[$k])`"" }
 [System.IO.File]::WriteAllText($EnvFile, (($lines -join "`n") + "`n"), [System.Text.UTF8Encoding]::new($false))
 

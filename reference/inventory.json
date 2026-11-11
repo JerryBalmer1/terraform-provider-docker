@@ -73,7 +73,7 @@
         "exists": 1
       },
       "skip": {
-        "n/a": 30
+        "n/a": 29
       }
     },
     "dockerfile": {
@@ -606,8 +606,9 @@
       "Spec items handled by docker_compose use name docker_compose (kind resource) rather than inventing per-element types; splitting is a naming question.",
       "docker_compose silently ignores top-level jobs (no warning) and warns on models; worth a TODO even without new types.",
       "docker_stack is HCL-native (service blocks), not compose-file driven; docker_compose mode=swarm is the compose-file path to a stack. tools/compose2stack is a one-shot converter, not a Terraform type.",
-      "compose_convert has only a yaml (no .md) in compose-cli v5.1.4 docs; it is an alias of config. docker_compose.yaml is the root command.",
-      "climap compose rows: up, down, ps, up --scale -> docker_compose; exec -> docker_exec; logs -> docker_logs; pull -> docker_image; config/convert -> tools/compose2stack; build, run/watch/alpha -> none."
+      "compose_convert has only a yaml (no .md) in compose-cli v5.7.0 docs; it is an alias of config. docker_compose.yaml is the root command.",
+      "climap compose rows: up, down, ps, up --scale -> docker_compose; exec -> docker_exec; logs -> docker_logs; pull -> docker_image; config/convert -> tools/compose2stack; build, run/watch/alpha -> none.",
+      "compose:cli-alpha-publish removed in Pass 6b: docker compose v5.7.0 dropped `docker compose alpha publish` (compose_alpha_publish.md and docker_compose_alpha_publish.yaml are gone from docs/reference); `docker compose publish` (docker_compose_publish) remains."
     ],
     "Z3": [
       "Scope: docker CLI 29.5.3 docs (commandline/*.md + docker-trust plugin docs), buildx v0.38.2 docs, CLI plugins seen in the Docker Desktop 4.78 help capture. Compose plugin is another lane.",
@@ -45487,29 +45488,6 @@
       "min_api": null,
       "cli_only": true,
       "skip_reason": "experimental authoring helper; output is a file, not infra (terraform query + list resources cover discovery)",
-      "lane": "Z2"
-    },
-    {
-      "id": "compose:cli-alpha-publish",
-      "layer": "compose",
-      "kind": "skip",
-      "name": null,
-      "summary": "Experimental alias of publish.",
-      "sources": [
-        {
-          "type": "cli",
-          "command": "docker compose alpha publish",
-          "file": "upstream/compose-cli/docs/reference/compose_alpha_publish.md"
-        },
-        {
-          "type": "cli",
-          "command": "docker compose alpha publish",
-          "file": "upstream/compose-cli/docs/reference/docker_compose_alpha_publish.yaml"
-        }
-      ],
-      "min_api": null,
-      "cli_only": true,
-      "skip_reason": "duplicate of docker_compose_publish",
       "lane": "Z2"
     },
     {

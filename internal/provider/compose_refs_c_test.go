@@ -30,7 +30,7 @@ services:
     volumes_from: [web, "container:outside:ro"]
 `
 
-// TestComposeLocalRefsC checks the pure resolution against compose v5.1.4
+// TestComposeLocalRefsC checks the pure resolution against compose v5.7.0
 // resolveServiceReferences: volumes_from "<svc>[:mode]" -> "<ID>",
 // "container:<c>[:mode]" -> "<c>", "service:<svc>" -> "container:<ID>";
 // the config-hash is ServiceHash of that resolved service.

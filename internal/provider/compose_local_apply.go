@@ -620,9 +620,9 @@ const composeLabelImage = "com.docker.compose.image"
 
 // composeLabelDependsOn lists a container's dependencies as
 // "<service>:<condition>:<restart>", comma-separated, like `docker compose`
-// (api.DependenciesLabel). compose v5.1.4 writes them in Go map order
-// (pkg/compose/create.go:510-513 prepareLabels ranges over
-// service.DependsOn), which differs from run to run; docker_compose sorts
+// (api.DependenciesLabel). compose v5.7.0 writes them in Go map order
+// (pkg/compose/depends_on_label.go:30-36 encodeDependsOnLabel ranges over
+// service.DependsOn, called from create.go:319), which differs from run to run; docker_compose sorts
 // them so the label is deterministic.
 const composeLabelDependsOn = "com.docker.compose.depends_on"
 

@@ -6,7 +6,9 @@
 # Mirrors harness-up.ps1: generates throwaway TLS material for tlsnode into
 # test/harness/tls/ (openssl), installs Terraform ${HARNESS_TF_VERSION:-1.14.9}
 # into test/harness/.bin/ once (SHA256-checked) and exports
-# TF_ACC_TERRAFORM_VERSION (+ TF_ACC_TERRAFORM_PATH when the install worked).
+# TF_ACC_TERRAFORM_VERSION (+ TF_ACC_TERRAFORM_PATH when the install worked),
+# and the docker compose release reference/SOURCES.md pins into the same
+# .bin (TF_ACC_COMPOSE_CLI, for TestAccComposeParity).
 # After the daemons answer it seeds the harness registry with the images in
 # test/harness/seed-images.txt (TF_ACC_SEEDED_IMAGES), builds the tfacc plugin
 # fixtures (TF_ACC_PLUGIN, TF_ACC_PLUGIN_DIR, TF_ACC_CSI_PLUGIN[_DIR]) and
@@ -97,12 +99,46 @@ install_terraform() {
   echo "${target}/${exe}"
 }
 
+# docker compose CLI for TestAccComposeParity: the release reference/SOURCES.md pins (the docker/compose row), never
+# whatever compose ships with Docker Desktop. One download into .bin, SHA256-checked against checksums.txt.
+install_compose() {
+  local os arch asset target base want got ver
+  ver="${HARNESS_COMPOSE_VERSION:-$(grep -oE 'github\.com/docker/compose/tree/v[0-9]+\.[0-9]+\.[0-9]+/' "${REPO_ROOT}/reference/SOURCES.md" | head -1 | sed -E 's#.*/tree/(v[^/]+)/##')}"
+  [ -n "${ver}" ] || return 1
+  case "$(uname -s)" in
+    Linux*) os=linux ;; Darwin*) os=darwin ;; MINGW*|MSYS*|CYGWIN*) os=windows ;; *) return 1 ;;
+  esac
+  case "$(uname -m)" in
+    aarch64|arm64) arch=aarch64 ;; *) arch=x86_64 ;;
+  esac
+  asset="docker-compose-${os}-${arch}"; [ "${os}" = windows ] && asset="${asset}.exe"
+  target="${BIN_DIR}/compose_${ver}"
+  if [ -f "${target}/${asset}" ]; then echo "${target}/${asset}"; return 0; fi
+  command -v curl >/dev/null 2>&1 || return 1
+  mkdir -p "${target}"
+  base="https://github.com/docker/compose/releases/download/${ver}"
+  curl -fsSL -o "${target}/${asset}" "${base}/${asset}" || return 1
+  want="$(curl -fsSL "${base}/checksums.txt" | awk -v f="${asset}" '$2==f || $2=="*"f {print $1}')"
+  if command -v sha256sum >/dev/null 2>&1; then got="$(sha256sum "${target}/${asset}" | awk '{print $1}')"; else got="$(shasum -a 256 "${target}/${asset}" | awk '{print $1}')"; fi
+  if [ -z "${want}" ] || [ "${got}" != "${want}" ]; then rm -rf "${target}"; echo "SHA256 mismatch for ${asset}" >&2; return 1; fi
+  chmod +x "${target}/${asset}" 2>/dev/null || true
+  echo "${target}/${asset}"
+}
+
 # Reuse existing material: a running tlsnode keeps the certs it started with
 # (harness-down removes tls/, so a fresh harness always gets new ones).
 if [ -f "${TLS_DIR}/ca.pem" ] && [ -f "${TLS_DIR}/cert.pem" ] && [ -f "${TLS_DIR}/key.pem" ] && [ -f "${TLS_DIR}/server-cert.pem" ] && [ -f "${TLS_DIR}/server-key.pem" ]; then
   echo "Reusing TLS material in ${TLS_DIR}."
 else
   gen_tls
+fi
+
+COMPOSE_CLI=""
+if p="$(install_compose)"; then
+  COMPOSE_CLI="$(native_path "${p}")"
+  echo "docker compose at ${COMPOSE_CLI}"
+else
+  echo "WARNING: could not install the pinned docker compose; TF_ACC_COMPOSE_CLI is empty and TestAccComposeParity skips." >&2
 fi
 
 TF_PATH=""
@@ -280,7 +316,7 @@ fi
   if [ -n "${TLS_REGISTRY}" ]; then echo "export TF_ACC_TLS_REGISTRY=\"${TLS_REGISTRY}\""; fi
   echo "export TF_ACC_GPU_NODE_LABEL=\"gpu=nvidia\""
   echo "export TF_ACC_HARNESS_COMPOSE=\"$(native_path "${COMPOSE_FILE}")\""
-  echo "export TF_ACC_COMPOSE_CLI=\"$(native_path "$(command -v docker)")\""
+  echo "export TF_ACC_COMPOSE_CLI=\"${COMPOSE_CLI}\""
   echo "export TF_ACC_TERRAFORM_VERSION=\"${TF_VERSION}\""
   if [ -n "${TF_PATH}" ]; then echo "export TF_ACC_TERRAFORM_PATH=\"${TF_PATH}\""; fi
   echo "export TF_ACC_SEEDED_IMAGES=\"${SEEDED}\""

@@ -10,7 +10,7 @@ package provider
 // difference in the cases it names fails too (stale).
 //
 // Two fields are compared through a normalisation, not literally:
-//   - com.docker.compose.depends_on is a set: compose v5.1.4 writes it in Go
+//   - com.docker.compose.depends_on is a set: compose v5.7.0 writes it in Go
 //     map order (composeParitySetLabels);
 //   - com.docker.compose.config-hash of a container with service references
 //     (service:<x>, volumes_from) hashes the target's container ID, which
@@ -20,8 +20,10 @@ package provider
 //
 // The provider never shells out; this TEST runs the CLI (os/exec in this
 // _test.go file only) against DOCKER_HOST from test/harness/.env. It needs
-// TF_ACC, DOCKER_HOST and TF_ACC_COMPOSE_CLI (the docker binary with the
-// compose v2 plugin; harness-up writes it) and skips without them.
+// TF_ACC, DOCKER_HOST and TF_ACC_COMPOSE_CLI (harness-up installs the
+// docker compose release reference/SOURCES.md pins into test/harness/.bin and
+// points it there; a docker binary with the compose plugin works too) and
+// skips without them.
 //
 // Each sub-case first gets what it needs on the harness daemon
 // (composeParityOverrides in p_compose_parity_test.go: fictional images,
@@ -157,9 +159,10 @@ func composeParityExampleCases(t *testing.T) []composeParityCase {
 type composeParityObject map[string]string
 
 // composeParitySetLabels are labels whose value is a comma-separated set.
-// com.docker.compose.depends_on: docker compose v5.1.4 builds it by ranging
-// over the service.DependsOn map (pkg/compose/create.go:510-513,
-// composeService.prepareLabels: `for s, d := range service.DependsOn`), so
+// com.docker.compose.depends_on: docker compose v5.7.0 builds it by ranging
+// over the service.DependsOn map (pkg/compose/depends_on_label.go:30-36,
+// encodeDependsOnLabel: `for dep, d := range dependsOn`, called from
+// create.go:319), so
 // its order is Go's random map order, different per container and per run;
 // docker_compose sorts it. Only the set of entries is compared.
 var composeParitySetLabels = []string{"label " + composeLabelDependsOn}
@@ -189,8 +192,8 @@ var composeParityKnownDiffs = []composeParityKnownDiff{{
 	Cases: []string{"unit_expand"},
 	Reason: `volumes_from "<service>:ro" / "container:<c>:ro": docker compose drops the access mode and sends the bare container ` +
 		`(the volumes are mounted read-write); docker_compose keeps ":ro" / ":rw" as the compose spec documents it`,
-	Source: "docker/compose v5.1.4 pkg/compose/convergence.go:285-303 resolveVolumeFrom (service.VolumesFrom[i] = spec[1] / " +
-		"dependencies.sorted()[0].ID), sent as-is by pkg/compose/create.go:309",
+	Source: "docker/compose v5.7.0 pkg/compose/service_containers.go:79-97 resolveVolumeFrom (service.VolumesFrom[i] = spec[1] / " +
+		"dependencies.sorted()[0].ID), called from executor_ops.go:93, sent as-is by pkg/compose/create.go:453",
 	Match: composeParityModeSuffixOnly,
 }}
 
@@ -414,9 +417,20 @@ func composeParityDiffs(cli, prov map[string]composeParityObject) []composeParit
 	return out
 }
 
+// composeParityPrefix is the argument that selects compose on bin: none for
+// the standalone docker-compose release binary harness-up installs into
+// test/harness/.bin (the pinned version), "compose" for a docker CLI with the
+// compose plugin.
+func composeParityPrefix(bin string) []string {
+	if strings.HasPrefix(strings.ToLower(filepath.Base(bin)), "docker-compose") {
+		return nil
+	}
+	return []string{"compose"}
+}
+
 // composeParityCLI runs `docker compose` against the harness daemon.
 func composeParityCLI(ctx context.Context, bin, dir string, c composeParityCase, args ...string) (string, error) {
-	full := []string{"compose", "--project-name", c.Project, "--project-directory", dir, "--file", filepath.Join(dir, composeContentFilename)}
+	full := append(composeParityPrefix(bin), "--project-name", c.Project, "--project-directory", dir, "--file", filepath.Join(dir, composeContentFilename))
 	for _, p := range c.Profiles {
 		full = append(full, "--profile", p)
 	}
@@ -465,7 +479,7 @@ func TestAccComposeParity(t *testing.T) {
 		t.Skip("TF_ACC_COMPOSE_CLI and DOCKER_HOST are not set (source test/harness/.env); skipping the compose CLI parity test")
 	}
 	ctx := context.Background()
-	if out, err := exec.CommandContext(ctx, bin, "compose", "version").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(ctx, bin, append(composeParityPrefix(bin), "version")...).CombinedOutput(); err != nil {
 		t.Skipf("%s compose version failed (no compose v2 plugin?): %v: %s", bin, err, out)
 	}
 	c := testAccDockerClient(t)

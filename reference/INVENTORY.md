@@ -164,7 +164,6 @@ Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/
 | skip | - |  | `docker compose alpha`<br>`docker compose alpha` |  | - · cli | skip: command group only |
 | skip | - |  | `docker compose alpha dry-run`<br>`docker compose alpha dry-run` |  | - · cli | skip: Terraform plan already is the dry run |
 | skip | - |  | `docker compose alpha generate`<br>`docker compose alpha generate` |  | - · cli | skip: experimental authoring helper; output is a file, not infra (terraform query + list resources cover discovery) |
-| skip | - |  | `docker compose alpha publish`<br>`docker compose alpha publish` |  | - · cli | skip: duplicate of docker_compose_publish |
 | skip | - |  | `docker compose alpha scale`<br>`docker compose alpha scale` |  | - · cli | skip: duplicate of docker_compose_scale |
 | skip | - |  | `docker compose alpha viz`<br>`docker compose alpha viz` |  | - · cli | skip: visualisation only; terraform graph covers it |
 | skip | - |  | `docker compose alpha watch`<br>`docker compose alpha watch` |  | - · cli | skip: interactive file watcher |
@@ -501,11 +500,11 @@ Counts as exists / partial / missing.
 |---|---|---|---|---|---|---|---|---|
 | engine | 7 (7 / 0 / 0) | 23 (23 / 0 / 0) | 23 (23 / 0 / 0) | 3 (3 / 0 / 0) | 4 (4 / 0 / 0) | 3 (3 / 0 / 0) | 0 | 7 |
 | swarm | 6 (6 / 0 / 0) | 14 (14 / 0 / 0) | 11 (11 / 0 / 0) | 1 (1 / 0 / 0) | 4 (4 / 0 / 0) | 0 | 0 | 0 |
-| compose | 11 (10 / 1 / 0) | 8 (8 / 0 / 0) | 17 (16 / 1 / 0) | 0 | 0 | 1 (1 / 0 / 0) | 0 | 30 |
+| compose | 11 (10 / 1 / 0) | 8 (8 / 0 / 0) | 17 (16 / 1 / 0) | 0 | 0 | 1 (1 / 0 / 0) | 0 | 29 |
 | dockerfile | 0 | 1 (1 / 0 / 0) | 0 | 0 | 0 | 0 | 21 (21 / 0 / 0) | 0 |
 | buildx | 2 (1 / 1 / 0) | 6 (6 / 0 / 0) | 1 (0 / 1 / 0) | 0 | 0 | 0 | 0 | 23 |
 | cli-only | 2 (2 / 0 / 0) | 3 (3 / 0 / 0) | 0 | 0 | 0 | 0 | 0 | 21 |
-| **all** | 28 (26 / 2 / 0) | 55 (55 / 0 / 0) | 52 (50 / 2 / 0) | 4 (4 / 0 / 0) | 8 (8 / 0 / 0) | 4 (4 / 0 / 0) | 21 (21 / 0 / 0) | 81 |
+| **all** | 28 (26 / 2 / 0) | 55 (55 / 0 / 0) | 52 (50 / 2 / 0) | 4 (4 / 0 / 0) | 8 (8 / 0 / 0) | 4 (4 / 0 / 0) | 21 (21 / 0 / 0) | 80 |
 
 Engine API coverage: 108 of 108 swagger operations placed.
 

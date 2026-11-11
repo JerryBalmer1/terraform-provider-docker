@@ -301,16 +301,16 @@ Where an argument has the same name as an upstream flag but a different default,
 ## Known differences from upstream
 
 Where `docker_compose` (local mode) deliberately sends the Engine something other than what `docker compose`
-(v5.1.4 @ 4732a2ed, reference/SOURCES.md) sends for the same project. TestAccComposeParity fails on any other
+(v5.7.0 @ 5bceecf9, reference/SOURCES.md) sends for the same project. TestAccComposeParity fails on any other
 difference, and its allowlist (`composeParityKnownDiffs` in internal/provider/compose_parity_acc_c_test.go) holds
 exactly the rows of this table; an allowlist entry that no longer matches an observed difference fails the test too.
 
 | field | `docker compose` | `docker_compose` | why | upstream source |
 |---|---|---|---|---|
-| `volumes_from` access mode (`HostConfig.VolumesFrom`) | `<service>:ro` and `container:<name>:ro` are sent as the bare container ID / name: the mode is dropped and the volumes are mounted read-write | the mode is kept: `<container ID>:ro`, `<name>:ro` (also `:rw`) | The compose spec documents `ro` / `rw` for `volumes_from` (reference/upstream/compose-spec/container_spec.md, "volumes_from"). Mounting read-write what the file declares read-only is a security regression, so the provider does not copy it. The container (the ID, for a service reference) is the same on both sides; only the suffix differs. | pkg/compose/convergence.go:285-303 `resolveVolumeFrom` (`service.VolumesFrom[i] = spec[1]` / `dependencies.sorted()[0].ID`), sent unchanged by pkg/compose/create.go:309 |
+| `volumes_from` access mode (`HostConfig.VolumesFrom`) | `<service>:ro` and `container:<name>:ro` are sent as the bare container ID / name: the mode is dropped and the volumes are mounted read-write | the mode is kept: `<container ID>:ro`, `<name>:ro` (also `:rw`) | The compose spec documents `ro` / `rw` for `volumes_from` (reference/upstream/compose-spec/container_spec.md, "volumes_from"). Mounting read-write what the file declares read-only is a security regression, so the provider does not copy it. The container (the ID, for a service reference) is the same on both sides; only the suffix differs. | pkg/compose/service_containers.go:79-97 `resolveVolumeFrom` (`service.VolumesFrom[i] = spec[1]` / `dependencies.sorted()[0].ID`), called from executor_ops.go:93 `execCreateContainer`, sent unchanged by pkg/compose/create.go:453 |
 
 Not a difference in content: `com.docker.compose.depends_on` lists the same entries on both sides, but compose writes
-them in Go map order (pkg/compose/create.go:510-513 `prepareLabels`), which changes from run to run, and
+them in Go map order (pkg/compose/depends_on_label.go:30-36 `encodeDependsOnLabel`, called from create.go:319), which changes from run to run, and
 `docker_compose` sorts them. The parity test compares that label as a set.
 
 ## Handoff

@@ -37,6 +37,17 @@
   it off for TestAccE2E and TestAccSwarmInit, which need a manager outside any
   swarm.
 
+.PARAMETER Script
+  Run this PowerShell script (pwsh -NoProfile -File <Script> <ScriptArgs>)
+  instead of go test, with the same harness lifecycle, environment (.env
+  loaded, TF_ACC=1, the DOCKER_HOST safety check) and log handling; its exit
+  code becomes Invoke-E2E's. Relative paths resolve against the repository
+  root. -Run, -Skip and -Timeout are ignored. Used by Invoke-Build
+  ExampleTests (Pester) and PairwiseTest.
+
+.PARAMETER ScriptArgs
+  Arguments passed to -Script.
+
 .PARAMETER KeepUp
   Leave the harness running afterwards (tear it down later with
   test/harness/scripts/harness-down.ps1).
@@ -55,7 +66,9 @@ param(
     [string]$Timeout = '30m',
     [string]$Log = 'test/harness/last-e2e.log',
     [switch]$KeepUp,
-    [switch]$SwarmInit
+    [switch]$SwarmInit,
+    [string]$Script = '',
+    [string[]]$ScriptArgs = @()
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -114,15 +127,22 @@ try {
     $logDir = Split-Path -Parent $LogPath
     if ($logDir -and -not (Test-Path -LiteralPath $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
 
-    $goArgs = @('test', './internal/provider/', '-run', $Run)
-    if ($Skip) { $goArgs += @('-skip', $Skip) }
-    $goArgs += @('-count=1', '-v', '-timeout', $Timeout)
-    Write-Host "Invoke-E2E: go $($goArgs -join ' ')  (log: $LogPath)"
+    if ($Script) {
+        $scriptPath = if ([System.IO.Path]::IsPathRooted($Script)) { $Script } else { Join-Path $RepoRoot $Script }
+        $exe = 'pwsh'
+        $goArgs = @('-NoProfile', '-File', $scriptPath) + $ScriptArgs
+    } else {
+        $exe = 'go'
+        $goArgs = @('test', './internal/provider/', '-run', $Run)
+        if ($Skip) { $goArgs += @('-skip', $Skip) }
+        $goArgs += @('-count=1', '-v', '-timeout', $Timeout)
+    }
+    Write-Host "Invoke-E2E: $exe $($goArgs -join ' ')  (log: $LogPath)"
     Push-Location $RepoRoot
     try {
         # go writes to stderr too; do not let that trip ErrorActionPreference=Stop.
         $ErrorActionPreference = 'Continue'
-        & go @goArgs 2>&1 |
+        & $exe @goArgs 2>&1 |
             ForEach-Object { "$_" } |
             Tee-Object -FilePath $LogPath
         $testExit = $LASTEXITCODE
@@ -130,7 +150,7 @@ try {
         $ErrorActionPreference = 'Stop'
         Pop-Location
     }
-    Write-Host "Invoke-E2E: go test exit code $testExit"
+    Write-Host "Invoke-E2E: $(if ($Script) { 'script' } else { 'go test' }) exit code $testExit"
 } catch {
     Write-Host "Invoke-E2E: $($_.Exception.Message)" -ForegroundColor Red
     $testExit = 1

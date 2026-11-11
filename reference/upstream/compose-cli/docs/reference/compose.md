@@ -28,7 +28,7 @@ Define and run multi-container applications with Docker
 | [`logs`](compose_logs.md)       | View output from containers                                                             |
 | [`ls`](compose_ls.md)           | List running compose projects                                                           |
 | [`pause`](compose_pause.md)     | Pause services                                                                          |
-| [`port`](compose_port.md)       | Print the public port for a port binding                                                |
+| [`port`](compose_port.md)       | List port mappings or print the public port for a specific mapping for the service      |
 | [`ps`](compose_ps.md)           | List containers                                                                         |
 | [`publish`](compose_publish.md) | Publish compose application                                                             |
 | [`pull`](compose_pull.md)       | Pull service images                                                                     |
@@ -215,9 +215,13 @@ Profiles can also be set by `COMPOSE_PROFILES` environment variable.
 
 ### Configuring parallelism
 
-Use `--parallel` to specify the maximum level of parallelism for concurrent engine calls.
+Use `--parallel` to specify the maximum level of parallelism for concurrent engine calls or builds.
 Calling `docker compose --parallel 1 pull` pulls the pullable images defined in the Compose file
-one at a time. This can also be used to control build concurrency.
+one at a time.
+
+Limiting build concurrency requires Buildx 0.38.0 or later. When services are linked by
+`additional_contexts` (`service:`), Buildx rejects a limit lower than the number of images to
+build, so Compose ignores it with a warning.
 
 Parallelism can also be set by the `COMPOSE_PARALLEL_LIMIT` environment variable.
 
