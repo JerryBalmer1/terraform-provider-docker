@@ -500,8 +500,14 @@ task Inventory {
     exec { & $PythonExe -I (Join-Path $RefDir '_gen/merge.py') } -ErrorMessage 'merge.py reported validation errors (ERR lines above).'
 }
 
-# Synopsis: Inventory, then fail if git diff of inventory.json / INVENTORY.md is not empty.
-task InventoryCheck Inventory, {
+# Synopsis: Pin consistency: every pinned version string and hash in the generators, build scripts, tools/apiwatch/pinned.json, go.mod and the dind harness, and the generated pins (inventory.json, contract_gen.go), equal reference/SOURCES.md (reference/_gen/pins.py).
+task PinCheck {
+    requires -Variable PythonExe
+    exec { & $PythonExe -I (Join-Path $RefDir '_gen/pins.py') $BuildRoot } -ErrorMessage 'Pins differ from reference/SOURCES.md (MISMATCH lines above). SOURCES.md is the single source: fix the copy, or run Invoke-Build Inventory, ContractGen for the generated ones.'
+}
+
+# Synopsis: Inventory and PinCheck, then fail if git diff of inventory.json / INVENTORY.md is not empty.
+task InventoryCheck Inventory, PinCheck, {
     requires -Variable GitExe
     exec { & $GitExe diff --exit-code --stat -- @InventoryFiles } -ErrorMessage 'Generated inventory differs from git. Edit fragments, run Invoke-Build Inventory, stage both files.'
     Write-Build Green 'InventoryCheck: inventory.json and INVENTORY.md match the fragments'

@@ -1,6 +1,10 @@
 # Release: on a pushed v* tag, GoReleaser builds, GPG-signs and publishes the GitHub release the
 # Terraform Registry ingests; a second job signs the SHA256SUMS keyless with cosign (GitHub OIDC),
-# uploads the Sigstore bundle and attaches SLSA build provenance. See RELEASING.md.
+# keeps the Sigstore bundle as a workflow artifact and attaches SLSA build provenance. See RELEASING.md.
+# Only GoReleaser uploads release assets. The registry rejects any release asset besides the zips,
+# <name>_<version>_manifest.json, _SHA256SUMS and _SHA256SUMS.sig ("invalid file extension found: json"
+# for the v0.1.0 .sigstore.json), so no other step may upload to the release: Invoke-Build ReleaseCheck
+# parses this file and fails on a step that uploads any other file to it.
 # Every action is pinned by commit SHA (comment = the tag it resolves to).
 name: release
 
@@ -52,7 +56,7 @@ jobs:
     needs: goreleaser
     runs-on: ubuntu-latest
     permissions:
-      contents: write # download and upload release assets
+      contents: read # download release assets (this job never uploads to the release)
       id-token: write # cosign keyless signing and provenance (GitHub OIDC)
       attestations: write # actions/attest-build-provenance
     env:
@@ -79,7 +83,15 @@ jobs:
         run: |
           set -euo pipefail
           cosign sign-blob --yes --bundle "${SUMS}.sigstore.json" "${SUMS}"
-          gh release upload "$TAG" "${SUMS}.sigstore.json" --repo "$GITHUB_REPOSITORY" --clobber
+
+      # A workflow artifact, never a release asset (see the header). RELEASING.md: download and verify.
+      - name: Keep the cosign bundle as a workflow artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cosign-bundle-${{ github.ref_name }}
+          path: dist/${{ env.SUMS }}.sigstore.json
+          if-no-files-found: error
+          retention-days: 90
 
       - name: SLSA build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2

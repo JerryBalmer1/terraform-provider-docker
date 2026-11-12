@@ -1,0 +1,83 @@
+# GoReleaser (v2 schema) config for the Terraform Registry, after HashiCorp's
+# terraform-provider-scaffolding-framework layout.
+#
+# Release (.github/workflows/release.yml, on a v* tag): needs GPG_FINGERPRINT in the
+# environment and that key in the local keyring (crazy-max/ghaction-import-gpg).
+# Local snapshot: Invoke-Build Release (goreleaser release --snapshot --clean --skip=publish,sign).
+#
+# The target matrix (goos x goarch minus ignore) must agree with $ReleaseTargets in
+# build/release.tasks.ps1; Invoke-Build ReleaseCheck and Release fail otherwise.
+version: 2
+
+project_name: terraform-provider-docker
+
+before:
+  hooks:
+    # Fails instead of editing go.mod / go.sum when the module is not tidy.
+    - go mod tidy -diff
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    # main.go: var version, printed by -version and passed to provider.New.
+    ldflags:
+      - "-s -w -X main.version={{ .Version }}"
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - "386"
+    ignore:
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: "386"
+      - goos: darwin
+        goarch: arm
+      - goos: darwin
+        goarch: "386"
+    binary: "{{ .ProjectName }}_v{{ .Version }}"
+
+archives:
+  - formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+  algorithm: sha256
+  # The registry manifest is hashed under its release asset name (uploaded by release.extra_files).
+  extra_files:
+    - glob: terraform-registry-manifest.json
+      name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
+
+signs:
+  # Detached GPG signature of the checksum file: <name>_<version>_SHA256SUMS.sig.
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+snapshot:
+  # Keeps local snapshot archives on the <name>_<version>_<os>_<arch>.zip pattern
+  # (no commit hash, no underscore in the version).
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+release:
+  extra_files:
+    - glob: terraform-registry-manifest.json
+      name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
+
+changelog:
+  disable: true

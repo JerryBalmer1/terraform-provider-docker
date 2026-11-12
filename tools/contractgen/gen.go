@@ -190,9 +190,9 @@ func StructName(id string) string {
 	return b.String()
 }
 
-// PinVersion turns an inventory pin ("v2.16.2 @ <sha>", "dockerfile/1.28.0
+// PinVersion turns an inventory pin ("vX.Y.Z @ <sha>", "dockerfile/X.Y.Z
 // @ <sha>", "main @ <sha>") into the version value the contract reports:
-// the release ("v2.16.2", "1.28.0"), or "<branch>@<7-char sha>" when the
+// the release ("vX.Y.Z", "X.Y.Z"), or "<branch>@<7-char sha>" when the
 // pin follows a branch.
 func PinVersion(pin string) string {
 	ver, sha, _ := strings.Cut(pin, " @ ")

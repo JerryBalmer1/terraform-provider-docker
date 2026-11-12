@@ -1,7 +1,9 @@
 # Release tasks, dot-sourced by terraform-provider-docker.build.ps1 (Pass 6a Lane G).
 #
 #   Release       local goreleaser snapshot (never signs, never publishes), then checks dist/.
-#   ReleaseCheck  no goreleaser needed: .goreleaser.yml matrix == $ReleaseTargets, and every target cross-compiles.
+#   ReleaseCheck  no goreleaser needed: .goreleaser.yml matrix == $ReleaseTargets, every target cross-compiles, and the
+#                 asset-name gate (tools/releaseassets): release.yml uploads nothing else to the release, and dist/
+#                 (when a snapshot is there) would upload exactly the registry asset set.
 #
 # The real release runs in .github/workflows/release.yml on a pushed v* tag; see RELEASING.md.
 
@@ -21,6 +23,7 @@ $ReleaseProject = 'terraform-provider-docker'
 $GoreleaserConfig = Join-Path $BuildRoot '.goreleaser.yml'
 $ReleaseManifest = Join-Path $BuildRoot 'terraform-registry-manifest.json'
 $ReleaseDist = Join-Path $BuildRoot 'dist'
+$ReleaseWorkflow = Join-Path $BuildRoot '.github/workflows/release.yml'
 $GoreleaserInstall = 'go install github.com/goreleaser/goreleaser/v2@latest   (or: winget install goreleaser.goreleaser)'
 
 # Reads the target matrix of the single build in .goreleaser.yml (goos x goarch minus ignore) as sorted <goos>_<goarch>.
@@ -119,10 +122,22 @@ function Test-ReleaseDist([string]$Dist) {
     Write-Build Green "dist check: version $version, $($zips.Count) zips + manifest, all listed in $sumsName with matching hashes."
 }
 
-# Synopsis: Release config check without goreleaser: .goreleaser.yml matrix == $ReleaseTargets, every target cross-compiles (CGO_ENABLED=0, output in test/harness/.work/release-check).
+# The asset-name gate (tools/releaseassets). The Terraform Registry rejects a release carrying anything besides the zips,
+# <name>_<version>_manifest.json, _SHA256SUMS and _SHA256SUMS.sig (v0.1.0: the cosign .sigstore.json). -Dist: the files a
+# real release of that snapshot would upload must be exactly one zip per $ReleaseTargets entry, the manifest, the
+# SHA256SUMS and its .sig. Always: no release.yml step uploads any other file to the release.
+function Assert-ReleaseAssets([string]$Dist) {
+    $gateArgs = @('-workflow', $ReleaseWorkflow, '-goreleaser', $GoreleaserConfig)
+    if ($Dist) { $gateArgs += @('-dist', $Dist, '-targets', ($ReleaseTargets -join ',')) }
+    exec { & $GoExe run ./tools/releaseassets @gateArgs } -ErrorMessage 'Release asset gate failed (ASSET lines above): the Terraform Registry would reject the release.'
+}
+
+# Synopsis: Release config check without goreleaser: .goreleaser.yml matrix == $ReleaseTargets, the asset-name gate (release.yml uploads only registry assets; dist/ when a snapshot is there), every target cross-compiles (CGO_ENABLED=0, output in test/harness/.work/release-check).
 task ReleaseCheck {
     Assert-ReleaseMatrix
     if (-not $GoExe) { throw 'go not found on PATH.' }
+    if (Test-Path (Join-Path $ReleaseDist 'artifacts.json')) { Assert-ReleaseAssets $ReleaseDist }
+    else { Write-Build Yellow 'asset gate: no goreleaser snapshot in dist/ (Invoke-Build Release makes one); checking release.yml only.'; Assert-ReleaseAssets '' }
     $out = Join-Path $TpdWork 'release-check'
     New-Item -ItemType Directory -Force $out | Out-Null
     $saved = @{ GOOS = $env:GOOS; GOARCH = $env:GOARCH; CGO_ENABLED = $env:CGO_ENABLED }
@@ -153,4 +168,68 @@ task Release {
     Assert-ReleaseMatrix
     exec { & $goreleaser release --snapshot --clean --skip=publish,sign }
     Test-ReleaseDist $ReleaseDist
+    Assert-ReleaseAssets $ReleaseDist
+}
+
+# ---------------------------------------------------------------------------- after publishing
+
+# The GPG key the registry knows for jerrybalmer1/docker (RELEASING.md, One-time setup 4): terraform init must report it.
+$RegistrySigningKeyId = 'A18B1B39E1DFDD4C'
+$RegistryProviderSource = 'jerrybalmer1/docker'
+
+# The version of the top released heading in CHANGELOG.md ("## [X.Y.Z] (<date>)"; [Unreleased] is skipped).
+function Get-ChangelogReleasedVersion {
+    foreach ($l in [System.IO.File]::ReadAllLines((Join-Path $BuildRoot 'CHANGELOG.md'))) {
+        if ($l -match '^## \[(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\]') { return $Matches[1] }
+    }
+    throw 'CHANGELOG.md: no released "## [X.Y.Z]" heading.'
+}
+
+# Synopsis: Post-release smoke (after publishing; not in PreRelease): terraform init of jerrybalmer1/docker at CHANGELOG's top released version from the public registry, in test/harness/.work/registry-smoke; asserts it installed and was signed by key A18B1B39E1DFDD4C.
+task RegistrySmoke {
+    $tf = Resolve-Tool 'terraform'
+    if (-not $tf) {
+        $tf = Get-ChildItem (Join-Path $BuildRoot 'test/harness/.bin') -Recurse -Include 'terraform', 'terraform.exe' -File -ErrorAction Ignore |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+    }
+    if (-not $tf) { throw 'terraform not found on PATH or under test/harness/.bin (harness-up installs it).' }
+    $version = Get-ChangelogReleasedVersion
+    $dir = Join-Path $TpdWork "registry-smoke/$version"
+    Remove-Item -Recurse -Force $dir -ErrorAction Ignore
+    $null = New-Item -ItemType Directory -Force $dir
+    [System.IO.File]::WriteAllText((Join-Path $dir 'main.tf'), @"
+terraform {
+  required_providers {
+    docker = {
+      source  = "$RegistryProviderSource"
+      version = "= $version"
+    }
+  }
+}
+"@)
+    # An empty CLI config: no dev_overrides, filesystem mirror or plugin cache of this machine may stand in for the registry.
+    $cliConfig = Join-Path $dir 'empty.tfrc'
+    [System.IO.File]::WriteAllText($cliConfig, '')
+    $saved = @{ TF_CLI_CONFIG_FILE = $env:TF_CLI_CONFIG_FILE; TF_PLUGIN_CACHE_DIR = $env:TF_PLUGIN_CACHE_DIR }
+    try {
+        $env:TF_CLI_CONFIG_FILE = $cliConfig
+        Remove-Item Env:TF_PLUGIN_CACHE_DIR -ErrorAction Ignore
+        Write-Build Cyan "RegistrySmoke: terraform init of $RegistryProviderSource $version in $dir ($tf)"
+        $out = & $tf "-chdir=$dir" init -no-color -input=false 2>&1 | Out-String
+        $code = $LASTEXITCODE
+    }
+    finally {
+        foreach ($k in $saved.Keys) {
+            if ($null -eq $saved[$k]) { Remove-Item "env:$k" -ErrorAction Ignore } else { Set-Item "env:$k" -Value $saved[$k] }
+        }
+    }
+    $out.TrimEnd() -split "`r?`n" | ForEach-Object { print Gray $_ }
+    if ($code) { throw "RegistrySmoke: terraform init exited $code." }
+    $installed = [regex]::Escape("Installed $RegistryProviderSource v$version (")
+    $line = ($out -split "`r?`n") | Where-Object { $_ -match $installed } | Select-Object -First 1
+    if (-not $line) { throw "RegistrySmoke: terraform init did not report 'Installed $RegistryProviderSource v$version'." }
+    if ($line -notmatch "key ID $RegistrySigningKeyId\)") { throw "RegistrySmoke: '$($line.Trim())' is not signed by key ID $RegistrySigningKeyId." }
+    $lock = Join-Path $dir '.terraform.lock.hcl'
+    if (-not (Select-String -LiteralPath $lock -SimpleMatch "registry.terraform.io/$RegistryProviderSource" -Quiet)) { throw "RegistrySmoke: $lock has no entry for $RegistryProviderSource." }
+    Write-Build Green "RegistrySmoke: $($line.Trim().TrimStart('- '))"
 }

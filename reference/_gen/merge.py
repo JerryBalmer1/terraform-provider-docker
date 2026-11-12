@@ -3,6 +3,14 @@
 Run through `Invoke-Build Inventory` from the repo root. Stdlib only. Exits 1 on any validation error
 (the outputs are still written, so the error can be inspected in the diff)."""
 import json, os, sys, collections, re, argparse
+import importlib.util
+sys.dont_write_bytecode = True  # no reference/_gen/__pycache__ from importing pins.py
+# reference/_gen/pins.py: SOURCES.md is the single source of the pins. Loaded by path: python -I does not put this
+# directory on sys.path.
+_spec = importlib.util.spec_from_file_location("pins", os.path.join(os.path.dirname(os.path.abspath(__file__)), "pins.py"))
+_pins = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_pins)
+sources_pins, inventory_pins = _pins.sources_pins, _pins.inventory_pins
 
 ap = argparse.ArgumentParser(description="Merge inventory fragments (no arguments: write reference/inventory.json + INVENTORY.md).")
 ap.add_argument("--dry-run", action="store_true", help="validate only; write nothing under reference/")
@@ -344,15 +352,8 @@ for it in sorted(items, key=lambda i: (LAYERS.index(i["layer"]), KINDS.index(i["
 inv = {
     "generated": "2026-11-08",
     "about": "Every Docker object, operation and spec element in reference/upstream (see SOURCES.md) with its decided Terraform name (DECISIONS.md). status is computed from internal/provider/registry_gen.go and the STUB(pass5) / PARTIAL(pass5) markers in internal/provider. Paths in sources are relative to reference/.",
-    "pins": {
-        "engine_api": "1.56 (moby api/v1.56.1 @ 14ebc602124e280ef4ae3e1a8e688dac1255baa6)",
-        "compose_spec": "main @ 3a4a6995e4a971f6173dff9130cb3e38e6738651",
-        "compose_go": "v2.16.2 @ ddbe099a5404149d75fe774b30de7bd0befd3bd3",
-        "compose_cli": "v5.7.1 @ fb1fd129f86828359335477f82821525201d4a8c",
-        "docker_cli": "v29.5.3 @ d1c06ef6b41d88d76866aea43c246cd7c63d04fa",
-        "dockerfile": "dockerfile/1.29.0 @ f55949dea4f03bb9d85b73e9afc9a609291289db",
-        "buildx": "v0.38.2 @ 3c4cbd35852fc1a476923627a780a7836c28b654",
-    },
+    # Read from reference/SOURCES.md (reference/_gen/pins.py), never carried here; PinCheck fails on a stale copy.
+    "pins": inventory_pins(sources_pins(os.path.join(REF, "SOURCES.md"))),
     "swagger_coverage": {"operations": len(all_ops), "covered": len(all_ops & set(seen)), "uncovered": uncovered,
                          "primary_homes": len(primary)},
     "totals": {L: {k: dict(c) for k, c in kk.items() if sum(c.values())} for L, kk in tot.items()},

@@ -1,0 +1,50 @@
+[
+ {
+  "name": "terraform-provider-docker_1.2.3_darwin_amd64.zip",
+  "type": "Archive"
+ },
+ {
+  "name": "terraform-provider-docker_1.2.3_darwin_arm64.zip",
+  "type": "Archive"
+ },
+ {
+  "name": "terraform-provider-docker_1.2.3_linux_386.zip",
+  "type": "Archive"
+ },
+ {
+  "name": "terraform-provider-docker_1.2.3_linux_amd64.zip",
+  "type": "Archive"
+ },
+ {
+  "name": "terraform-provider-docker_1.2.3_linux_arm.zip",
+  "type": "Archive"
+ },
+ {
+  "name": "terraform-provider-docker_1.2.3_linux_arm64.zip",
+  "type": "Archive"
+ },
+ {
+  "name": "terraform-provider-docker_1.2.3_windows_amd64.zip",
+  "type": "Archive"
+ },
+ {
+  "name": "terraform-provider-docker_1.2.3_windows_arm64.zip",
+  "type": "Archive"
+ },
+ {
+  "name": "terraform-provider-docker_v1.2.3",
+  "type": "Binary"
+ },
+ {
+  "name": "terraform-provider-docker_1.2.3_SHA256SUMS",
+  "type": "Checksum"
+ },
+ {
+  "name": "metadata.json",
+  "type": "Metadata"
+ },
+ {
+  "name": "terraform-provider-docker_1.2.3_SHA256SUMS.sigstore.json",
+  "type": "Uploadable File"
+ }
+]

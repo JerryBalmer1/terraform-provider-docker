@@ -17,7 +17,7 @@ var contractPins = map[string]string{
 	"compose_cli":  "v5.7.1 @ fb1fd129f86828359335477f82821525201d4a8c",
 	"compose_go":   "v2.16.2 @ ddbe099a5404149d75fe774b30de7bd0befd3bd3",
 	"compose_spec": "main @ 3a4a6995e4a971f6173dff9130cb3e38e6738651",
-	"docker_cli":   "v29.5.3 @ d1c06ef6b41d88d76866aea43c246cd7c63d04fa",
+	"docker_cli":   "v29.9.3 @ 5457199aa57c45e990c59c89cab5f02b817238d7",
 	"dockerfile":   "dockerfile/1.29.0 @ f55949dea4f03bb9d85b73e9afc9a609291289db",
 	"engine_api":   "1.56 (moby api/v1.56.1 @ 14ebc602124e280ef4ae3e1a8e688dac1255baa6)",
 }

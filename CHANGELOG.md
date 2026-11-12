@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Release workflow: the `sign` job no longer uploads the cosign bundle (`<name>_<version>_SHA256SUMS.sigstore.json`) to the GitHub release, which made the Terraform Registry reject v0.1.0 ("invalid file extension found: json") until the asset was deleted by hand. The bundle is now a workflow artifact (`cosign-bundle-vX.Y.Z`); the keyless signature and the SLSA provenance are unchanged, and the job's `contents` permission dropped to read. RELEASING.md says where the bundle lives and how to verify it.
+- `reference/inventory.json` (and the generated `contractPins` copy) labelled the docker CLI pin v29.5.3 while `reference/SOURCES.md` pins v29.9.3.
+
+### Added
+
+- Release asset-name gate (`tools/releaseassets`, in `Invoke-Build ReleaseCheck` and `Release`): the files a release would upload must be exactly one zip per target, the manifest, the SHA256SUMS and its `.sig`, and no `release.yml` step may upload anything else to the release.
+- Pin gate `Invoke-Build PinCheck` (part of `InventoryCheck`, so in the default task): `reference/SOURCES.md` is the single source of the upstream pins. `reference/_gen/merge.py` reads the inventory pins from it (`reference/_gen/pins.py`) instead of carrying a copy, and the gate fails when a pinned version or hash in a generator, the build scripts, `tools/apiwatch/pinned.json`, `go.mod`, the dind harness, `inventory.json` or `contract_gen.go` differs from it.
+- `Invoke-Build RegistrySmoke`: after publishing, `terraform init` of `jerrybalmer1/docker` at the newest released version from the public registry; fails unless it installs and is signed by key ID `A18B1B39E1DFDD4C`. The last step of RELEASING.md, not part of PreRelease.
+
 ## [0.1.0] (2026-11-11)
 
 The first release. This section covers build passes 5, 5.1, 5.2, 5.3, 6a, 6b, 6c, 6d and 6e (the log of each pass is in [BUILD_REPORT.md](BUILD_REPORT.md)). Pass 6e comes first, then 6d, 6c, 6b, 6a and 5.3; the sections after them are passes 5 to 5.2.
