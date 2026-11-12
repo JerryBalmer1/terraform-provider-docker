@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] (2026-11-11)
+
 ### Fixed
 
 - Release workflow: the `sign` job no longer uploads the cosign bundle (`<name>_<version>_SHA256SUMS.sigstore.json`) to the GitHub release, which made the Terraform Registry reject v0.1.0 ("invalid file extension found: json") until the asset was deleted by hand. The bundle is now a workflow artifact (`cosign-bundle-vX.Y.Z`); the keyless signature and the SLSA provenance are unchanged, and the job's `contents` permission dropped to read. RELEASING.md says where the bundle lives and how to verify it.
