@@ -125,7 +125,10 @@ $ReferenceSources = @(
     @{ Name = 'buildkit'; Url = 'https://github.com/moby/buildkit'; Sha = 'f55949dea4f03bb9d85b73e9afc9a609291289db'; Local = 'dockerfile' }
     @{ Name = 'buildx'; Url = 'https://github.com/docker/buildx'; Sha = '3c4cbd35852fc1a476923627a780a7836c28b654'; Local = 'buildx' }
 )
-$ReferenceSha256 = @{ 'engine-api/docs.docker.com-v1.56.yaml' = '00ccd7d2e6e0b7a943ac0067007d181d723b2513ef1f6af3b6b54145314a6fa7' }
+$ReferenceSha256 = @{
+    'engine-api/docs.docker.com-v1.56.yaml' = '00ccd7d2e6e0b7a943ac0067007d181d723b2513ef1f6af3b6b54145314a6fa7'
+    'hub/docs.docker.com-hub-latest.yaml'   = '7c280db399f81e7eaaf40c86b7cdfd9317c819b7589353e3a26e78d6a5a8d373'
+}
 $ReferenceSkip = @('.gitattributes', 'help/')
 
 # Runs go test with TF_ACC removed, restoring it afterwards.

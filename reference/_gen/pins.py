@@ -22,6 +22,12 @@ URL_KEYS = [
     (re.compile(r"github\.com/docker/buildx/"), "buildx"),
 ]
 PIN_CELL = re.compile(r"^(\S+) @ ([0-9a-f]{40})\b")
+# Specs published only as a URL (Pass 7): pinned by version and the sha256 of the downloaded bytes. Kept apart from
+# the git pins above: inventory.json carries them as "spec_pins", and contract_gen.go's contractPins does not (yet).
+SPEC_KEYS = [
+    (re.compile(r"docs\.docker\.com/reference/api/hub/"), "hub_api"),
+]
+SPEC_CELL = re.compile(r"^(\S+) @ sha256 ([0-9a-f]{64})\b.*?(?:downloaded (\d{4}-\d{2}-\d{2}))?\)?$")
 
 
 class PinError(Exception):
@@ -58,6 +64,30 @@ def sources_pins(path=SOURCES_MD):
     if missing:
         raise PinError("SOURCES.md: no row for %s" % ", ".join(missing))
     return pins
+
+
+def spec_pins(path=SOURCES_MD):
+    """{key: (version, sha256, download date)} for the URL-published specs, e.g. hub_api -> ("2-beta", "7c28...", "2026-11-11")."""
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    out = {}
+    for cells in _rows(text):
+        key = next((k for rx, k in SPEC_KEYS if rx.search(cells[2])), None)
+        if key is None:
+            continue
+        m = SPEC_CELL.match(cells[3])
+        if not m:
+            raise PinError("SOURCES.md row %r: tag/SHA cell %r is not '<version> @ sha256 <64-hex> (... downloaded YYYY-MM-DD)'" % (cells[1][:40], cells[3]))
+        out[key] = (m.group(1), m.group(2), m.group(3) or "")
+    missing = sorted({k for _, k in SPEC_KEYS} - set(out))
+    if missing:
+        raise PinError("SOURCES.md: no row for %s" % ", ".join(missing))
+    return out
+
+
+def inventory_spec_pins(specs):
+    """The inventory.json "spec_pins" block: "<version> @ sha256 <hex> (downloaded <date>)"."""
+    return {k: "%s @ sha256 %s (downloaded %s)" % v for k, v in sorted(specs.items())}
 
 
 def version(pins, key):
@@ -151,13 +181,28 @@ def check(root=ROOT, sources=None):
                         problems.append("%s:%d: %s %s, SOURCES.md pins %s (%s)" % (rel, n, key, m.group(1), want, m.group(0)))
     # Generated copies of the pins block.
     want = inventory_pins(pins)
+    want_specs = inventory_spec_pins(spec_pins(sources))
     inv_path = os.path.join(root, "reference", "inventory.json")
     if os.path.exists(inv_path):
         with open(inv_path, encoding="utf-8") as f:
-            got = json.load(f).get("pins", {})
+            inv = json.load(f)
+        got = inv.get("pins", {})
         for k in sorted(set(want) | set(got)):
             if got.get(k) != want.get(k):
                 problems.append("reference/inventory.json: pins.%s %r, SOURCES.md gives %r (run Invoke-Build Inventory)" % (k, got.get(k), want.get(k)))
+        got_specs = inv.get("spec_pins", {})
+        for k in sorted(set(want_specs) | set(got_specs)):
+            if got_specs.get(k) != want_specs.get(k):
+                problems.append("reference/inventory.json: spec_pins.%s %r, SOURCES.md gives %r (run Invoke-Build Inventory)" % (k, got_specs.get(k), want_specs.get(k)))
+        # The pinned spec file itself must hash to the pin.
+        import hashlib
+        for k, (ver, sha, _) in spec_pins(sources).items():
+            local = os.path.join(root, "reference", "upstream", "hub", "docs.docker.com-hub-latest.yaml") if k == "hub_api" else None
+            if local and os.path.exists(local):
+                with open(local, "rb") as f:
+                    got_sha = hashlib.sha256(f.read()).hexdigest()
+                if got_sha != sha:
+                    problems.append("%s: sha256 %s, SOURCES.md pins %s @ sha256 %s" % (os.path.relpath(local, root).replace(os.sep, "/"), got_sha, ver, sha))
     cg_path = os.path.join(root, "internal", "provider", "contract_gen.go")
     if os.path.exists(cg_path):
         with open(cg_path, encoding="utf-8") as f:
@@ -175,6 +220,7 @@ def main(argv):
     try:
         problems = check(root)
         pins = sources_pins(os.path.join(root, "reference", "SOURCES.md"))
+        pins.update(spec_pins(os.path.join(root, "reference", "SOURCES.md")))
     except (PinError, OSError) as e:
         print("ERR %s" % e)
         return 2

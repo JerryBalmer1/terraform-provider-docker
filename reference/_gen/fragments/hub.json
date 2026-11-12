@@ -1,0 +1,1638 @@
+{
+  "lane": "P7-0",
+  "notes": [
+    "Pass 7 Lane 0: every operation of the Docker Hub API spec (SOURCES.md pin hub_api, info.version 2-beta) has exactly one primary home; every spec tag is covered (hub_tag on the items, info_tags below). Names come only from the spec (DECISIONS.md).",
+    "planned: pass7 marks an item the Pass 7 build lanes implement: merge.py computes status `planned` while it is unregistered, registrygen and contractgen leave it out, validate.py S1 lists it without failing. The lane that registers the type removes the key (merge.py fails on a registered item that still says planned).",
+    "requires: org = the route is org-scoped; plan=<name> = a subscription the spec names; plan=unknown = a gated feature whose plan the spec does not state. No entry = reachable on a Personal plan as far as the spec says (the live probe, reference/_gen/pass7/hub-probe.md, can narrow it).",
+    "Provider block (Lane H, no inventory item): hub_username and hub_token, falling back to DOCKER_HUB_USERNAME and DOCKER_HUB_TOKEN; hub_token is sensitive. Every hub type exchanges them through POST /v2/auth/token (the docker_hub_token exchange) and caches the JWT per provider instance.",
+    "No owner label on Hub objects: no Hub object has a label field (CONTRACT.md Owner label, Excluded types).",
+    "Groups, not teams: the spec's tag and paths say group (the summaries add '(Team)'); every name uses group.",
+    "Docker Hardened Images and Docker Scout: the pinned spec has no tag or operation for either, so there is no item (DECISIONS.md: the spec is the only naming source). Re-harvest when the spec adds them (DriftCheck hub source)."
+  ],
+  "info_tags": {
+    "changelog": "Info tag, no operations: points at the Hub API changelog. DriftCheck watches the spec itself (hub source kind).",
+    "resources": "Info tag, no operations: links the experimental hub-tool CLI. Not a naming source (DECISIONS.md: the spec only).",
+    "rate-limiting": "Info tag, no operations: X-RateLimit-Limit / -Remaining / -Reset headers. Lane H's Hub client must honour them (retry after Reset on 429); no Terraform type.",
+    "authentication": "Info tag, no operations: password / PAT / OAT auth types. Covered by ephemeral docker_hub_token (the /v2/auth/token exchange) and the provider arguments hub_username / hub_token (Lane H)."
+  },
+  "naming_questions": [
+    "P7-Q1 docker_hub_repository and docker_hub_repository_group: the spec has no delete (and no update) route. Keep them as resources whose destroy only forgets (current), make create an action (docker_hub_repository_create), or defer both until the spec adds the routes?",
+    "P7-Q2 docker_hub_access_token: a JWT issued from a PAT is refused by /v2/access-tokens (403 'token issued from personal access token is not allowed', live probe). Managing PATs needs a password-issued JWT. Add a write-only hub_password provider argument for it, or ship the type documented as password-auth only?"
+  ],
+  "items": [
+    {
+      "id": "hub:token",
+      "layer": "hub",
+      "kind": "ephemeral_resource",
+      "name": "docker_hub_token",
+      "summary": "Exchange a username and a password, PAT or OAT for a short-lived Hub bearer JWT (POST /v2/auth/token); the JWT is sensitive and never stored.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "AuthCreateAccessToken",
+          "method": "POST",
+          "path": "/v2/auth/token",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "authentication-api",
+      "planned": "pass7",
+      "requires": [],
+      "writable_fields": [
+        {
+          "pointer": "#/paths/~1v2~1auth~1token/post/requestBody/content/application~1json/schema/properties/identifier",
+          "upstream": "identifier",
+          "attr": "identifier",
+          "in": "body",
+          "op": "AuthCreateAccessToken"
+        },
+        {
+          "pointer": "#/paths/~1v2~1auth~1token/post/requestBody/content/application~1json/schema/properties/secret",
+          "upstream": "secret",
+          "attr": "secret",
+          "in": "body",
+          "op": "AuthCreateAccessToken"
+        }
+      ]
+    },
+    {
+      "id": "hub:users-login",
+      "layer": "hub",
+      "kind": "skip",
+      "name": null,
+      "summary": "Legacy login (POST /v2/users/login).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "PostUsersLogin",
+          "method": "POST",
+          "path": "/v2/users/login",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "authentication-api",
+      "skip_reason": "Legacy login route; the spec documents POST /v2/auth/token (ephemeral docker_hub_token) as the exchange, with the same identifier and secret."
+    },
+    {
+      "id": "hub:users-2fa-login",
+      "layer": "hub",
+      "kind": "skip",
+      "name": null,
+      "summary": "Second-factor login (POST /v2/users/2fa-login).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "PostUsers2FALogin",
+          "method": "POST",
+          "path": "/v2/users/2fa-login",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "authentication-api",
+      "skip_reason": "Needs an interactive TOTP code after a password login; Terraform runs unattended. A PAT or OAT through docker_hub_token needs no second factor."
+    },
+    {
+      "id": "hub:access-token",
+      "layer": "hub",
+      "kind": "resource",
+      "name": "docker_hub_access_token",
+      "summary": "A personal access token. Label and is_active update in place; scopes and expires_at force replacement. The token value is returned once, by create: stored as the sensitive `token` and optionally written to secret_output_path.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "postV2AccessTokens",
+          "method": "POST",
+          "path": "/v2/access-tokens",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2AccessTokensByUuid",
+          "method": "GET",
+          "path": "/v2/access-tokens/{uuid}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "patchV2AccessTokensByUuid",
+          "method": "PATCH",
+          "path": "/v2/access-tokens/{uuid}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "deleteV2AccessTokensByUuid",
+          "method": "DELETE",
+          "path": "/v2/access-tokens/{uuid}",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "access-tokens",
+      "planned": "pass7",
+      "requires": [],
+      "update": "in_place",
+      "writable_fields": [
+        {
+          "pointer": "#/components/schemas/createAccessTokenRequest/properties/token_label",
+          "upstream": "token_label",
+          "attr": "token_label",
+          "in": "body",
+          "op": "postV2AccessTokens"
+        },
+        {
+          "pointer": "#/components/schemas/createAccessTokenRequest/properties/scopes",
+          "upstream": "scopes",
+          "attr": "scopes",
+          "in": "body",
+          "op": "postV2AccessTokens"
+        },
+        {
+          "pointer": "#/components/schemas/createAccessTokenRequest/properties/expires_at",
+          "upstream": "expires_at",
+          "attr": "expires_at",
+          "in": "body",
+          "op": "postV2AccessTokens"
+        },
+        {
+          "pointer": "#/components/schemas/patchAccessTokenRequest/properties/token_label",
+          "upstream": "token_label",
+          "attr": "token_label",
+          "in": "body",
+          "op": "patchV2AccessTokensByUuid"
+        },
+        {
+          "pointer": "#/components/schemas/patchAccessTokenRequest/properties/is_active",
+          "upstream": "is_active",
+          "attr": "is_active",
+          "in": "body",
+          "op": "patchV2AccessTokensByUuid"
+        }
+      ]
+    },
+    {
+      "id": "hub:access-tokens",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_access_tokens",
+      "summary": "The personal access tokens of the authenticated user (paginated list; never the token values).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2AccessTokens",
+          "method": "GET",
+          "path": "/v2/access-tokens",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "access-tokens",
+      "planned": "pass7",
+      "requires": [],
+      "plural": true
+    },
+    {
+      "id": "hub:access-token-data",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_access_token",
+      "summary": "One personal access token by UUID (metadata only; the value is never readable again).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2AccessTokensByUuid",
+          "method": "GET",
+          "path": "/v2/access-tokens/{uuid}"
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "access-tokens",
+      "planned": "pass7",
+      "requires": []
+    },
+    {
+      "id": "hub:audit-log-actions",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_audit_log_actions",
+      "summary": "The audit log action names of a namespace, for filtering docker_hub_audit_logs (the spec returns a map by category).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "AuditLogs_ListAuditActions",
+          "method": "GET",
+          "path": "/v2/auditlogs/{account}/actions",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "audit-logs",
+      "planned": "pass7",
+      "requires": [
+        "plan=unknown"
+      ]
+    },
+    {
+      "id": "hub:audit-logs",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_audit_logs",
+      "summary": "Audit log events of a namespace, filtered by action, name, actor and a from/to window; page_size bounds state.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "AuditLogs_ListAuditLogs",
+          "method": "GET",
+          "path": "/v2/auditlogs/{account}",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "audit-logs",
+      "planned": "pass7",
+      "requires": [
+        "plan=unknown"
+      ],
+      "plural": true
+    },
+    {
+      "id": "hub:org-settings",
+      "layer": "hub",
+      "kind": "resource",
+      "name": "docker_hub_org_settings",
+      "summary": "An organization's settings (restricted_images). A singleton: create adopts the existing settings and PUTs them, delete only removes it from state (the spec has no delete). The spec: restricted_images is only used on a business subscription.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByNameSettings",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/settings",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "putV2OrgsByNameSettings",
+          "method": "PUT",
+          "path": "/v2/orgs/{org_name}/settings",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "org-settings",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=business"
+      ],
+      "update": "in_place",
+      "writable_fields": [
+        {
+          "pointer": "#/components/parameters/org_name",
+          "upstream": "org_name",
+          "attr": "org_name",
+          "in": "path",
+          "op": "putV2OrgsByNameSettings"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1settings/put/requestBody/content/application~1json/schema/properties/restricted_images/properties/enabled",
+          "upstream": "restricted_images.enabled",
+          "attr": "restricted_images.enabled",
+          "in": "body",
+          "op": "putV2OrgsByNameSettings"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1settings/put/requestBody/content/application~1json/schema/properties/restricted_images/properties/allow_official_images",
+          "upstream": "restricted_images.allow_official_images",
+          "attr": "restricted_images.allow_official_images",
+          "in": "body",
+          "op": "putV2OrgsByNameSettings"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1settings/put/requestBody/content/application~1json/schema/properties/restricted_images/properties/allow_verified_publishers",
+          "upstream": "restricted_images.allow_verified_publishers",
+          "attr": "restricted_images.allow_verified_publishers",
+          "in": "body",
+          "op": "putV2OrgsByNameSettings"
+        }
+      ]
+    },
+    {
+      "id": "hub:org-settings-data",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_org_settings",
+      "summary": "An organization's settings, read only.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByNameSettings",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/settings"
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "org-settings",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ]
+    },
+    {
+      "id": "hub:org-access-token",
+      "layer": "hub",
+      "kind": "resource",
+      "name": "docker_hub_org_access_token",
+      "summary": "An organization access token (OAT). A separate item from docker_hub_access_token: org-scoped, with resource scopes. The value is returned once, by create: sensitive `token` and optional secret_output_path.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "postV2OrgsByNameAccessTokens",
+          "method": "POST",
+          "path": "/v2/orgs/{org_name}/access-tokens",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameAccessTokensByAccessTokenId",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/access-tokens/{access_token_id}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "patchV2OrgsByOrgNameAccessTokensByAccessTokenId",
+          "method": "PATCH",
+          "path": "/v2/orgs/{org_name}/access-tokens/{access_token_id}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "deleteV2OrgsByOrgNameAccessTokensByAccessTokenId",
+          "method": "DELETE",
+          "path": "/v2/orgs/{org_name}/access-tokens/{access_token_id}",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "org-access-tokens",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "update": "in_place",
+      "writable_fields": [
+        {
+          "pointer": "#/components/parameters/org_name",
+          "upstream": "org_name",
+          "attr": "org_name",
+          "in": "path",
+          "op": "postV2OrgsByNameAccessTokens"
+        },
+        {
+          "pointer": "#/components/schemas/createOrgAccessTokenRequest/properties/label",
+          "upstream": "label",
+          "attr": "label",
+          "in": "body",
+          "op": "postV2OrgsByNameAccessTokens"
+        },
+        {
+          "pointer": "#/components/schemas/createOrgAccessTokenRequest/properties/description",
+          "upstream": "description",
+          "attr": "description",
+          "in": "body",
+          "op": "postV2OrgsByNameAccessTokens"
+        },
+        {
+          "pointer": "#/components/schemas/orgAccessTokenResource/properties/type",
+          "upstream": "resources[].type",
+          "attr": "resources.type",
+          "in": "body",
+          "op": "postV2OrgsByNameAccessTokens"
+        },
+        {
+          "pointer": "#/components/schemas/orgAccessTokenResource/properties/path",
+          "upstream": "resources[].path",
+          "attr": "resources.path",
+          "in": "body",
+          "op": "postV2OrgsByNameAccessTokens"
+        },
+        {
+          "pointer": "#/components/schemas/orgAccessTokenResource/properties/scopes",
+          "upstream": "resources[].scopes",
+          "attr": "resources.scopes",
+          "in": "body",
+          "op": "postV2OrgsByNameAccessTokens"
+        },
+        {
+          "pointer": "#/components/schemas/createOrgAccessTokenRequest/properties/expires_at",
+          "upstream": "expires_at",
+          "attr": "expires_at",
+          "in": "body",
+          "op": "postV2OrgsByNameAccessTokens"
+        },
+        {
+          "pointer": "#/components/schemas/updateOrgAccessTokenRequest/properties/label",
+          "upstream": "label",
+          "attr": "label",
+          "in": "body",
+          "op": "patchV2OrgsByOrgNameAccessTokensByAccessTokenId"
+        },
+        {
+          "pointer": "#/components/schemas/updateOrgAccessTokenRequest/properties/description",
+          "upstream": "description",
+          "attr": "description",
+          "in": "body",
+          "op": "patchV2OrgsByOrgNameAccessTokensByAccessTokenId"
+        },
+        {
+          "pointer": "#/components/schemas/updateOrgAccessTokenRequest/properties/is_active",
+          "upstream": "is_active",
+          "attr": "is_active",
+          "in": "body",
+          "op": "patchV2OrgsByOrgNameAccessTokensByAccessTokenId"
+        }
+      ]
+    },
+    {
+      "id": "hub:org-access-tokens",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_org_access_tokens",
+      "summary": "The access tokens of an organization (paginated; never the values).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByNameAccessTokens",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/access-tokens",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "org-access-tokens",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "plural": true
+    },
+    {
+      "id": "hub:org-access-token-data",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_org_access_token",
+      "summary": "One organization access token by ID (metadata only).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameAccessTokensByAccessTokenId",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/access-tokens/{access_token_id}"
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "org-access-tokens",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ]
+    },
+    {
+      "id": "hub:repository",
+      "layer": "hub",
+      "kind": "resource",
+      "name": "docker_hub_repository",
+      "summary": "A Hub repository in a namespace (name, description, full_description, registry, is_private). The spec has create and read only: no update and no delete route, so every change replaces and destroy can only remove it from state (finding P7-F5).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "CreateRepository",
+          "method": "POST",
+          "path": "/v2/namespaces/{namespace}/repositories",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "GetRepository",
+          "method": "GET",
+          "path": "/v2/namespaces/{namespace}/repositories/{repository}",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "repositories",
+      "planned": "pass7",
+      "requires": [],
+      "update": "replace",
+      "writable_fields": [
+        {
+          "pointer": "#/components/parameters/namespace",
+          "upstream": "namespace",
+          "attr": "namespace",
+          "in": "path",
+          "op": "CreateRepository"
+        },
+        {
+          "pointer": "#/components/schemas/repo_creation_request/properties/name",
+          "upstream": "name",
+          "attr": "name",
+          "in": "body",
+          "op": "CreateRepository"
+        },
+        {
+          "pointer": "#/components/schemas/repo_creation_request/properties/namespace",
+          "upstream": "namespace",
+          "attr": "namespace",
+          "in": "body",
+          "op": "CreateRepository"
+        },
+        {
+          "pointer": "#/components/schemas/repo_creation_request/properties/description",
+          "upstream": "description",
+          "attr": "description",
+          "in": "body",
+          "op": "CreateRepository"
+        },
+        {
+          "pointer": "#/components/schemas/repo_creation_request/properties/full_description",
+          "upstream": "full_description",
+          "attr": "full_description",
+          "in": "body",
+          "op": "CreateRepository"
+        },
+        {
+          "pointer": "#/components/schemas/repo_creation_request/properties/registry",
+          "upstream": "registry",
+          "attr": "registry",
+          "in": "body",
+          "op": "CreateRepository"
+        },
+        {
+          "pointer": "#/components/schemas/repo_creation_request/properties/is_private",
+          "upstream": "is_private",
+          "attr": "is_private",
+          "in": "body",
+          "op": "CreateRepository"
+        }
+      ]
+    },
+    {
+      "id": "hub:repositories",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_repositories",
+      "summary": "The repositories of a namespace (user or organization), filtered by name and ordered.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "listNamespaceRepositories",
+          "method": "GET",
+          "path": "/v2/namespaces/{namespace}/repositories",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "repositories",
+      "planned": "pass7",
+      "requires": [],
+      "plural": true
+    },
+    {
+      "id": "hub:repository-data",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_repository",
+      "summary": "One repository of a namespace; public repositories read anonymously.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "GetRepository",
+          "method": "GET",
+          "path": "/v2/namespaces/{namespace}/repositories/{repository}"
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "CheckRepository",
+          "method": "HEAD",
+          "path": "/v2/namespaces/{namespace}/repositories/{repository}",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "repositories",
+      "planned": "pass7",
+      "requires": []
+    },
+    {
+      "id": "hub:repository-tags",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_repository_tags",
+      "summary": "The tags of a repository (paginated).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "ListRepositoryTags",
+          "method": "GET",
+          "path": "/v2/namespaces/{namespace}/repositories/{repository}/tags",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "headV2NamespacesByNamespaceRepositoriesByRepositoryTags",
+          "method": "HEAD",
+          "path": "/v2/namespaces/{namespace}/repositories/{repository}/tags",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "repositories",
+      "planned": "pass7",
+      "requires": [],
+      "plural": true
+    },
+    {
+      "id": "hub:repository-tag",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_repository_tag",
+      "summary": "One tag of a repository: its images per platform, size, status and push/pull times.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "GetRepositoryTag",
+          "method": "GET",
+          "path": "/v2/namespaces/{namespace}/repositories/{repository}/tags/{tag}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "headV2NamespacesByNamespaceRepositoriesByRepositoryTagsByTag",
+          "method": "HEAD",
+          "path": "/v2/namespaces/{namespace}/repositories/{repository}/tags/{tag}",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "repositories",
+      "planned": "pass7",
+      "requires": []
+    },
+    {
+      "id": "hub:repository-immutable-tags",
+      "layer": "hub",
+      "kind": "resource",
+      "name": "docker_hub_repository_immutable_tags",
+      "summary": "A repository's immutable tags setting (enabled + rules). Read from the repository's immutable_tags_settings; delete PATCHes it off. Repository admin only (the spec).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "UpdateRepositoryImmutableTags",
+          "method": "PATCH",
+          "path": "/v2/namespaces/{namespace}/repositories/{repository}/immutabletags",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "GetRepository",
+          "method": "GET",
+          "path": "/v2/namespaces/{namespace}/repositories/{repository}"
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "repositories",
+      "planned": "pass7",
+      "requires": [],
+      "update": "in_place",
+      "writable_fields": [
+        {
+          "pointer": "#/components/parameters/namespace",
+          "upstream": "namespace",
+          "attr": "namespace",
+          "in": "path",
+          "op": "UpdateRepositoryImmutableTags"
+        },
+        {
+          "pointer": "#/components/parameters/repository",
+          "upstream": "repository",
+          "attr": "repository",
+          "in": "path",
+          "op": "UpdateRepositoryImmutableTags"
+        },
+        {
+          "pointer": "#/components/schemas/update_repository_immutable_tags_request/properties/immutable_tags",
+          "upstream": "immutable_tags",
+          "attr": "immutable_tags",
+          "in": "body",
+          "op": "UpdateRepositoryImmutableTags"
+        },
+        {
+          "pointer": "#/components/schemas/update_repository_immutable_tags_request/properties/immutable_tags_rules",
+          "upstream": "immutable_tags_rules",
+          "attr": "immutable_tags_rules",
+          "in": "body",
+          "op": "UpdateRepositoryImmutableTags"
+        }
+      ]
+    },
+    {
+      "id": "hub:repository-immutable-tags-verify",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_repository_immutable_tags_verify",
+      "summary": "Validate an immutable-tags regex and list the repository's tags it matches. A POST that changes nothing (the spec: validates and returns), so a data source.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "VerifyRepositoryImmutableTags",
+          "method": "POST",
+          "path": "/v2/namespaces/{namespace}/repositories/{repository}/immutabletags/verify",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "repositories",
+      "planned": "pass7",
+      "requires": []
+    },
+    {
+      "id": "hub:repository-group",
+      "layer": "hub",
+      "kind": "resource",
+      "name": "docker_hub_repository_group",
+      "summary": "An organization group's permission on a repository. The spec has only the assign route: no read and no delete (finding P7-F5).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "CreateRepositoryGroup",
+          "method": "POST",
+          "path": "/v2/repositories/{namespace}/{repository}/groups",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "repositories",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "update": "replace",
+      "writable_fields": [
+        {
+          "pointer": "#/components/parameters/namespace",
+          "upstream": "namespace",
+          "attr": "namespace",
+          "in": "path",
+          "op": "CreateRepositoryGroup"
+        },
+        {
+          "pointer": "#/components/parameters/repository",
+          "upstream": "repository",
+          "attr": "repository",
+          "in": "path",
+          "op": "CreateRepositoryGroup"
+        },
+        {
+          "pointer": "#/components/schemas/RepositoryGroupCreationRequest/properties/group_id",
+          "upstream": "group_id",
+          "attr": "group_id",
+          "in": "body",
+          "op": "CreateRepositoryGroup"
+        },
+        {
+          "pointer": "#/components/schemas/RepositoryGroupCreationRequest/properties/permission",
+          "upstream": "permission",
+          "attr": "permission",
+          "in": "body",
+          "op": "CreateRepositoryGroup"
+        }
+      ]
+    },
+    {
+      "id": "hub:org-members",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_org_members",
+      "summary": "The members of an organization, filtered by search, type and role.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameMembers",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/members",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "orgs",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "plural": true
+    },
+    {
+      "id": "hub:org-members-export",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_org_members_export",
+      "summary": "The organization's members as the CSV the Hub exports (raw text only).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameMembersExport",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/members/export",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "orgs",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ]
+    },
+    {
+      "id": "hub:org-member",
+      "layer": "hub",
+      "kind": "resource",
+      "name": "docker_hub_org_member",
+      "summary": "An existing member's role in an organization. Members join through invites (docker_hub_invite), so create adopts the member and PUTs the role; delete removes the member from the organization.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "putV2OrgsByOrgNameMembersByUsername",
+          "method": "PUT",
+          "path": "/v2/orgs/{org_name}/members/{username}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "deleteV2OrgsByOrgNameMembersByUsername",
+          "method": "DELETE",
+          "path": "/v2/orgs/{org_name}/members/{username}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameMembers",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/members"
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "orgs",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "update": "in_place",
+      "writable_fields": [
+        {
+          "pointer": "#/components/parameters/org_name",
+          "upstream": "org_name",
+          "attr": "org_name",
+          "in": "path",
+          "op": "putV2OrgsByOrgNameMembersByUsername"
+        },
+        {
+          "pointer": "#/components/parameters/username",
+          "upstream": "username",
+          "attr": "username",
+          "in": "path",
+          "op": "putV2OrgsByOrgNameMembersByUsername"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1members~1{username}/put/requestBody/content/application~1json/schema/properties/role",
+          "upstream": "role",
+          "attr": "role",
+          "in": "body",
+          "op": "putV2OrgsByOrgNameMembersByUsername"
+        }
+      ]
+    },
+    {
+      "id": "hub:org-invites",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_org_invites",
+      "summary": "The pending invites of an organization.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameInvites",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/invites",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "invites",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "plural": true
+    },
+    {
+      "id": "hub:invite",
+      "layer": "hub",
+      "kind": "resource",
+      "name": "docker_hub_invite",
+      "summary": "One invite of a Docker ID or email to an organization (and optionally a group, with a role), sent through the bulk route with one invitee; delete cancels it. Read finds it in the pending list.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "postV2InvitesBulk",
+          "method": "POST",
+          "path": "/v2/invites/bulk",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "deleteV2InvitesById",
+          "method": "DELETE",
+          "path": "/v2/invites/{id}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameInvites",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/invites"
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "invites",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "update": "replace",
+      "writable_fields": [
+        {
+          "pointer": "#/paths/~1v2~1invites~1bulk/post/requestBody/content/application~1json/schema/properties/org",
+          "upstream": "org",
+          "attr": "org",
+          "in": "body",
+          "op": "postV2InvitesBulk"
+        },
+        {
+          "pointer": "#/paths/~1v2~1invites~1bulk/post/requestBody/content/application~1json/schema/properties/team",
+          "upstream": "team",
+          "attr": "team",
+          "in": "body",
+          "op": "postV2InvitesBulk"
+        },
+        {
+          "pointer": "#/paths/~1v2~1invites~1bulk/post/requestBody/content/application~1json/schema/properties/role",
+          "upstream": "role",
+          "attr": "role",
+          "in": "body",
+          "op": "postV2InvitesBulk"
+        },
+        {
+          "pointer": "#/paths/~1v2~1invites~1bulk/post/requestBody/content/application~1json/schema/properties/invitees",
+          "upstream": "invitees",
+          "attr": "invitees",
+          "in": "body",
+          "op": "postV2InvitesBulk"
+        },
+        {
+          "pointer": "#/paths/~1v2~1invites~1bulk/post/requestBody/content/application~1json/schema/properties/dry_run",
+          "upstream": "dry_run",
+          "attr": "dry_run",
+          "in": "body",
+          "op": "postV2InvitesBulk"
+        }
+      ]
+    },
+    {
+      "id": "hub:invite-resend",
+      "layer": "hub",
+      "kind": "action",
+      "name": "docker_hub_invite_resend",
+      "summary": "Resend a pending invite.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "patchV2InvitesByIdResend",
+          "method": "PATCH",
+          "path": "/v2/invites/{id}/resend",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "invites",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "writable_fields": []
+    },
+    {
+      "id": "hub:group",
+      "layer": "hub",
+      "kind": "resource",
+      "name": "docker_hub_group",
+      "summary": "A group of an organization (the spec's name; the Hub UI says team). Name and description update in place.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "postV2OrgsByOrgNameGroups",
+          "method": "POST",
+          "path": "/v2/orgs/{org_name}/groups",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameGroupsByGroupName",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/groups/{group_name}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "putV2OrgsByOrgNameGroupsByGroupName",
+          "method": "PUT",
+          "path": "/v2/orgs/{org_name}/groups/{group_name}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "patchV2OrgsByOrgNameGroupsByGroupName",
+          "method": "PATCH",
+          "path": "/v2/orgs/{org_name}/groups/{group_name}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "deleteV2OrgsByOrgNameGroupsByGroupName",
+          "method": "DELETE",
+          "path": "/v2/orgs/{org_name}/groups/{group_name}",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "groups",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "update": "in_place",
+      "writable_fields": [
+        {
+          "pointer": "#/components/parameters/org_name",
+          "upstream": "org_name",
+          "attr": "org_name",
+          "in": "path",
+          "op": "postV2OrgsByOrgNameGroups"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1groups/post/requestBody/content/application~1json/schema/properties/name",
+          "upstream": "name",
+          "attr": "name",
+          "in": "body",
+          "op": "postV2OrgsByOrgNameGroups"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1groups/post/requestBody/content/application~1json/schema/properties/description",
+          "upstream": "description",
+          "attr": "description",
+          "in": "body",
+          "op": "postV2OrgsByOrgNameGroups"
+        },
+        {
+          "pointer": "#/components/parameters/group_name",
+          "upstream": "group_name",
+          "attr": "group_name",
+          "in": "path",
+          "op": "putV2OrgsByOrgNameGroupsByGroupName"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1groups~1{group_name}/put/requestBody/content/application~1json/schema/properties/name",
+          "upstream": "name",
+          "attr": "name",
+          "in": "body",
+          "op": "putV2OrgsByOrgNameGroupsByGroupName"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1groups~1{group_name}/put/requestBody/content/application~1json/schema/properties/description",
+          "upstream": "description",
+          "attr": "description",
+          "in": "body",
+          "op": "putV2OrgsByOrgNameGroupsByGroupName"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1groups~1{group_name}/patch/requestBody/content/application~1json/schema/properties/name",
+          "upstream": "name",
+          "attr": "name",
+          "in": "body",
+          "op": "patchV2OrgsByOrgNameGroupsByGroupName"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1groups~1{group_name}/patch/requestBody/content/application~1json/schema/properties/description",
+          "upstream": "description",
+          "attr": "description",
+          "in": "body",
+          "op": "patchV2OrgsByOrgNameGroupsByGroupName"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1groups~1{group_name}/patch/requestBody/content/application~1json/schema/properties/role",
+          "upstream": "role",
+          "attr": "role",
+          "in": "body",
+          "op": "patchV2OrgsByOrgNameGroupsByGroupName"
+        }
+      ]
+    },
+    {
+      "id": "hub:groups",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_groups",
+      "summary": "The groups of an organization, filtered by username or search.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameGroups",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/groups",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "groups",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "plural": true
+    },
+    {
+      "id": "hub:group-data",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_group",
+      "summary": "One group of an organization.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameGroupsByGroupName",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/groups/{group_name}"
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "groups",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ]
+    },
+    {
+      "id": "hub:group-member",
+      "layer": "hub",
+      "kind": "resource",
+      "name": "docker_hub_group_member",
+      "summary": "A user's membership in a group. Read finds the member in the group's member list.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "postV2OrgsByOrgNameGroupsByGroupNameMembers",
+          "method": "POST",
+          "path": "/v2/orgs/{org_name}/groups/{group_name}/members",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "deleteV2OrgsByOrgNameGroupsByGroupNameMembersByUsername",
+          "method": "DELETE",
+          "path": "/v2/orgs/{org_name}/groups/{group_name}/members/{username}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameGroupsByGroupNameMembers",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/groups/{group_name}/members"
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "groups",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "update": "replace",
+      "writable_fields": [
+        {
+          "pointer": "#/components/parameters/org_name",
+          "upstream": "org_name",
+          "attr": "org_name",
+          "in": "path",
+          "op": "postV2OrgsByOrgNameGroupsByGroupNameMembers"
+        },
+        {
+          "pointer": "#/components/parameters/group_name",
+          "upstream": "group_name",
+          "attr": "group_name",
+          "in": "path",
+          "op": "postV2OrgsByOrgNameGroupsByGroupNameMembers"
+        },
+        {
+          "pointer": "#/paths/~1v2~1orgs~1{org_name}~1groups~1{group_name}~1members/post/requestBody/content/application~1json/schema/properties/member",
+          "upstream": "member",
+          "attr": "member",
+          "in": "body",
+          "op": "postV2OrgsByOrgNameGroupsByGroupNameMembers"
+        }
+      ]
+    },
+    {
+      "id": "hub:group-members",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_group_members",
+      "summary": "The members of a group.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2OrgsByOrgNameGroupsByGroupNameMembers",
+          "method": "GET",
+          "path": "/v2/orgs/{org_name}/groups/{group_name}/members",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "groups",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "plural": true
+    },
+    {
+      "id": "hub:scim-service-provider-config",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_scim_service_provider_config",
+      "summary": "The SCIM service provider configuration (SCIM token auth).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2Scim20ServiceProviderConfig",
+          "method": "GET",
+          "path": "/v2/scim/2.0/ServiceProviderConfig",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "scim",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ]
+    },
+    {
+      "id": "hub:scim-resource-types",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_scim_resource_types",
+      "summary": "The SCIM resource types.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2Scim20ResourceTypes",
+          "method": "GET",
+          "path": "/v2/scim/2.0/ResourceTypes",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "scim",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "plural": true
+    },
+    {
+      "id": "hub:scim-resource-type",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_scim_resource_type",
+      "summary": "One SCIM resource type by name.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2Scim20ResourceTypesByName",
+          "method": "GET",
+          "path": "/v2/scim/2.0/ResourceTypes/{name}",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "scim",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ]
+    },
+    {
+      "id": "hub:scim-schemas",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_scim_schemas",
+      "summary": "The SCIM schemas.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2Scim20Schemas",
+          "method": "GET",
+          "path": "/v2/scim/2.0/Schemas",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "scim",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "plural": true
+    },
+    {
+      "id": "hub:scim-schema",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_scim_schema",
+      "summary": "One SCIM schema by ID.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2Scim20SchemasById",
+          "method": "GET",
+          "path": "/v2/scim/2.0/Schemas/{id}",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "scim",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ]
+    },
+    {
+      "id": "hub:scim-users",
+      "layer": "hub",
+      "kind": "data_source",
+      "name": "docker_hub_scim_users",
+      "summary": "The SCIM users of the organization (filter, sort, startIndex/count).",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2Scim20Users",
+          "method": "GET",
+          "path": "/v2/scim/2.0/Users",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "scim",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "plural": true
+    },
+    {
+      "id": "hub:scim-user",
+      "layer": "hub",
+      "kind": "resource",
+      "name": "docker_hub_scim_user",
+      "summary": "A SCIM-provisioned user. The spec has no delete: destroy PUTs active=false (deactivate), the spec's documented way to remove access.",
+      "sources": [
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "postV2Scim20Users",
+          "method": "POST",
+          "path": "/v2/scim/2.0/Users",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "getV2Scim20UsersById",
+          "method": "GET",
+          "path": "/v2/scim/2.0/Users/{id}",
+          "primary": true
+        },
+        {
+          "type": "openapi",
+          "spec": "hub",
+          "file": "upstream/hub/docs.docker.com-hub-latest.yaml",
+          "operationId": "putV2Scim20UsersById",
+          "method": "PUT",
+          "path": "/v2/scim/2.0/Users/{id}",
+          "primary": true
+        }
+      ],
+      "min_api": null,
+      "hub_tag": "scim",
+      "planned": "pass7",
+      "requires": [
+        "org",
+        "plan=unknown"
+      ],
+      "update": "in_place",
+      "writable_fields": [
+        {
+          "pointer": "#/components/schemas/scim_user_schemas",
+          "upstream": "schemas",
+          "attr": "schemas",
+          "in": "body",
+          "op": "postV2Scim20Users"
+        },
+        {
+          "pointer": "#/components/schemas/scim_user_username",
+          "upstream": "userName",
+          "attr": "user_name",
+          "in": "body",
+          "op": "postV2Scim20Users"
+        },
+        {
+          "pointer": "#/components/schemas/scim_user_name/properties/givenName",
+          "upstream": "name.givenName",
+          "attr": "name.given_name",
+          "in": "body",
+          "op": "postV2Scim20Users"
+        },
+        {
+          "pointer": "#/components/schemas/scim_user_name/properties/familyName",
+          "upstream": "name.familyName",
+          "attr": "name.family_name",
+          "in": "body",
+          "op": "postV2Scim20Users"
+        },
+        {
+          "pointer": "#/paths/~1v2~1scim~12.0~1Users~1{id}/put/requestBody/content/application~1scim+json/schema/properties/active",
+          "upstream": "active",
+          "attr": "active",
+          "in": "body",
+          "op": "putV2Scim20UsersById"
+        }
+      ]
+    }
+  ]
+}

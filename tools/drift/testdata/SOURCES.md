@@ -4,6 +4,7 @@
 |---|---|---|---|---|---|---|
 | engine | moby Engine API | https://github.com/moby/moby/tree/14ebc602124e280ef4ae3e1a8e688dac1255baa6/api | api/v1.56.1 @ 14ebc602124e280ef4ae3e1a8e688dac1255baa6 (note) | upstream/engine-api/api/ | Apache-2.0 | 2026-11-08 |
 | engine | docs.docker.com spec | https://docs.docker.com/reference/api/engine/version/v1.56.yaml | sha256 00ccd7d2e6e0b7a943ac0067007d181d723b2513ef1f6af3b6b54145314a6fa7 | upstream/engine-api/docs.docker.com-v1.56.yaml | Apache-2.0 | 2026-11-08 |
+| hub | Docker Hub API spec | https://docs.docker.com/reference/api/hub/latest.yaml | 2-beta @ sha256 0000000000000000000000000000000000000000000000000000000000000000 (fixture: tests re-pin to testdata/hub/base.yaml) | upstream/hub/docs.docker.com-hub-latest.yaml | n/a | 2026-11-11 |
 | compose | Compose Specification | https://github.com/compose-spec/compose-spec/tree/3a4a6995e4a971f6173dff9130cb3e38e6738651 | main @ 3a4a6995e4a971f6173dff9130cb3e38e6738651 (no tags) | upstream/compose-spec/ | Apache-2.0 | 2026-11-08 |
 | compose | compose-go embedded schema | https://github.com/compose-spec/compose-go/blob/ddbe099a5404149d75fe774b30de7bd0befd3bd3/schema/compose-spec.json | v2.16.2 @ ddbe099a5404149d75fe774b30de7bd0befd3bd3 | upstream/compose-spec/compose-go-embedded.json | Apache-2.0 | 2026-11-08 |
 | compose | docker compose CLI reference | https://github.com/docker/compose/tree/v5.1.4/docs/reference | v5.1.4 @ 4732a2ed20a49c43a7b44bb4928259162c3ae3be | upstream/compose-cli/ | Apache-2.0 | 2026-11-08 |

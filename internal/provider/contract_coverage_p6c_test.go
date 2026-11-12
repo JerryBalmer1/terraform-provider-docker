@@ -62,6 +62,9 @@ type p6cInvItem struct {
 	ID      string         `json:"id"`
 	Kind    string         `json:"kind"`
 	Outputs []p6cInvOutput `json:"outputs"`
+	// Status "planned" (Pass 7): an unregistered item a build pass implements;
+	// contractgen gives it no contract until its lane registers it.
+	Status string `json:"status"`
 }
 
 type p6cTarget struct {
@@ -167,7 +170,7 @@ func p6cTargets(t *testing.T) []p6cTarget {
 	var out []p6cTarget
 	seenMap := map[string]bool{}
 	for _, iv := range p6cInventoryItems(t) {
-		if iv.Kind == "skip" {
+		if iv.Kind == "skip" || iv.Status == "planned" {
 			continue
 		}
 		for _, o := range iv.Outputs {

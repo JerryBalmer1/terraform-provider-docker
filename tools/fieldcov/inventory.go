@@ -26,6 +26,21 @@ type invItem struct {
 	Registered string      `json:"registered"`
 	Status     string      `json:"status"`
 	Sources    []invSource `json:"sources"`
+	// Pass 7 (Docker Hub items): the build pass that implements the item, and
+	// its writable fields with their planned attribute (fragments/hub.json).
+	Planned        string         `json:"planned"`
+	WritableFields []hubWriteable `json:"writable_fields"`
+}
+
+// hubWriteable is one writable field of a Docker Hub item (SCHEMA.md
+// writable_fields): its pointer into the pinned Hub spec and the attribute it
+// maps to.
+type hubWriteable struct {
+	Pointer  string `json:"pointer"`
+	Upstream string `json:"upstream"`
+	Attr     string `json:"attr"`
+	In       string `json:"in"`
+	Op       string `json:"op"`
 }
 
 // tfType is the Terraform type name the item is registered as

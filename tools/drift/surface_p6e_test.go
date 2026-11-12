@@ -163,6 +163,7 @@ func surfaceRun(t *testing.T, head string, deferred map[string]upstreamDeferral)
 		urls: map[string][]byte{}}
 	pins := testPins(t)
 	rm.urls["https://docs.docker.com/reference/api/engine/version/v1.56.yaml"] = []byte("x")
+	rm.urls[hubURL] = hubFixture(t, "base.yaml")
 	p := pins["docs-engine-api"]
 	p.SHA256 = sha256Hex([]byte("x"))
 	pins["docs-engine-api"] = p

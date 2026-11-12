@@ -19,7 +19,7 @@ A fragment is ONE JSON file (UTF-8, LF), shaped:
 ITEM:
 {
   "id": "<layer>:<stable-slug>",            // unique, e.g. "engine:container", "swarm:service-rollback", "dockerfile:RUN"
-  "layer": "engine|swarm|compose|dockerfile|buildx|cli-only",
+  "layer": "engine|swarm|compose|dockerfile|buildx|cli-only|hub",
   "kind": "resource|data_source|action|ephemeral_resource|list_resource|function|dockerfile_block|skip",
   "name": "docker_...",                     // proposed Terraform type name; null only for skip
   "update": "in_place|replace",             // resources only: in_place if an update endpoint/mechanism exists, else replace. Omit otherwise.
@@ -39,8 +39,20 @@ ITEM:
   "cli_only": false,                        // true when it appears in a CLI but has NO Engine API endpoint (client-side: compose, stack deploy, context, trust, manifest, buildx bake...)
   "skip_reason": "one line",                // required for skip
   "collision": "text if the proposed name collides or is confusable with another name (existing or proposed)",  // optional
-  "flags": [ {"name": "--mount=type=cache", "options": ["id","target","sharing","..."], "anchor": "#run---mounttypecache"} ]  // dockerfile_block only (optional elsewhere)
+  "flags": [ {"name": "--mount=type=cache", "options": ["id","target","sharing","..."], "anchor": "#run---mounttypecache"} ],  // dockerfile_block only (optional elsewhere)
+  // Pass 7 (Docker Hub, fragments/hub.json):
+  "planned": "pass7",                       // a build pass implements the item: status `planned` while unregistered (S1 lists it, never fails);
+                                            //   registrygen and contractgen leave it out; merge.py fails when a registered item still has it
+  "requires": ["org", "plan=business"],     // hub items, required (may be []): org-scoped route / a plan the spec names / plan=unknown
+  "hub_tag": "repositories",                // hub items: the spec tag the item covers (merge.py: every spec tag is covered here or in info_tags)
+  "plural": true,                           // optional: a plural (list) data source
+  "writable_fields": [ {"pointer": "#/components/schemas/X/properties/y", "upstream": "y", "attr": "y", "in": "body|query|path", "op": "<operationId>"} ]
+                                            // hub resources / actions / ephemerals: the writable fields and their planned attribute (tools/fieldcov hub lane)
 }
+
+A hub source is {"type": "openapi", "spec": "hub", "file": "upstream/hub/docs.docker.com-hub-latest.yaml", "operationId": ..., "method": ...,
+"path": ..., "primary": true}; every Hub operation has exactly one primary home. A fragment may carry
+"info_tags": {"<tag>": "reason"} for spec tags with no operations.
 
 Path strings in sources are relative to reference/ (start with "upstream/").
 
@@ -129,6 +141,7 @@ SOURCE (paths relative to reference/):
   {"type": "cli",     "command": "docker buildx inspect", "format_field": "{{.Name}}", "file": "upstream/..."}  // a CLI --format / inspect field
   {"type": "sources_md", "pin": "compose_spec"}       // a pin from SOURCES.md / inventory.json "pins"
   {"type": "derived", "from": "inspect_json", "how": "sha256 of the UTF-8 bytes"}
+  {"type": "openapi", "file": "upstream/hub/docs.docker.com-hub-latest.yaml", "pointer": "#/components/schemas/repository_info"}  // Pass 7
 ```
 
 Naming rules:
@@ -157,6 +170,7 @@ Naming rules:
 | `buildkit_version` | builder inspect: `docker buildx inspect` node `BuildkitVersion` (BuildKit's ListWorkers / Info) | - |
 | `distribution_api_version` | the registry's `Docker-Distribution-API-Version` response header (e.g. `registry/2.0`), for items that talk to a registry directly | - |
 | `docker_cli_version` | `docker version` client `Version` of the docker CLI binary the item runs | `uses_cli` |
+| `hub_api_version` | SOURCES.md pin `hub_api` (`info.version` of the pinned Docker Hub API spec, the version the Hub client follows) | - |
 <!-- /version-registry -->
 
 - result outputs: the outcome of an action (every structured output of an action) or a descriptive value about how

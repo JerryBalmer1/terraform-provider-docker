@@ -17,6 +17,9 @@ type Item struct {
 	Kind    string `json:"kind"`
 	Name    string `json:"name"`
 	Summary string `json:"summary"`
+	// Planned (Pass 7) names the build pass that implements the item; until the
+	// lane removes it the item is not registered (merge.py status "planned").
+	Planned string `json:"planned"`
 }
 
 // Inventory is the part of reference/inventory.json registrygen reads.
@@ -72,6 +75,9 @@ func Types(inv *Inventory) ([]Type, error) {
 	for _, it := range inv.Items {
 		if _, ok := kinds[it.Kind]; !ok {
 			continue // skip, dockerfile_block
+		}
+		if it.Planned != "" {
+			continue // planned for a build pass: not registered yet
 		}
 		if it.Name == "" {
 			return nil, fmt.Errorf("item %s (%s) has no name", it.ID, it.Kind)

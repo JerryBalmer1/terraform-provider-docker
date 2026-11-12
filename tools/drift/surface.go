@@ -540,14 +540,15 @@ func diffSurfaces(o options, r *report) {
 	}
 }
 
-// judgeNoChange marks every moved, surface-diffed source with no findings
-// besides its version movement, and logs it.
+// judgeNoChange marks every moved, surface-diffed source (docs surface or a
+// URL-published OpenAPI spec) with no findings besides its version movement,
+// and logs it.
 func judgeNoChange(o options, r *report) {
 	var rows []driftLogRow
 	for i := range r.Sources {
 		st := &r.Sources[i]
 		s := sourceByName(o, st.Name)
-		if s == nil || s.Surface == "" || o.Docs == nil || !st.Moved || st.Error != "" {
+		if s == nil || !st.Moved || st.Error != "" || !((s.Surface != "" && o.Docs != nil) || s.SpecURL != "") {
 			continue
 		}
 		n := 0

@@ -6,7 +6,7 @@
     "example": 7,
     "field_partial": 7,
     "field_skip": 92,
-    "inventory_skip": 80,
+    "inventory_skip": 82,
     "known_issue": 5,
     "partial_marker": 5,
     "upstream_surface": 4
@@ -1036,6 +1036,18 @@
       "kind": "inventory_skip",
       "id": "engine:session",
       "reason": "Deprecated (API 1.53) transport; used internally by the docker_image BuildKit build path, not a user-facing object.",
+      "source": "reference/inventory.json"
+    },
+    {
+      "kind": "inventory_skip",
+      "id": "hub:users-2fa-login",
+      "reason": "Needs an interactive TOTP code after a password login; Terraform runs unattended. A PAT or OAT through docker_hub_token needs no second factor.",
+      "source": "reference/inventory.json"
+    },
+    {
+      "kind": "inventory_skip",
+      "id": "hub:users-login",
+      "reason": "Legacy login route; the spec documents POST /v2/auth/token (ephemeral docker_hub_token) as the exchange, with the same identifier and secret.",
       "source": "reference/inventory.json"
     },
     {

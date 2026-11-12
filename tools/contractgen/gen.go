@@ -25,6 +25,7 @@ type Item struct {
 	Name       string   `json:"name"`
 	MinAPI     *string  `json:"min_api"`
 	SkipReason string   `json:"skip_reason"`
+	Planned    string   `json:"planned"` // Pass 7: a planned item gets its contract when its lane registers it
 	Outputs    []Output `json:"outputs"`
 	Inputs     []Input  `json:"inputs"`
 }
@@ -91,7 +92,7 @@ func Parse(raw []byte) (*Inventory, error) {
 	kept := inv.Items[:0]
 	seen := map[string]bool{}
 	for _, it := range inv.Items {
-		if !KnownKinds[it.Kind] || it.SkipReason != "" || len(it.Outputs) == 0 {
+		if !KnownKinds[it.Kind] || it.SkipReason != "" || it.Planned != "" || len(it.Outputs) == 0 {
 			continue
 		}
 		if seen[it.ID] {

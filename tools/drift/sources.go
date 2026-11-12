@@ -52,6 +52,12 @@ type source struct {
 	Surface  string
 	Local    string
 	DocPaths []string
+	// SpecURL: a spec published only as a URL (no repository, no tags; Model
+	// modelOpenAPI, openapi.go). Pinned as "<info.version> @ sha256 <hex>";
+	// Baseline is the pinned copy, InventorySpec the "spec" value of its
+	// reference/inventory.json sources.
+	SpecURL       string
+	InventorySpec string
 }
 
 // defaultSources follow reference/SOURCES.md, row by row. The docker trust
@@ -78,6 +84,9 @@ var defaultSources = []source{
 	{Name: "buildx", Title: "buildx CLI and bake reference", RowKey: "github.com/docker/buildx/tree/",
 		Repo: "https://github.com/docker/buildx", TagPrefix: "v", Model: modelBake, File: "docs/bake-reference.md",
 		Surface: surfaceCLIMD, Local: "buildx", DocPaths: []string{"docs/reference"}},
+	{Name: "hub", Title: "Docker Hub API spec", RowKey: "docs.docker.com/reference/api/hub/",
+		SpecURL: "https://docs.docker.com/reference/api/hub/latest.yaml", Model: modelOpenAPI, InventorySpec: "hub",
+		Baseline: "reference/upstream/hub/docs.docker.com-hub-latest.yaml"},
 }
 
 // localRow marks SOURCES.md rows with no upstream to watch.
@@ -183,6 +192,15 @@ func parsePin(s source, r sourceRow) (pin, error) {
 			return p, fmt.Errorf("SOURCES.md %s: want a .../version/vX.Y.yaml URL and a sha256, got %q / %q", s.Name, r.URL, r.TagSHA)
 		}
 		p.Version, p.SHA256 = m[1], h[1]
+		return p, nil
+	}
+	if s.SpecURL != "" {
+		ver, rest, ok := strings.Cut(r.TagSHA, " @ ")
+		h := sha256Re.FindStringSubmatch(rest)
+		if !ok || h == nil || strings.TrimSpace(ver) == "" {
+			return p, fmt.Errorf("SOURCES.md %s: tag/SHA column %q is not \"<info.version> @ sha256 <hex>\"", s.Name, r.TagSHA)
+		}
+		p.Version, p.SHA256 = strings.TrimSpace(ver), h[1]
 		return p, nil
 	}
 	ver, rest, ok := strings.Cut(r.TagSHA, " @ ")

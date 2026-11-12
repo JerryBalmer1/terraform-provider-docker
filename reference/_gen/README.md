@@ -88,3 +88,15 @@ They are provenance: re-running one on the current files fails or doubles its ed
 - `renames.json`: every kreuzwerker v4.6.0 attribute and every Pass 5 rename of ours,
   `{type, kreuzwerker_attr, previous_attr, our_attr, transform, upstream, reason}`.
 - `pass5/ownership.json`: which lane owns each file under internal/provider, examples and test during Pass 5.
+
+## Pass 7 (Docker Hub)
+
+- `fragments/hub.json` (layer `hub`) and `fragments/outputs/hub.json` come from the pinned Hub API spec
+  (`upstream/hub/docs.docker.com-hub-latest.yaml`, SOURCES.md pin `hub_api`) through
+  `generators/pass7/p7_hub.py` (needs PyYAML; re-run it after editing its item table, then `Invoke-Build Inventory`).
+  merge.py checks that every Hub operation has exactly one primary home and every spec tag is covered (`hub_tag` on an
+  item, or `info_tags` with a reason).
+- `planned: "pass7"` marks an item a build lane implements: status `planned` while unregistered, not registered by
+  registrygen, no contract from contractgen, fields credited `planned` by tools/fieldcov, listed by validate.py S1
+  without failing. Remove it when the type is registered (merge.py fails otherwise).
+- `pass7/hub-probe.md` is the read-only live probe; `pass7/lane-0.md` the lane plan.

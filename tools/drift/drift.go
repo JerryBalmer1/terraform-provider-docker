@@ -202,6 +202,9 @@ func run(o options, rm remote, fr fieldRunner) *report {
 				// Documentation only: nothing to diff, so the movement itself must be
 				// reviewed (re-pin, or accept this version).
 				f.Status = statusUnmapped
+			} else if s.Model == modelOpenAPI {
+				f.Status = statusInfo
+				f.Detail += " (operations and schema properties diffed below)"
 			} else {
 				f.Status = statusInfo
 				f.Detail += " (operations and fields diffed below)"
@@ -211,6 +214,7 @@ func run(o options, rm remote, fr fieldRunner) *report {
 	}
 	diffModels(o, r, fr)
 	diffSurfaces(o, r)
+	diffOpenAPI(o, r)
 	judgeNoChange(o, r)
 	applyAccepted(r, o.Accepted)
 	sortFindings(r.Findings)
@@ -226,6 +230,8 @@ func probe(o options, rm remote, s source) sourceStatus {
 	ov, hasOv := o.Overrides[s.Name]
 	st.Override = hasOv
 	switch {
+	case s.SpecURL != "":
+		probeSnapshot(o, rm, s, p, ov, hasOv, &st)
 	case s.URLTemplate != "":
 		probeURL(o, rm, s, p, ov, hasOv, &st)
 	case s.Branch != "":
@@ -341,7 +347,10 @@ func fetchSpec(o options, rm remote, s source, st *sourceStatus) error {
 		body = b
 	}
 	name := filepath.Base(s.File)
-	if s.File == "" {
+	switch {
+	case s.SpecURL != "":
+		name = s.SpecURL[strings.LastIndex(s.SpecURL, "/")+1:]
+	case s.File == "":
 		name = "spec.yaml"
 	}
 	dir := filepath.Join(o.Work, s.Name, safeName(st.Newest))

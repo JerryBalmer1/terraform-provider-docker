@@ -11,6 +11,7 @@ _spec = importlib.util.spec_from_file_location("pins", os.path.join(os.path.dirn
 _pins = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_pins)
 sources_pins, inventory_pins = _pins.sources_pins, _pins.inventory_pins
+spec_pins, inventory_spec_pins = _pins.spec_pins, _pins.inventory_spec_pins
 
 ap = argparse.ArgumentParser(description="Merge inventory fragments (no arguments: write reference/inventory.json + INVENTORY.md).")
 ap.add_argument("--dry-run", action="store_true", help="validate only; write nothing under reference/")
@@ -27,13 +28,13 @@ REF = os.path.normpath(os.path.join(HERE, ".."))  # reference/
 Z = os.path.join(HERE, "fragments")
 FRAGS = ["z1-engine.json", "z2-compose.json", "z3-cli.json", "z4-dockerfile.json"]
 # Fragments added after the harvest; each is read only when the file exists, in this order.
-EXTRA_FRAGS = ["dockerfile-sources.json", "pass5.json"] + ["pass53-%s.json" % l for l in "ARSKBI"]  # Pass 5.3: one per lane
+EXTRA_FRAGS = ["dockerfile-sources.json", "pass5.json"] + ["pass53-%s.json" % l for l in "ARSKBI"] + ["hub.json"]  # Pass 5.3: one per lane; Pass 7: Docker Hub
 OUTPUTS_DIR = os.path.join(Z, "outputs")  # outputs/<lane>.json, joined onto items by id (SCHEMA.md)
 OUT_CATEGORIES = ["raw", "structured", "result", "identity", "version", "hash"]
-OUT_SOURCE_TYPES = ["swagger", "schema", "doc", "cli", "sources_md", "derived"]
+OUT_SOURCE_TYPES = ["swagger", "schema", "doc", "cli", "sources_md", "derived", "openapi"]
 ITEM_OUT_KEYS = {"no_raw_reason", "no_structured_reason", "outputs_status", "outputs_note", "uses_cli", "inputs"}
 TF_TYPE = re.compile(r"^(string|number|bool|dynamic|(list|set|map)\(.+\)|object\(\{.*\}\))$", re.S)
-LAYERS = ["engine", "swarm", "compose", "dockerfile", "buildx", "cli-only"]
+LAYERS = ["engine", "swarm", "compose", "dockerfile", "buildx", "cli-only", "hub"]
 KINDS = ["resource", "data_source", "action", "ephemeral_resource", "list_resource", "function", "dockerfile_block", "skip"]
 # Terraform kind label per inventory kind (collisions, the `registered` field).
 TFKIND = {"resource": "resource", "data_source": "data", "action": "action", "ephemeral_resource": "ephemeral",
@@ -42,7 +43,13 @@ TFKIND = {"resource": "resource", "data_source": "data", "action": "action", "ep
 # (generated from this inventory by tools/registrygen) and the stub markers in internal/provider/*.go.
 PROVIDER = os.path.abspath(ARGS.provider) if ARGS.provider else os.path.normpath(os.path.join(REF, "..", "internal", "provider"))
 REGISTRY_GEN = os.path.join(PROVIDER, "registry_gen.go")
-STATUSES = ["exists", "partial", "missing"]
+STATUSES = ["exists", "partial", "missing", "planned"]
+# Pass 7: `planned: "<pass>"` on an item = a build pass implements it. While unregistered its status is `planned`
+# (validate.py S1 lists it, never fails); registrygen and contractgen leave it out. A registered item that still says
+# planned is an error: the lane that registers it removes the key.
+PLANNED = re.compile(r"^pass[0-9][0-9a-z]*$")
+REQUIRES = re.compile(r"^(org|plan=[a-z][a-z0-9_-]*)$")
+HUB_SPEC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "upstream", "hub", "docs.docker.com-hub-latest.yaml")
 # Status markers in internal/provider/*.go (test files excluded), one line comment each (Pass 5.1):
 #   // STUB(pass5) <item id>             the type is a placeholder: status missing (tools/registrygen -stubs writes these)
 #   // PARTIAL(pass5) <item id> <note>   registered, but a documented sub-feature is absent or a no-op: status partial;
@@ -162,6 +169,12 @@ for it in items:
         for k in ("status", "status_note", "existing"):
             if k in it:
                 errors.append("%s: %s is computed by merge.py (Pass 5); remove it from the fragment" % (it["id"], k))
+    if "planned" in it and (it["kind"] == "skip" or not PLANNED.match(str(it["planned"]))):
+        errors.append("%s: planned must be a pass name (pass7) on a non-skipped item, got %r" % (it["id"], it["planned"]))
+    if "requires" in it and (not isinstance(it["requires"], list) or any(not REQUIRES.match(str(r)) for r in it["requires"])):
+        errors.append("%s: requires must be a list of org / plan=<name> / plan=unknown, got %r" % (it["id"], it["requires"]))
+    if it.get("layer") == "hub" and it["kind"] != "skip" and "requires" not in it:
+        errors.append("%s: hub items say what they need (requires: [] for a Personal plan)" % it["id"])
     if it["kind"] == "resource" and it.get("update") not in ("in_place", "replace"):
         errors.append("%s resource without update" % it["id"])
     for s in it.get("sources", []):
@@ -190,6 +203,36 @@ uncovered = sorted(all_ops - set(seen))
 unknown = sorted(set(seen) - all_ops)
 for o in unknown:
     errors.append("unknown operationId %s" % o)
+
+# Docker Hub spec coverage (Pass 7): every operation has exactly one primary home, every tag is covered by an item's
+# hub_tag or the fragment's info_tags. Regex scan (stdlib only), like the swagger one above.
+hub_text = open(HUB_SPEC, encoding="utf-8").read() if os.path.exists(HUB_SPEC) else ""
+hub_ops = set(re.findall(r"^\s+operationId:\s*\"?([A-Za-z0-9_]+)\"?\s*$", hub_text, re.M))
+_tags_block = re.search(r"^tags:\n(.*?)^paths:", hub_text, re.M | re.S)
+hub_tags = set(re.findall(r"^  - name:\s*(\S+)", _tags_block.group(1), re.M)) if _tags_block else set()
+hub_seen, hub_primary = collections.Counter(), collections.Counter()
+for it in items:
+    for s in it.get("sources", []):
+        if s.get("type") == "openapi" and s.get("spec") == "hub":
+            hub_seen[s.get("operationId")] += 1
+            if s.get("primary"):
+                hub_primary[s.get("operationId")] += 1
+for o in sorted(set(hub_seen) | hub_ops):
+    if o not in hub_ops:
+        errors.append("unknown hub operationId %s" % o)
+    elif hub_primary[o] != 1:
+        errors.append("hub operation %s has %d primary homes (want 1)" % (o, hub_primary[o]))
+hub_info_tags = {}
+for fn in EXTRA_FRAGS:
+    if os.path.exists(os.path.join(Z, fn)):
+        with open(os.path.join(Z, fn), encoding="utf-8") as f:
+            hub_info_tags.update(json.load(f).get("info_tags", {}))
+hub_tag_items = {it.get("hub_tag") for it in items if it.get("hub_tag")}
+for t in sorted(hub_tags):
+    if t not in hub_tag_items and not str(hub_info_tags.get(t, "")).strip():
+        errors.append("hub tag %s is covered by no item (hub_tag) and no info_tags reason" % t)
+for t in sorted(hub_tag_items - hub_tags):
+    errors.append("hub_tag %s is not a tag of the pinned Hub spec" % t)
 
 # ---- outputs: join outputs/<lane>.json onto items by id
 by_id = {i["id"]: i for i in items}
@@ -314,7 +357,9 @@ for it in items:
         continue
     key = item_key(it)
     mk = markers.get(it["id"], [])
-    if key not in registered:
+    if key not in registered and it.get("planned"):
+        it["status"], it["status_note"] = "planned", "planned for %s, not registered yet" % it["planned"]
+    elif key not in registered:
         it["status"], it["status_note"] = "missing", "not registered"
     elif any(k == "stub" for _, k, _ in mk):
         it["status"], it["status_note"] = "missing", "stub: not implemented (Pass 5)"
@@ -322,6 +367,8 @@ for it in items:
         it["status"], it["status_note"] = "partial", "; ".join(n for _, _, n in mk)
     else:
         it["status"] = "exists"
+    if key in registered and it.get("planned"):
+        errors.append("%s is registered but still says planned: %s; remove the key" % (it["id"], it["planned"]))
     if key in registered:
         it["registered"] = ("%s.%s" % (TFKIND[key[0]], key[1])) if key[0] != "resource" else key[1]
     if mk:
@@ -354,6 +401,10 @@ inv = {
     "about": "Every Docker object, operation and spec element in reference/upstream (see SOURCES.md) with its decided Terraform name (DECISIONS.md). status is computed from internal/provider/registry_gen.go and the STUB(pass5) / PARTIAL(pass5) markers in internal/provider. Paths in sources are relative to reference/.",
     # Read from reference/SOURCES.md (reference/_gen/pins.py), never carried here; PinCheck fails on a stale copy.
     "pins": inventory_pins(sources_pins(os.path.join(REF, "SOURCES.md"))),
+    # URL-published specs (Pass 7: the Docker Hub API), pinned by version + sha256 + download date.
+    "spec_pins": inventory_spec_pins(spec_pins(os.path.join(REF, "SOURCES.md"))),
+    "hub_coverage": {"operations": len(hub_ops), "covered": len(hub_ops & set(hub_seen)), "tags": len(hub_tags),
+                     "info_tags": sorted(hub_info_tags)},
     "swagger_coverage": {"operations": len(all_ops), "covered": len(all_ops & set(seen)), "uncovered": uncovered,
                          "primary_homes": len(primary)},
     "totals": {L: {k: dict(c) for k, c in kk.items() if sum(c.values())} for L, kk in tot.items()},
@@ -384,6 +435,8 @@ def srcs(it):
             out.append("`%s`" % s.get("pointer", ""))
         elif t == "cli":
             out.append("`%s`" % s.get("command", ""))
+        elif t == "openapi":
+            out.append("`%s %s` (%s)" % (s.get("method", ""), s.get("path", ""), s.get("operationId", "")))
         elif t == "doc":
             out.append("%s%s" % (os.path.basename(s.get("file", "")), s.get("anchor", "") or ""))
     if len(out) > 6:
@@ -395,7 +448,7 @@ KN = {"resource": "resource", "data_source": "data source", "action": "action", 
 md = ["# Inventory", "",
       "The Terraform name of every item in [upstream/](upstream/) ([SOURCES.md](SOURCES.md)). Machine-readable: [inventory.json](inventory.json).", "",
       "Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/merge.py`: `missing` = not registered in `internal/provider/registry_gen.go`, or still a Pass 5 stub (`// STUB(pass5) <id>`); `partial` = registered, with a `// PARTIAL(pass5) <id> <note>` marker for a documented sub-feature that is absent or a no-op (the note says what is missing); `exists` = registered with no marker. `cli` = CLI-only (no Engine API endpoint, client-side). Update: `in place` / `replace` for resources.", ""]
-TITLES = {"engine": "Engine", "swarm": "Swarm", "compose": "Compose", "dockerfile": "Dockerfile", "buildx": "Buildx", "cli-only": "CLI-only"}
+TITLES = {"engine": "Engine", "swarm": "Swarm", "compose": "Compose", "dockerfile": "Dockerfile", "buildx": "Buildx", "cli-only": "CLI-only", "hub": "Docker Hub"}
 for L in LAYERS:
     rows = [i for i in out_items if i["layer"] == L]
     if not rows:
@@ -424,6 +477,8 @@ for L in LAYERS:
                     note = (note + " " if note else "") + "(was `%s`)" % it["previous_name"]
             if it.get("cli_only"):
                 st += " · cli"
+            if it.get("requires"):
+                note = (note + " " if note else "") + "requires: " + ", ".join(it["requires"])
             if it.get("collision"):
                 note += " ⚠ " + it["collision"]
             md.append("| %s | %s | %s | %s | %s | %s | %s |" % (
@@ -467,12 +522,13 @@ if any(i.get("outputs") for i in out_items):
                 ocell(it, "version"), ocell(it, "hash"), esc(st)))
         md.append("")
 
-md += ["## Totals", "", "Counts as exists / partial / missing.", "",
+md += ["## Totals", "", "Counts as exists / partial / missing (+ planned: unregistered items a build pass implements).", "",
        "| layer | resources | data sources | actions | ephemeral | list resources | functions | blocks | skipped |",
        "|---|---|---|---|---|---|---|---|---|"]
 def cell(c):
     n = sum(c[s] for s in STATUSES)
-    return "%d (%d / %d / %d)" % (n, c["exists"], c["partial"], c["missing"]) if n else "0"
+    pl = " + %d planned" % c["planned"] if c["planned"] else ""
+    return "%d (%d / %d / %d%s)" % (n, c["exists"], c["partial"], c["missing"], pl) if n else "0"
 grand = {k: collections.Counter() for k in KINDS}
 for L in LAYERS:
     t = tot[L]
@@ -480,6 +536,7 @@ for L in LAYERS:
         grand[k].update(t[k])
     md.append("| %s | %s | %d |" % (L, " | ".join(cell(t[k]) for k in KINDS[:-1]), sum(t["skip"].values())))
 md.append("| **all** | %s | %d |" % (" | ".join(cell(grand[k]) for k in KINDS[:-1]), sum(grand["skip"].values())))
+md += ["", "Docker Hub API coverage: %d of %d operations placed, %d tags covered." % (len(hub_ops & set(hub_seen)), len(hub_ops), len(hub_tags))]
 md += ["", "Engine API coverage: %d of %d swagger operations placed%s." % (
     len(all_ops & set(seen)), len(all_ops), (" (uncovered: " + ", ".join(uncovered) + ")") if uncovered else ""), ""]
 
@@ -501,6 +558,7 @@ if not ARGS.dry_run:
 print("items", len(items), "errors", len(errors))
 for e in errors[:80]:
     print("ERR", e)
+print("hub ops", len(hub_ops), "covered", len(hub_ops & set(hub_seen)), "tags", len(hub_tags))
 print("swagger ops", len(all_ops), "covered", len(all_ops & set(seen)), "uncovered", uncovered[:30])
 print("auto collisions", auto_collisions)
 for L in LAYERS:

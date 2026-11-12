@@ -348,6 +348,10 @@ These types create or manage Docker objects but deliberately carry no owner labe
 | `docker_registry_image` | pushes to a registry; registry manifests carry no Docker labels |
 | `docker_registry_manifest_list` | a registry manifest list carries no Docker labels |
 
+### Docker Hub objects (Pass 7)
+
+Every `docker_hub_*` type (the `hub` layer of [inventory.json](inventory.json); planned in Pass 7, not registered yet) is excluded by decision: no Docker Hub object in the pinned Hub API spec (`upstream/hub/docs.docker.com-hub-latest.yaml`, SOURCES.md pin `hub_api`) has a label field (repositories, tags, access tokens, organization access tokens, groups, members, invites, org settings, SCIM users), so there is nothing to carry `io.terraform.provider.owner`. The `owner` argument does not apply to them: no inject, no conflict check, no `adopt`. When the Pass 7 lanes register the types, each goes into `ownerLabelExclusions` with the reason "Docker Hub objects have no labels in the Hub API", and its row joins the table above (TestOwnerLabelExclusionsInContract).
+
 ## Known differences from upstream defaults
 
 Where an argument has the same name as an upstream flag but a different default, by decision:

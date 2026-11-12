@@ -1,0 +1,40 @@
+openapi: 3.2.0
+info:
+  title: Hub fixture
+  version: 2-beta
+paths:
+  /v2/namespaces/{namespace}/repositories:
+    get:
+      operationId: ListRepositories
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/repo_list"
+components:
+  schemas:
+    repo:
+      type: object
+      properties:
+        name:
+          type: string
+        is_private:
+          type: boolean
+    repo_list:
+      type: object
+      properties:
+        count:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/repo"
+    repo_detail:
+      allOf:
+        - $ref: "#/components/schemas/repo"
+        - type: object
+          properties:
+            pulls:
+              type: integer
+              format: int64

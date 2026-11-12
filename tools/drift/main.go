@@ -22,6 +22,11 @@
 //   - docs.docker.com Engine API spec: versions above the pinned one are
 //     probed by URL until a 404; the pinned version re-published with a
 //     different sha256 also counts as moved.
+//   - Docker Hub API spec (openapi.go): published only as a URL with no
+//     version history; the live bytes are fetched and compared with the
+//     pinned sha256. Changed bytes are diffed against the pinned copy
+//     (operations as hub:op/<METHOD> <path>, component schema properties as
+//     hub:schema/<Schema>.<prop>); -to hub=<file or URL> diffs another copy.
 //
 // Exit codes: 0 no unaccepted drift; 1 unmapped items that are not in
 // reference/_gen/drift-accepted.json (a new operation not in the inventory,

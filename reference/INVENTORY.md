@@ -286,9 +286,53 @@ Names follow [DECISIONS.md](DECISIONS.md) (Pass 5). Status is computed by `_gen/
 | skip | - |  | `docker sandbox --help`<br>`docker --help` |  | - · cli | skip: Docker Desktop sandbox product with its own VM backend API, not Engine API. |
 | skip | - |  | `docker scout --help`<br>`docker --help` |  | - · cli | skip: Docker Scout SaaS/analysis tool; not Engine API. Vulnerability data could later be a data source in a Scout/Hub provider. |
 
+## Docker Hub
+
+| kind | name | update | sources | min API | status | note |
+|---|---|---|---|---|---|---|
+| resource | `docker_hub_access_token` | in place | `POST /v2/access-tokens` (postV2AccessTokens)<br>`GET /v2/access-tokens/{uuid}` (getV2AccessTokensByUuid)<br>`PATCH /v2/access-tokens/{uuid}` (patchV2AccessTokensByUuid)<br>`DELETE /v2/access-tokens/{uuid}` (deleteV2AccessTokensByUuid) |  | planned |  |
+| resource | `docker_hub_group` | in place | `POST /v2/orgs/{org_name}/groups` (postV2OrgsByOrgNameGroups)<br>`GET /v2/orgs/{org_name}/groups/{group_name}` (getV2OrgsByOrgNameGroupsByGroupName)<br>`PUT /v2/orgs/{org_name}/groups/{group_name}` (putV2OrgsByOrgNameGroupsByGroupName)<br>`PATCH /v2/orgs/{org_name}/groups/{group_name}` (patchV2OrgsByOrgNameGroupsByGroupName)<br>`DELETE /v2/orgs/{org_name}/groups/{group_name}` (deleteV2OrgsByOrgNameGroupsByGroupName) |  | planned | requires: org, plan=unknown |
+| resource | `docker_hub_group_member` | replace | `POST /v2/orgs/{org_name}/groups/{group_name}/members` (postV2OrgsByOrgNameGroupsByGroupNameMembers)<br>`DELETE /v2/orgs/{org_name}/groups/{group_name}/members/{username}` (deleteV2OrgsByOrgNameGroupsByGroupNameMembersByUsername)<br>`GET /v2/orgs/{org_name}/groups/{group_name}/members` (getV2OrgsByOrgNameGroupsByGroupNameMembers) |  | planned | requires: org, plan=unknown |
+| resource | `docker_hub_invite` | replace | `POST /v2/invites/bulk` (postV2InvitesBulk)<br>`DELETE /v2/invites/{id}` (deleteV2InvitesById)<br>`GET /v2/orgs/{org_name}/invites` (getV2OrgsByOrgNameInvites) |  | planned | requires: org, plan=unknown |
+| resource | `docker_hub_org_access_token` | in place | `POST /v2/orgs/{org_name}/access-tokens` (postV2OrgsByNameAccessTokens)<br>`GET /v2/orgs/{org_name}/access-tokens/{access_token_id}` (getV2OrgsByOrgNameAccessTokensByAccessTokenId)<br>`PATCH /v2/orgs/{org_name}/access-tokens/{access_token_id}` (patchV2OrgsByOrgNameAccessTokensByAccessTokenId)<br>`DELETE /v2/orgs/{org_name}/access-tokens/{access_token_id}` (deleteV2OrgsByOrgNameAccessTokensByAccessTokenId) |  | planned | requires: org, plan=unknown |
+| resource | `docker_hub_org_member` | in place | `PUT /v2/orgs/{org_name}/members/{username}` (putV2OrgsByOrgNameMembersByUsername)<br>`DELETE /v2/orgs/{org_name}/members/{username}` (deleteV2OrgsByOrgNameMembersByUsername)<br>`GET /v2/orgs/{org_name}/members` (getV2OrgsByOrgNameMembers) |  | planned | requires: org, plan=unknown |
+| resource | `docker_hub_org_settings` | in place | `GET /v2/orgs/{org_name}/settings` (getV2OrgsByNameSettings)<br>`PUT /v2/orgs/{org_name}/settings` (putV2OrgsByNameSettings) |  | planned | requires: org, plan=business |
+| resource | `docker_hub_repository` | replace | `POST /v2/namespaces/{namespace}/repositories` (CreateRepository)<br>`GET /v2/namespaces/{namespace}/repositories/{repository}` (GetRepository) |  | planned |  |
+| resource | `docker_hub_repository_group` | replace | `POST /v2/repositories/{namespace}/{repository}/groups` (CreateRepositoryGroup) |  | planned | requires: org, plan=unknown |
+| resource | `docker_hub_repository_immutable_tags` | in place | `PATCH /v2/namespaces/{namespace}/repositories/{repository}/immutabletags` (UpdateRepositoryImmutableTags)<br>`GET /v2/namespaces/{namespace}/repositories/{repository}` (GetRepository) |  | planned |  |
+| resource | `docker_hub_scim_user` | in place | `POST /v2/scim/2.0/Users` (postV2Scim20Users)<br>`GET /v2/scim/2.0/Users/{id}` (getV2Scim20UsersById)<br>`PUT /v2/scim/2.0/Users/{id}` (putV2Scim20UsersById) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_access_token` |  | `GET /v2/access-tokens/{uuid}` (getV2AccessTokensByUuid) |  | planned |  |
+| data source | `docker_hub_access_tokens` |  | `GET /v2/access-tokens` (getV2AccessTokens) |  | planned |  |
+| data source | `docker_hub_audit_log_actions` |  | `GET /v2/auditlogs/{account}/actions` (AuditLogs_ListAuditActions) |  | planned | requires: plan=unknown |
+| data source | `docker_hub_audit_logs` |  | `GET /v2/auditlogs/{account}` (AuditLogs_ListAuditLogs) |  | planned | requires: plan=unknown |
+| data source | `docker_hub_group` |  | `GET /v2/orgs/{org_name}/groups/{group_name}` (getV2OrgsByOrgNameGroupsByGroupName) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_group_members` |  | `GET /v2/orgs/{org_name}/groups/{group_name}/members` (getV2OrgsByOrgNameGroupsByGroupNameMembers) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_groups` |  | `GET /v2/orgs/{org_name}/groups` (getV2OrgsByOrgNameGroups) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_org_access_token` |  | `GET /v2/orgs/{org_name}/access-tokens/{access_token_id}` (getV2OrgsByOrgNameAccessTokensByAccessTokenId) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_org_access_tokens` |  | `GET /v2/orgs/{org_name}/access-tokens` (getV2OrgsByNameAccessTokens) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_org_invites` |  | `GET /v2/orgs/{org_name}/invites` (getV2OrgsByOrgNameInvites) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_org_members` |  | `GET /v2/orgs/{org_name}/members` (getV2OrgsByOrgNameMembers) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_org_members_export` |  | `GET /v2/orgs/{org_name}/members/export` (getV2OrgsByOrgNameMembersExport) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_org_settings` |  | `GET /v2/orgs/{org_name}/settings` (getV2OrgsByNameSettings) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_repositories` |  | `GET /v2/namespaces/{namespace}/repositories` (listNamespaceRepositories) |  | planned |  |
+| data source | `docker_hub_repository` |  | `GET /v2/namespaces/{namespace}/repositories/{repository}` (GetRepository)<br>`HEAD /v2/namespaces/{namespace}/repositories/{repository}` (CheckRepository) |  | planned |  |
+| data source | `docker_hub_repository_immutable_tags_verify` |  | `POST /v2/namespaces/{namespace}/repositories/{repository}/immutabletags/verify` (VerifyRepositoryImmutableTags) |  | planned |  |
+| data source | `docker_hub_repository_tag` |  | `GET /v2/namespaces/{namespace}/repositories/{repository}/tags/{tag}` (GetRepositoryTag)<br>`HEAD /v2/namespaces/{namespace}/repositories/{repository}/tags/{tag}` (headV2NamespacesByNamespaceRepositoriesByRepositoryTagsByTag) |  | planned |  |
+| data source | `docker_hub_repository_tags` |  | `GET /v2/namespaces/{namespace}/repositories/{repository}/tags` (ListRepositoryTags)<br>`HEAD /v2/namespaces/{namespace}/repositories/{repository}/tags` (headV2NamespacesByNamespaceRepositoriesByRepositoryTags) |  | planned |  |
+| data source | `docker_hub_scim_resource_type` |  | `GET /v2/scim/2.0/ResourceTypes/{name}` (getV2Scim20ResourceTypesByName) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_scim_resource_types` |  | `GET /v2/scim/2.0/ResourceTypes` (getV2Scim20ResourceTypes) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_scim_schema` |  | `GET /v2/scim/2.0/Schemas/{id}` (getV2Scim20SchemasById) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_scim_schemas` |  | `GET /v2/scim/2.0/Schemas` (getV2Scim20Schemas) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_scim_service_provider_config` |  | `GET /v2/scim/2.0/ServiceProviderConfig` (getV2Scim20ServiceProviderConfig) |  | planned | requires: org, plan=unknown |
+| data source | `docker_hub_scim_users` |  | `GET /v2/scim/2.0/Users` (getV2Scim20Users) |  | planned | requires: org, plan=unknown |
+| action | `docker_hub_invite_resend` |  | `PATCH /v2/invites/{id}/resend` (patchV2InvitesByIdResend) |  | planned | requires: org, plan=unknown |
+| ephemeral | `docker_hub_token` |  | `POST /v2/auth/token` (AuthCreateAccessToken) |  | planned |  |
+| skip | - |  | `POST /v2/users/2fa-login` (PostUsers2FALogin) |  | - | skip: Needs an interactive TOTP code after a password login; Terraform runs unattended. A PAT or OAT through docker_hub_token needs no second factor. |
+| skip | - |  | `POST /v2/users/login` (PostUsersLogin) |  | - | skip: Legacy login route; the spec documents POST /v2/auth/token (ephemeral docker_hub_token) as the exchange, with the same identifier and secret. |
+
 ## Outputs
 
-The outputs contract ([CONTRACT.md](CONTRACT.md)): 160 items, 1164 outputs, from [_gen/fragments/outputs/](_gen/fragments/outputs/). `*` = sensitive, `(a.b*)` = only those nested fields are sensitive, `+` = known after apply. Full detail (types, sources, field maps) is in inventory.json.
+The outputs contract ([CONTRACT.md](CONTRACT.md)): 197 items, 1361 outputs, from [_gen/fragments/outputs/](_gen/fragments/outputs/). `*` = sensitive, `(a.b*)` = only those nested fields are sensitive, `+` = known after apply. Full detail (types, sources, field maps) is in inventory.json.
 
 ### Engine
 
@@ -492,9 +536,51 @@ The outputs contract ([CONTRACT.md](CONTRACT.md)): 160 items, 1164 outputs, from
 | data source | `docker_stack` | `services_json`* | `services`(spec*) |  | `name`, `service_ids`, `images` | `engine_api_version`, `docker_server_version` | `content_sha256` | missing: docker_services with a label filter returns services today but no replica counts, no tasks, no raw JSON. uses_cli false: GET /services and GET /tasks filtered by the namespace label; no `docker stack services`; so no docker_cli_version. |
 | data source | `docker_stacks` | `stacks_json` | `stacks` |  | `names` | `engine_api_version`, `docker_server_version` | `content_sha256` | missing: uses_cli false: groups GET /services by the com.docker.stack.namespace label; no `docker stack ls`; so no docker_cli_version. |
 
+### Docker Hub
+
+| kind | name | raw | structured | result | identity | version | hash | outputs status |
+|---|---|---|---|---|---|---|---|---|
+| resource | `docker_hub_access_token` | `access_token_json`*+ | `access_token`(token*)+ |  | `id`+, `token`*+ | `hub_api_version` | `content_sha256`+ |  |
+| resource | `docker_hub_group` | `group_json`+ | `group`+ |  | `id`+, `name`+ | `hub_api_version` | `content_sha256`+ |  |
+| resource | `docker_hub_group_member` | `group_member_json`+ | `group_member`+ |  | `org_name`, `group_name`, `username` | `hub_api_version` | `content_sha256`+ |  |
+| resource | `docker_hub_invite` | `invite_json`+ | `invite`+ |  | `id`, `org_name` | `hub_api_version` | `content_sha256`+ |  |
+| resource | `docker_hub_org_access_token` | `org_access_token_json`+ | `org_access_token`+ |  | `id`+, `token`*+ | `hub_api_version` | `content_sha256`+ |  |
+| resource | `docker_hub_org_member` | `org_member_json`+ | `org_member`+ |  | `org_name`, `username` | `hub_api_version` | `content_sha256`+ |  |
+| resource | `docker_hub_org_settings` | `org_settings_json`+ | `org_settings`+ |  | `org_name` | `hub_api_version` | `content_sha256`+ |  |
+| resource | `docker_hub_repository` | `repository_json`+ | `repository`+ |  | `name`+, `namespace`+ | `hub_api_version` | `content_sha256`+ |  |
+| resource | `docker_hub_repository_group` | `repository_group_json`+ | `repository_group`+ |  | `namespace`, `repository` | `hub_api_version` | `content_sha256`+ |  |
+| resource | `docker_hub_repository_immutable_tags` | `repository_immutable_tags_json`+ | `repository_immutable_tags`+ |  | `name`+, `namespace`+ | `hub_api_version` | `content_sha256`+ |  |
+| resource | `docker_hub_scim_user` | `scim_user_json`+ | `scim_user`+ |  | `id`+, `name`+ | `hub_api_version` | `content_sha256`+ |  |
+| data source | `docker_hub_access_token` | `access_token_json`* | `access_token`(token*) |  | `id` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_access_tokens` | `access_tokens_json`* | `access_tokens`(token*) |  | `ids` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_audit_log_actions` | `audit_log_actions_json` | `audit_log_actions` |  | `account` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_audit_logs` | `audit_logs_json` | `audit_logs` |  | `names` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_group` | `group_json` | `group` |  | `id`, `name` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_group_members` | `group_members_json` | `group_members` |  | `ids` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_groups` | `groups_json` | `groups` |  | `ids` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_org_access_token` | `org_access_token_json` | `org_access_token` |  | `id` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_org_access_tokens` | `org_access_tokens_json` | `org_access_tokens` |  | `ids` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_org_invites` | `org_invites_json` | `org_invites` |  | `ids` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_org_members` | `org_members_json` | `org_members` |  | `ids` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_org_members_export` | `members_csv` | none: The response is text/csv, not a JSON schema; docker_hub_org_members has the same members structured. |  | `org_name` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_org_settings` | `org_settings_json` | `org_settings` |  | `org_name` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_repositories` | `repositories_json` | `repositories` |  | `names` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_repository` | `repository_json` | `repository` |  | `name`, `namespace` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_repository_immutable_tags_verify` | `repository_immutable_tags_verify_json` | `repository_immutable_tags_verify` |  | `namespace`, `repository` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_repository_tag` | `repository_tag_json` | `repository_tag` |  | `id`, `name` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_repository_tags` | `repository_tags_json` | `repository_tags` |  | `ids` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_scim_resource_type` | `scim_resource_type_json` | `scim_resource_type` |  | `id`, `name` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_scim_resource_types` | `scim_resource_types_json` | `scim_resource_types` |  | `ids` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_scim_schema` | `scim_schema_json` | `scim_schema` |  | `id`, `name` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_scim_schemas` | `scim_schemas_json` | `scim_schemas` |  | `ids` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_scim_service_provider_config` | `scim_service_provider_config_json` | `scim_service_provider_config` |  | `id` | `hub_api_version` | `content_sha256` |  |
+| data source | `docker_hub_scim_users` | `scim_users_json` | `scim_users` |  | `ids` | `hub_api_version` | `content_sha256` |  |
+| action | `docker_hub_invite_resend` |  |  | `result`+ | `id` | `hub_api_version` |  |  |
+| ephemeral | `docker_hub_token` | none: The response is one secret value (access_token); a raw copy would only duplicate it. | none: The response has the single field access_token, exposed as its own output. |  | `identifier`, `access_token`*+ | `hub_api_version` |  |  |
+
 ## Totals
 
-Counts as exists / partial / missing.
+Counts as exists / partial / missing (+ planned: unregistered items a build pass implements).
 
 | layer | resources | data sources | actions | ephemeral | list resources | functions | blocks | skipped |
 |---|---|---|---|---|---|---|---|---|
@@ -504,7 +590,10 @@ Counts as exists / partial / missing.
 | dockerfile | 0 | 1 (1 / 0 / 0) | 0 | 0 | 0 | 0 | 21 (21 / 0 / 0) | 0 |
 | buildx | 2 (1 / 1 / 0) | 6 (6 / 0 / 0) | 1 (0 / 1 / 0) | 0 | 0 | 0 | 0 | 23 |
 | cli-only | 2 (2 / 0 / 0) | 3 (3 / 0 / 0) | 0 | 0 | 0 | 0 | 0 | 21 |
-| **all** | 28 (26 / 2 / 0) | 55 (55 / 0 / 0) | 52 (50 / 2 / 0) | 4 (4 / 0 / 0) | 8 (8 / 0 / 0) | 4 (4 / 0 / 0) | 21 (21 / 0 / 0) | 80 |
+| hub | 11 (0 / 0 / 0 + 11 planned) | 24 (0 / 0 / 0 + 24 planned) | 1 (0 / 0 / 0 + 1 planned) | 1 (0 / 0 / 0 + 1 planned) | 0 | 0 | 0 | 2 |
+| **all** | 39 (26 / 2 / 0 + 11 planned) | 79 (55 / 0 / 0 + 24 planned) | 53 (50 / 2 / 0 + 1 planned) | 5 (4 / 0 / 0 + 1 planned) | 8 (8 / 0 / 0) | 4 (4 / 0 / 0) | 21 (21 / 0 / 0) | 82 |
+
+Docker Hub API coverage: 54 of 54 operations placed, 14 tags covered.
 
 Engine API coverage: 108 of 108 swagger operations placed.
 
@@ -596,22 +685,24 @@ Shared names below are intentional: the items are facets of one existing type, n
 30. ONBUILD: separate block nesting an instruction vs an `onbuild = true` attribute on each instruction block?
 31. Stages: model FROM ... AS name as a `stage` block with `name` (recommended) rather than a FROM flag?
 32. check rule names: validate against a pinned list (21 rules at frontend 1.28) or accept free strings?
-33. Raw outputs that are not JSON: container logs `logs` (vs `logs_text`), exec `output` (vs `stdout`+`stderr`), image-build `build_log`, container-file `content_base64` (vs `content`). SCHEMA lists raw names as fixed or `<thing>_json`; which form for non-JSON streams?
-34. Hash name when an item has two raw outputs (container-file stat_json + content_base64): used `<raw>_sha256` (`stat_json_sha256`, `content_base64_sha256`) per SCHEMA; confirm, or should file content keep `content_sha256`?
-35. Action result output: `result` (whole API JSON body, structured) vs flattening each field (`space_reclaimed`, `exit_code`) to top-level outputs. Used `result` + identity lists of deleted IDs; container state-change actions use `state` (ContainerState).
-36. List data sources: identity as `ids` / `names` list(string) vs per-element identity inside the structured list only.
-37. Files written by actions (export, save, upload): sha256 exposed as identity `archive_sha256` because category hash requires a raw string output; or should these get a hash category exception?
-38. docker_swarm_init exposes the cluster ID today as `cluster_id`; the contract uses `id` = ClusterInfo.ID. Keep `cluster_id` as an alias, or drop it?
-39. Plural data sources: structured list named after the type (`services`, `nodes`, ...) with raw `<plural>_json` (this lane), or a uniform `items` / `items_json` across every plural data source?
-40. Action identity for the target: `node_id` / `service_id` (this lane) or plain `id` like resources?
-41. docker_compose exposes the project name as `id` and `project_name`; the contract's identity name is `name`. Add a `name` alias, rename project_name to name (breaking), or keep project_name?
-42. Facets of docker_compose: one `project` attribute (whole project) as proposed, or per-slice attributes (`project_services`, `project_networks`, ...) that do not clash with today's computed `services`/`networks`/`volumes` ID maps?
-43. Action results: `result` object {exit_code, stdout, stderr} (as proposed for docker_compose_exec / _run) or flat `exit_code` / `stdout` / `stderr` like docker_exec_output?
-44. docker_image and data.docker_image expose `repo_digest`; the contract name is `image_digest_ref`: rename (breaking), add `image_digest_ref` and deprecate `repo_digest`, or keep `repo_digest` as the contract name?
-45. data.docker_registry_image exposes `sha256_digest` (= contract `digest`) and `id` = `<name>@<digest>` (≈ `image_digest_ref`): add `digest` + `image_digest_ref` and deprecate `sha256_digest`, or keep the current names?
-46. `image_id` duplicates `id` on docker_image and data.docker_image: keep both, or deprecate `image_id`?
-47. data.docker_dockerfile: expose the original input text as a second raw output (`source_dockerfile` + `source_dockerfile_sha256`) beside the re-rendered `dockerfile`, or only the rendered form?
-48. Structured output name on each dockerfile_block item: the lowercase keyword (`run`, `copy`, `from`, current) or one uniform name (`block`)?
-49. data.docker_dockerfile image mode: name the provenance outputs `reconstructed` + `fidelity` (current, both identity) or a single `fidelity` (`exact`/`approximate`)?
-50. docker_stack data source structured output: `services` + `tasks` (current) or split tasks into docker_tasks only and drop `tasks` here?
-51. stack ls Services count: `services` in docker_stacks (upstream name) while docker_stack.stack.services is the compose service map; rename the docker_stacks field to `services_count`, or keep upstream `services`?
+33. P7-Q1 docker_hub_repository and docker_hub_repository_group: the spec has no delete (and no update) route. Keep them as resources whose destroy only forgets (current), make create an action (docker_hub_repository_create), or defer both until the spec adds the routes?
+34. P7-Q2 docker_hub_access_token: a JWT issued from a PAT is refused by /v2/access-tokens (403 'token issued from personal access token is not allowed', live probe). Managing PATs needs a password-issued JWT. Add a write-only hub_password provider argument for it, or ship the type documented as password-auth only?
+35. Raw outputs that are not JSON: container logs `logs` (vs `logs_text`), exec `output` (vs `stdout`+`stderr`), image-build `build_log`, container-file `content_base64` (vs `content`). SCHEMA lists raw names as fixed or `<thing>_json`; which form for non-JSON streams?
+36. Hash name when an item has two raw outputs (container-file stat_json + content_base64): used `<raw>_sha256` (`stat_json_sha256`, `content_base64_sha256`) per SCHEMA; confirm, or should file content keep `content_sha256`?
+37. Action result output: `result` (whole API JSON body, structured) vs flattening each field (`space_reclaimed`, `exit_code`) to top-level outputs. Used `result` + identity lists of deleted IDs; container state-change actions use `state` (ContainerState).
+38. List data sources: identity as `ids` / `names` list(string) vs per-element identity inside the structured list only.
+39. Files written by actions (export, save, upload): sha256 exposed as identity `archive_sha256` because category hash requires a raw string output; or should these get a hash category exception?
+40. docker_swarm_init exposes the cluster ID today as `cluster_id`; the contract uses `id` = ClusterInfo.ID. Keep `cluster_id` as an alias, or drop it?
+41. Plural data sources: structured list named after the type (`services`, `nodes`, ...) with raw `<plural>_json` (this lane), or a uniform `items` / `items_json` across every plural data source?
+42. Action identity for the target: `node_id` / `service_id` (this lane) or plain `id` like resources?
+43. docker_compose exposes the project name as `id` and `project_name`; the contract's identity name is `name`. Add a `name` alias, rename project_name to name (breaking), or keep project_name?
+44. Facets of docker_compose: one `project` attribute (whole project) as proposed, or per-slice attributes (`project_services`, `project_networks`, ...) that do not clash with today's computed `services`/`networks`/`volumes` ID maps?
+45. Action results: `result` object {exit_code, stdout, stderr} (as proposed for docker_compose_exec / _run) or flat `exit_code` / `stdout` / `stderr` like docker_exec_output?
+46. docker_image and data.docker_image expose `repo_digest`; the contract name is `image_digest_ref`: rename (breaking), add `image_digest_ref` and deprecate `repo_digest`, or keep `repo_digest` as the contract name?
+47. data.docker_registry_image exposes `sha256_digest` (= contract `digest`) and `id` = `<name>@<digest>` (≈ `image_digest_ref`): add `digest` + `image_digest_ref` and deprecate `sha256_digest`, or keep the current names?
+48. `image_id` duplicates `id` on docker_image and data.docker_image: keep both, or deprecate `image_id`?
+49. data.docker_dockerfile: expose the original input text as a second raw output (`source_dockerfile` + `source_dockerfile_sha256`) beside the re-rendered `dockerfile`, or only the rendered form?
+50. Structured output name on each dockerfile_block item: the lowercase keyword (`run`, `copy`, `from`, current) or one uniform name (`block`)?
+51. data.docker_dockerfile image mode: name the provenance outputs `reconstructed` + `fidelity` (current, both identity) or a single `fidelity` (`exact`/`approximate`)?
+52. docker_stack data source structured output: `services` + `tasks` (current) or split tasks into docker_tasks only and drop `tasks` here?
+53. stack ls Services count: `services` in docker_stacks (upstream name) while docker_stack.stack.services is the compose service map; rename the docker_stacks field to `services_count`, or keep upstream `services`?

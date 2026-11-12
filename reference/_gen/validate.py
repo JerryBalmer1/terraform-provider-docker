@@ -114,7 +114,7 @@ for it in inv["items"]:
 
 # S1 (Pass 5.1): status. A `missing` item (not registered, or a STUB(pass5) placeholder) fails, and
 # allowed-violations.txt cannot excuse it. A `partial` item (PARTIAL(pass5) marker) is listed and never fails.
-missing, partial = [], []
+missing, partial, planned = [], [], []  # planned (Pass 7): unregistered with `planned: <pass>`; listed, never fails
 for it in inv["items"]:
     if it["kind"] == "skip" or (args.lane and it.get("outputs_lane") != args.lane):
         continue
@@ -122,6 +122,8 @@ for it in inv["items"]:
         missing.append((it["id"], it.get("status_note", "")))
     elif it.get("status") == "partial":
         partial.append((it["id"], it.get("status_note", "")))
+    elif it.get("status") == "planned":
+        planned.append((it["id"], it.get("status_note", "")))
 
 failing = [v for v in violations if (v[0], v[1]) not in allowed]
 used = {(v[0], v[1]) for v in violations}
@@ -136,10 +138,12 @@ for b in bad_allowed:
     print("ERROR     " + b)
 for iid, note in partial:
     print("PARTIAL   S1 %s: %s" % (iid, note))
+for iid, note in planned:
+    print("PLANNED   S1 %s: %s" % (iid, note))
 for iid, note in missing:
     print("MISSING   S1 %s: %s (stubs and unregistered items fail; this cannot be allowed)" % (iid, note))
 n_out = sum(len(i.get("outputs") or []) for i in inv["items"] if not args.lane or i.get("outputs_lane") == args.lane)
 print("checked %d items, %d outputs: %d violations (%d allowed, %d failing), %d stale allowed entries"
       % (checked, n_out, len(violations), len(violations) - len(failing), len(failing), len(stale)))
-print("status: %d partial (listed, not failing), %d missing (failing)" % (len(partial), len(missing)))
+print("status: %d partial (listed, not failing), %d planned (listed, not failing), %d missing (failing)" % (len(partial), len(planned), len(missing)))
 sys.exit(1 if failing or bad_allowed or stale or missing else 0)

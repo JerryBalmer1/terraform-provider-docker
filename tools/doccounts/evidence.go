@@ -60,6 +60,7 @@ func (e Evidence) PairwiseTotal() int {
 
 // ParseFieldMap counts reference/_gen/fieldmap.json: an entry with "skip" is
 // skipped, with "partial" partial, with "attr" mapped, anything else a gap.
+// Entries with how "planned" (fields of unregistered Pass 7 items) are not counted.
 func ParseFieldMap(b []byte) (FieldCounts, error) {
 	var doc struct {
 		Fields map[string]map[string]any `json:"fields"`
@@ -75,6 +76,9 @@ func ParseFieldMap(b []byte) (FieldCounts, error) {
 		src, _, ok := strings.Cut(key, ":")
 		if !ok {
 			return FieldCounts{}, fmt.Errorf("fieldmap: key %q has no source prefix", key)
+		}
+		if v["how"] == "planned" {
+			continue // Pass 7: a field of an unregistered planned item is not provider coverage yet
 		}
 		s := fc.BySource[src]
 		if s == nil {

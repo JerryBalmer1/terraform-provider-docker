@@ -63,6 +63,11 @@ func testPins(t *testing.T) map[string]pin {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The hub pin is the sha256 of the fixture as checked out (line endings
+	// may differ between checkouts).
+	h := p["hub"]
+	h.SHA256 = sha256Hex(hubFixture(t, "base.yaml"))
+	p["hub"] = h
 	return p
 }
 
@@ -70,7 +75,7 @@ func TestPinsFrom(t *testing.T) {
 	p := testPins(t)
 	want := map[string]string{
 		"moby": "api/v1.56.1", "docs-engine-api": "1.56", "compose-spec": "main", "compose-go": "v2.16.2",
-		"compose": "v5.1.4", "docker-cli": "v29.5.3", "buildkit": "dockerfile/1.28.0", "buildx": "v0.38.2",
+		"compose": "v5.1.4", "docker-cli": "v29.5.3", "buildkit": "dockerfile/1.28.0", "buildx": "v0.38.2", "hub": "2-beta",
 	}
 	for k, v := range want {
 		if p[k].Version != v {
@@ -180,6 +185,7 @@ func fixtureRun(t *testing.T, overrides map[string]string) (*report, *fakeRemote
 			"https://raw.githubusercontent.com/moby/moby/refs/tags/api/v1.55.0/api/swagger.yaml":                   []byte("swagger: old"),
 			"https://docs.docker.com/reference/api/engine/version/v1.57.yaml":                                      []byte("swagger: docs"),
 			"https://raw.githubusercontent.com/compose-spec/compose-go/refs/tags/v2.17.0/schema/compose-spec.json": []byte("{}"),
+			hubURL: hubFixture(t, "base.yaml"),
 		},
 	}
 	fc := &fakeFieldcov{t: t}
@@ -207,7 +213,7 @@ func TestRunScenario(t *testing.T) {
 		moved[s.Name] = s.Moved
 	}
 	wantMoved := map[string]bool{"moby": true, "docs-engine-api": true, "compose-spec": false, "compose-go": true,
-		"compose": true, "docker-cli": true, "buildkit": false, "buildx": false}
+		"compose": true, "docker-cli": true, "buildkit": false, "buildx": false, "hub": false}
 	for k, v := range wantMoved {
 		if moved[k] != v {
 			t.Errorf("%s moved = %v, want %v", k, moved[k], v)
@@ -276,7 +282,7 @@ func TestRunScenario(t *testing.T) {
 			t.Errorf("markdown lacks %q", s)
 		}
 	}
-	if !strings.Contains(con.String(), "drift: FAIL: 5 of 8 sources moved; new operations 2, new writable fields 4") {
+	if !strings.Contains(con.String(), "drift: FAIL: 5 of 9 sources moved; new operations 2, new writable fields 4") {
 		t.Errorf("console summary:\n%s", con.String())
 	}
 	if _, err := r.json(); err != nil {
