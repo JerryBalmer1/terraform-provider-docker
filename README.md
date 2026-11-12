@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:1D63ED,100:0B214A&height=220&section=header&text=terraform-provider-docker&fontSize=48&fontColor=FFFFFF&fontAlignY=38&desc=Engine%20%C2%B7%20Swarm%20%C2%B7%20Compose%20%C2%B7%20BuildKit%2C%20from%20the%20upstream%20specs&descSize=18&descAlignY=58&animation=fadeIn" alt="terraform-provider-docker" width="100%" />
+</p>
+
 # terraform-provider-docker
 
 A Terraform provider (registry address `JerryBalmer1/docker`) that manages the whole Docker chain, from image builds
@@ -146,3 +150,7 @@ v4.6.0 type and attribute to its counterpart here, or says why it was dropped. I
 - [CLAUDE.md](CLAUDE.md): repository map, standing rules and every build task.
 - [RELEASING.md](RELEASING.md): how releases are built, signed and published.
 - [BUILD_REPORT.md](BUILD_REPORT.md): the log of every build pass.
+
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:1D63ED,100:0B214A&height=110&section=footer" alt="" width="100%" />
+</p>
