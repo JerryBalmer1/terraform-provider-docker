@@ -1,0 +1,133 @@
+{
+  "gate": "unit",
+  "rows": [
+    {
+      "key": ".",
+      "hash": "97a1c8fff4adfdcbbd94907305c614c6fe960afc191760732017fc4cde9d35ca",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 0
+    },
+    {
+      "key": "internal/provider",
+      "hash": "6bda4a0ee0edfeed15528367d35ea693fbffd89d32063ed842e36c81311cb065",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 130835
+    },
+    {
+      "key": "test/harness/tfaccplugin",
+      "hash": "f1fd8e49db67f9351d5e1a5ba7c9333d41471680457ccb28407b2a0c2738ba3a",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 0
+    },
+    {
+      "key": "tools/apiwatch",
+      "hash": "a7c25c4f1d0e2afe12f81d51fb15c37bdfce24ff2c797c171670ce41ba9fe274",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 1783
+    },
+    {
+      "key": "tools/compose2stack",
+      "hash": "2b4075ed1affa7c26fd6eb80fc37cd4d2ced79a64ca1dd384e3471e22db084b7",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 526
+    },
+    {
+      "key": "tools/contractgen",
+      "hash": "1caa8372b554556020289661629f099d7e7e3e7e18d84bf2514c4e3445371942",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 1581
+    },
+    {
+      "key": "tools/deferred",
+      "hash": "ba087416b01e393d51c5ee17676f35c8eea2a519cbf0a8ee32626cc990870461",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 1816
+    },
+    {
+      "key": "tools/doccounts",
+      "hash": "c75ba61f6b2dd8092e89cd7fef952b2836a0c76f020d713d5ee37c9d11b89527",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 1516
+    },
+    {
+      "key": "tools/fieldcov",
+      "hash": "67567aa644bac4c9b072ac08a87800fa888c2712966d2def307cb01be9204eca",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 408
+    },
+    {
+      "key": "tools/genskill",
+      "hash": "1e8444ed286302d75e1b0963ac3be4919e042edd52ddf7e300ffca2d171dc64b",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 3393
+    },
+    {
+      "key": "tools/ledger",
+      "hash": "00543959603a318b9e14a65b3492d1ab7973179b9b4a87d8403f2d85d7e44bfe",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 2126
+    },
+    {
+      "key": "tools/pairwise",
+      "hash": "2b4075ed1affa7c26fd6eb80fc37cd4d2ced79a64ca1dd384e3471e22db084b7",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 3049
+    },
+    {
+      "key": "tools/parity",
+      "hash": "71101638cacd82912be1593c637b73d9d02cd0265d9998f0a0c8169637c37af8",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 1074
+    },
+    {
+      "key": "tools/parity/paritydata",
+      "hash": "5d6b81940ebf61e4a06239b31365a66f985b9bb60d4de9388ed76f4ed6c74f9e",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 0
+    },
+    {
+      "key": "tools/registrygen",
+      "hash": "9ec7029b207ef5449abbb0a1cd5a0f8186e2df90e392fa6ebfa06942d3c89c6b",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 968
+    },
+    {
+      "key": "tools/releaseassets",
+      "hash": "531b8b0107f296972644d9a5a7244f1d05e02e088e97f7980cd9e53bbd9ae5a4",
+      "status": "pass",
+      "passed_at": "2026-11-12T02:06:24Z",
+      "commit": "d4c3461+dirty",
+      "duration_ms": 801
+    }
+  ]
+}

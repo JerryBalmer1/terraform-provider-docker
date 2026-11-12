@@ -25,31 +25,54 @@ task PairwiseTest PairwiseGen, {
     # The provider from a local filesystem mirror (TfDockerTest Initialize-TfProviderMirror: go build, zipped under the
     # registry path layout), so terraform init runs for real, writes the lock file and verifies the checksum.
     Import-Module (Join-Path $BuildRoot 'test/TfDockerTest') -Force
-    $mirror = Initialize-TfProviderMirror -MirrorDir (Join-Path $work.Root 'mirror') -Force
-    $cliConfig = New-TfMirrorConfig -ProvidersDir $mirror.Providers -Path (Join-Path $work.Root 'terraform.rc')
     $runner = Join-Path $BuildRoot 'tools/pairwise/run.ps1'
-    $plainTypes = @($work.Types | Where-Object { $_ -ne 'docker_service' })
-    $swarmTypes = @($work.Types | Where-Object { $_ -eq 'docker_service' })
-    $failed = @()
-    foreach ($pass in @(@{ Name = 'plain'; Types = $plainTypes; Swarm = $false }, @{ Name = 'swarm'; Types = $swarmTypes; Swarm = $true })) {
-        if ($pass.Types.Count -eq 0) { continue }
-        $log = Join-Path $work.Root "pairwise-$($pass.Name).log"
-        $e2eArgs = @{
-            Script     = $runner
-            ScriptArgs = @('-OutDir', $work.Configs, '-Types', ($pass.Types -join ','), '-Pairwise', $tool, '-CliConfig', $cliConfig)
-            Log        = $log
+    # Gate ledger (build/ledger.tasks.ps1): one unit per generated config <type>/<nn>; unchanged configs are skipped
+    # (-Full runs all). The skipped configs' folders are removed from this run's configs/ (PairwiseGen regenerates
+    # them every run), so the runner and the report see only the configs that run.
+    Invoke-LedgerGate -Gate pairwise -PlanArgs @('-configs', $work.Configs) -Run {
+        param($toRun)
+        $run = @{}
+        foreach ($d in $toRun) { $run[$d.key] = $d }
+        foreach ($t in Get-ChildItem -LiteralPath $work.Configs -Directory) {
+            foreach ($c in Get-ChildItem -LiteralPath $t.FullName -Directory) {
+                if (-not $run.ContainsKey("$($t.Name)/$($c.Name)")) { Remove-Item -LiteralPath $c.FullName -Recurse -Force }
+            }
         }
-        if ($pass.Swarm) { $e2eArgs.SwarmInit = $true }
-        try { $global:LASTEXITCODE = 0; & $Harness @e2eArgs; if ($LASTEXITCODE -ne 0) { $failed += $pass.Name } }
-        catch { Write-Warning "PairwiseTest $($pass.Name) pass: $_"; $failed += $pass.Name }
+        $types = @($work.Types | Where-Object { $tt = $_; @($toRun | Where-Object { $_.extra.type -eq $tt }).Count })
+        $mirror = Initialize-TfProviderMirror -MirrorDir (Join-Path $work.Root 'mirror') -Force
+        $cliConfig = New-TfMirrorConfig -ProvidersDir $mirror.Providers -Path (Join-Path $work.Root 'terraform.rc')
+        $plainTypes = @($types | Where-Object { $_ -ne 'docker_service' })
+        $swarmTypes = @($types | Where-Object { $_ -eq 'docker_service' })
+        $failed = @()
+        foreach ($pass in @(@{ Name = 'plain'; Types = $plainTypes; Swarm = $false }, @{ Name = 'swarm'; Types = $swarmTypes; Swarm = $true })) {
+            if ($pass.Types.Count -eq 0) { continue }
+            $log = Join-Path $work.Root "pairwise-$($pass.Name).log"
+            $e2eArgs = @{
+                Script     = $runner
+                ScriptArgs = @('-OutDir', $work.Configs, '-Types', ($pass.Types -join ','), '-Pairwise', $tool, '-CliConfig', $cliConfig)
+                Log        = $log
+            }
+            if ($pass.Swarm) { $e2eArgs.SwarmInit = $true }
+            try { $global:LASTEXITCODE = 0; & $Harness @e2eArgs; if ($LASTEXITCODE -ne 0) { $failed += $pass.Name } }
+            catch { Write-Warning "PairwiseTest $($pass.Name) pass: $_"; $failed += $pass.Name }
+        }
+        $results = Join-Path $work.Root 'results.json'
+        $summary = @(exec { & $tool -report -out-dir $work.Configs -results $results })
+        $summary | ForEach-Object { Write-Build $(if ($_ -like 'FINDING*') { 'Yellow' } else { 'Cyan' }) $_ }
+        Write-Build Cyan "PairwiseTest: results in $results"
+        $findings = @($summary | Where-Object { $_ -like 'FINDING*' })
+        # One ledger result per config: no run.json = no result; a FINDING line for its config name = fail.
+        $rows = foreach ($d in $toRun) {
+            $runJson = Join-Path (Join-Path $work.Configs $d.key) 'run.json'
+            if (-not (Test-Path -LiteralPath $runJson)) { continue }
+            $secs = 0
+            try { $secs = [long]((Get-Content -LiteralPath $runJson -Raw | ConvertFrom-Json).apply_seconds) } catch {}
+            $bad = @($findings | Where-Object { $_ -like "FINDING $($d.extra.config):*" }).Count
+            @{ key = $d.key; status = $(if ($bad) { 'fail' } else { 'pass' }); duration_ms = $secs * 1000 }
+        }
+        $err = if ($failed.Count) { "harness pass failed: $($failed -join ', ')" } elseif ($findings.Count) { "$($findings.Count) finding(s); see $results" } else { $null }
+        @{ Results = @($rows); Error = $err }
     }
-    $results = Join-Path $work.Root 'results.json'
-    $summary = @(exec { & $tool -report -out-dir $work.Configs -results $results })
-    $summary | ForEach-Object { Write-Build $(if ($_ -like 'FINDING*') { 'Yellow' } else { 'Cyan' }) $_ }
-    Write-Build Cyan "PairwiseTest: results in $results"
-    assert ($failed.Count -eq 0) "PairwiseTest: harness pass failed: $($failed -join ', ')"
-    $findings = @($summary | Where-Object { $_ -like 'FINDING*' })
-    assert ($findings.Count -eq 0) "PairwiseTest: $($findings.Count) finding(s); see $results"
 }
 
 # Get-PairwiseWork returns the work directories (PAIRWISE_OUT) and the types (PAIRWISE_TYPES).

@@ -62,7 +62,8 @@ task PreRelease {
         Write-Build Cyan "==== PreRelease [$($rows.Count + 1)/$($tasks.Count)]: $t"
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
         $err = $null
-        try { Invoke-Build $t $BuildFile -Go $Go -Python $Python }
+        # -Full: a release never skips a unit the gate ledger (build/ledger.tasks.ps1) remembers as passed.
+        try { Invoke-Build $t $BuildFile -Go $Go -Python $Python -Full }
         catch { $err = $_ }
         $sw.Stop()
         $msg = ''

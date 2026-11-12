@@ -156,7 +156,10 @@ function Read-ExampleResults([string[]]$XmlFiles) {
             # Pester's test-case name is "<Describe>.<It>", and the Describe is the example path (examples/<kind>/<name>).
             $name = $tc.GetAttribute('name')
             $ex = if ($name -match '^(examples/[A-Za-z0-9_/-]+)') { $Matches[1] } else { $name }
-            [pscustomobject]@{ Example = $ex; Result = $tc.GetAttribute('result'); Message = $msg }
+            $ms = 0
+            $t = $tc.GetAttribute('time')
+            if ($t) { $ms = [long]([double]::Parse($t, [Globalization.CultureInfo]::InvariantCulture) * 1000) }
+            [pscustomobject]@{ Example = $ex; Result = $tc.GetAttribute('result'); Message = $msg; Ms = $ms }
         }
     }
 }
@@ -172,12 +175,31 @@ function Read-ExampleResults([string[]]$XmlFiles) {
 task ExampleTests {
     requires -Path $Harness, $ExampleRunner
     requires -Variable GoExe
+    # Gate ledger (build/ledger.tasks.ps1): one unit per example folder; unchanged examples are skipped (-Full runs
+    # all). -Filter / TPD_EXAMPLE_INCLUDE narrow further: examples outside the selection keep their ledger rows.
+    $selection = Get-ExampleSelection
+    $selected = @{}
+    foreach ($f in @(Get-ExampleTestFiles $selection)) { $selected[$f.Example] = $true }
+    assert ($selected.Count) "ExampleTests: no example test matches '$selection'"
+    Invoke-LedgerGate -Gate examples -Run {
+        param($toRun)
+        $keys = @($toRun | ForEach-Object key)
+        $notRun = @($keys | Where-Object { -not $selected.ContainsKey($_) } | ForEach-Object { @{ key = $_; status = 'notrun'; duration_ms = 0 } })
+        $keys = @($keys | Where-Object { $selected.ContainsKey($_) })
+        if (-not $keys.Count) { return @{ Results = $notRun; Error = $null } }
+        $r = Invoke-ExampleTestRun -Selection ($keys -join ',')
+        @{ Results = @($r.Results) + $notRun; Error = $r.Error }
+    }
+}
+
+# Runs the selected examples (comma-separated example paths) on the harness: plain pass, then the swarm pass; returns
+# @{ Results = one row per example (pass/fail, summed time); Error = text when a pass or a test failed }.
+function Invoke-ExampleTestRun([string]$Selection) {
     $out = if ($env:TPD_EXAMPLE_RESULTS) { $env:TPD_EXAMPLE_RESULTS } else { Join-Path $BuildRoot 'test/harness/.logs/examples' }
     $null = New-Item -ItemType Directory -Force $out
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $selection = Get-ExampleSelection
+    $selection = $Selection
     $files = @(Get-ExampleTestFiles $selection)
-    assert ($files.Count) "ExampleTests: no example test matches '$selection'"
     # One provider mirror for every example: the runner builds it (go build, host platform, zipped under the registry
     # path layout) on the first pass and the second reuses it through TPD_PROVIDER_MIRROR; every example runs a real
     # terraform init from it (lock file, checksum verified). The plugin cache is shared.
@@ -226,7 +248,14 @@ task ExampleTests {
     Set-Content -LiteralPath $summary -Value $lines
     foreach ($l in $lines) { Write-Build $(if ($l -like 'FAILED*') { 'Red' } else { 'Gray' }) $l }
     Write-Build Gray "ExampleTests results: $out (summary $summary)"
-    assert (-not ($codes.Values | Where-Object { $_ })) "ExampleTests failed (plain pass exit $($codes['plain']), swarm pass exit $($codes['swarm']))"
+    # One ledger result per example: failed if any of its test cases failed; examples with no test case have no result.
+    $rows = foreach ($g in ($results | Group-Object Example)) {
+        $key = $g.Name -replace '^examples/', ''
+        $bad = @($g.Group | Where-Object { $_.Result -notin 'Success', 'Ignored', 'Skipped', 'Inconclusive' }).Count
+        @{ key = $key; status = $(if ($bad) { 'fail' } else { 'pass' }); duration_ms = [long](($g.Group | Measure-Object -Property Ms -Sum).Sum) }
+    }
+    $err = if ($codes.Values | Where-Object { $_ }) { "ExampleTests failed (plain pass exit $($codes['plain']), swarm pass exit $($codes['swarm']))" } else { $null }
+    @{ Results = @($rows); Error = $err }
 }
 
 # ---------------------------------------------------------------------------- manual-task guard

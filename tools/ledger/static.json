@@ -1,0 +1,18 @@
+{
+  "unit:internal/provider": {
+    "exec_ok": "os/exec only in acceptance tests (TF_ACC, skipped by the unit gate) and in provider_auth_r_test.go, which go-builds ./testdata/credhelper (testdata/ is an input)"
+  },
+  "unit:tools/doccounts": {
+    "exec_ok": "go run ./tools/pairwise -gen: tools/pairwise is named by a literal and so an input",
+    "inputs": [
+      "tools/pairwise",
+      "reference/_gen/pairwise"
+    ]
+  },
+  "unit:tools/drift": {
+    "unknown": "runs git ls-remote and sparse checkouts of upstream repositories; its outcome depends on upstream state, not on repository files"
+  },
+  "unit:tools/ledger": {
+    "exec_ok": "git ls-files / go list on the repository itself; tools/ledger is in the always-in set, so any change to it runs every unit anyway"
+  }
+}

@@ -76,7 +76,10 @@ param(
     [switch]$Prompt,
     # ExampleTests / ExampleValidate: comma-separated wildcards on the example path (resources/docker_tag, actions/*)
     # or its folder name (docker_tag); overrides TPD_EXAMPLE_INCLUDE.
-    [string]$Filter = ''
+    [string]$Filter = '',
+    # Gate ledger (build/ledger.tasks.ps1): ignore test/harness/.ledger and run every unit of Test, TestAcc,
+    # ExampleTests and PairwiseTest (as TPD_LEDGER=off does; PreRelease always passes it).
+    [switch]$Full
 )
 
 if ($MyInvocation.ScriptName -notlike '*Invoke-Build.ps1') {
@@ -345,10 +348,31 @@ function Remove-TpdTempItems([string]$TempDir = [System.IO.Path]::GetTempPath())
 
 # ---------------------------------------------------------------------------- tests
 
-# Synopsis: Unit tests: go test ./... -short with TF_ACC unset (TestAcc* skip).
+# Synopsis: Unit tests: go test -short with TF_ACC unset (TestAcc* skip), one ledger unit per Go package: packages unchanged since their last pass are skipped (-Full runs all).
 task Test {
     requires -Variable GoExe
-    Invoke-GoTestNoAcc './...'
+    Invoke-LedgerGate -Gate unit -Run {
+        param($toRun)
+        $pkgs = @($toRun | ForEach-Object { if ($_.key -eq '.') { '.' } else { "./$($_.key)" } })
+        $mod = (([IO.File]::ReadAllText((Join-Path $BuildRoot 'go.mod'))) -split "`n" | Where-Object { $_ -match '^module\s' } | Select-Object -First 1) -replace '^module\s+', ''
+        $mod = $mod.Trim()
+        $saved = $env:TF_ACC
+        Remove-Item Env:TF_ACC -ErrorAction Ignore
+        try {
+            $global:LASTEXITCODE = 0
+            $out = @(& $GoExe test @pkgs -short -count=1 -timeout 10m 2>&1 | ForEach-Object { "$_" } | Tee-Object -Variable lines | ForEach-Object { Write-Host $_ })
+            $code = $LASTEXITCODE
+        } finally { if ($null -ne $saved) { $env:TF_ACC = $saved } }
+        # ok  <pkg> 1.2s | FAIL <pkg> 0.3s | FAIL <pkg> [build failed] | ?   <pkg> [no test files]
+        $results = foreach ($l in $lines) {
+            if ($l -match '^(ok|FAIL|\?)\s+(\S+)(?:\s+([\d.]+)s)?') {
+                $ip = $Matches[2]
+                $key = if ($ip -eq $mod) { '.' } elseif ($ip.StartsWith("$mod/")) { $ip.Substring($mod.Length + 1) } else { continue }
+                @{ key = $key; status = $(if ($Matches[1] -eq 'FAIL') { 'fail' } else { 'pass' }); duration_ms = $(if ($Matches[3]) { [long]([double]$Matches[3] * 1000) } else { 0 }) }
+            }
+        }
+        @{ Results = @($results); Error = $(if ($code) { "go test exit $code" } else { $null }) }
+    }
 }
 
 # Synopsis: Unit tests of tools/ only (parity, apiwatch, compose2stack, genskill, doccounts, ...).
@@ -357,25 +381,47 @@ task Tools {
     Invoke-GoTestNoAcc './tools/...'
 }
 
-# Synopsis: Acceptance tests (TF_ACC=1) on the dind harness: plain pass, then the -SwarmInit pass. Never in the default task.
+# Synopsis: Acceptance tests (TF_ACC=1) on the dind harness: plain pass, then the -SwarmInit pass; one ledger unit per TestAcc function, unchanged ones skipped (-Full runs all). Never in the default task.
 task TestAcc {
     requires -Path $Harness
-    $saved = $env:TF_ACC
-    $env:TF_ACC = '1'
-    try {
-        # Both passes always run; the task fails afterwards if either did.
-        $plain = 0
-        # The plain pass skips the swarm tests (-Skip $SwarmAccRegex): they need
-        # DOCKER_HOST to be a swarm manager and run once, in the swarm pass.
-        try { $global:LASTEXITCODE = 0; & $Harness -Run TestAcc -Skip $SwarmAccRegex -Timeout 120m -Log test/harness/last-acc.log; $plain = $LASTEXITCODE }
-        catch { Write-Warning "TestAcc plain pass: $_"; $plain = 1 }
-        $swarm = 0
-        try { $global:LASTEXITCODE = 0; & $Harness -SwarmInit -Run $SwarmAccRegex -Timeout 120m -Log test/harness/last-acc-swarm.log; $swarm = $LASTEXITCODE }
-        catch { Write-Warning "TestAcc swarm pass: $_"; $swarm = 1 }
-        assert (-not ($plain -or $swarm)) "TestAcc failed (plain pass exit $plain, swarm pass exit $swarm)"
-    }
-    finally {
-        if ($null -ne $saved) { $env:TF_ACC = $saved } else { Remove-Item Env:TF_ACC -ErrorAction Ignore }
+    Invoke-LedgerGate -Gate testacc -PlanArgs @('-swarm-regex', $SwarmAccRegex) -Run {
+        param($toRun)
+        $saved = $env:TF_ACC
+        $env:TF_ACC = '1'
+        $results = [System.Collections.Generic.List[object]]::new()
+        $codes = [ordered]@{}
+        try {
+            # Both passes always run (when they have a unit to run); the gate fails afterwards if either did. Each
+            # pass runs exactly the planned functions; swarm tests ($SwarmAccRegex) need DOCKER_HOST to be a swarm
+            # manager and run once, in the swarm pass.
+            foreach ($pass in 'plain', 'swarm') {
+                $names = @($toRun | Where-Object { $_.extra.pass -eq $pass } | ForEach-Object key)
+                if (-not $names.Count) { Write-Build Gray "TestAcc $pass pass: nothing to run"; continue }
+                $log = if ($pass -eq 'swarm') { 'test/harness/last-acc-swarm.log' } else { 'test/harness/last-acc.log' }
+                $run = '^(' + ($names -join '|') + ')$'
+                Write-Build Cyan "TestAcc $pass pass: $($names.Count) function(s)"
+                $code = 0
+                try {
+                    $global:LASTEXITCODE = 0
+                    if ($pass -eq 'swarm') { & $Harness -SwarmInit -Run $run -Timeout 120m -Log $log } else { & $Harness -Run $run -Timeout 120m -Log $log }
+                    $code = $LASTEXITCODE
+                } catch { Write-Warning "TestAcc $pass pass: $_"; $code = 1 }
+                $codes[$pass] = $code
+                # Top-level results only (subtests are indented): --- PASS: TestAccX (12.34s)
+                $logPath = Join-Path $BuildRoot $log
+                if (Test-Path -LiteralPath $logPath) {
+                    foreach ($l in [IO.File]::ReadAllLines($logPath)) {
+                        if ($l -match '^--- (PASS|FAIL|SKIP): (TestAcc\w+) \(([\d.]+)s\)') {
+                            $results.Add(@{ key = $Matches[2]; status = $Matches[1].ToLower(); duration_ms = [long]([double]$Matches[3] * 1000) })
+                        }
+                    }
+                }
+            }
+        } finally {
+            if ($null -ne $saved) { $env:TF_ACC = $saved } else { Remove-Item Env:TF_ACC -ErrorAction Ignore }
+        }
+        $bad = @($codes.Keys | Where-Object { $codes[$_] })
+        @{ Results = @($results); Error = $(if ($bad.Count) { 'TestAcc failed (' + (($bad | ForEach-Object { "$_ pass exit $($codes[$_])" }) -join ', ') + ')' } else { $null }) }
     }
 }
 
@@ -680,10 +726,10 @@ task DeferredCheck {
 }
 
 # ---------------------------------------------------------------------------- task files
-# Release tasks (Release), pre-release tasks (DriftCheck, PreRelease), example tests (ExampleTests, ExampleCoverage) and
+# The gate ledger (Invoke-LedgerGate, used by Test, TestAcc, ExampleTests, PairwiseTest), release tasks (Release), pre-release tasks (DriftCheck, PreRelease), example tests (ExampleTests, ExampleCoverage) and
 # pairwise tests (PairwiseTest) live in their own files, dot-sourced here so they share this script's variables and
 # helpers.
-foreach ($taskFile in 'build/release.tasks.ps1', 'build/prerelease.tasks.ps1', 'build/examples.tasks.ps1', 'build/pairwise.tasks.ps1') {
+foreach ($taskFile in 'build/ledger.tasks.ps1', 'build/release.tasks.ps1', 'build/prerelease.tasks.ps1', 'build/examples.tasks.ps1', 'build/pairwise.tasks.ps1') {
     . (Join-Path $BuildRoot $taskFile)
 }
 

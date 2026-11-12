@@ -33,6 +33,10 @@ $pidFile = Join-Path $LogDir "$Name.pid"
 $log = Join-Path $LogDir "$Name.log"
 $errLog = Join-Path $LogDir "$Name.err.log"
 $exitFile = Join-Path $LogDir "$Name.exit"
+# Gate ledger (build/ledger.tasks.ps1): each gate appends "<gate>: ran N, skipped M, failed K" here; it goes on the exit line.
+$ledgerFile = Join-Path $LogDir "$Name.ledger"
+Remove-Item -LiteralPath $ledgerFile -Force -ErrorAction Ignore
+$env:TPD_LEDGER_SUMMARY = $ledgerFile
 $child = Join-Path $LogDir "$Name.cmd.ps1"
 foreach ($f in $exitFile, $log, $errLog) { Remove-Item -LiteralPath $f -Force -ErrorAction Ignore }
 
@@ -73,7 +77,9 @@ if (-not $p.WaitForExit($CapMinutes * 60 * 1000)) {
     $exitText = [string]$p.ExitCode
 }
 $dur = (Get-Date) - $started
-Add-Content -LiteralPath $log -Value ("### Invoke-Logged {0}: exit {1}, {2:hh\:mm\:ss}" -f $Name, $exitText, $dur)
-Set-Content -LiteralPath $exitFile -Value ("{0}`nduration {1:hh\:mm\:ss}" -f $exitText, $dur)
-Write-Host "Invoke-Logged ${Name}: exit $exitText after $('{0:hh\:mm\:ss}' -f $dur)"
+$ledger = if (Test-Path -LiteralPath $ledgerFile) { (@(Get-Content -LiteralPath $ledgerFile | Where-Object { $_ }) -join '; ') } else { '' }
+$ledgerText = if ($ledger) { "; ledger $ledger" } else { '' }
+Add-Content -LiteralPath $log -Value ("### Invoke-Logged {0}: exit {1}, {2:hh\:mm\:ss}{3}" -f $Name, $exitText, $dur, $ledgerText)
+Set-Content -LiteralPath $exitFile -Value ("{0}`nduration {1:hh\:mm\:ss}{2}" -f $exitText, $dur, $(if ($ledger) { "`nledger $ledger" } else { '' }))
+Write-Host "Invoke-Logged ${Name}: exit $exitText after $('{0:hh\:mm\:ss}' -f $dur)$ledgerText"
 exit $(if ($exitText -match '^\d+$') { [int]$exitText } else { 124 })
