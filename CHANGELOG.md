@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Release workflow: the `sign` job no longer uploads the cosign bundle (`<name>_<version>_SHA256SUMS.sigstore.json`) to the GitHub release, which made the Terraform Registry reject v0.1.0 ("invalid file extension found: json") until the asset was deleted by hand. The bundle is now a workflow artifact (`cosign-bundle-vX.Y.Z`); the keyless signature and the SLSA provenance are unchanged, and the job's `contents` permission dropped to read. RELEASING.md says where the bundle lives and how to verify it.
 - `reference/inventory.json` (and the generated `contractPins` copy) labelled the docker CLI pin v29.5.3 while `reference/SOURCES.md` pins v29.9.3.
+- `docker_service`: create and update now wait until swarm has finished applying the spec (no rollout in progress and the same `Version.Index` on two consecutive inspects; `converge_config.timeout`, else 3m) before the read that goes to state, so `version_index`, `inspect` and `inspect_json` no longer record a rollout that starts a few milliseconds after `ServiceUpdate` returns and the next read no longer disagrees. A `paused` or `rollback_paused` rollout, or `rollback_completed`, is an error naming the state. The same wait now runs first in every `converge_config` / compose `wait` convergence check (`docker_stack`, `docker_compose` swarm mode, service actions), which could pass on the old tasks before the rollout began.
 
 ### Added
 

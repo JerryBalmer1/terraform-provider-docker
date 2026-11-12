@@ -162,9 +162,28 @@ func (r *serviceResource) Create(ctx context.Context, req resource.CreateRequest
 		resp.Diagnostics.AddError("Service did not converge", err.Error())
 		return
 	}
+	if !r.settle(ctx, out.ID, plan.ConvergeConfig, &resp.Diagnostics) {
+		return
+	}
 	r.refresh(ctx, &plan, lk, &resp.Diagnostics, swarmPriv(resp.Private))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	resp.Diagnostics.Append(listSetIDIdentity(ctx, resp.Identity, plan.ID.ValueString())...)
+}
+
+// settle waits, after a create or update, until swarm has finished applying
+// the spec (svcWaitSettled), so the read that goes to state is not taken
+// while the rollout is still bumping Version.Index, UpdatedAt and
+// UpdateStatus. The timeout is converge_config.timeout, else 3m.
+func (r *serviceResource) settle(ctx context.Context, id string, cfg *svcConvergeModel, diags *diag.Diagnostics) bool {
+	timeout, err := svcSettleTimeoutFor(cfg)
+	if err == nil {
+		err = svcWaitSettled(ctx, r.pd.Client, id, timeout, svcSettleMinInterval)
+	}
+	if err != nil {
+		diags.AddError("Service did not settle", err.Error())
+		return false
+	}
+	return true
 }
 
 // refresh replaces m with the daemon's view, keeping m's spellings. It
@@ -250,6 +269,9 @@ func (r *serviceResource) Update(ctx context.Context, req resource.UpdateRequest
 	}
 	if err := svcWaitConverged(ctx, r.pd.Client, state.ID.ValueString(), plan.ConvergeConfig); err != nil {
 		resp.Diagnostics.AddError("Service did not converge", err.Error())
+		return
+	}
+	if !r.settle(ctx, state.ID.ValueString(), plan.ConvergeConfig, &resp.Diagnostics) {
 		return
 	}
 	r.refresh(ctx, &plan, lk, &resp.Diagnostics, swarmPriv(resp.Private))

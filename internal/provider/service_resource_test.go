@@ -33,6 +33,11 @@ type svcFakeDaemon struct {
 	networks map[string]*network.Summary
 	// creates counts ServiceCreate calls per name (to detect recreation).
 	creates map[string]int
+	// onInspect (when set) runs on every service inspect before the reply,
+	// with the number of ServiceUpdate calls so far; it plays the
+	// orchestrator changing the service after an update.
+	onInspect func(s *swarm.Service, updates int)
+	updates   int
 }
 
 func newSvcFakeDaemon(t *testing.T) (*svcFakeDaemon, string) {
@@ -414,6 +419,9 @@ func (f *svcFakeDaemon) handleServices(w http.ResponseWriter, r *http.Request, p
 			svcFakeErr(w, 404, "service "+parts[1]+" not found")
 			return
 		}
+		if f.onInspect != nil {
+			f.onInspect(s, f.updates)
+		}
 		svcFakeJSON(w, 200, s)
 	case len(parts) == 3 && parts[2] == "update":
 		s := f.findService(parts[1])
@@ -434,6 +442,7 @@ func (f *svcFakeDaemon) handleServices(w http.ResponseWriter, r *http.Request, p
 		svcFakeNormalize(&spec)
 		s.Spec = spec
 		s.Version.Index++
+		f.updates++
 		svcFakeJobStatus(s)
 		svcFakeJSON(w, 200, swarm.ServiceUpdateResponse{})
 	case len(parts) == 2 && r.Method == http.MethodDelete:

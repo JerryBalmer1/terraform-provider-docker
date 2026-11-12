@@ -161,6 +161,18 @@ func svcWaitConverged(ctx context.Context, c *client.Client, id string, cfg *svc
 	if err != nil {
 		return fmt.Errorf("converge_config.delay: %w", err)
 	}
+	// One deadline for both waits: first let swarm finish applying the spec
+	// (so the task check below does not pass on the old tasks before the
+	// rollout starts), then wait for the tasks.
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	settleEvery := svcSettleMinInterval
+	if delay > 0 && delay < settleEvery {
+		settleEvery = delay
+	}
+	if err := svcWaitSettled(ctx, c, id, timeout, settleEvery); err != nil {
+		return err
+	}
 	var last svcConvergeState
 	werr := waitFor(ctx, timeout, delay, func(ctx context.Context) (bool, error) {
 		svcRes, err := c.ServiceInspect(ctx, id, client.ServiceInspectOptions{})
@@ -206,6 +218,92 @@ func svcWaitConverged(ctx context.Context, c *client.Client, id string, cfg *svc
 		return svcConvergeError(fmt.Errorf("service %s did not converge: %d/%d tasks %s: %w", id, last.Running, last.Want, what, werr), last)
 	}
 	return werr
+}
+
+const (
+	// svcSettleTimeout bounds svcWaitSettled for a service without
+	// converge_config (with one, its timeout applies).
+	svcSettleTimeout = 3 * time.Minute
+	// svcSettleMinInterval is the first gap between two inspects; it doubles
+	// up to svcSettleMaxInterval. Swarm starts a rollout a few milliseconds
+	// after ServiceUpdate returns, well inside the first gap.
+	svcSettleMinInterval = 500 * time.Millisecond
+	svcSettleMaxInterval = 4 * time.Second
+)
+
+// svcSettleTimeoutFor is converge_config.timeout when set, else
+// svcSettleTimeout.
+func svcSettleTimeoutFor(cfg *svcConvergeModel) (time.Duration, error) {
+	if cfg == nil {
+		return svcSettleTimeout, nil
+	}
+	d, err := parseDurationOr(cfg.Timeout.ValueString(), 3*time.Minute)
+	if err != nil {
+		return 0, fmt.Errorf("converge_config.timeout: %w", err)
+	}
+	return d, nil
+}
+
+// svcWaitSettled polls the service after a create or update until swarm has
+// finished applying it: no rollout of the current spec in progress (its
+// UpdateStatus absent, belonging to an earlier spec, or completed) and the
+// same Version.Index on two consecutive inspects. A paused or rollback_paused
+// rollout is an error naming the state, and so is rollback_completed (the
+// update failed and swarm rolled it back). interval is the first gap between
+// inspects; it doubles up to svcSettleMaxInterval.
+func svcWaitSettled(ctx context.Context, c *client.Client, id string, timeout, interval time.Duration) error {
+	if interval <= 0 {
+		interval = svcSettleMinInterval
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	var stable *uint64 // index of the last inspect with no rollout running
+	status, index := "none", uint64(0)
+	timedOut := func() error {
+		return fmt.Errorf("service %s did not settle within %s: update status %s at version %d: %w",
+			id, timeout, status, index, context.DeadlineExceeded)
+	}
+	for {
+		res, err := c.ServiceInspect(ctx, id, client.ServiceInspectOptions{})
+		if err != nil {
+			if ctx.Err() != nil {
+				return timedOut()
+			}
+			return err
+		}
+		svc := res.Service
+		index = svc.Version.Index
+		us := actRolloutStatus(svc)
+		status = "none"
+		if us != nil {
+			status = string(us.State)
+			if us.Message != "" {
+				status += " (" + us.Message + ")"
+			}
+		}
+		switch {
+		case us == nil || us.State == swarm.UpdateStateCompleted:
+			if stable != nil && *stable == index {
+				return nil
+			}
+			i := index
+			stable = &i
+		case us.State == swarm.UpdateStatePaused || us.State == swarm.UpdateStateRollbackPaused:
+			return fmt.Errorf("service update %s: %s", us.State, us.Message)
+		case us.State == swarm.UpdateStateRollbackCompleted:
+			return fmt.Errorf("service update rolled back (%s): %s", us.State, us.Message)
+		default: // updating, rollback_started
+			stable = nil
+		}
+		select {
+		case <-ctx.Done():
+			return timedOut()
+		case <-time.After(interval):
+		}
+		if interval *= 2; interval > svcSettleMaxInterval {
+			interval = svcSettleMaxInterval
+		}
+	}
 }
 
 func svcConvergeError(base error, st svcConvergeState) error {
