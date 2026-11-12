@@ -57,7 +57,7 @@ function Invoke-LedgerGate {
     } else {
         Write-Build Green "${Gate}: every unit unchanged since its last pass; nothing to run"
     }
-    $lgResults = @(if ($lgOutcome) { $lgOutcome.Results })
+    $lgResults = @(if ($lgOutcome -is [hashtable] -and $lgOutcome.ContainsKey('Results')) { $lgOutcome.Results } elseif ($lgOutcome -and $lgOutcome.PSObject.Properties['Results']) { $lgOutcome.Results } else { @($lgOutcome) | Where-Object { $_ -and $_.PSObject.Properties['Key'] } })
     [IO.File]::WriteAllText($lgResFile, (ConvertTo-Json -InputObject @($lgResults | ForEach-Object { [ordered]@{ key = $_.key; status = $_.status; duration_ms = [long]$_.duration_ms } }) -Depth 3))
     $lgRec = @(exec { & $lgExe record -plan $lgPlanFile -results $lgResFile })
     $lgSummary = ($lgRec | Where-Object { $_ -like 'ledger *' } | Select-Object -Last 1) -replace '^ledger ', ''

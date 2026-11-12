@@ -187,7 +187,9 @@ task ExampleTests {
         $notRun = @($keys | Where-Object { -not $selected.ContainsKey($_) } | ForEach-Object { @{ key = $_; status = 'notrun'; duration_ms = 0 } })
         $keys = @($keys | Where-Object { $selected.ContainsKey($_) })
         if (-not $keys.Count) { return @{ Results = $notRun; Error = $null } }
-        $r = Invoke-ExampleTestRun -Selection ($keys -join ',')
+        $r = $null
+        foreach ($o in @(Invoke-ExampleTestRun -Selection ($keys -join ','))) { if ($o -is [System.Collections.IDictionary] -and $o.Contains('Results')) { $r = $o } else { Write-Host $o } }
+        if (-not $r) { $r = @{ Results = @(); Error = 'Invoke-ExampleTestRun returned no outcome' } }
         @{ Results = @($r.Results) + $notRun; Error = $r.Error }
     }
 }
